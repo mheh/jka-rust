@@ -776,25 +776,28 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                 // Raven guards this Com_Printf with `#ifndef FINAL_BUILD`; FINAL_BUILD
                 // is undefined for this build, so the print is unconditional here.
                 if view.cvar_integer("sv_showghoultraces") != 0 {
-                    mp_engine_qcommon::common::common::com_printf(
-                        view.common,
-                        &format!(
-                            "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
-                            (*clip).useLod,
-                            Distance((*clip).start, (*clip).end),
-                            (&*((*touch).ghoul2 as *mut CGhoul2Info_v))
-                                .get(&*(view.g2.as_raw() as *mut Ghoul2System), 0)
-                                .file_name
-                        ),
-                    );
+                    let trace_g2 = CGhoul2Info_v::from_token((*touch).ghoul2);
+                    let g2_read = &*(view.g2.as_raw() as *mut Ghoul2System);
+                    // The print indexes model 0, so an empty or stale cell skips it instead of panicking.
+                    if trace_g2.size(g2_read) > 0 {
+                        mp_engine_qcommon::common::common::com_printf(
+                            view.common,
+                            &format!(
+                                "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
+                                (*clip).useLod,
+                                Distance((*clip).start, (*clip).end),
+                                trace_g2.get(g2_read, 0).file_name
+                            ),
+                        );
+                    }
                 }
 
                 // The ported `g2api_collision_detect[_cache]` fns return the
                 // distance-sorted, populated collision records as an owned
                 // `Vec<CollisionRecord_t>` (the out-param array + `CMiniHeap
                 // *G2VertSpace` scratch arg both drop, per the ghoul2-server
-                // design); `(*touch).ghoul2` is the opaque `*mut CGhoul2Info_v`.
-                let ghoul2 = &mut *((*touch).ghoul2 as *mut CGhoul2Info_v);
+                // design); `(*touch).ghoul2` is the module's ghoul2 token (DEC-65 ruling 3).
+                let mut ghoul2 = CGhoul2Info_v::from_token((*touch).ghoul2);
                 // SAFETY: view-constructor slot, single-threaded; this ghoul2
                 // cast aliases `view.g2`, but the g2api callees take it directly
                 // and never re-cast that slot for the borrow's duration (rule 7).
@@ -811,7 +814,7 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                     g2api_collision_detect_cache(
                         g2,
                         view,
-                        ghoul2,
+                        &mut ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
                         sv_time,
@@ -827,7 +830,7 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                     g2api_collision_detect(
                         g2,
                         view,
-                        ghoul2,
+                        &mut ghoul2,
                         angles2,
                         (*touch).r.currentOrigin,
                         sv_time,

@@ -3016,8 +3016,9 @@ pub fn SV_GameSystemCalls(
         // Raven's `G_G2_*` ghoul2 (§F) table (`sv_game.cpp:1316-1618`). Each arm
         // casts the `view.g2` slot to the live `Ghoul2System` (per-slot rule);
         // host-taking g2 fns receive `view` (whose host methods touch only
-        // common/rm, never g2). The VM `CGhoul2Info_v` handle is a raw
-        // `*mut`/`**` into game/engine memory (ruling 40 dropped the `G2API_`
+        // common/rm, never g2). The module's ghoul2 handle crosses as the
+        // `Ghoul2Handle + 1` token (DEC-65 ruling 3), which each arm decodes
+        // into a stack `CGhoul2Info_v` cell (ruling 40 dropped the `G2API_`
         // C prefix).
         else if trap == G::G_G2_LISTBONES as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
@@ -3037,32 +3038,32 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_HAVEWEGHOULMODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1923`
-            let p = *args.offset(1) as *const CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &*p;
-            return g2api_have_we_ghoul2_models(g2, ghoul2) as isize;
+            let ghoul2 = CGhoul2Info_v::from_token(token);
+            return g2api_have_we_ghoul2_models(g2, &ghoul2) as isize;
         } else if trap == G::G_G2_SETMODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1942`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             // Raven's `(qhandle_t*)VMA(2)`/`VMA(3)` arrays are length-less at the
             // seam and the ported fn ignores both (api_models.rs) — empty slices.
-            g2api_set_ghoul2_model_indexes(g2, ghoul2, &[], &[]);
+            g2api_set_ghoul2_model_indexes(g2, &mut ghoul2, &[], &[]);
             return 0;
         } else if trap == G::G_G2_GETBOLT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bolt_matrix = &mut *(vma(view.common, args, 4) as *mut mdxaBone_t);
             let angles = *(vma(view.common, args, 5) as *const vec3_t);
             let position = *(vma(view.common, args, 6) as *const vec3_t);
@@ -3070,7 +3071,7 @@ pub fn SV_GameSystemCalls(
             return g2api_get_bolt_matrix(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 *args.offset(3) as c_int,
                 angles,
@@ -3084,7 +3085,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
             g2.gbm_no_reconstruct = true;
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bolt_matrix = &mut *(vma(view.common, args, 4) as *mut mdxaBone_t);
             let angles = *(vma(view.common, args, 5) as *const vec3_t);
             let position = *(vma(view.common, args, 6) as *const vec3_t);
@@ -3092,7 +3093,7 @@ pub fn SV_GameSystemCalls(
             return g2api_get_bolt_matrix(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 *args.offset(3) as c_int,
                 angles,
@@ -3107,7 +3108,7 @@ pub fn SV_GameSystemCalls(
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
             g2.gbm_no_reconstruct = true;
             g2.gbm_use_sp_method = true;
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bolt_matrix = &mut *(vma(view.common, args, 4) as *mut mdxaBone_t);
             let angles = *(vma(view.common, args, 5) as *const vec3_t);
             let position = *(vma(view.common, args, 6) as *const vec3_t);
@@ -3115,7 +3116,7 @@ pub fn SV_GameSystemCalls(
             return g2api_get_bolt_matrix(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 *args.offset(3) as c_int,
                 angles,
@@ -3128,22 +3129,18 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_INITGHOUL2MODEL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
-            // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` — the
-            // ported `g2api_init_ghoul2_model` takes the deref'd handle, so the
-            // handle object's `new`/`delete` is the seam's job: the engine owns
-            // the `Box`, the game holds the raw pointer, freed at G_G2_CLEANMODELS.
-            if (*pp).is_null() {
-                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
-            }
-            let ghoul2 = &mut **pp;
+            let pp = vma(view.common, args, 1) as *mut *mut c_void;
+            // Raven `if (!(*ghoul2Ptr)) *ghoul2Ptr = new CGhoul2Info_v;` builds the handle object the game then holds.
+            // The token scheme (DEC-65 ruling 3) needs no allocation.
+            // The slot reads into a stack cell, and the write-back below carries the new handle out.
+            let mut ghoul2 = CGhoul2Info_v::from_token(*pp);
             let file_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            return g2api_init_ghoul2_model(
+            let answer = g2api_init_ghoul2_model(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 file_name,
                 *args.offset(3) as c_int,
                 *args.offset(4) as c_int,
@@ -3151,10 +3148,12 @@ pub fn SV_GameSystemCalls(
                 *args.offset(6) as c_int,
                 *args.offset(7) as c_int,
             ) as isize;
+            *pp = ghoul2.to_token();
+            return answer;
         } else if trap == G::G_G2_SETSKIN as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             // The indexed `CGhoul2Info` lives inside `g2.info_array`; the raw
             // reborrow detaches it so `g2` also threads through (the callee
             // touches only its own fields — the §F per-slot escape, cf.
@@ -3170,35 +3169,36 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_SIZE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &*(*args.offset(1) as *const CGhoul2Info_v);
-            return g2api_ghoul2_size(g2, ghoul2) as isize;
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
+            return g2api_ghoul2_size(g2, &ghoul2) as isize;
         } else if trap == G::G_G2_ADDBOLT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is -1.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1637`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return -1;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            return g2api_add_bolt(g2, view, ghoul2, *args.offset(2) as c_int, bone_name) as isize;
+            return g2api_add_bolt(g2, view, &mut ghoul2, *args.offset(2) as c_int, bone_name)
+                as isize;
         } else if trap == G::G_G2_SETBOLTINFO as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the call does nothing.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1686`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             g2api_set_bolt_info(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 *args.offset(3) as c_int,
             );
@@ -3206,13 +3206,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_ANGLEOVERRIDE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1302`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3238,7 +3238,7 @@ pub fn SV_GameSystemCalls(
             return g2api_set_bone_angles(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 bone_name,
                 angles,
@@ -3253,13 +3253,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_PLAYANIM as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:1103`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3279,7 +3279,7 @@ pub fn SV_GameSystemCalls(
             );
             return g2api_set_bone_anim(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 bone_name,
                 *args.offset(4) as c_int,
@@ -3293,7 +3293,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_GETBONEANIM as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3323,14 +3323,14 @@ pub fn SV_GameSystemCalls(
             // Raven reads the handle before its `if ((int)&ghoul2)` check, so a null handle is UB.
             // §19: we take the NULL-name path, which leaves the out-buffer alone.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:2414-2416`
-            let p = *args.offset(1) as *const CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &*p;
+            let ghoul2 = CGhoul2Info_v::from_token(token);
             // Raven shoves the name into the VM-supplied buffer instead of
             // returning a pointer; the ported fn returns `Option<String>`.
-            if let Some(name) = g2api_get_gla_name(g2, view, ghoul2, *args.offset(2) as c_int) {
+            if let Some(name) = g2api_get_gla_name(g2, view, &ghoul2, *args.offset(2) as c_int) {
                 let bytes = name.as_bytes();
                 core::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, point, bytes.len());
                 *point.add(bytes.len()) = 0;
@@ -3339,79 +3339,107 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_COPYGHOUL2INSTANCE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let g2_from = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let g2_to = &mut *(*args.offset(2) as *mut CGhoul2Info_v);
-            return g2api_copy_ghoul2_instance(g2, g2_from, g2_to, *args.offset(3) as c_int)
-                as isize;
+            // Both sides come across by value, so this arm has no slot to write back through.
+            // In-place `deep_copy` (DEC-65 ruling 3) keeps a live destination's handle, so the discarded cell is correct.
+            // §19: a null destination is Raven's own crash on a null reference (`G2_API.cpp:2239-2259`).
+            // A call would allocate into the discarded cell and strand the arena slot, so this answers -1 without calling.
+            // The arm is dead in both trees.
+            // No Rust module calls it, and no oracle game, cgame, or ui source calls `trap_G2API_CopyGhoul2Instance`.
+            let to_token = *args.offset(2) as *mut c_void;
+            if to_token.is_null() {
+                return -1;
+            }
+            let mut g2_from = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
+            let mut g2_to = CGhoul2Info_v::from_token(to_token);
+            return g2api_copy_ghoul2_instance(
+                g2,
+                &mut g2_from,
+                &mut g2_to,
+                *args.offset(3) as c_int,
+            ) as isize;
         } else if trap == G::G_G2_COPYSPECIFICGHOUL2MODEL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
+            // A null token makes Raven's `if (((int)&ghoul2From) && ((int)&ghoul2To))` false,
             // and the call does nothing.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:2291`
-            let p_from = *args.offset(1) as *mut CGhoul2Info_v;
-            let p_to = *args.offset(3) as *mut CGhoul2Info_v;
-            if p_from.is_null() || p_to.is_null() {
+            // §19: after a remove empties a slot the slot now reads null, so this arm no-ops.
+            // Raven no-ops there too, because Raven nulls the slot at remove (`G2_API.cpp:868-869`).
+            // The pointer code that preceded this reallocated through a kept empty cell (`api_models.rs:695-697`), which was the outlier.
+            let from_token = *args.offset(1) as *mut c_void;
+            let to_token = *args.offset(3) as *mut c_void;
+            if from_token.is_null() || to_token.is_null() {
                 return 0;
             }
-            let g2_from = &mut *p_from;
-            let g2_to = &mut *p_to;
+            let mut g2_from = CGhoul2Info_v::from_token(from_token);
+            let mut g2_to = CGhoul2Info_v::from_token(to_token);
             g2api_copy_specific_g2_model(
                 g2,
-                g2_from,
+                &mut g2_from,
                 *args.offset(2) as c_int,
-                g2_to,
+                &mut g2_to,
                 *args.offset(4) as c_int,
             );
             return 0;
         } else if trap == G::G_G2_DUPLICATEGHOUL2INSTANCE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let g2_from = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            let pp = vma(view.common, args, 2) as *mut *mut CGhoul2Info_v;
-            // Raven `*g2To = new CGhoul2Info_v` (assert `!*g2To`) — the seam owns
-            // the box; the ported fn takes the deref'd handle.
+            let mut g2_from = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
+            let pp = vma(view.common, args, 2) as *mut *mut c_void;
+            // Raven `*g2To = new CGhoul2Info_v` (assert `!*g2To`) builds the destination object.
+            // The destination starts empty, so the copy allocates and the write-back carries the new handle out.
             if (*pp).is_null() {
-                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
+                let mut g2_to = CGhoul2Info_v { mItem: 0 };
+                g2api_duplicate_ghoul2_instance(g2, &mut g2_from, &mut g2_to);
+                *pp = g2_to.to_token();
             }
-            let g2_to = &mut **pp;
-            g2api_duplicate_ghoul2_instance(g2, g2_from, g2_to);
             return 0;
         } else if trap == G::G_G2_HASGHOUL2MODELONINDEX as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
-            let ghoul2 = &**pp;
-            return g2api_has_ghoul2_model_on_index(g2, ghoul2, *args.offset(2) as c_int) as isize;
+            // The arm reads the slot but never writes it, because the call is a pure read.
+            // §19: Raven binds `**ghlRemove` and reads `mItem` through a null `this`, which crashes (`G2_API.cpp:783-885`).
+            // A null token decodes to a `mItem: 0` cell here, which answers qfalse.
+            let pp = vma(view.common, args, 1) as *mut *mut c_void;
+            let ghoul2 = CGhoul2Info_v::from_token(*pp);
+            return g2api_has_ghoul2_model_on_index(g2, &ghoul2, *args.offset(2) as c_int) as isize;
         } else if trap == G::G_G2_REMOVEGHOUL2MODEL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
-            let ghoul2 = &mut **pp;
-            return g2api_remove_ghoul2_model(g2, ghoul2, *args.offset(2) as c_int) as isize;
+            // The callee frees the handle when the vector empties (`api_models.rs:497`).
+            // The write-back therefore restores Raven's `*ghlRemove = NULL` (`G2_API.cpp:868-869`).
+            // §19: a null token decodes to a `mItem: 0` cell, which answers qfalse where Raven crashes.
+            let pp = vma(view.common, args, 1) as *mut *mut c_void;
+            let mut ghoul2 = CGhoul2Info_v::from_token(*pp);
+            let answer =
+                g2api_remove_ghoul2_model(g2, &mut ghoul2, *args.offset(2) as c_int) as isize;
+            *pp = ghoul2.to_token();
+            return answer;
         } else if trap == G::G_G2_REMOVEGHOUL2MODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
-            let ghoul2 = &mut **pp;
-            return g2api_remove_ghoul2_models(g2, ghoul2) as isize;
+            // Same write-back and §19 null answer as the single-model arm above (`api_models.rs:549`, `G2_API.cpp:956-957`).
+            let pp = vma(view.common, args, 1) as *mut *mut c_void;
+            let mut ghoul2 = CGhoul2Info_v::from_token(*pp);
+            let answer = g2api_remove_ghoul2_models(g2, &mut ghoul2) as isize;
+            *pp = ghoul2.to_token();
+            return answer;
         } else if trap == G::G_G2_CLEANMODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let pp = vma(view.common, args, 1) as *mut *mut CGhoul2Info_v;
+            let pp = vma(view.common, args, 1) as *mut *mut c_void;
             if !(*pp).is_null() {
-                g2api_clean_ghoul2_models(g2, &mut **pp);
-                // Raven `delete *ghoul2Ptr; *ghoul2Ptr = NULL;` — free the
-                // seam-owned box (allocated at G_G2_INITGHOUL2MODEL); the ported
-                // fn only ran the vector `Free`.
-                drop(Box::from_raw(*pp));
-                *pp = core::ptr::null_mut();
+                let mut ghoul2 = CGhoul2Info_v::from_token(*pp);
+                g2api_clean_ghoul2_models(g2, &mut ghoul2);
+                // Raven `delete *ghoul2Ptr; *ghoul2Ptr = NULL;`.
+                // `g2api_clean_ghoul2_models` zeroes `mItem`, and a zeroed cell encodes back to the null token.
+                *pp = ghoul2.to_token();
             }
             return 0;
         } else if trap == G::G_G2_COLLISIONDETECT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(2) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(2) as *mut c_void);
             let coll_rec_map = vma(view.common, args, 1) as *mut CollisionRecord_t;
             let angles = *(vma(view.common, args, 3) as *const vec3_t);
             let position = *(vma(view.common, args, 4) as *const vec3_t);
@@ -3421,7 +3449,7 @@ pub fn SV_GameSystemCalls(
             let records = g2api_collision_detect(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 angles,
                 position,
                 *args.offset(5) as c_int,
@@ -3447,7 +3475,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_COLLISIONDETECTCACHE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(2) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(2) as *mut c_void);
             let coll_rec_map = vma(view.common, args, 1) as *mut CollisionRecord_t;
             let angles = *(vma(view.common, args, 3) as *const vec3_t);
             let position = *(vma(view.common, args, 4) as *const vec3_t);
@@ -3457,7 +3485,7 @@ pub fn SV_GameSystemCalls(
             let records = g2api_collision_detect_cache(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 angles,
                 position,
                 *args.offset(5) as c_int,
@@ -3480,23 +3508,28 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_SETROOTSURFACE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let surface_name =
                 core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                     .to_str()
                     .unwrap_or("");
-            return g2api_set_root_surface(g2, view, ghoul2, *args.offset(2) as c_int, surface_name)
-                as isize;
+            return g2api_set_root_surface(
+                g2,
+                view,
+                &mut ghoul2,
+                *args.offset(2) as c_int,
+                surface_name,
+            ) as isize;
         } else if trap == G::G_G2_SETSURFACEONOFF as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:710`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
             let surface_name =
                 core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                     .to_str()
@@ -3504,25 +3537,25 @@ pub fn SV_GameSystemCalls(
             return g2api_set_surface_on_off(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 surface_name,
                 *args.offset(3) as c_int,
             ) as isize;
         } else if trap == G::G_G2_SETNEWORIGIN as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            // A null handle makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
+            // A null token makes Raven's `if ((int)&ghoul2)` false, and the answer is qfalse.
             // Source: `oracle/codemp/ghoul2/G2_API.cpp:2432`
-            let p = *args.offset(1) as *mut CGhoul2Info_v;
-            if p.is_null() {
+            let token = *args.offset(1) as *mut c_void;
+            if token.is_null() {
                 return 0;
             }
-            let ghoul2 = &mut *p;
-            return g2api_set_new_origin(g2, view, ghoul2, *args.offset(2) as c_int) as isize;
+            let mut ghoul2 = CGhoul2Info_v::from_token(token);
+            return g2api_set_new_origin(g2, view, &mut ghoul2, *args.offset(2) as c_int) as isize;
         } else if trap == G::G_G2_DOESBONEEXIST as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let info = ghoul2.get_mut(g2, *args.offset(2) as c_int) as *mut CGhoul2Info;
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
@@ -3531,7 +3564,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_GETSURFACERENDERSTATUS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let info = ghoul2.get_mut(g2, *args.offset(2) as c_int) as *mut CGhoul2Info;
             let surface_name =
                 core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
@@ -3541,16 +3574,16 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_ABSURDSMOOTHING as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            g2api_absurd_smoothing(g2, ghoul2, *args.offset(2) != 0);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
+            g2api_absurd_smoothing(g2, &mut ghoul2, *args.offset(2) != 0);
             return 0;
         } else if trap == G::G_G2_SETRAGDOLL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let rd_paramst = vma(view.common, args, 2) as *mut sharedRagDollParams_t;
             if rd_paramst.is_null() {
-                g2api_reset_ragdoll(g2, ghoul2);
+                g2api_reset_ragdoll(g2, &mut ghoul2);
                 return 0;
             }
             // Raven copies the C-ified shared struct into the class-based
@@ -3576,12 +3609,12 @@ pub fn SV_GameSystemCalls(
                     st.effectors_to_turn_off,
                 ),
             };
-            g2api_set_ragdoll(g2, view, ghoul2, &mut rd_params);
+            g2api_set_ragdoll(g2, view, &mut ghoul2, &mut rd_params);
             return 0;
         } else if trap == G::G_G2_ANIMATEG2MODELS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let rdu_paramst = vma(view.common, args, 3) as *mut sharedRagDollUpdateParams_t;
             if rdu_paramst.is_null() {
                 return 0;
@@ -3599,7 +3632,7 @@ pub fn SV_GameSystemCalls(
             g2api_animate_g2_models_rag(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 &mut rdu_params,
             );
@@ -3607,25 +3640,25 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_RAGPCJCONSTRAINT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
             let min = *(vma(view.common, args, 3) as *const vec3_t);
             let max = *(vma(view.common, args, 4) as *const vec3_t);
-            return g2api_rag_pcj_constraint(g2, ghoul2, bone_name, min, max) as isize;
+            return g2api_rag_pcj_constraint(g2, &mut ghoul2, bone_name, min, max) as isize;
         } else if trap == G::G_G2_RAGPCJGRADIENTSPEED as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            return g2api_rag_pcj_gradient_speed(g2, ghoul2, bone_name, vmf(args, 3)) as isize;
+            return g2api_rag_pcj_gradient_speed(g2, &mut ghoul2, bone_name, vmf(args, 3)) as isize;
         } else if trap == G::G_G2_RAGEFFECTORGOAL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3636,11 +3669,11 @@ pub fn SV_GameSystemCalls(
             } else {
                 Some(*(vma(view.common, args, 3) as *const vec3_t))
             };
-            return g2api_rag_effector_goal(g2, ghoul2, bone_name, pos) as isize;
+            return g2api_rag_effector_goal(g2, &mut ghoul2, bone_name, pos) as isize;
         } else if trap == G::G_G2_GETRAGBONEPOS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
@@ -3648,7 +3681,8 @@ pub fn SV_GameSystemCalls(
             let ent_pos = *(vma(view.common, args, 5) as *const vec3_t);
             let ent_scale = *(vma(view.common, args, 6) as *const vec3_t);
             let out = vma(view.common, args, 3) as *mut vec3_t;
-            match g2api_get_rag_bone_pos(g2, ghoul2, bone_name, ent_angles, ent_pos, ent_scale) {
+            match g2api_get_rag_bone_pos(g2, &mut ghoul2, bone_name, ent_angles, ent_pos, ent_scale)
+            {
                 Some(pos) => {
                     *out = pos;
                     return qtrue as isize;
@@ -3658,21 +3692,21 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_RAGEFFECTORKICK as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
                 .unwrap_or("");
             let velocity = *(vma(view.common, args, 3) as *const vec3_t);
-            return g2api_rag_effector_kick(g2, ghoul2, bone_name, velocity) as isize;
+            return g2api_rag_effector_kick(g2, &mut ghoul2, bone_name, velocity) as isize;
         } else if trap == G::G_G2_RAGFORCESOLVE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
-            return g2api_rag_force_solve(g2, ghoul2, *args.offset(2) != 0) as isize;
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
+            return g2api_rag_force_solve(g2, &mut ghoul2, *args.offset(2) != 0) as isize;
         } else if trap == G::G_G2_SETBONEIKSTATE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let bone_name = if *args.offset(3) == 0 {
                 None
             } else {
@@ -3690,7 +3724,7 @@ pub fn SV_GameSystemCalls(
             return g2api_set_bone_ik_state(
                 g2,
                 view,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 bone_name,
                 *args.offset(4) as c_int,
@@ -3699,13 +3733,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_IKMOVE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let params = &mut *(vma(view.common, args, 3) as *mut sharedIKMoveParams_t);
-            return g2api_ik_move(g2, view, ghoul2, *args.offset(2) as c_int, params) as isize;
+            return g2api_ik_move(g2, view, &mut ghoul2, *args.offset(2) as c_int, params) as isize;
         } else if trap == G::G_G2_REMOVEBONE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let info = ghoul2.get_mut(g2, *args.offset(3) as c_int) as *mut CGhoul2Info;
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_str()
@@ -3714,10 +3748,10 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_ATTACHINSTANCETOENTNUM as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let mut ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             g2api_attach_instance_to_ent_num(
                 g2,
-                ghoul2,
+                &mut ghoul2,
                 *args.offset(2) as c_int,
                 *args.offset(3) != 0,
             );
@@ -3735,13 +3769,13 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_G2_OVERRIDESERVER as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let info = ghoul2.get_mut(g2, 0) as *mut CGhoul2Info;
             return g2api_override_server_with_client_data(g2, &mut *info) as isize;
         } else if trap == G::G_G2_GETSURFACENAME as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);
-            let ghoul2 = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+            let ghoul2 = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
             let point = vma(view.common, args, 4) as *mut c_char;
             let info = ghoul2.get_mut(g2, *args.offset(3) as c_int) as *mut CGhoul2Info;
             // Raven `if (local) strcpy(point, local)` — the ported fn returns an
