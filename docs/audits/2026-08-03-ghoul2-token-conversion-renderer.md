@@ -81,3 +81,51 @@ Key deltas the draft introduced over the original packet:
 - The pre-flight audit names the full mutator inventory (`alloc`, `free`, `clear`, `deep_copy`, `assign`, `assign_item`, lazy allocs in `resize`/`push_back`, `cghoul2_info_v.rs:49-186`) and audits the has/remove family as slot-address.
 - `sv_world.rs:785` diagnostic print guarded with `size(g2) > 0`.
 - Commit 1 gains the `deep_copy` change plus a unit test that a live destination keeps its handle across a copy.
+
+## Follow-up: the landing (work lane, 2026-08-03)
+
+The work lane executed the amended packet as the five-commit bundle. The commits are `7833dc68`, `49419369`, `92e136de`, `129cc053`, and `62b2e7af`, all on `master` and held local. The lane's own file is `.claude/packets/31/step-001/finished.md`, which carries the per-commit assumptions and the deviation note. The lane report follows verbatim, with em dashes normalized to plain hyphens for house style.
+
+### Lane report
+
+Lane complete. Five commits on `master`, local only, nothing pushed.
+
+#### What landed
+
+| # | Commit | Subject |
+|---|---|---|
+| 1 | `7833dc68` | token helpers move to `mp_engine_ghoul2`, `deep_copy` goes in-place |
+| 2 | `49419369` | `cl_ui.rs` arms read the token |
+| 3 | `92e136de` | `cl_cgame.rs` arms read the token |
+| 4 | `129cc053` | `sv_game.rs` + `sv_world.rs` arms read the token |
+| 5 | `62b2e7af` | DEC-65 ruling 3 close-out + finished file |
+
+Raw `Box<CGhoul2Info_v>` pointers no longer cross any module boundary. `Box::new`/`into_raw`/`from_raw` are gone from all three dispatch files. All 13 write-back arms carry the slot address, and the remove family's write-back restores Raven's `*ghlRemove = NULL` that the pointer code omitted.
+
+#### Gate results
+
+- Every commit: `cargo build --workspace` and `cargo test --workspace` green, zero failures.
+- Commits 1 and 3: world goldens byte-identical (`golden_world_duel1`, `golden_world_ffa2` pass under `--ignored`).
+- Commit 4: **lockstep referee suite green** - all 4 mock scenarios, all 4 real-map scenarios, and `regenerate_logs`; 9 passed, 0 failed, no self-skips, committed reflogs unchanged.
+
+#### Pre-flight class-2 audit - no STOP
+
+No uncovered value-passed `mItem` mutator exists. The exhaustive grep of `mp_engine_ghoul2` found every mutator call site outside the type's own file; each is covered by a named class or rule. One addition over the packet's inventory: the two saveload mutators (`misc.rs:1676`/`:1959` via `g2_load_ghoul2_model`, and `api_saveload.rs:144`) have **no trap arm** in any dispatch file, so they are not trap-reachable.
+
+#### One deviation, pre-existing
+
+The `--ignored` leg of `ghoul2_vertex_golden` aborts in `re_from_view` (`crates/mp/renderer/src/hook_install.rs:58`) on a null `re` slot. **It does the same at HEAD before this work**, in both debug (SIGABRT) and release (SIGSEGV) - verified by stashing and re-running. It is a rig defect, and it blocks the image-golden half of the DEC-65 gate for later steps.
+
+#### Judgement calls worth your eye
+
+- **`deep_copy` empty-source arm.** The packet did not state it. The body keeps the destination handle with an empty vector where Raven frees outright; the sole caller guards on `g2From.IsValid()`, so no trap arm reaches it. Documented at the site.
+- **`deep_copy` frees replaced bone caches.** Raven's `Free()` did this via `DeleteLow`; the in-place body would otherwise strand them. Inside the one method the contract names.
+
+#### Open gaps (both out of write scope, deliberately untouched)
+
+- `crates/mp/game/src/g_turret_G2.rs:189` - stale comment citing `CGhoul2Info_v **` at `sv_game.rs:3326`. Comment only, no behavior.
+- `docs/decisions.md:1534` - the DEC-65 entry still describes the split in present tense; not marked executed.
+
+### Standing items this landing leaves open
+
+Three items outlive the lane. Two are stale comments the packet's write scope excluded: the `g_turret_G2.rs:189` cite and the present-tense DEC-65 entry in the ledger. The third is the `ghoul2_vertex_golden` rig defect, which predates this work and needs its own ticket, because it blocks the image-golden half of the DEC-65 gate that later gh#31 steps depend on.
