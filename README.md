@@ -22,17 +22,28 @@ the exact symbols the engines load. See
 crate graph and [`docs/porting-rules.md`](docs/porting-rules.md) for how code
 is ported.
 
-## Status (2026-07-24)
+## Status (2026-08-04)
 
 The MP game module (`jampgame`) and the MP dedicated-server engine are
-complete, lockstep-verified against Raven's binaries, and hosting live play;
-the idiomatic consolidation campaigns (owned strings, `bool`, threaded state,
-model-data views) are done on top of that parity. Next up: the `ui` module,
-then `cgame` and the renderer, toward a full `jamp` client — plans in
-[`docs/plans/2026-07-24-client-port/`](docs/plans/2026-07-24-client-port/).
-Architectural rulings live in [`docs/decisions.md`](docs/decisions.md);
-pushes to `master` run the full parity gate and publish loadable modules to
-the rolling [`latest` release](../../releases/tag/latest).
+complete, lockstep-verified against Raven's binaries, and hosting live play.
+The idiomatic consolidation campaigns (owned strings, `bool`, threaded state,
+model-data views) are done on top of that parity, and the `ui` module port
+closed on 2026-08-01.
+
+The active track is the full `jamp` client: `cgame` and the renderer. Design
+groundwork sits in
+[`docs/plans/2026-07-24-client-port/`](docs/plans/2026-07-24-client-port/),
+and the live work plan is the wayfinder map, [issue
+#2](../../issues/2). The renderer census ([issue
+#31](../../issues/31)) is in progress: the ghoul2 token conversion landed, and
+model-block publication to the render thread is next.
+
+Architectural rulings live in [`docs/decisions.md`](docs/decisions.md).
+Pushes to `master` build the workspace, run the workspace test suite,
+cross-check the ILP32 layout asserts, and publish the loadable modules and the
+`jampded` server to the rolling [`latest`
+release](../../releases/tag/latest). The lockstep referee and the world
+goldens run locally, because they need the retail assets and a GPU.
 
 ## If you've spent twenty years in `g_*.c`
 
@@ -159,5 +170,5 @@ drive a live server through the same audited command queue rcon uses.
 - **SP** (`jasp` engine): `jagame` only (SP cgame/ui are statically linked into
   the engine).
 - **The MP dedicated server engine (`jampDed` equivalent) — done and hosting
-  live sessions** (see Status); client engine and renderer are deferred by
-  decision (DEC ledger).
+  live sessions** (see Status). The client engine and the renderer are the
+  active track, no longer deferred (DEC ledger).
