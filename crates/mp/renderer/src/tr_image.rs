@@ -8,7 +8,9 @@
 
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::io::Cursor;
 
+use image::{load_from_memory_with_format, ImageFormat};
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
@@ -24,6 +26,7 @@ use mp_qshared::shared::{fileHandle_t, qhandle_t, MAX_QPATH};
 use native_math::qmath::Com_Clamp;
 use native_string::latin1_to_string;
 use native_string::q_string::Q_stricmp;
+use png::Decoder;
 use zune_jpeg::zune_core::bytestream::ZCursor;
 use zune_jpeg::zune_core::colorspace::ColorSpace;
 use zune_jpeg::zune_core::options::DecoderOptions;
@@ -831,6 +834,149 @@ pub fn LoadJPG(view: &mut EngineHostView, filename: &str) -> Option<(Vec<u8>, i3
     Some((out, output_width, output_height))
 }
 
+/// Raven `png_signature`.
+/// Source: `oracle/codemp/png/png.cpp:32`
+const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/// Raven `MAX_PNG_WIDTH`.
+/// Source: `oracle/codemp/png/png.h:37`
+const MAX_PNG_WIDTH: u32 = 4096;
+
+/// Raven `PNG_Load`'s signature test and `PNG_HandleIHDR`'s validation gates.
+///
+/// Raven's PNG reader is its own inflate and unfilter pass over zlib, and the crates below replace it (§F).
+/// Only the gates transcribe, because they decide which files load and which fall through to the next extension.
+/// `isimage` is Raven's `png_image_t::isimage` flag, which picks the color-type rule and the power-of-two rule.
+/// `LoadPNG32` sets it and `LoadPNG8` clears it.
+/// A valid PNG carries IHDR as its first chunk, so this reads the header at its fixed offset instead of walking the chunk list.
+/// The `Err` text is the `png_errors` entry `PNG_GetError` would return.
+///
+/// Raven reads the signature and the IHDR out of bounds on a file shorter than either.
+/// The length test below is the one defined behavior we pick for that (§19), and it reports the signature error.
+///
+/// Source: `oracle/codemp/png/png.cpp:78-159`, `oracle/codemp/png/png.cpp:466-479`
+fn png_check_header(buf: &[u8], isimage: bool) -> Result<(), &'static str> {
+    if buf.len() < 29 || buf[..8] != PNG_SIGNATURE {
+        return Err("PNG signature not found.");
+    }
+
+    // The IHDR data starts after the 8-byte signature and the chunk's 4-byte length and 4-byte type.
+    let ihdr = &buf[16..29];
+    let width = u32::from_be_bytes([ihdr[0], ihdr[1], ihdr[2], ihdr[3]]);
+    let height = u32::from_be_bytes([ihdr[4], ihdr[5], ihdr[6], ihdr[7]]);
+    let bitdepth = ihdr[8];
+    let colortype = ihdr[9];
+    let compression = ihdr[10];
+    let filter = ihdr[11];
+
+    // Make sure image is a reasonable size
+    if width < 2 || height < 2 {
+        return Err("Image is too small to load.");
+    }
+    if width > MAX_PNG_WIDTH {
+        return Err("Image is too large");
+    }
+    if bitdepth != 8 {
+        return Err("Image does not have 8 bits per sample.");
+    }
+
+    if isimage {
+        // Check for non power of two size (but not for data files)
+        if width & (width - 1) != 0 {
+            return Err("Width is not a power of two.");
+        }
+        if height & (height - 1) != 0 {
+            return Err("Height is not a power of two.");
+        }
+        // Make sure we have a 24 or 32 bit image (for images)
+        if colortype != 2 && colortype != 6 {
+            return Err("Image is not 24 or 32 bit.");
+        }
+    } else {
+        // Make sure we have an 8 bit grayscale image for data files
+        if colortype != 0 && colortype != 3 {
+            return Err("Image is not indexed colour.");
+        }
+    }
+
+    // Make sure we aren't using any wacky compression or filter algos
+    if compression != 0 || filter != 0 {
+        return Err("Invalid filter or compression type.");
+    }
+
+    Ok(())
+}
+
+/// Raven `LoadPNG32`.
+///
+/// Out-params collapse to a return value (§C7).
+/// The `bytedepth` out-param is dropped, because `PNG_ConvertTo32` runs on every 24-bit file and Raven writes 4 on every success.
+/// `R_LoadImage`, its one caller, never reads it.
+/// A decode failure prints Raven's `Error parsing` line and returns no picture, so the caller tries the next extension.
+/// The crate does not separate Raven's CRC error from its inflate error, so that line always names the inflate one.
+///
+/// Source: `oracle/codemp/png/png.cpp:679-731`
+fn LoadPNG32(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>, i32, i32)> {
+    let buf = FS_ReadFileVec(view, name)?;
+
+    let decoded = png_check_header(&buf, true).and_then(|()| {
+        load_from_memory_with_format(&buf, ImageFormat::Png)
+            .map_err(|_| "Error decompressing image data.")
+    });
+    let decoded = match decoded {
+        Ok(decoded) => decoded,
+        Err(message) => {
+            com_printf(view.common, &format!("Error parsing {name}: {message}\n"));
+            return None;
+        }
+    };
+
+    let width = decoded.width() as i32;
+    let height = decoded.height() as i32;
+    // `PNG_ConvertTo32` gives a 24-bit file an 0xff alpha, which is what `into_rgba8` writes.
+    Some((decoded.into_rgba8().into_raw(), width, height))
+}
+
+/// Raven `LoadPNG8`.
+///
+/// Out-params collapse to a return value (§C7).
+/// A data image keeps Raven's raw 8-bit samples, one byte per pixel.
+/// A grayscale file keeps its samples, and a palette file keeps its indices, because Raven's reader ignores the PLTE chunk.
+/// The `image` umbrella expands a palette to RGB before a caller sees it, so this reaches its PNG decoder directly.
+///
+/// Source: `oracle/codemp/png/png.cpp:736-780`
+fn LoadPNG8(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>, i32, i32)> {
+    let buf = FS_ReadFileVec(view, name)?;
+
+    match png_check_header(&buf, false).and_then(|()| png_decode_8bit(&buf)) {
+        Ok(decoded) => Some(decoded),
+        Err(message) => {
+            com_printf(view.common, &format!("Error parsing {name}: {message}\n"));
+            None
+        }
+    }
+}
+
+/// The one-byte-per-pixel decode `LoadPNG8` needs.
+///
+/// `png::Decoder` starts at `Transformations::IDENTITY`, so the samples arrive unexpanded.
+/// The caller has already run the 8-bit and color-type gates, so the frame holds exactly one byte per pixel.
+fn png_decode_8bit(buf: &[u8]) -> Result<(Vec<u8>, i32, i32), &'static str> {
+    let mut reader = Decoder::new(Cursor::new(buf))
+        .read_info()
+        .map_err(|_| "Error decompressing image data.")?;
+    let size = reader
+        .output_buffer_size()
+        .ok_or("Error allocating memory.")?;
+    let mut pixels = vec![0u8; size];
+    let info = reader
+        .next_frame(&mut pixels)
+        .map_err(|_| "Error decompressing image data.")?;
+    pixels.truncate(info.buffer_size());
+
+    Ok((pixels, info.width as i32, info.height as i32))
+}
+
 // DEFERRED-WHOLE: vendored libjpeg destination-manager glue — Raven's
 // `init_destination`/`empty_output_buffer`/`jpeg_start_compress`/
 // `jpeg_write_scanlines`/`term_destination`/`jpegDest`
@@ -1572,14 +1718,10 @@ pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8
         return Some((pic, width, height, format));
     }
 
-    // DEFERRED: `LoadPNG32` — vendored libpng, no Rust-crate seam wired in
-    // this workspace (`Cargo.toml` carries no png/image dependency);
-    // escalate rather than byte-port, matching `LoadJPG`'s identical
-    // codec-seam precedent above in this same file. The default-extension
-    // computation is still performed for parity of the attempted-path
-    // sequence; the decode itself is a no-op (always "no pic").
-    // Source: oracle/codemp/renderer/tr_image.cpp:2243-2248
-    let _name_png = com_default_extension(&COM_StripExtension(shortname), ".png");
+    let name = com_default_extension(&COM_StripExtension(shortname), ".png");
+    if let Some((pic, width, height)) = LoadPNG32(view, &name) {
+        return Some((pic, width, height, format));
+    }
 
     let name = com_default_extension(&COM_StripExtension(shortname), ".tga");
     if let Some((pic, width, height)) = LoadTGA(view, &name) {
@@ -1592,9 +1734,7 @@ pub fn R_LoadImage(view: &mut EngineHostView, shortname: &str) -> Option<(Vec<u8
 /// Raven `R_LoadDataImage`.
 ///
 /// Out-params collapse to a return value (§C7); both length guards
-/// (`len >= MAX_QPATH`, `len < 5`) transcribed faithfully. `LoadPNG8` is the
-/// same unresolved vendored-libpng codec seam as `R_LoadImage`'s `LoadPNG32`
-/// — DEFERRED, matching precedent.
+/// (`len >= MAX_QPATH`, `len < 5`) transcribed faithfully.
 ///
 /// Source: oracle/codemp/renderer/tr_image.cpp:2259-2306
 pub fn R_LoadDataImage(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>, i32, i32)> {
@@ -1606,10 +1746,10 @@ pub fn R_LoadDataImage(view: &mut EngineHostView, name: &str) -> Option<(Vec<u8>
         return None;
     }
 
-    // DEFERRED: `LoadPNG8` — vendored libpng, no Rust-crate seam wired (see
-    // `R_LoadImage`'s identical PNG note above).
-    // Source: oracle/codemp/renderer/tr_image.cpp:2281-2282
-    let _work_png = com_default_extension(name, ".png");
+    let work = com_default_extension(name, ".png");
+    if let Some(result) = LoadPNG8(view, &work) {
+        return Some(result);
+    }
 
     let work = com_default_extension(name, ".jpg");
     if let Some(result) = LoadJPG(view, &work) {

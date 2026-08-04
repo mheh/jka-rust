@@ -32,6 +32,17 @@ mp_host_interface = { path = "../host-interface" }
 # mp_engine_ghoul2 deps only mp_qshared + mp_host_interface.
 mp_engine_ghoul2 = { path = "../engine/ghoul2" }
 zune-jpeg = "0.5"
+# DEC-64: the image-codec umbrella for the workspace.
+# The `png` feature decodes the retail PNG textures `R_LoadImage` reads, and the
+# `jpeg` feature encodes the screenshot `R_ScreenShot_f` writes.
+# `LoadJPG` still decodes through zune-jpeg above (DEC-49), and the `image` crate
+# uses that same decoder.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
+# `LoadPNG8` returns Raven's raw 8-bit samples, palette indices included, and the
+# `image` umbrella expands a palette to RGB before a caller sees it. This is
+# `image`'s own PNG decoder, reached directly for the one load that needs the
+# unexpanded bytes.
+png = "0.18"
 
 [dev-dependencies]
 testkit = { path = "../../testkit" }
