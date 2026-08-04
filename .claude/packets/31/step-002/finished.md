@@ -10,6 +10,8 @@ Branch `gh31-step-002-block-publication`, four commits, held for lane-review. No
 | 2 | `155fa02f` | `feat(gh#31 s002): the shader poke becomes copy-on-write` | `cargo build --workspace` green. `cargo test --workspace` green, zero failures. |
 | 3 | `2a201deb` | `feat(gh#31 s002): publish the model blocks into RenderAssets` | `cargo build --workspace` green. `cargo test --workspace` green, zero failures. World goldens byte-identical, both fixtures. |
 | 4 | `af9ee9cb` | `docs(gh#31 s002): correct the never-Arc-published claims` | `cargo build --workspace` green. `cargo test --workspace` green, zero failures. |
+| 5 | `1d8f061d` | `process(gh#31 s002): record the lane finished file` | Prose only, no gate. |
+| 6 | `b326fbc6` | `style(gh#31 s002): lint the comments this lane touched` | `cargo build --workspace` green. `cargo test -p mp_renderer --lib` green, 53 passed. |
 
 Every commit used `--no-gpg-sign` and carries no trailer.
 
