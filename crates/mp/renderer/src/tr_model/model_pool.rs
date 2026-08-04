@@ -13,6 +13,9 @@
 //!    `RenderAssets` (A9/NB-1). A pool entry here is a `model_t` owning the
 //!    `mdxm`/`mdxa` raw block pointers the DEC-35 mdx views hand out, so it is
 //!    deliberately not `Clone` and never enters an `Arc`-published registry.
+//!    DEC-65 ruling 1 publishes the blocks themselves instead, as
+//!    `Arc<ModelBlocks>` on `RenderAssets`. The pool keeps its `Box` entries
+//!    and its address-stability contract unchanged.
 //! 2. `Arena::insert` hands out slots from a LIFO free list. Raven's
 //!    `R_AllocModel` hands out `tr.numModels` — a strictly sequential
 //!    high-water mark — and the only vacating operations
@@ -59,6 +62,8 @@ pub type ModelHandle = Handle<ModelData>;
 /// entry. `Box` is load-bearing — `G2_API.cpp:2716` caches the registered
 /// `model_t *`, and the DEC-35 mdx views read the `mdxm`/`mdxa` blocks out of
 /// this entry, so the entry's address must not move when the pool grows.
+/// The render thread reads the published `Arc<ModelBlocks>` copy instead, which holds byte offsets rather than
+/// these pointers (DEC-65 ruling 1).
 struct ModelSlot {
     generation: u32,
     data: Box<ModelData>,
