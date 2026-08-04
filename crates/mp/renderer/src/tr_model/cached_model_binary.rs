@@ -37,12 +37,15 @@
 //! Source: `oracle/codemp/renderer/tr_model.cpp:48-68,70-568`
 
 use core::ffi::{c_char, c_void};
+use std::sync::Arc;
 
 use mp_host_interface::mdx::mdxa::{MdxaParsed, MdxaView};
 use mp_host_interface::mdx::mdxm::{MdxmParsed, MdxmView};
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::{qhandle_t, ForceReload_e};
+
+use crate::render_state::model_block::ModelBlock;
 
 use super::aligned_bytes::AlignedBytes;
 use super::render_models::RenderModels;
@@ -108,8 +111,11 @@ pub(crate) struct CachedEndianedModelBinary {
     /// idiom). 16-byte-aligned, heap-pinned; in-place mutable for the `LL()`
     /// swap (`TRM-D4`/ruling 58; ruling 52 ownership).
     ///
+    /// DEC-65 ruling 1 puts the block behind an `Arc`, so the published registry can name it.
+    /// The bytes and the two DEC-35 sidecars moved into [`ModelBlock`] with it.
+    ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:50`
-    disk_image: Option<AlignedBytes>,
+    disk_image: Option<Arc<ModelBlock>>,
 
     /// `iAllocSize` — "may be useful for mem-query, but I don't actually need
     /// it" (Raven). Backs [`RenderModels`]'s local `GetModelDataAllocSize`
@@ -141,21 +147,6 @@ pub(crate) struct CachedEndianedModelBinary {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:54,63`
     pak_file_checksum: i32,
-
-    /// DEC-35 parse-once sidecar for a `.glm` entry — the `MdxmParsed` index
-    /// built over [`disk_image`] once at ingest (after the endian swaps), read
-    /// out via [`RenderModels::model_mdxm_ptrs`]. `None` until built / for a
-    /// non-mdxm entry. Owned beside the block, so it drops exactly when the
-    /// block does (eviction).
-    ///
-    /// [`disk_image`]: CachedEndianedModelBinary::disk_image
-    parsed_mdxm: Option<MdxmParsed>,
-
-    /// DEC-35 parse-once sidecar for a `.gla` entry — the `MdxaParsed` index.
-    /// See [`parsed_mdxm`].
-    ///
-    /// [`parsed_mdxm`]: CachedEndianedModelBinary::parsed_mdxm
-    parsed_mdxa: Option<MdxaParsed>,
 }
 
 impl Default for CachedEndianedModelBinary {
@@ -169,8 +160,6 @@ impl Default for CachedEndianedModelBinary {
             shader_register_data: Vec::new(),
             last_level_used_on: -1,
             pak_file_checksum: -1,
-            parsed_mdxm: None,
-            parsed_mdxa: None,
         }
     }
 }
@@ -197,13 +186,9 @@ impl RenderModels {
 
         if let Some(disk_image) = &entry.disk_image {
             // Cache hit: return a copy of the cached block, `already_cached = true`.
-            // SAFETY: `disk_image` owns `disk_image.len()` initialized bytes for
-            // its whole life (`TRM-D4`); this is a read-only copy out, not an
-            // aliasing borrow into `self.cached` (see `GetDiskFileResult`'s doc).
-            let bytes =
-                unsafe { std::slice::from_raw_parts(disk_image.as_ptr(), disk_image.len()) }
-                    .to_vec();
-            return Some((bytes, true));
+            // This is a read-only copy out, not an aliasing borrow into `self.cached`
+            // (see `GetDiskFileResult`'s doc).
+            return Some((disk_image.bytes().to_vec(), true));
         }
 
         // strcmp against the ORIGINAL (not lowercased) name — case-sensitive,
@@ -270,7 +255,7 @@ impl RenderModels {
                 Some(bytes) => AlignedBytes::copy_from(bytes),
                 None => AlignedBytes::zeroed(size as usize),
             };
-            entry.disk_image = Some(aligned);
+            entry.disk_image = Some(Arc::new(ModelBlock::new(aligned)));
             entry.alloc_size = size;
 
             if let Some(checksum) = host.fs_file_is_in_pak(&model_name) {
@@ -286,11 +271,21 @@ impl RenderModels {
 
         entry.last_level_used_on = level;
 
-        let ptr = entry
+        let block = entry
             .disk_image
             .as_mut()
-            .expect("disk_image is always Some by this point")
-            .as_mut_ptr();
+            .expect("disk_image is always Some by this point");
+        let ptr = if already_found {
+            // A repeat entry may already be published, so the Arc is not unique here.
+            // The three loaders return before any write on this arm, so a read-only base is enough.
+            block.base_ptr() as *mut u8
+        } else {
+            // The fresh arm just built this Arc, so the endian swaps behind the returned pointer land in a block
+            // nobody else holds.
+            Arc::get_mut(block)
+                .expect("a just-created block Arc is unique")
+                .base_ptr_mut()
+        };
 
         (ptr, already_found)
     }
@@ -302,11 +297,14 @@ impl RenderModels {
     pub(crate) fn store_parsed_mdxm(&mut self, model_file_name: &str) {
         let key = model_file_name.to_lowercase();
         if let Some(entry) = self.cached.get_mut(&key) {
-            if let Some(disk_image) = &entry.disk_image {
-                // SAFETY: DEC-35 — `disk_image` is the live, endian-swap-completed
+            if let Some(block) = entry.disk_image.as_mut() {
+                // SAFETY: DEC-35 — the block is the live, endian-swap-completed
                 // `.glm` block (self-sized by `ofsEnd`); parsing is a pure read.
-                let view = unsafe { MdxmView::from_block(disk_image.as_ptr() as *const c_void) };
-                entry.parsed_mdxm = Some(MdxmParsed::parse(view));
+                let view = unsafe { MdxmView::from_block(block.base_ptr() as *const c_void) };
+                let parsed = MdxmParsed::parse(view);
+                Arc::get_mut(block)
+                    .expect("the fresh-load path holds the only Arc, and the registration-completion mark is what first shares a block")
+                    .set_parsed_mdxm(parsed);
             }
         }
     }
@@ -316,11 +314,14 @@ impl RenderModels {
     pub(crate) fn store_parsed_mdxa(&mut self, model_file_name: &str) {
         let key = model_file_name.to_lowercase();
         if let Some(entry) = self.cached.get_mut(&key) {
-            if let Some(disk_image) = &entry.disk_image {
-                // SAFETY: DEC-35 — `disk_image` is the live, endian-swap-completed
+            if let Some(block) = entry.disk_image.as_mut() {
+                // SAFETY: DEC-35 — the block is the live, endian-swap-completed
                 // `.gla` block (self-sized by `ofsEnd`); parsing is a pure read.
-                let view = unsafe { MdxaView::from_block(disk_image.as_ptr() as *const c_void) };
-                entry.parsed_mdxa = Some(MdxaParsed::parse(view));
+                let view = unsafe { MdxaView::from_block(block.base_ptr() as *const c_void) };
+                let parsed = MdxaParsed::parse(view);
+                Arc::get_mut(block)
+                    .expect("the fresh-load path holds the only Arc, and the registration-completion mark is what first shares a block")
+                    .set_parsed_mdxa(parsed);
             }
         }
     }
@@ -339,7 +340,8 @@ impl RenderModels {
         let parsed = self
             .cached
             .get(&key)
-            .and_then(|e| e.parsed_mdxm.as_ref())
+            .and_then(|e| e.disk_image.as_ref())
+            .and_then(|b| b.parsed_mdxm())
             .map(|p| p as *const MdxmParsed as *const c_void)
             .unwrap_or(core::ptr::null());
         (block, parsed)
@@ -369,7 +371,8 @@ impl RenderModels {
         let parsed = self
             .cached
             .get(&key)
-            .and_then(|e| e.parsed_mdxa.as_ref())
+            .and_then(|e| e.disk_image.as_ref())
+            .and_then(|b| b.parsed_mdxa())
             .map(|p| p as *const MdxaParsed as *const c_void)
             .unwrap_or(core::ptr::null());
         (block, parsed)
@@ -437,7 +440,7 @@ impl RenderModels {
                 // `re_register_models_store_shader_request`; `read_qpath`
                 // stops at the first NUL inside the block-tail slice.
                 let name = unsafe {
-                    let base = disk_image.as_ptr().add(name_offset as usize) as *const c_char;
+                    let base = disk_image.base_ptr().add(name_offset as usize) as *const c_char;
                     read_qpath(core::slice::from_raw_parts(
                         base,
                         disk_image.len() - name_offset as usize,
@@ -466,13 +469,15 @@ impl RenderModels {
         let Some(disk_image) = &mut entry.disk_image else {
             return;
         };
+        let block = Arc::get_mut(disk_image)
+            .expect("the published registry is the first sharer of a block, and it does not exist yet");
 
         // SAFETY: as [`Self::shader_register_requests`] — `poke_offset` is a
         // byte offset into this same live block, recorded off it by the store
         // call; written unaligned because the offset is a file-layout field
         // position, not a Rust-typed one.
         unsafe {
-            let slot = disk_image.as_mut_ptr().add(poke_offset as usize) as *mut i32;
+            let slot = block.base_ptr_mut().add(poke_offset as usize) as *mut i32;
             slot.write_unaligned(value);
         }
     }
@@ -710,13 +715,11 @@ mod tests {
         pak_file_checksum: i32,
     ) -> CachedEndianedModelBinary {
         CachedEndianedModelBinary {
-            disk_image: Some(AlignedBytes::copy_from(bytes)),
+            disk_image: Some(Arc::new(ModelBlock::new(AlignedBytes::copy_from(bytes)))),
             alloc_size: bytes.len() as i32,
             shader_register_data: Vec::new(),
             last_level_used_on,
             pak_file_checksum,
-            parsed_mdxm: None,
-            parsed_mdxa: None,
         }
     }
 
