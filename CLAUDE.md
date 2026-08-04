@@ -115,3 +115,7 @@ Open work lives as GitHub issues on `mheh/jka-rust` (`gh` CLI). The wayfinder ma
 ### Domain docs
 
 No `CONTEXT.md` / ADR layout. The DEC ledger (`docs/decisions.md`) is the single decision store, and tickets resolve into it. See `docs/agents/domain.md`.
+
+### Audit records
+
+When an agent returns, apply `.claude/skills/audit/SKILL.md`: a broad-scope landing (workspace-wide conversion, multi-crate feature, ~100+ sites, DEC-executing campaign) gets a dated record under `docs/audits/` without asking, a smaller-but-useful one gets one question to the user, a routine one gets nothing. The user also invokes `/audit <subject>` directly. A `SubagentStop` hook injects this rule at every agent return.

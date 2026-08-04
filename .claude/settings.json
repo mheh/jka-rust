@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-nudge.sh",
+            "timeout": 10,
+            "statusMessage": "Audit decision rule"
+          }
+        ]
+      }
     ]
   }
 }
