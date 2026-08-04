@@ -77,3 +77,43 @@ The audit changed three things in the record, and the issue comment on gh#35 sta
 ## Rulings
 
 None yet. The choice between A1, A2 and the wholesale absorption is open, and gh#35 stays open with nothing committed against it.
+
+## The step-001 lane and the close, appended 2026-08-04
+
+The user ruled "do A1 and A2", and one opus lane ran packet `.claude/packets/35/step-001/packet.md` on branch `gh35-step-001-golden-rig`. A1 landed, A2 stopped on a pause trigger, and the user then ruled the close: A1 stands, and the client path moves to gh#31 step-003. The merge is `56a80eef`.
+
+### The lane's report, verbatim
+
+Lane stopped on a pause trigger. A1 landed; A2 did not.
+
+**Commits on `gh35-step-001-golden-rig`:** `45480710` - `test(gh#35 s001): the ghoul2 golden control run on the server register path`, and `5bb7ff24` - `process(gh#35 s001): finished file, control-run verdict and the A2 stop`.
+
+**Control-run verdict: byte-identical to the committed fixture.** The golden passed on the first run under the A1 configuration, so it reached the byte comparison and matched exactly. Order is identical to the fixture and content is identical. The 2026-08-04 reorder therefore belongs to the reverted `dedicated` experiment, and mainline moved nothing between the bless at `bc856508` (2026-07-31) and today. The audit's residual hole in section B closes, and its correction 2 upgrades from "plausible" to proven by elimination. The multiset check is subsumed by byte identity; the per-surface digest list is recorded in `finished.md` for future re-blesses.
+
+**Gates (commit 1):** `cargo build --workspace` green. `cargo test --workspace` green, exit 0. Ghoul2 golden green. Both world goldens byte-identical. No `.actual.bin` produced at any point.
+
+**The stop: fact 3 of the packet is false.** It claims nothing past the init call reads the `re` slot, citing the `dedicated` experiment as proof. That experiment proved nothing about the slot: a nonzero `dedicated` short-circuits every `dedicated || g2_should_register_server(host)` guard in the ghoul2 crate to the server path, so it masked two call sites, not one. With the frontend seated for the init call, the init succeeded - the `.glm` and `.gla` both disk-loaded through Raven's client `RE_RegisterModel`. The abort then moved to draw time, same line: `re_from_view` (`crates/mp/renderer/src/hook_install.rs:58`) reached from `misc::g2_setup_model_pointers` (`crates/mp/engine/ghoul2/src/misc.rs:403`) through `r_add_ghoul_surfaces`, `R_AddEntitySurfaces`, `R_RenderView`, `FrameExecutor::execute_frame`. `G2_SetupModelPointers` re-registers the model on every frame's entity walk, which is faithful Raven behavior. The client path needs a seated `re` for the whole frame render, not for the init call. The shape is the blocker: while the twins sit in the frontend, the `UiHost` fields hold placeholders, and the golden feeds `sim.published`, `world_load`, `img_state`, `noise` from `UiHost` straight into `execute_frame`. A frame-length window forces the draw to read its receivers off the frontend. That changes `init_ghoul2`'s contract signature and needs a new pub item. The lane did not rule on it.
+
+**Deviations:** one - commit 2 not delivered. Its edits compiled clean but sat uncommitted, because the golden aborts at draw time and a red gate must not land. The session preserved them as `.claude/packets/35/step-001/a2-attempt.patch` and cleaned the tree before review.
+
+**Two further findings:** `world_harness` has had the same draw-time abort since `00569c66` (2026-08-02) and neither document recorded it, and the fact-3 claim in this record plus the issue comment carrying it both needed correcting.
+
+### The clerk's verification
+
+Lane-review ran with a conformance clerk on opus, per the user's instruction. It walked the whole diff and found no letter violation in the delivered code: the one added statement is the exact reassignment the contract names, at the named place, and the two hook fields have one signature (`engine_hooks.rs:165,168`). Its gate re-runs, verbatim:
+
+| Gate | Claim | The clerk's run |
+|---|---|---|
+| `cargo build --workspace` | green | exit 0, `Finished dev profile in 1m 13s` |
+| `cargo test --workspace` | green, exit 0 | exit 0. 516 passed, 0 failed, 18 ignored |
+| the ghoul2 golden, serial | green, byte-identical | exit 0, `1 passed; 0 failed`, 125.81s, no `.actual.bin` produced |
+| the world goldens, serial | green on both maps | exit 0, `2 passed; 0 failed`, 73.31s |
+| the multiset check | subsumed by byte identity | re-derived independently: 95472 bytes, 22 surfaces, all 22 digest prefixes and the multiset digest `f3551f6a...ef7264` match `finished.md` |
+
+Its ledger findings, all accepted with dispositions: (a) the landed comment forward-referenced an undelivered commit 2, closed by the reword at `a4b84cd8`; (b) the override's crate-wide reach was unstated - every `mp_renderer_gpu` boot now takes the server register path for ghoul2, which also clears `world_harness`'s latent crash; (c) and (d) the finished file described the pre-preservation tree and its line cites key to the A2 patch, both caused by the session's evidence-preservation commit `b9eef39f` and documented in the packet Amendments; (e) the preserved patch's module doc asserts a re-bless that did not happen, which is evidence, not delivered code. Its house-style flags on "lane talk" in the process files were ruled non-violations: "lane" is this repo's process vocabulary in packet and finished files, the same standing as "seam" in port comments.
+
+## Ruling: option 1, appended 2026-08-04
+
+The user ruled the close on 2026-08-04: A1 stands as the harness's standing configuration, gh#35 closes on the merge, and the honest client path arrives with the wholesale absorption - `UiHost` owns a real `RendererFrontend` - which the gh#31 step-003 packet must name as a prerequisite for its entity image goldens. The absorption inherits the audit's section C scoping: 14 destructure sites plus 1 literal, 47 to 53 dot accesses, `models` stays outside, and the forced `frame_data` decision (keep per-call construction, or clear at frame start).
+
+Correction to this record's own section A: A2 as scoped there cannot exist. Fact 3 of the step-001 packet, which restated section A2's window premise, is refuted by the draw-time re-register at `misc.rs:403`. Section B's residual hole is closed by the control run: the order is byte-identical, so the experiment reorder is proven experiment-caused and mainline carries no drift since `bc856508`.
