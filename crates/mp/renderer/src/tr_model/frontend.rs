@@ -1127,6 +1127,8 @@ fn RE_RegisterModel_Actual(
         // comment above. Source: oracle/codemp/renderer/tr_model.cpp:1375-1380
 
         rm.re_insert_model_into_hash(name, handle);
+        // DEC-65 ruling 1: the slot is finished, so record its blocks for publication.
+        rm.mark_block(handle);
         return handle;
     }
 

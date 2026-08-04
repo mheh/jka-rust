@@ -37,6 +37,7 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_sink::FrameSink;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::light_style_table::LightStyleTable;
+use crate::render_state::model_blocks::ModelBlocks;
 use crate::render_state::placeholders::{
     AutomapWireframe, BackEndCounters, FunctionTables, GlConfig, OrientationR, RefEntity, TrRefdef,
     ViewParms,
@@ -173,6 +174,7 @@ pub fn empty_render_assets() -> RenderAssets {
         projection_shadow_shader: ShaderHandle::slot_zero(),
         sun_shader: ShaderHandle::slot_zero(),
         sky_parse: SkyParse::default(),
+        models: Arc::new(ModelBlocks::default()),
         world: None,
         external_vis_data: None,
         bsp_models: Vec::new(),

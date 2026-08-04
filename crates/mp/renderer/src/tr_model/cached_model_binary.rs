@@ -489,6 +489,26 @@ impl RenderModels {
         block.bump_generation();
     }
 
+    /// The cached block that owns `ptr`, paired with the byte offset of `ptr` inside it.
+    /// [`RenderModels::mark_block`] resolves `model_t`'s raw block pointers this way, because one model slot can
+    /// span up to three cache entries and only the addresses say which entry a LOD came from.
+    pub(crate) fn block_containing(&self, ptr: *const u8) -> Option<(Arc<ModelBlock>, usize)> {
+        if ptr.is_null() {
+            return None;
+        }
+        let addr = ptr as usize;
+        for entry in self.cached.values() {
+            let Some(block) = &entry.disk_image else {
+                continue;
+            };
+            let start = block.base_ptr() as usize;
+            if addr >= start && addr < start + block.len() {
+                return Some((Arc::clone(block), addr - start));
+            }
+        }
+        None
+    }
+
     /// The named entry's current block base, `None` for an unknown entry or one with no disk image.
     /// [`super::frontend::re_register_models_malloc`] re-reads this after the poke replay, because a
     /// copy-on-write poke can leave the entry naming a different allocation than the one the caller started with.
@@ -559,7 +579,11 @@ impl RenderModels {
                 if delete_this {
                     host.print(&format!("Dumping \"{key}\""));
                     if let Some(model) = self.cached.remove(&key) {
-                        if model.disk_image.is_some() {
+                        if let Some(block) = &model.disk_image {
+                            // The published registry holds a clone of this Arc, and dropping it here is what
+                            // actually frees the bytes the `r_modelpoolmegs` budget just reclaimed.
+                            self.blocks.remove_block(block);
+                            self.blocks_dirty = true;
                             at_least_one_freed = true;
                         }
                     }
@@ -607,7 +631,14 @@ impl RenderModels {
             // skeleton name — "that's program internal anyway".
             if dump && !key.eq_ignore_ascii_case(DEFAULT_GLA_NAME) {
                 host.print(&format!("Dumping none pure model \"{key}\""));
-                self.cached.remove(&key);
+                if let Some(model) = self.cached.remove(&key) {
+                    if let Some(block) = &model.disk_image {
+                        // As in `models_level_load_end`: drop the registry's clone, or the dumped bytes stay
+                        // resident.
+                        self.blocks.remove_block(block);
+                        self.blocks_dirty = true;
+                    }
+                }
             }
         }
 
@@ -653,7 +684,10 @@ impl RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:496-516`
     pub(crate) fn re_register_models_delete_all(&mut self) {
-        // Dropping each entry drops its `Option<AlignedBytes>`, which frees
+        // Every published entry names a block this map owns, so dropping the whole map orphans all of them.
+        self.blocks.clear();
+        self.blocks_dirty = true;
+        // Dropping each entry drops its `Option<Arc<ModelBlock>>`, which frees
         // the block (`AlignedBytes::drop`, mirroring `Z_Free`).
         self.cached.clear();
     }
@@ -722,7 +756,11 @@ impl RenderModels {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
     use mp_host_interface::mock::MockHost;
+
+    use crate::mdx_format::mdxm_header_t::mdxmHeader_t;
+    use crate::tr_local::modtype_t::modtype_t;
 
     /// Build a `CachedEndianedModelBinary` cache entry directly (bypassing the
     /// registration path) for eviction/dump tests that only care about the
@@ -864,6 +902,59 @@ mod tests {
             rm.cached["models/foo.glm"].shader_register_data,
             vec![(10, 20)]
         );
+    }
+
+    #[test]
+    fn marked_slots_publish_their_blocks_and_drop_them_on_eviction() {
+        let mut rm = RenderModels::default();
+        let mut host = MockHost::new();
+        host.set_cvar("r_modelpoolmegs", "9999");
+        rm.model_init();
+        let handle = rm.r_alloc_model().expect("a second slot is available");
+        let (ptr, _) = rm.re_register_server_models_malloc(
+            &mut host,
+            16,
+            Some(&[0u8; 16]),
+            "models/foo.glm",
+            memtag_t::TAG_MODEL_GLM,
+        );
+        {
+            let slot = rm.models.slot_mut(handle as usize);
+            slot.r#type = modtype_t::MOD_MDXM;
+            slot.numLods = 1;
+            slot.mdxm = ptr as *mut mdxmHeader_t;
+            // A second family slot four bytes in proves the offset is a real pointer subtraction.
+            slot.md3[0] = unsafe { ptr.add(4) } as *mut md3Header_t;
+        }
+
+        rm.mark_block(handle);
+        let published = rm.publish_blocks().expect("the mark sets the dirty flag");
+        let entry = published.get(handle).expect("the slot is published");
+
+        let cached = rm.cached["models/foo.glm"]
+            .disk_image
+            .as_ref()
+            .expect("the ingest built the block");
+        let (mdxm_block, mdxm_offset) = entry.mdxm.as_ref().expect("the mdxm slot names a block");
+        assert!(Arc::ptr_eq(mdxm_block, cached));
+        assert_eq!(*mdxm_offset, 0);
+        let (md3_block, md3_offset) = entry.md3[0].as_ref().expect("LOD 0 names a block");
+        assert!(Arc::ptr_eq(md3_block, cached));
+        assert_eq!(*md3_offset, 4);
+        assert!(entry.md3[1].is_none());
+        assert!(entry.mdxa.is_none());
+        assert_eq!(entry.num_lods, 1);
+
+        // A second drain reports nothing, because nothing changed.
+        assert!(rm.publish_blocks().is_none());
+
+        // Eviction drops the entry, so the published registry stops naming the freed bytes.
+        rm.current_level = 5;
+        assert!(rm.models_level_load_end(&mut host, true));
+        let published = rm
+            .publish_blocks()
+            .expect("the eviction sets the dirty flag");
+        assert!(published.get(handle).is_none());
     }
 
     #[test]

@@ -29,6 +29,7 @@ use crate::render_state::render_assets_sim::RenderAssetsSim;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_image::{GL_TextureMode, R_SetColorMappings, TrImageState};
+use crate::tr_model::render_models::RenderModels;
 use crate::tr_scene::{R_ToggleSmpFrame, SceneState};
 use crate::tr_shader::R_GetShaderByHandle;
 
@@ -327,12 +328,16 @@ pub fn R_SyncRenderThread(assets: &RenderAssets, common: &Common, cvars: &Render
 /// With no sink installed, which is every dedicated build, harness and test,
 /// the old behavior stands and `R_ToggleSmpFrame` clears the stream in place.
 ///
+/// `rm` is here for the DEC-65 ruling 1 model-block handoff. `RenderModels` lives on the engine as `view.rm`, not
+/// on `RendererFrontend`, so the drain has no other path to it.
+///
 /// Source: `oracle/codemp/renderer/tr_cmds.cpp:441-475`
 #[allow(clippy::too_many_arguments)]
 pub fn RE_EndFrame(
     frame: &mut FrameData,
     scene: &mut SceneState,
-    sim: &RenderAssetsSim,
+    sim: &mut RenderAssetsSim,
+    rm: &mut RenderModels,
     img_state: &mut TrImageState,
     sink: Option<&mut FrameSink>,
     pending_capture: &mut Option<CaptureRequest>,
@@ -344,6 +349,12 @@ pub fn RE_EndFrame(
 ) {
     if !sim.published.registered {
         return;
+    }
+
+    // DEC-65 ruling 1: hand the model blocks over before the frame is built, so the package carries them.
+    // This sits above the sink match, so the flag drains with no sink installed too.
+    if let Some(blocks) = rm.publish_blocks() {
+        sim.publish_models(blocks);
     }
 
     // DEFERRED: `cmd = R_GetCommandBuffer(sizeof(*cmd)); if (!cmd) return;

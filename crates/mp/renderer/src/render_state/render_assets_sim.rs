@@ -8,6 +8,7 @@ use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::render_state::light_style_table::LightStyleTable;
+use crate::render_state::model_blocks::ModelBlocks;
 use crate::render_state::render_assets::RenderAssets;
 
 /// Sim-thread-owned. `published` IS the one registry: images, shaders, skins
@@ -28,6 +29,12 @@ pub struct RenderAssetsSim {
 }
 
 impl RenderAssetsSim {
+    /// Publish the DEC-65 ruling 1 model blocks, replacing whatever the registry named before.
+    /// `RE_EndFrame` calls this only when `RenderModels` reports a change, so a quiet frame costs nothing.
+    pub fn publish_models(&mut self, blocks: ModelBlocks) {
+        Arc::make_mut(&mut self.published).models = Arc::new(blocks);
+    }
+
     /// Raven `RE_SetLightStyle` — mutates `self.light_styles.colors[style]` in
     /// place, **not** via `Arc::make_mut` (A6/A9). Out-param `int color` →
     /// typed `[u8; 4]` per §C7; `style: usize` closes the oracle's missing

@@ -884,6 +884,8 @@ pub fn SCR_UpdateScreen(view: &mut EngineHostView, cl: &mut Client) {
     // one call.
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let re = unsafe { re_from_view(view) };
+    // SAFETY: same rule for the `rm` slot, which the DEC-65 ruling 1 block handoff reads.
+    let rm = unsafe { rm_from_view(view) };
     // `RB_SetGL2D` stamps `backEnd.refdef.floatTime` from `ri.Milliseconds()`
     // at the top of every 2D pass. The frame carries that stamp to the render
     // thread instead, and `cls.realtime` is the client's millisecond clock.
@@ -892,7 +894,8 @@ pub fn SCR_UpdateScreen(view: &mut EngineHostView, cl: &mut Client) {
     RE_EndFrame(
         &mut re.frame_data,
         &mut re.scene,
-        &re.sim,
+        &mut re.sim,
+        rm,
         &mut re.img_state,
         re.frame_sink.as_mut(),
         &mut re.pending_capture,

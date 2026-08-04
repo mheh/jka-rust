@@ -35,6 +35,7 @@ use mp_renderer::render_state::arena::Arena;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::image_asset::ImageAsset;
+use mp_renderer::render_state::model_blocks::ModelBlocks;
 use mp_renderer::render_state::placeholders::{AutomapWireframe, FunctionTables, GlConfig};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::sky_parse::SkyParse;
@@ -344,6 +345,7 @@ fn dev_registries() -> DevRegistries {
         skin_lookup: HashMap::new(),
         projection_shadow_shader: ShaderHandle::slot_zero(),
         sun_shader: ShaderHandle::slot_zero(),
+        models: Arc::new(ModelBlocks::default()),
         world: None,
         external_vis_data: None,
         sky_parse: SkyParse::default(),
