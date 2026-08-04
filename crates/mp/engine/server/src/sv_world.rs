@@ -796,7 +796,8 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                 // distance-sorted, populated collision records as an owned
                 // `Vec<CollisionRecord_t>` (the out-param array + `CMiniHeap
                 // *G2VertSpace` scratch arg both drop, per the ghoul2-server
-                // design); `(*touch).ghoul2` is the module's ghoul2 token (DEC-65 ruling 3).
+                // design).
+                // `(*touch).ghoul2` is the module's ghoul2 token (DEC-65 ruling 3).
                 let mut ghoul2 = CGhoul2Info_v::from_token((*touch).ghoul2);
                 // SAFETY: view-constructor slot, single-threaded; this ghoul2
                 // cast aliases `view.g2`, but the g2api callees take it directly

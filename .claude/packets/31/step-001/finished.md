@@ -22,7 +22,7 @@ Lane complete. Five commits on `master`, all local, nothing pushed.
 - The new file is `crates/mp/engine/ghoul2/src/token.rs`, a crate-root module. The two helpers are free functions, not a type, so the one-type-per-file rule does not select a `shared/` subfolder for them.
 - `deep_copy`'s empty-source arm. The packet states the destination keeps its handle when one exists and allocates only for `mItem: 0`, and it does not state what an empty source does. The body keeps the destination handle and gives it an empty vector, where Raven frees the destination outright. The one caller guards on `g2From.IsValid()` (`api_models.rs:653`), so a trap arm cannot reach that state, and the doc comment records the divergence. A `mItem: 0` destination with an empty source returns without allocating, which matches Raven.
 - `deep_copy` frees the replaced instances' bone caches before it overwrites them. Raven's `Free()` reaches `DeleteLow`, which frees them (`G2_API.cpp:319-326`), and the in-place body would otherwise strand them in the sibling arena. This is inside the one method the surface contract names, so it is in scope.
-- The round-trip unit tests moved from `tr_scene.rs` to `token.rs` with the helpers, and a third case was added for handle `0` against the null token. DEC-32 gives one canonical home, so nothing stayed behind.
+- The round-trip unit tests moved from `tr_scene.rs` to `token.rs` with the helpers, and a third case was added for handle `0` against the null token. DEC-32 gives one home per function, so nothing stayed behind.
 
 **Commit 2.**
 
@@ -37,7 +37,7 @@ Lane complete. Five commits on `master`, all local, nothing pushed.
 **Commit 4.**
 
 - `sv_world.rs` builds the diagnostic cell and takes a read-only `&Ghoul2System` for the `size(g2) > 0` guard and the `get(g2, 0)` read. The guard sits inside the existing `sv_showghoultraces` test, so a disabled diagnostic costs nothing.
-- The six `sv_game` arms that only index through `get_mut` bind the cell without `mut`, because `CGhoul2Info_v::get_mut` takes `&self`.
+- The seven `sv_game` arms that only index through `get_mut` bind the cell without `mut`, because `CGhoul2Info_v::get_mut` takes `&self`. The lines are 3156, 3296, 3558, 3567, 3742, 3772, and 3778.
 
 **Commit 5.**
 
@@ -48,7 +48,7 @@ Lane complete. Five commits on `master`, all local, nothing pushed.
 
 One, and it is a pre-existing defect, not a change this lane made.
 
-The `--ignored` leg of `ghoul2_vertex_golden` aborts in `re_from_view` (`crates/mp/renderer/src/hook_install.rs:58`) on a null `re` slot. It does the same at `HEAD` before any of this work, in both the debug profile (null-pointer-dereference panic, SIGABRT) and the release profile (SIGSEGV), verified by stashing the work and re-running both. The test's default leg, which is what `cargo test --workspace` runs, passes as an `#[ignore]`d skip. The packet's gate for commit 1 says to run the test in its own invocation, which was done; the golden itself could not execute on either side of the change.
+The `--ignored` leg of `ghoul2_vertex_golden` aborts in `re_from_view` (`crates/mp/renderer/src/hook_install.rs:58`) on a null `re` slot. It does the same at `HEAD` before any of this work, in both the debug profile (null-pointer-dereference panic, SIGABRT) and the release profile (SIGSEGV), verified by stashing the work and re-running both. The test's default leg, which is what `cargo test --workspace` runs, passes as an `#[ignore]`d skip. The packet's gate for commit 1 says to run the test in its own invocation, and that was done. The golden itself could not execute on either side of the change.
 
 ## Open gaps
 

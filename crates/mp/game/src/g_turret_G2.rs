@@ -185,8 +185,8 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
             e.s.modelindex2 = mi2;
         }
 
-        // Raven `&self->ghoul2`: the engine derefs arg1 as `CGhoul2Info_v **`
-        // (`sv_game.rs:3326`), so the seam takes the slot's address.
+        // Raven `&self->ghoul2`: the engine decodes the ghoul2 token from this slot address and writes the new token back (`sv_game.rs:3406`).
+        // The seam therefore passes the slot's address, not its value.
         let ghoul2 = &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void as *mut c_void;
         trap::G2API_RemoveGhoul2Model(
             ctx.engine,

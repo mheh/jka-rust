@@ -109,13 +109,13 @@ impl CGhoul2Info_v {
         self.free(g2);
     }
 
-    /// Raven `CGhoul2Info_v::DeepCopy` — replaces this handle's instance vector with a copy of `other`'s,
-    /// and zeroes each copied instance's runtime-only fields (`mBoneCache`, `mTransformedVertsArray`,
-    /// `mSkelFrameNum`, `mMeshFrameNum`) so no runtime state aliases across the copy.
+    /// Raven `CGhoul2Info_v::DeepCopy` - replaces this handle's instance vector with a copy of `other`'s.
+    /// It zeroes each copied instance's runtime-only fields (`mBoneCache`, `mTransformedVertsArray`, `mSkelFrameNum`, `mMeshFrameNum`),
+    /// so no runtime state aliases across the copy.
     ///
     /// DIVERGENCE (DEC-65 ruling 3, the 2026-08-03 in-place ruling).
-    /// Raven does `Free()` then `Alloc()`, which gives the destination a new `mItem` while the destination
-    /// *object* keeps its address, so a module that holds that object still sees the copy.
+    /// Raven does `Free()` then `Alloc()`, which gives the destination a new `mItem` while the destination *object* keeps its address,
+    /// so a module that holds that object still sees the copy.
     /// Here the destination object is the module's own 4-byte token slot, passed by value into the trap,
     /// so a new `mItem` would die in the discarded stack cell and leak the arena slot.
     /// This body therefore keeps the destination handle when one exists and replaces the arena contents in place.
