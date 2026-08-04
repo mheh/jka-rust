@@ -100,6 +100,12 @@ pub struct RendererFrontend {
     ///
     /// Source: `oracle/codemp/renderer/tr_init.cpp:708`
     pub screenshot_last_number: i32,
+    /// Raven's `R_ScreenShot_f`-local `static int lastNumber`, the JPEG twin of
+    /// the field above. Raven keeps one scan position per extension, so a
+    /// `screenshot` and a `screenshot_tga` burst number independently.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_init.cpp:764`
+    pub screenshot_jpeg_last_number: i32,
     /// `tr_scene.cpp`'s per-scene accumulation state.
     pub scene: SceneState,
     /// The Perlin noise tables `R_NoiseInit` fills once.
@@ -259,6 +265,7 @@ impl RendererFrontend {
             pending_capture: None,
             pending_world: None,
             screenshot_last_number: -1,
+            screenshot_jpeg_last_number: -1,
             scene: SceneState::default(),
             noise: NoiseState::default(),
             rng: Rng::new(),

@@ -23,6 +23,7 @@
 
 pub mod arena;
 pub mod bmodel_table;
+pub mod capture_format;
 pub mod capture_request;
 pub mod frame_data;
 pub mod frame_event;

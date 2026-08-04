@@ -25,9 +25,11 @@ use std::fs;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 
+use mp_renderer::render_state::capture_format::CaptureFormat;
+use mp_renderer::render_state::capture_request::CaptureRequest;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_package::FramePackage;
-use mp_renderer::tr_init::R_TakeScreenshot;
+use mp_renderer::tr_init::{R_TakeScreenshot, R_TakeScreenshotJPEG};
 use mp_renderer::tr_noise::{NoiseState, R_NoiseInit};
 use mp_renderer_gpu::{read_texture_rgb_bottom_up, FrameError, FrameExecutor, Gpu, GpuImages};
 use native_math::rng::Rng;
@@ -115,7 +117,7 @@ pub fn run(
                             );
 
                             if let Some(capture) = package.capture.take() {
-                                write_screenshot(&gpu, &frame.texture, &capture.os_path);
+                                write_screenshot(&gpu, &frame.texture, &capture);
                                 if !capture.silent {
                                     println!("Wrote {}", capture.os_path);
                                 }
@@ -146,23 +148,30 @@ pub fn run(
     }
 }
 
-/// Reads the drawn frame back and writes it as an uncompressed TGA.
+/// Reads the drawn frame back and writes it in the format the request asked
+/// for.
 ///
 /// Raven's `FS_WriteFile` creates the path on the way, so this creates the
 /// screenshots directory before the write.
 ///
-/// Source: `oracle/codemp/renderer/tr_init.cpp:537-571`
-fn write_screenshot(gpu: &Gpu, texture: &wgpu::Texture, os_path: &str) {
+/// Source: `oracle/codemp/renderer/tr_init.cpp:537-571`, `oracle/codemp/renderer/tr_init.cpp:578-596`
+fn write_screenshot(gpu: &Gpu, texture: &wgpu::Texture, capture: &CaptureRequest) {
     let (width, height, rgb) = read_texture_rgb_bottom_up(gpu, texture);
-    let tga = R_TakeScreenshot(&rgb, width as i32, height as i32);
+    let encoded = match capture.format {
+        CaptureFormat::Tga => R_TakeScreenshot(&rgb, width as i32, height as i32),
+        CaptureFormat::Jpeg { quality } => {
+            R_TakeScreenshotJPEG(&rgb, width as i32, height as i32, quality)
+        }
+    };
 
+    let os_path = &capture.os_path;
     if let Some(parent) = Path::new(os_path).parent() {
         if let Err(e) = fs::create_dir_all(parent) {
             eprintln!("jamp: could not create {}: {e}", parent.display());
             return;
         }
     }
-    if let Err(e) = fs::write(os_path, &tga) {
+    if let Err(e) = fs::write(os_path, &encoded) {
         eprintln!("jamp: could not write {os_path}: {e}");
     }
 }

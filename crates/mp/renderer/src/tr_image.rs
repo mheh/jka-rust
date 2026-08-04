@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::io::Cursor;
 
-use image::{load_from_memory_with_format, ImageFormat};
+use image::codecs::jpeg::JpegEncoder;
+use image::{load_from_memory_with_format, ExtendedColorType, ImageFormat};
 use mp_engine_qcommon::common::common::com_printf;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::error::com_error;
@@ -1653,21 +1654,47 @@ pub fn R_FindImageFile_NoLoad(
     Some(handle)
 }
 
-// DEFERRED-WHOLE: `SaveJPG` — entirely a vendored-libjpeg compression
-// pipeline (`jpeg_std_error`/`jpeg_create_compress`/`jpeg_set_defaults`/
-// `jpeg_set_quality`/`jpeg_finish_compress`/`jpeg_destroy_compress`, plus the
-// already-deferred `jpegDest`/`jpeg_start_compress`/`jpeg_write_scanlines`
-// glue directly above) with no Rust-crate jpeg-encode seam wired in this
-// workspace (`Cargo.toml` carries no image/jpeg dependency) — this packet's
-// own threading digest for `SaveJPG` says exactly this: "vendored
-// libjpeg/png; a Rust-crate seam, never byte-ported (escalate if the seam
-// lacks a wrapper)", extending wave 0's jpegDest-family precedent (no stub
-// body written, this comment block only) to the caller. `hackSize`
-// (`term_destination`'s write target, the `FS_WriteFile` size argument) has
-// no consumer elsewhere in this packet and stays unhomed alongside this
-// glue.
-//
-// Source: oracle/codemp/renderer/tr_image.cpp:2113-2216
+/// Raven `SaveJPG`: encodes one read-back frame as a baseline JPEG.
+///
+/// Raven's steps 1 to 7 drive vendored libjpeg-6b, not Raven logic, and the `image` crate fills that seam (§F, the `LoadJPG` precedent above).
+/// The `jpegDest` destination manager and its `hackSize` counter dissolve with the library they served, and so does the `FS_WriteFile` call.
+/// The render thread owns the file write, so this returns the encoded bytes to it, matching `R_TakeScreenshot`.
+///
+/// `image_buffer` arrives bottom-up, the order `qglReadPixels` produced.
+/// Raven's scanline loop walks it backwards, so the encoded rows come out top-down, and the flip below is that loop.
+/// Raven feeds 4-byte RGBA pixels to a libjpeg patched to `RGB_PIXELSIZE 4`, which reads three channels and steps four.
+/// The read-back path hands 3-byte RGB instead, so the pixels reaching the encoder are the same.
+///
+/// Source: `oracle/codemp/renderer/tr_image.cpp:2113-2216`
+pub fn SaveJPG(quality: u8, image_width: i32, image_height: i32, image_buffer: &[u8]) -> Vec<u8> {
+    let row_stride = (image_width * 3).max(0) as usize;
+    let rows = (image_height).max(0) as usize;
+
+    let mut top_down = vec![0u8; row_stride * rows];
+    for (written, read) in (0..rows).rev().enumerate() {
+        let source = read * row_stride;
+        // A short buffer leaves the rest of the row black rather than panicking.
+        let take = row_stride.min(image_buffer.len().saturating_sub(source));
+        let destination = written * row_stride;
+        top_down[destination..destination + take]
+            .copy_from_slice(&image_buffer[source..source + take]);
+    }
+
+    let mut out = Vec::new();
+    let mut encoder = JpegEncoder::new_with_quality(&mut out, quality);
+    // The dimensions and the buffer come from the same read-back, so the only
+    // failure left is a write to a `Vec`.
+    encoder
+        .encode(
+            &top_down,
+            image_width.max(0) as u32,
+            image_height.max(0) as u32,
+            ExtendedColorType::Rgb8,
+        )
+        .expect("SaveJPG: encoding one read-back frame into a Vec cannot fail");
+
+    out
+}
 
 /// Raven `COM_DefaultExtension` on owned strings: append `extension` unless
 /// the basename (scan back to the last `/`) already carries a `.`; result is
@@ -3304,4 +3331,30 @@ pub fn R_SkinList_f(view: &mut EngineHostView, assets: &RenderAssets) {
         }
     }
     com_printf(view.common, "------------------\n");
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{load_from_memory_with_format, ImageFormat};
+
+    use super::SaveJPG;
+
+    /// Raven's scanline loop reads the read-back buffer backwards, so the row it
+    /// encodes first is the last row it was given.
+    #[test]
+    fn save_jpg_flips_the_bottom_up_readback() {
+        // given: a 2x2 RGB frame in readback order, black row then white row
+        let bottom_up: [u8; 12] = [0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255];
+
+        // when
+        let encoded = SaveJPG(95, 2, 2, &bottom_up);
+
+        // then: the white row is on top
+        let decoded = load_from_memory_with_format(&encoded, ImageFormat::Jpeg)
+            .expect("SaveJPG wrote a decodable JPEG")
+            .to_rgb8();
+        assert_eq!(decoded.dimensions(), (2, 2));
+        assert!(decoded.get_pixel(0, 0).0[0] > 128, "the top row is white");
+        assert!(decoded.get_pixel(0, 1).0[0] < 128, "the bottom row is black");
+    }
 }
