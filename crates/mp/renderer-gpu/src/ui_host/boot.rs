@@ -130,6 +130,13 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
 
+    // The gh#35 control configuration: `RE_RegisterModel` routes to the server registration path.
+    // This reproduces the configuration the ghoul2 vertex fixture was blessed under (`bc856508`, 2026-07-31),
+    // so the control run compares today's draw-surf order against that fixture.
+    // The two hooks have one signature, so the reassignment needs no adapter.
+    // Commit 2 of gh#35 step-001 removes this override and seats a real `RendererFrontend` for the init call.
+    engine.common.hooks.RE_RegisterModel = engine.common.hooks.R_RegisterServerModel;
+
     // The renderer's model pool, built before the engine subset because
     // `Com_InitHunkMemory` -> `Hunk_Clear` calls the `R_HunkClearCrap` hook,
     // which casts the view's `rm` slot before doing anything else.
