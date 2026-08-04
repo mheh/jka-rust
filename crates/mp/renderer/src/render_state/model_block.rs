@@ -101,6 +101,13 @@ impl ModelBlock {
     pub fn parsed_mdxa(&self) -> Option<&MdxaParsed> {
         self.parsed_mdxa.as_deref()
     }
+
+    /// Record one more copy-on-write version of this block.
+    /// `Arc::make_mut` hands the shader poke a unique block, and this marks it as a later version than the one a
+    /// held frame still reads.
+    pub(crate) fn bump_generation(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+    }
 }
 
 impl Clone for ModelBlock {

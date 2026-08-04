@@ -455,6 +455,11 @@ impl RenderModels {
     /// `poke_offset` — Raven's `*piShaderPokePtr = ...`, the write side of the
     /// replay above. No-op for an unknown entry or one with no disk image.
     ///
+    /// DEC-65 ruling B makes this write copy-on-write. `Arc::make_mut` clones the block when a published frame
+    /// still holds it, so the write lands in a block only this thread can see, and the clone gets a higher
+    /// generation. The caller must re-read the entry's base pointer afterwards, because the entry can now name a
+    /// different allocation ([`Self::block_base_ptr`]).
+    ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:231,235-240`
     pub(crate) fn poke_shader_index(
         &mut self,
@@ -469,17 +474,30 @@ impl RenderModels {
         let Some(disk_image) = &mut entry.disk_image else {
             return;
         };
-        let block = Arc::get_mut(disk_image)
-            .expect("the published registry is the first sharer of a block, and it does not exist yet");
+        let block = Arc::make_mut(disk_image);
 
         // SAFETY: as [`Self::shader_register_requests`] — `poke_offset` is a
         // byte offset into this same live block, recorded off it by the store
         // call; written unaligned because the offset is a file-layout field
-        // position, not a Rust-typed one.
+        // position, not a Rust-typed one. `Arc::make_mut` above made the block
+        // unique, so no other holder sees this write.
         unsafe {
             let slot = block.base_ptr_mut().add(poke_offset as usize) as *mut i32;
             slot.write_unaligned(value);
         }
+
+        block.bump_generation();
+    }
+
+    /// The named entry's current block base, `None` for an unknown entry or one with no disk image.
+    /// [`super::frontend::re_register_models_malloc`] re-reads this after the poke replay, because a
+    /// copy-on-write poke can leave the entry naming a different allocation than the one the caller started with.
+    pub(crate) fn block_base_ptr(&self, model_file_name: &str) -> Option<*mut u8> {
+        let key = model_file_name.to_lowercase();
+        self.cached
+            .get(&key)
+            .and_then(|entry| entry.disk_image.as_ref())
+            .map(|block| block.base_ptr() as *mut u8)
     }
 
     /// Raven `RE_RegisterModels_LevelLoadEnd` — the live eviction path
@@ -846,6 +864,55 @@ mod tests {
             rm.cached["models/foo.glm"].shader_register_data,
             vec![(10, 20)]
         );
+    }
+
+    #[test]
+    fn poke_shader_index_copies_a_shared_block_instead_of_writing_it() {
+        let mut rm = RenderModels::default();
+        let mut host = MockHost::new();
+        rm.re_register_server_models_malloc(
+            &mut host,
+            8,
+            Some(&[0u8; 8]),
+            "models/foo.md3",
+            memtag_t::TAG_MODEL_MD3,
+        );
+        // A published frame would hold exactly this second Arc.
+        let held = Arc::clone(rm.cached["models/foo.md3"].disk_image.as_ref().unwrap());
+
+        rm.poke_shader_index("models/foo.md3", 4, 7);
+
+        // The held block keeps the bytes and the generation it was published with.
+        assert_eq!(&held.bytes()[4..8], &[0u8, 0, 0, 0]);
+        assert_eq!(held.generation(), 0);
+
+        // The entry now names a different block, carrying the poked value and a higher generation.
+        let poked = rm.cached["models/foo.md3"].disk_image.as_ref().unwrap();
+        assert_eq!(&poked.bytes()[4..8], &7i32.to_le_bytes());
+        assert_eq!(poked.generation(), 1);
+        assert!(!Arc::ptr_eq(&held, poked));
+    }
+
+    #[test]
+    fn poke_shader_index_writes_an_unshared_block_in_place() {
+        let mut rm = RenderModels::default();
+        let mut host = MockHost::new();
+        rm.re_register_server_models_malloc(
+            &mut host,
+            8,
+            Some(&[0u8; 8]),
+            "models/foo.md3",
+            memtag_t::TAG_MODEL_MD3,
+        );
+        let base = rm.block_base_ptr("models/foo.md3").unwrap();
+
+        rm.poke_shader_index("models/foo.md3", 4, 7);
+
+        // Nobody else held the block, so `Arc::make_mut` wrote it where it was.
+        assert_eq!(rm.block_base_ptr("models/foo.md3"), Some(base));
+        let entry = rm.cached["models/foo.md3"].disk_image.as_ref().unwrap();
+        assert_eq!(&entry.bytes()[4..8], &7i32.to_le_bytes());
+        assert_eq!(entry.generation(), 1);
     }
 
     #[test]

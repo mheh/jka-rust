@@ -365,6 +365,8 @@ pub unsafe fn r_model_bounds(
 /// Out-param `qboolean *pqbAlreadyFound` collapses to the return tuple's
 /// second field (porting-rules §C7); the `void *` return is the entry's
 /// disk-image base pointer, matching the delegated twin's `*mut u8`.
+/// The returned pointer is re-read after the replay, because DEC-65 ruling B made the poke copy-on-write and it
+/// can leave the entry naming a different allocation.
 ///
 /// Source: `oracle/codemp/renderer/tr_model.cpp:179-249`
 #[allow(clippy::too_many_arguments)]
@@ -385,7 +387,7 @@ pub(crate) fn re_register_models_malloc(
     // The fresh/repeat-entry ingest logic is identical to the already-ported
     // server twin, so this delegates to it rather than duplicating it
     // (porting-rules §C10).
-    let (ptr, already_found) = rm.re_register_server_models_malloc(
+    let (mut ptr, already_found) = rm.re_register_server_models_malloc(
         view,
         size,
         disk_buffer_if_just_loaded,
@@ -421,6 +423,12 @@ pub(crate) fn re_register_models_malloc(
                 sh.index() as i32
             };
             rm.poke_shader_index(model_file_name, poke_offset, poked);
+        }
+
+        // A copy-on-write poke can leave the entry naming a different allocation than the one the malloc above
+        // returned. All three callers store the returned pointer into `model_t`, so it must name the live block.
+        if let Some(current) = rm.block_base_ptr(model_file_name) {
+            ptr = current;
         }
     }
 
