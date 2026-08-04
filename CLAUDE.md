@@ -118,4 +118,6 @@ No `CONTEXT.md` / ADR layout. The DEC ledger (`docs/decisions.md`) is the single
 
 ### Audit records
 
-When an agent returns, apply `.claude/skills/audit/SKILL.md`: a broad-scope landing (workspace-wide conversion, multi-crate feature, ~100+ sites, DEC-executing campaign) gets a dated record under `docs/audits/` without asking, a smaller-but-useful one gets one question to the user, a routine one gets nothing. The user also invokes `/audit <subject>` directly. A `SubagentStop` hook injects this rule at every agent return.
+When an agent returns, apply `.claude/skills/audit/SKILL.md`: a broad-scope landing (workspace-wide conversion, multi-crate feature, ~100+ sites, DEC-executing campaign) gets a dated record under `docs/audits/` without asking, a smaller-but-useful one gets one question to the user, a routine one gets nothing. The user also invokes `/audit <subject>` directly.
+
+This rule binds the session, never the returning agent. A `SubagentStop` hook was tried on 2026-08-03 and removed the next day: its text reached the subagent instead of the session, and a read-only survey agent burned a whole turn refusing to write a file it had no tool for.
