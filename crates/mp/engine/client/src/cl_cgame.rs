@@ -1058,13 +1058,11 @@ pub fn CL_GetServerCommand(
         if cmd == "map_restart" {
             // Clear notify lines and outgoing commands before passing the restart to the cgame.
             Con_ClearNotify(cl);
-            unsafe {
-                Com_Memset(
-                    cl.cl.cmds.as_mut_ptr() as *mut (),
-                    0,
-                    core::mem::size_of_val(&cl.cl.cmds),
-                );
-            }
+            Com_Memset(
+                cl.cl.cmds.as_mut_ptr() as *mut (),
+                0,
+                core::mem::size_of_val(&cl.cl.cmds),
+            );
             return qtrue;
         }
 
@@ -1118,13 +1116,11 @@ pub fn CL_InitCGame(view: &mut EngineHostView, cl: &mut Client) {
     let mapname = Info_ValueForKey(&info, "mapname");
     let bsp_path = format!("maps/{}.bsp", mapname);
     let bsp_path_c = std::ffi::CString::new(bsp_path).unwrap_or_default();
-    unsafe {
-        Com_sprintf(
-            cl.cl.mapname.as_mut_ptr(),
-            cl.cl.mapname.len() as c_int,
-            &bsp_path_c.to_string_lossy(),
-        );
-    }
+    Com_sprintf(
+        cl.cl.mapname.as_mut_ptr(),
+        cl.cl.mapname.len() as c_int,
+        &bsp_path_c.to_string_lossy(),
+    );
 
     // Load the dll or bytecode.
     let interpret: vmInterpret_t;
@@ -1415,16 +1411,14 @@ pub fn CL_CgameSystemCalls(
     // match, and all of these traps must be shared and have cases in sv_game, cl_cgame, and
     // cl_ui. They must also all be in the same order, and start at 100.
     if op == sharedTraps_t::TRAP_MEMSET as c_int {
-        unsafe { Com_Memset(vma(vc, args, 1), arg(2), arg(3) as usize) };
+        Com_Memset(vma(vc, args, 1), arg(2), arg(3) as usize);
         0
     } else if op == sharedTraps_t::TRAP_MEMCPY as c_int {
-        unsafe {
-            Com_Memcpy(
-                vma(vc, args, 1),
-                vma(vc, args, 2) as *const (),
-                arg(3) as usize,
-            )
-        };
+        Com_Memcpy(
+            vma(vc, args, 1),
+            vma(vc, args, 2) as *const (),
+            arg(3) as usize,
+        );
         0
     } else if op == sharedTraps_t::TRAP_STRNCPY as c_int {
         unsafe {

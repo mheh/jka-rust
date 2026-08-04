@@ -224,56 +224,53 @@ pub fn LAN_LoadCachedServers(common: &mut Common, cl: &mut Client) {
     let mut file_in: native_types::fileHandle_t = 0;
     if FS_SV_FOpenFileRead(common, "servercache.dat", &mut file_in) != 0 {
         let int_size = core::mem::size_of::<c_int>() as c_int;
-        // SAFETY: seam file reads into owned struct fields (porting-rules §D11).
-        unsafe {
+        FS_Read(
+            common,
+            &mut cl.cls.numglobalservers as *mut _ as *mut (),
+            int_size,
+            file_in,
+        );
+        FS_Read(
+            common,
+            &mut cl.cls.nummplayerservers as *mut _ as *mut (),
+            int_size,
+            file_in,
+        );
+        FS_Read(
+            common,
+            &mut cl.cls.numfavoriteservers as *mut _ as *mut (),
+            int_size,
+            file_in,
+        );
+        let mut size: c_int = 0;
+        FS_Read(common, &mut size as *mut _ as *mut (), int_size, file_in);
+        let expect = (core::mem::size_of_val(&cl.cls.globalServers)
+            + core::mem::size_of_val(&cl.cls.favoriteServers)
+            + core::mem::size_of_val(&cl.cls.mplayerServers)) as c_int;
+        if size == expect {
             FS_Read(
                 common,
-                &mut cl.cls.numglobalservers as *mut _ as *mut (),
-                int_size,
+                cl.cls.globalServers.as_mut_ptr() as *mut (),
+                core::mem::size_of_val(&cl.cls.globalServers) as c_int,
                 file_in,
             );
             FS_Read(
                 common,
-                &mut cl.cls.nummplayerservers as *mut _ as *mut (),
-                int_size,
+                cl.cls.mplayerServers.as_mut_ptr() as *mut (),
+                core::mem::size_of_val(&cl.cls.mplayerServers) as c_int,
                 file_in,
             );
             FS_Read(
                 common,
-                &mut cl.cls.numfavoriteservers as *mut _ as *mut (),
-                int_size,
+                cl.cls.favoriteServers.as_mut_ptr() as *mut (),
+                core::mem::size_of_val(&cl.cls.favoriteServers) as c_int,
                 file_in,
             );
-            let mut size: c_int = 0;
-            FS_Read(common, &mut size as *mut _ as *mut (), int_size, file_in);
-            let expect = (core::mem::size_of_val(&cl.cls.globalServers)
-                + core::mem::size_of_val(&cl.cls.favoriteServers)
-                + core::mem::size_of_val(&cl.cls.mplayerServers)) as c_int;
-            if size == expect {
-                FS_Read(
-                    common,
-                    cl.cls.globalServers.as_mut_ptr() as *mut (),
-                    core::mem::size_of_val(&cl.cls.globalServers) as c_int,
-                    file_in,
-                );
-                FS_Read(
-                    common,
-                    cl.cls.mplayerServers.as_mut_ptr() as *mut (),
-                    core::mem::size_of_val(&cl.cls.mplayerServers) as c_int,
-                    file_in,
-                );
-                FS_Read(
-                    common,
-                    cl.cls.favoriteServers.as_mut_ptr() as *mut (),
-                    core::mem::size_of_val(&cl.cls.favoriteServers) as c_int,
-                    file_in,
-                );
-            } else {
-                cl.cls.numglobalservers = 0;
-                cl.cls.nummplayerservers = 0;
-                cl.cls.numfavoriteservers = 0;
-                cl.cls.numGlobalServerAddresses = 0;
-            }
+        } else {
+            cl.cls.numglobalservers = 0;
+            cl.cls.nummplayerservers = 0;
+            cl.cls.numfavoriteservers = 0;
+            cl.cls.numGlobalServerAddresses = 0;
         }
         FS_FCloseFile(common, file_in);
     }
@@ -285,49 +282,46 @@ pub fn LAN_LoadCachedServers(common: &mut Common, cl: &mut Client) {
 pub fn LAN_SaveServersToCache(common: &mut Common, cl: &mut Client) {
     let file_out = FS_SV_FOpenFileWrite(common, "servercache.dat");
     let int_size = core::mem::size_of::<c_int>() as c_int;
-    // SAFETY: seam file writes from owned struct fields (porting-rules §D11).
-    unsafe {
-        FS_Write(
-            common,
-            &cl.cls.numglobalservers as *const _ as *const (),
-            int_size,
-            file_out,
-        );
-        FS_Write(
-            common,
-            &cl.cls.nummplayerservers as *const _ as *const (),
-            int_size,
-            file_out,
-        );
-        FS_Write(
-            common,
-            &cl.cls.numfavoriteservers as *const _ as *const (),
-            int_size,
-            file_out,
-        );
-        let size = (core::mem::size_of_val(&cl.cls.globalServers)
-            + core::mem::size_of_val(&cl.cls.favoriteServers)
-            + core::mem::size_of_val(&cl.cls.mplayerServers)) as c_int;
-        FS_Write(common, &size as *const _ as *const (), int_size, file_out);
-        FS_Write(
-            common,
-            cl.cls.globalServers.as_ptr() as *const (),
-            core::mem::size_of_val(&cl.cls.globalServers) as c_int,
-            file_out,
-        );
-        FS_Write(
-            common,
-            cl.cls.mplayerServers.as_ptr() as *const (),
-            core::mem::size_of_val(&cl.cls.mplayerServers) as c_int,
-            file_out,
-        );
-        FS_Write(
-            common,
-            cl.cls.favoriteServers.as_ptr() as *const (),
-            core::mem::size_of_val(&cl.cls.favoriteServers) as c_int,
-            file_out,
-        );
-    }
+    FS_Write(
+        common,
+        &cl.cls.numglobalservers as *const _ as *const (),
+        int_size,
+        file_out,
+    );
+    FS_Write(
+        common,
+        &cl.cls.nummplayerservers as *const _ as *const (),
+        int_size,
+        file_out,
+    );
+    FS_Write(
+        common,
+        &cl.cls.numfavoriteservers as *const _ as *const (),
+        int_size,
+        file_out,
+    );
+    let size = (core::mem::size_of_val(&cl.cls.globalServers)
+        + core::mem::size_of_val(&cl.cls.favoriteServers)
+        + core::mem::size_of_val(&cl.cls.mplayerServers)) as c_int;
+    FS_Write(common, &size as *const _ as *const (), int_size, file_out);
+    FS_Write(
+        common,
+        cl.cls.globalServers.as_ptr() as *const (),
+        core::mem::size_of_val(&cl.cls.globalServers) as c_int,
+        file_out,
+    );
+    FS_Write(
+        common,
+        cl.cls.mplayerServers.as_ptr() as *const (),
+        core::mem::size_of_val(&cl.cls.mplayerServers) as c_int,
+        file_out,
+    );
+    FS_Write(
+        common,
+        cl.cls.favoriteServers.as_ptr() as *const (),
+        core::mem::size_of_val(&cl.cls.favoriteServers) as c_int,
+        file_out,
+    );
     FS_FCloseFile(common, file_out);
 }
 
@@ -382,10 +376,7 @@ pub fn LAN_AddServer(
         return -1;
     }
     let mut adr: netadr_t = unsafe { core::mem::zeroed() };
-    // SAFETY: `address` is the VM's seam string pointer (porting-rules §D11).
-    unsafe {
-        NET_StringToAdr(address, &mut adr);
-    }
+    NET_StringToAdr(address, &mut adr);
     if adr.r#type == netadrtype_t::NA_BAD {
         return -1;
     }
@@ -428,10 +419,7 @@ pub fn LAN_RemoveServer(common: &mut Common, cl: &mut Client, source: c_int, add
         _ => return,
     };
     let mut comp: netadr_t = unsafe { core::mem::zeroed() };
-    // SAFETY: `addr` is the VM's seam string pointer (porting-rules §D11).
-    unsafe {
-        NET_StringToAdr(addr, &mut comp);
-    }
+    NET_StringToAdr(addr, &mut comp);
     let mut i = 0;
     while i < *count {
         if servers[i as usize].adr.r#type == netadrtype_t::NA_BAD

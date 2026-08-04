@@ -30,6 +30,10 @@
 //!    dropped in the middle: the compared range must be snapshot-consecutive on
 //!    both sides.
 
+// The record fields mirror the journal format, and the diff reads the subset it
+// compares, so a field with no reader here still documents the wire record.
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;

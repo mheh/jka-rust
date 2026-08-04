@@ -5,7 +5,6 @@
 #![allow(non_snake_case)]
 
 use core::f64::consts::PI;
-use core::ffi::c_int;
 use std::sync::Arc;
 
 use mp_engine_qcommon::cmd_common::{Cmd_Argc, Cmd_Argv};

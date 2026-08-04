@@ -4,6 +4,11 @@
 //! then flushed with a length prefix so a reader can skip any record it does
 //! not understand.
 
+// The blob kinds and the marker/flush pair are the journal format's full
+// surface. The shim writes the subset its traps reach, and the readers name the
+// rest, so an unconstructed variant here still documents the wire format.
+#![allow(dead_code)]
+
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;

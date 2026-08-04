@@ -114,20 +114,18 @@ pub fn PrintMatches(common: &mut Common, cl: &mut Client, s: &str) {
 ///
 /// Source: `oracle/codemp/client/cl_keys.cpp:705-724`
 pub fn keyConcatArgs(common: &mut Common, cl: &mut Client) {
-    unsafe {
-        let argc = Cmd_Argc(common);
-        // The buffer length is read once, so each `Q_strcat` holds the only borrow.
-        let size = cl.kg.g_consoleField.buffer.len();
-        for i in 1..argc {
-            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
-            let arg = Cmd_Argv(common, i);
-            if arg.contains(' ') {
-                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
-            }
-            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, arg);
-            if arg.contains(' ') {
-                Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
-            }
+    let argc = Cmd_Argc(common);
+    // The buffer length is read once, so each `Q_strcat` holds the only borrow.
+    let size = cl.kg.g_consoleField.buffer.len();
+    for i in 1..argc {
+        Q_strcat(&mut cl.kg.g_consoleField.buffer, size, " ");
+        let arg = Cmd_Argv(common, i);
+        if arg.contains(' ') {
+            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
+        }
+        Q_strcat(&mut cl.kg.g_consoleField.buffer, size, arg);
+        if arg.contains(' ') {
+            Q_strcat(&mut cl.kg.g_consoleField.buffer, size, "\"");
         }
     }
 }
@@ -872,7 +870,9 @@ pub fn Field_VariableSizeDraw(
     edit: *mut field_t,
     x: c_int,
     y: c_int,
-    width: c_int,
+    // Raven's own body never reads `width`, so the port keeps the parameter and
+    // marks it dead.
+    _width: c_int,
     size: c_int,
     showCursor: qboolean,
 ) {

@@ -465,13 +465,11 @@ pub fn Con_CheckResize(cl: &mut Client) {
             numchars = cl.con.linewidth;
         }
 
-        unsafe {
-            Com_Memcpy(
-                tbuf.as_mut_ptr() as *mut (),
-                cl.con.text.as_ptr() as *const (),
-                crate::client::console_t::CON_TEXTSIZE * core::mem::size_of::<i16>(),
-            );
-        }
+        Com_Memcpy(
+            tbuf.as_mut_ptr() as *mut (),
+            cl.con.text.as_ptr() as *const (),
+            crate::client::console_t::CON_TEXTSIZE * core::mem::size_of::<i16>(),
+        );
         for i in 0..crate::client::console_t::CON_TEXTSIZE {
             cl.con.text[i] = ((ColorIndex(COLOR_WHITE) << 8) | (b' ' as i32)) as i16;
         }

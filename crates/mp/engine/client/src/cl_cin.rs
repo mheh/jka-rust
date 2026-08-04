@@ -556,13 +556,11 @@ pub fn readQuadInfo(common: &mut Common, cl: &mut Client, qData: *mut byte) {
     cl.cinTable[handle].VQ0 = cl.cinTable[handle].VQNormal;
     cl.cinTable[handle].VQ1 = cl.cinTable[handle].VQBuffer;
 
-    unsafe {
-        let linbuf = cl.cin.linbuf.as_mut_ptr() as usize;
-        cl.cinTable[handle].t[0] =
-            (0 - linbuf as c_long) + linbuf as c_long + cl.cinTable[handle].screenDelta;
-        cl.cinTable[handle].t[1] =
-            (0 - (linbuf as c_long + cl.cinTable[handle].screenDelta)) + linbuf as c_long;
-    }
+    let linbuf = cl.cin.linbuf.as_mut_ptr() as usize;
+    cl.cinTable[handle].t[0] =
+        (0 - linbuf as c_long) + linbuf as c_long + cl.cinTable[handle].screenDelta;
+    cl.cinTable[handle].t[1] =
+        (0 - (linbuf as c_long + cl.cinTable[handle].screenDelta)) + linbuf as c_long;
 
     cl.cinTable[handle].drawX = cl.cinTable[handle].CIN_WIDTH as c_long;
     cl.cinTable[handle].drawY = cl.cinTable[handle].CIN_HEIGHT as c_long;
@@ -1157,14 +1155,12 @@ pub fn RoQReset(view: &mut EngineHostView, cl: &mut Client) {
             0,
             fsOrigin_t::FS_SEEK_SET as c_int,
         );
-        unsafe {
-            FS_Read(
-                view.common,
-                cl.cin.file.as_mut_ptr() as *mut (),
-                16,
-                cl.cinTable[handle].iFile,
-            );
-        }
+        FS_Read(
+            view.common,
+            cl.cin.file.as_mut_ptr() as *mut (),
+            16,
+            cl.cinTable[handle].iFile,
+        );
         RoQ_init(view.common, cl);
         // let the background thread start reading ahead
         Sys_BeginStreamedFile(cl.cinTable[handle].iFile, 0x10000);
@@ -1272,13 +1268,11 @@ pub fn CIN_PlayCinematic(
     for (slot, &b) in name_buf.iter_mut().zip(&composed[..copied]) {
         *slot = b as c_char;
     }
-    unsafe {
-        COM_DefaultExtension(
-            name_buf.as_mut_ptr(),
-            name_buf.len() as c_int,
-            c".roq".as_ptr(),
-        );
-    }
+    COM_DefaultExtension(
+        name_buf.as_mut_ptr(),
+        name_buf.len() as c_int,
+        c".roq".as_ptr(),
+    );
     let name = file_name_to_string(&name_buf);
 
     if systemBits & CIN_SYSTEM == 0 {
@@ -1373,14 +1367,12 @@ pub fn CIN_PlayCinematic(
 
     initRoQ(cl);
 
-    unsafe {
-        FS_Read(
-            view.common,
-            cl.cin.file.as_mut_ptr() as *mut (),
-            16,
-            cl.cinTable[handle].iFile,
-        );
-    }
+    FS_Read(
+        view.common,
+        cl.cin.file.as_mut_ptr() as *mut (),
+        16,
+        cl.cinTable[handle].iFile,
+    );
 
     let roq_id = cl.cin.file[0] as c_ushort + cl.cin.file[1] as c_ushort * 256;
     if roq_id == 0x1084 {
@@ -1448,15 +1440,13 @@ pub fn RoQInterrupt(view: &mut EngineHostView, cl: &mut Client) {
 
     let mut sbuf = [0i16; SBUF_LEN];
 
-    unsafe {
-        Sys_StreamedRead(
-            view.common,
-            cl.cin.file.as_mut_ptr() as *mut (),
-            (cl.cinTable[handle].RoQFrameSize + 8) as c_int,
-            1,
-            cl.cinTable[handle].iFile,
-        );
-    }
+    Sys_StreamedRead(
+        view.common,
+        cl.cin.file.as_mut_ptr() as *mut (),
+        (cl.cinTable[handle].RoQFrameSize + 8) as c_int,
+        1,
+        cl.cinTable[handle].iFile,
+    );
     if cl.cinTable[handle].RoQPlayed >= cl.cinTable[handle].ROQSize {
         if cl.cinTable[handle].holdAtEnd == qfalse {
             if cl.cinTable[handle].looping != qfalse {

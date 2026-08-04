@@ -10,6 +10,10 @@
 //! (len_arg / the trap-204 product) wins over a fixed size_of, and trap 204's
 //! `args[2]*args[4]` is the only product special-case.
 
+// Three consumers include this file by `#[path]` and each reads a subset of the
+// tables, so an item with no reader in one consumer is live in another.
+#![allow(dead_code)]
+
 use std::path::Path;
 
 use serde_json::Value;

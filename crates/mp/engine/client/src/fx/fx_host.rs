@@ -135,10 +135,7 @@ impl FxHost<'_, '_> {
         match self {
             FxHost::Engine { view, .. } => {
                 let mut data = vec![0u8; len];
-                // SAFETY: `FS_Read2` writes `len` bytes into the buffer we just sized.
-                unsafe {
-                    FS_Read2(view.common, data.as_mut_ptr() as *mut (), len as c_int, fh);
-                }
+                FS_Read2(view.common, data.as_mut_ptr() as *mut (), len as c_int, fh);
                 data
             }
             FxHost::Harness(h) => match h.open_files.get_mut(&fh) {
