@@ -129,3 +129,338 @@ The `--ignored` leg of `ghoul2_vertex_golden` aborts in `re_from_view` (`crates/
 ### Standing items this landing leaves open
 
 Three items outlive the lane. Two are stale comments the packet's write scope excluded: the `g_turret_G2.rs:189` cite and the present-tense DEC-65 entry in the ledger. The third is the `ghoul2_vertex_golden` rig defect, which predates this work and needs its own ticket, because it blocks the image-golden half of the DEC-65 gate that later gh#31 steps depend on.
+
+## Follow-up: the conformance pass (lane-review clerk, 2026-08-03)
+
+A conformance clerk read the packet with its Amendments, the finished file, and the whole diff `e9c7cf8c..d666bad3` hunk by hunk, then re-ran every gate the finished file claims. The clerk judges nothing and approves nothing. The report below is the evidence half of the lane-review, and the disposition stays with the reviewer.
+
+The clerk re-ran the gates on `d666bad3` with a clean tree. All of them reproduce. The base-commit checks used a throwaway git worktree at `e9c7cf8c` with its own `CARGO_TARGET_DIR`, and the worktree was removed afterwards.
+
+Em dashes in the clerk's own prose are normalized to plain hyphens for house style. Em dashes inside quoted source lines, diff hunks, and captured tool output are evidence, so they keep their original bytes.
+
+### Clerk report
+
+#### 1. Letter violations
+
+**1.1 - File outside the write scopes: `crates/mp/renderer/src/render_state/placeholders.rs`.** The packet's Paths list names ten paths plus `.claude/packets/31/step-001/`. This file is not among them. Changed in commit `62b2e7af`:
+
+```
+--- a/crates/mp/renderer/src/render_state/placeholders.rs
++++ b/crates/mp/renderer/src/render_state/placeholders.rs
+@@ -168,7 +168,7 @@ pub struct RefEntity {
+     /// The entity's attached Ghoul2 instance list, decoded from the tier-1
+-    /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `tr_scene.rs`). Raven
++    /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `mp_engine_ghoul2::token`). Raven
+```
+
+**1.2 - File outside the write scopes, in a commit outside the bundle: `docs/audits/2026-08-03-ghoul2-token-conversion-renderer.md`.** 48 lines appended in `d666bad3` (`audit: ghoul2 token conversion landing (DEC-65 ruling 3)`), the tip of the diff range. The packet's bundle has five commits and the finished file lists five. This is a sixth.
+
+**1.3 - Behavior change to a dispatch arm that the Conversion rules do not describe: `sv_game.rs` `G_G2_DUPLICATEGHOUL2INSTANCE` no longer calls the callee on a non-null slot.** The packet's Class 1 rule reads "read the slot token into a stack cell with `from_token`, call the `g2api_*` function, write the cell back into the slot with `to_token`". The sv arm instead moved the call inside the null-slot branch and builds the cell literally, not through `from_token`:
+
+```
+-            let g2_from = &mut *(*args.offset(1) as *mut CGhoul2Info_v);
+-            let pp = vma(view.common, args, 2) as *mut *mut CGhoul2Info_v;
+-            // Raven `*g2To = new CGhoul2Info_v` (assert `!*g2To`) — the seam owns
+-            // the box; the ported fn takes the deref'd handle.
++            let mut g2_from = CGhoul2Info_v::from_token(*args.offset(1) as *mut c_void);
++            let pp = vma(view.common, args, 2) as *mut *mut c_void;
++            // Raven `*g2To = new CGhoul2Info_v` (assert `!*g2To`) builds the destination object.
++            // The destination starts empty, so the copy allocates and the write-back carries the new handle out.
+             if (*pp).is_null() {
+-                *pp = Box::into_raw(Box::new(CGhoul2Info_v { mItem: 0 }));
++                let mut g2_to = CGhoul2Info_v { mItem: 0 };
++                g2api_duplicate_ghoul2_instance(g2, &mut g2_from, &mut g2_to);
++                *pp = g2_to.to_token();
+             }
+-            let g2_to = &mut **pp;
+-            g2api_duplicate_ghoul2_instance(g2, g2_from, g2_to);
+             return 0;
+```
+
+Before the change the sv arm called `g2api_duplicate_ghoul2_instance` on every dispatch. After it, a non-null slot reaches no call. The callee's own body is:
+
+```rust
+pub fn g2api_duplicate_ghoul2_instance(
+    g2: &mut Ghoul2System,
+    g2_from: &mut CGhoul2Info_v,
+    g2_to: &mut CGhoul2Info_v,
+) {
+    if g2_to.is_valid(g2) {
+        return;
+    }
+    let _ = g2api_copy_ghoul2_instance(g2, g2_from, g2_to, -1);
+}
+```
+
+The two client twins already had the call inside the null branch before this lane, so only the sv arm moved.
+
+**Nothing else exceeded the contract.** A mechanical scan of all 801 added lines found no added `#[repr]`, no added `offset_of!` or `size_of` assert, no added cvar call, no `FrameEvent` variant, no added `impl`, `trait`, `struct`, or `enum`, no added or reordered dispatch condition, and no dependency edit. `crates/mp/renderer-gpu/Cargo.toml` already carried `mp_engine_ghoul2 = { path = "../engine/ghoul2" }`, and no `Cargo.toml` is in the range. The complete added `pub` set is exactly the contract's list:
+
+```
+crates/mp/engine/ghoul2/src/lib.rs: pub mod token;
+crates/mp/engine/ghoul2/src/shared/cghoul2_info_v.rs:     pub fn from_token(token: *mut c_void) -> CGhoul2Info_v {
+crates/mp/engine/ghoul2/src/shared/cghoul2_info_v.rs:     pub fn to_token(&self) -> *mut c_void {
+crates/mp/engine/ghoul2/src/token.rs: pub fn ghoul2_token_decode(token: *mut c_void) -> Option<Ghoul2Handle> {
+crates/mp/engine/ghoul2/src/token.rs: pub fn ghoul2_token_encode(handle: Option<Ghoul2Handle>) -> *mut c_void {
+```
+
+The removed `pub` set is exactly the two `tr_scene.rs` definitions. Write-back sites number exactly 13, which matches the packet's arm set: `sv_game.rs:3151,3394,3416,3425,3436`, `cl_cgame.rs:2953,3040,3172,3199`, `cl_ui.rs:2065,2114,2269,2306`. `oracle/` is unmodified, and `git log origin/master..master` is 116 commits, so nothing was pushed.
+
+#### 2. The named hunks
+
+The clerk quoted all twelve named hunks verbatim. The full quotations live in the session record. The load-bearing ones follow.
+
+`crates/mp/engine/ghoul2/src/token.rs`, the whole new file:
+
+```rust
+//! The module-visible Ghoul2 token (DEC-65 ruling 3).
+//!
+//! Every ghoul2 reference that leaves the engine crosses as `Ghoul2Handle + 1`, cast to pointer width.
+//! Null round-trips to `None`, because handle `0` is the always-invalid arena id (`info_array.rs:132-137`).
+//! One scheme serves the module `void*` slots and `refEntity_t.ghoul2`.
+//! That is what lets cgame copy its slot value straight into the render entity, and the renderer decode it.
+//! Raw ghoul2 pointers never leave the engine.
+//!
+//! The scheme is live at every seam as of 2026-08-03, which closes the split `tr_scene.rs` used to flag.
+//! The render trap decoded tokens while `sv_game.rs` handed out `Box<CGhoul2Info_v>` pointers in the same `void*` slot.
+//! All 115 ghoul2 trap arms in `sv_game.rs`, `cl_cgame.rs`, and `cl_ui.rs`, plus the two `sv_world.rs` slot readers, now decode this token.
+
+use core::ffi::c_void;
+
+use crate::info_array::Ghoul2Handle;
+
+/// Decodes a module-visible ghoul2 token into a [`Ghoul2Handle`].
+/// A null token reads as no instance.
+pub fn ghoul2_token_decode(token: *mut c_void) -> Option<Ghoul2Handle> {
+    if token.is_null() {
+        None
+    } else {
+        Some(Ghoul2Handle(token as i32 - 1))
+    }
+}
+
+/// Encodes a [`Ghoul2Handle`] back into the module-visible token.
+/// The inverse of [`ghoul2_token_decode`], and `None` encodes as null.
+pub fn ghoul2_token_encode(handle: Option<Ghoul2Handle>) -> *mut c_void {
+    match handle {
+        Some(h) => (h.0 + 1) as *mut c_void,
+        None => core::ptr::null_mut(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_token_round_trips_to_none() {
+        assert!(ghoul2_token_decode(ghoul2_token_encode(None)).is_none());
+        assert!(ghoul2_token_encode(None).is_null());
+    }
+
+    #[test]
+    fn handle_round_trips_through_the_token() {
+        let handle = Ghoul2Handle(1024);
+        let token = ghoul2_token_encode(Some(handle));
+        assert!(!token.is_null());
+        assert_eq!(ghoul2_token_decode(token), Some(handle));
+    }
+
+    /// Handle `0` is a real value on the arena side, and it must not collide with the null token.
+    #[test]
+    fn zero_handle_is_not_the_null_token() {
+        let token = ghoul2_token_encode(Some(Ghoul2Handle(0)));
+        assert!(!token.is_null());
+        assert_eq!(ghoul2_token_decode(token), Some(Ghoul2Handle(0)));
+    }
+}
+```
+
+The two function bodies are byte-identical to the definitions deleted from `tr_scene.rs`. The module doc cites `info_array.rs:132-137` where the packet's Ground truth paragraph cited `info_array.rs:132-151`.
+
+The `deep_copy` hunk, `crates/mp/engine/ghoul2/src/shared/cghoul2_info_v.rs`:
+
+```
+-    /// Raven `CGhoul2Info_v::DeepCopy` — frees this handle, then (if `other`
+-    /// is non-null) allocates a fresh slot, copies `other`'s instance vector,
+-    /// and zeroes each copied instance's runtime-only fields (`mBoneCache`,
+-    /// `mTransformedVertsArray`, `mSkelFrameNum`, `mMeshFrameNum`) so no
+-    /// runtime state aliases across the copy.
++    /// Raven `CGhoul2Info_v::DeepCopy` — replaces this handle's instance vector with a copy of `other`'s,
++    /// and zeroes each copied instance's runtime-only fields (`mBoneCache`, `mTransformedVertsArray`,
++    /// `mSkelFrameNum`, `mMeshFrameNum`) so no runtime state aliases across the copy.
++    ///
++    /// DIVERGENCE (DEC-65 ruling 3, the 2026-08-03 in-place ruling).
++    /// Raven does `Free()` then `Alloc()`, which gives the destination a new `mItem` while the destination
++    /// *object* keeps its address, so a module that holds that object still sees the copy.
++    /// Here the destination object is the module's own 4-byte token slot, passed by value into the trap,
++    /// so a new `mItem` would die in the discarded stack cell and leak the arena slot.
++    /// This body therefore keeps the destination handle when one exists and replaces the arena contents in place.
++    /// It allocates only for a `mItem: 0` destination, and it frees the replaced instances' bone caches,
++    /// which is the half of Raven's `Free()` that has an effect outside the destination handle.
++    /// A live destination with an empty source keeps its handle and ends up with an empty vector, where Raven ends up null.
++    /// The one caller guards on `g2From.IsValid()` (`api_models.rs:653`), so that state is unreachable from a trap arm.
+     ///
+-    /// Source: `oracle/codemp/ghoul2/ghoul2_shared.h:382-397`
++    /// Source: `oracle/codemp/ghoul2/ghoul2_shared.h:382-397`, `oracle/codemp/ghoul2/G2_API.cpp:2239-2259`
+     pub fn deep_copy(&mut self, g2: &mut Ghoul2System, other: &CGhoul2Info_v) {
+...
+-        self.free(g2);
+-        if other.mItem != 0 {
+-            self.alloc(g2);
+-            let copy = g2.info_array.get(other.mItem).to_vec();
+-            let dest = g2.info_array.get_mut(self.mItem);
+-            *dest = copy;
+-            for info in dest.iter_mut() {
+-                info.bone_cache = None;
+-                info.transformed_verts_array = None;
+-                info.skel_frame_num = 0;
+-                info.mesh_frame_num = 0;
++        if self.mItem == 0 {
++            if other.mItem == 0 {
++                return;
+             }
++            self.alloc(g2);
++        }
++
++        // Raven's `Free()` reaches `DeleteLow`, which frees every replaced instance's bone cache
++        // (`G2_API.cpp:319-326`) from the sibling arena. The in-place body keeps that half.
++        let stale: Vec<_> = g2
++            .info_array
++            .get_mut(self.mItem)
++            .iter_mut()
++            .filter_map(|info| info.bone_cache.take())
++            .collect();
++        for id in stale {
++            remove_bone_cache(g2, id);
++        }
++
++        let copy = if other.mItem == 0 {
++            Vec::new()
++        } else {
++            g2.info_array.get(other.mItem).to_vec()
++        };
++        let dest = g2.info_array.get_mut(self.mItem);
++        *dest = copy;
++        for info in dest.iter_mut() {
++            info.bone_cache = None;
++            info.transformed_verts_array = None;
++            info.skel_frame_num = 0;
++            info.mesh_frame_num = 0;
+         }
+     }
+```
+
+The signature is unchanged. Two unit tests were added where the packet asked for one.
+
+The `sv_world.rs` diagnostic guard:
+
+```
+                 if view.cvar_integer("sv_showghoultraces") != 0 {
+-                    mp_engine_qcommon::common::common::com_printf(
+-                        view.common,
+-                        &format!(
+-                            "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
+-                            (*clip).useLod,
+-                            Distance((*clip).start, (*clip).end),
+-                            (&*((*touch).ghoul2 as *mut CGhoul2Info_v))
+-                                .get(&*(view.g2.as_raw() as *mut Ghoul2System), 0)
+-                                .file_name
+-                        ),
+-                    );
++                    let trace_g2 = CGhoul2Info_v::from_token((*touch).ghoul2);
++                    let g2_read = &*(view.g2.as_raw() as *mut Ghoul2System);
++                    // The print indexes model 0, so an empty or stale cell skips it instead of panicking.
++                    if trace_g2.size(g2_read) > 0 {
++                        mp_engine_qcommon::common::common::com_printf(
++                            view.common,
++                            &format!(
++                                "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
++                                (*clip).useLod,
++                                Distance((*clip).start, (*clip).end),
++                                trace_g2.get(g2_read, 0).file_name
++                            ),
++                        );
++                    }
+                 }
+```
+
+The clerk found nothing wrong with the three CLEANMODELS arms, the four remove-family write-back arms, the three COPYGHOUL2INSTANCE null-guard arms, the three COPYSPECIFICGHOUL2MODEL arms and their §19 notes, the unguarded sv trio, the `CG_FX_PLAY_BOLTED_EFFECT_ID` arm, the two import hunks, or the `placeholders.rs` cite change, beyond the items listed under sections 1, 3, and 6.
+
+#### 3. Ledger mismatches
+
+Behaviors visible in the diff that the finished file does not mention. A confessed choice is not a mismatch, and the finished file's confessed set is excluded.
+
+1. **The sv `G_G2_DUPLICATEGHOUL2INSTANCE` call-skip**, quoted at 1.3. The finished file has no line about this arm, and the commit-4 body names it only as a write-back arm.
+2. **The sv duplicate arm builds its destination cell literally**, as `let mut g2_to = CGhoul2Info_v { mItem: 0 };`, where the packet's Class 1 rule says `from_token`. The same literal appears in the two client twins.
+3. **The "six sv_game arms" count is seven.** The finished file states "The six `sv_game` arms that only index through `get_mut` bind the cell without `mut`". Seven arms do: `sv_game.rs` lines 3156, 3296, 3558, 3567, 3742, 3772, 3778.
+4. **Handle `0` does not survive the `from_token` and `to_token` pair, while the new unit test pins that it survives the free-function pair.** `to_token` maps `mItem == 0` to null. The finished file records the third test only as "a third case was added for handle `0` against the null token". The packet's Surface contract does state the `to_token` null encoding, so the letter holds. The two layers behave differently for handle `0`, and that is unstated.
+5. **`cl_cgame.rs` `CG_G2_COPYSPECIFICGHOUL2MODEL` lost its `// SAFETY:` line outright** together with its `unsafe` block, where the finished file's Commit 3 note says such prefixes "became plain notes".
+6. **`deep_copy`'s `Source:` cite gained a second file**, `oracle/codemp/ghoul2/G2_API.cpp:2239-2259`.
+7. **The `token.rs` module doc cites `info_array.rs:132-137`** where the packet's ground truth cited `info_array.rs:132-151`.
+
+#### 4. The inventories
+
+Files changed against the write scopes. Twelve of fourteen are in scope. The two exceptions are `crates/mp/renderer/src/render_state/placeholders.rs` and this audit file itself.
+
+Commits against the bundle. All five bundle items map one to one, with no split and no reorder.
+
+| Bundle item | Commit | Match |
+|---|---|---|
+| 1. token helpers plus `deep_copy` | `7833dc68` | yes |
+| 2. `cl_ui.rs` plus the audit report in the body | `49419369` | yes, and the audit report is present |
+| 3. `cl_cgame.rs` | `92e136de` | yes |
+| 4. `sv_game.rs` plus `sv_world.rs` | `129cc053` | yes |
+| 5. doc close-out | `62b2e7af` | yes, plus the out-of-scope `placeholders.rs` |
+| not in the bundle | `d666bad3` | the audit commit |
+
+Commit messages against the rules. All six carry a heading subject in `scope(gh#31 wN): noun phrase` form, subject lengths 41 to 81. Bodies are unwrapped STE-flavored paragraphs. A mechanical lint of every body found 0 em dashes, 0 semicolons outside backticks, and 0 trailers of any kind. Each commit is unsigned, which matches the packet's `--no-gpg-sign`.
+
+#### 5. Repo mechanics on added lines
+
+- No `use` declaration inside a function body. All 16 added `use` lines sit at file top, except `use super::*;` in the `token.rs` `#[cfg(test)]` module, which porting-rules exempts.
+- No `todo!()` and no other placeholder. Zero `todo!`, zero `unimplemented!`, zero `TODO` strings added.
+- Four added items carry no oracle `Source:` cite: `ghoul2_token_decode`, `ghoul2_token_encode`, `from_token`, and `to_token`. The two free functions are relocated byte for byte from `tr_scene.rs`, whose deleted definitions also carried no cite. `from_token` and `to_token` are new, and they are the only members of that `impl` block without a `Source:` line.
+- No new extern forward-declaration block. Zero `extern "` lines added.
+- One `format!` on an added line, in `sv_world.rs`. It feeds `com_printf`, so it builds a console diagnostic and not a wire string. It is the pre-existing `sv_showghoultraces` print, re-indented one level by the new guard.
+
+#### 6. House-style violations on added lines
+
+1. **One em dash**, in the `deep_copy` doc: ``/// Raven `CGhoul2Info_v::DeepCopy` — replaces this handle's instance vector with a copy of `other`'s,``
+2. **Two prose semicolons.** In code, `sv_world.rs`: `// design); \`(*touch).ghoul2\` is the module's ghoul2 token (DEC-65 ruling 3).` In the finished file: "which was done; the golden itself could not execute on either side of the change." Four further prose semicolons landed in this audit file under commit `d666bad3`. Semicolons inside backticked C source are code, not prose, and are not counted.
+3. **Pet vocabulary on three added lines.** "seam" in the `token.rs` module doc and in the `cghoul2_info_v.rs` lifecycle block. "canonical" in the finished file.
+4. **Comments that narrate mechanics.** Three families, each repeated once per dispatch file: `// The slot reads into a stack cell, and the write-back below carries the new handle out.`, `// The arm reads the slot but never writes it, because the call is a pure read.`, and `// Both sides come across by value, so this arm has no slot to write back through.`
+5. **A doc comment off the content rules.** The `deep_copy` doc is 15 `///` lines, of which the DIVERGENCE block is 10, against the house rule of 1 to 2 lines for a method. The packet's Surface contract required a divergence record at this site, so the length is the part that exceeds the rule. Two of its lines also break inside a sentence at a point that is not a clause boundary, with joined lengths under 150.
+6. Clean: no banned voice, no antithesis constructions, zero added comment lines over 150 columns, zero contractions, zero marketing adjectives.
+
+#### 7. The gate claims, re-run
+
+Every gate re-run by the clerk on `d666bad3` with a clean tree.
+
+| Claim in the finished file | Command | Real output |
+|---|---|---|
+| `cargo build --workspace` green | `cargo build --workspace` | Green, exit 0. Warnings: `mp_engine_client` 26, `mp_renderer` 1, `mp_uishared` 2. |
+| `cargo test --workspace` green, no failures | `cargo test --workspace` | Green, exit 0. No `FAILED`. |
+| the new unit tests | `cargo test -p mp_engine_ghoul2 --lib` | 89 passed, 0 failed. `deep_copy_allocates_an_empty_destination` ok, `deep_copy_keeps_a_live_destination_handle` ok, and all three `token::tests` ok. |
+| world goldens byte-identical under `--ignored` | `JKA_REF_BASEPATH=~/Developer/jka/jka_server cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1 --nocapture` | `test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 73.78s`. `git status` clean afterwards, so no golden was rewritten. |
+| `ghoul2_vertex_golden` default leg passes | `cargo test -p mp_renderer_gpu --test ghoul2_vertex_golden` | `ignored, needs retail assets and a GPU; run locally with --ignored`, 0 passed, 0 failed, 1 ignored. The file holds one test and it is `#[ignore]`d, so the default leg is a skip. |
+| the `--ignored` leg aborts in `re_from_view` | same test with `-- --ignored --nocapture` | Reproduced: `panicked at crates/mp/renderer/src/hook_install.rs:58:5: null pointer dereference occurred`, `signal: 6, SIGABRT`. |
+| the abort predates the work | worktree at `e9c7cf8c`, separate `CARGO_TARGET_DIR`, same command | Reproduced at the base commit with the same panic site and the same SIGABRT. Debug profile only. The clerk did not re-run the release profile. |
+| lockstep referee suite green, 9 passed, no self-skip, reflogs unchanged | `JKA_REF_BASEPATH=~/Developer/jka/jka_server cargo test -p jampgame --test referee -- --ignored --test-threads=1 --nocapture`, after `cargo build --workspace`, with the oracle dylib present | `test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 18.07s`. Zero case-insensitive matches for "skip", so no self-skip. Real-map work confirmed by `===== referee PASS — scenario 'real-ffa1-items': 2501 frames byte-identical; 15006 client-states, 275856 entity-states, 850498 syscalls compared =====`. `regenerate_logs` rewrote all eight `.reflog` files, and `git status --short` afterwards is empty. |
+| the crate warning count returns to its pre-change value | `cargo build -p mp_engine_client` at HEAD and at `e9c7cf8c` | 26 warnings at both. The claim holds. |
+
+No environment piece was missing. `~/Developer/jka/jka_server/base/assets0.pk3` and `tools/referee-oracle/build/liboraclejampgame.dylib` both exist.
+
+#### 8. The unverified list
+
+Named plainly. None is assumed fine.
+
+1. **The "115 ghoul2 trap arms" figure** in the `token.rs` module doc, and the packet's 42, 46, 27 split. A raw condition count gives 47, 54, and 35 hits, which over-counts multi-condition arms. The counting method could not be settled mechanically.
+2. **The pre-flight class-2 audit result.** The clerk confirmed every cite the commit body names, and confirmed no save or load trap arm exists in the three dispatch files. The clerk did not re-derive the exhaustive mutator inventory across all 99 class-2 callees.
+3. **Whether the arm-by-arm conversions preserve module-observable behavior.** The referee suite and the world goldens cover the server and render paths. Nothing in the range exercises the `cl_ui.rs` ghoul2 arms or the copy family under a differential harness.
+4. **The `-1` return the three COPYGHOUL2INSTANCE null guards introduce.** No test and no oracle comparison covers it. The clerk did not grep the oracle tree for `trap_G2API_CopyGhoul2Instance`.
+5. **The `deep_copy` bone-cache free.** Neither new unit test asserts that the stale bone caches leave `Ghoul2System.bone_caches`.
+6. **The release-profile SIGSEGV** the finished file claims for the `ghoul2_vertex_golden` deviation. The clerk reproduced the debug-profile abort on both sides only.
+7. **`crates/mp/game/src/g_turret_G2.rs:189` and `docs/decisions.md:1534`.** Nothing in the diff touches them, and the clerk did not read either to confirm the described staleness.
+8. **Whether the sv duplicate call-skip changes anything observable.** That depends on whether a non-null slot can hold a stale or invalid token at that arm, which is a judgment about reachable state.
+9. **`fx_host.rs:693`.** The file is unchanged and the site still reads `let mut handle = CGhoul2Info_v { mItem: ghoul2 };`, which builds a cell from an `i32` handle value and not from a module slot. Whether that is the intended consistency is a judgment.
