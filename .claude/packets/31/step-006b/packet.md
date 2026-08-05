@@ -95,6 +95,10 @@ Ruling 1 is settled and the packet is ready for the lane, which spawns only on t
 
 **2026-08-05 - ruling 1 is taken.** The re-bless of `world_marks_duel1.png` is authorized on the recommendation, exactly this one fixture, gated on the bless-STOP comparison. The packet is ready for the lane.
 
+**2026-08-05 - the STOP resolved: the step ships without an image observer.** The lane stopped on the "marks golden did not move" trigger and disproved the trigger's stated cause with two reverted probes. The straight-down camera cannot observe a coplanar depth shift, so the re-bless had nothing to act on and no fixture moved. The user ruled: ship on the probe evidence plus the byte-identical battery, and live play is the visual gate.
+
+**2026-08-05 - lane-review closed, merge clean.** A Fable investigator (user-ordered) walked the diff, re-ran every gate green, and closed the direction question the lane's probes left open: a two-sided probe proved negative bias advances the decal toward the viewer on Metal (positive bias made the mark vanish, matching the golden's differing-pixel analysis), so `constant: -2, slope_scale: -1.0` carries the correct sign against the `Depth32Float`/`LessEqual`/near-zero depth setup. Findings, all cosmetic: the finished file's deviation 3 miscounts its own comment breaks, and one pre-existing semicolon sits in a `PipelineKey` doc line the lane touched one word of. No code change. The magnitude at oblique angles stays on live play, as ruled.
+
 ## Amendments
 
 **2026-08-05 - the draft awaits the user audit.**
