@@ -4039,7 +4039,6 @@ fn decode_md3_surface(
     sin_table: &[f32; FUNCTABLE_SIZE],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
     let model = models.get(md3_ref.h_model)?;
-    // `md3_ptr` covers both old skips at once.
     // An unpublished slot and an unloaded LOD are both `None`, and a published LOD never names a null pointer.
     let header = model.md3_ptr(md3_ref.lod as usize)?;
 

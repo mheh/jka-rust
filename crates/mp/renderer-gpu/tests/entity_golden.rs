@@ -1,29 +1,27 @@
-//! Entity image golden: render one MD3 map object and one Ghoul2 player in a fixed duel1 scene and compare the
-//! pixels to a committed PNG.
+//! Entity image golden: render one MD3 map object and one Ghoul2 player in a fixed duel1 scene and compare the pixels to a committed PNG.
 //!
-//! This is the gate gh#31 step-004 needed. The world goldens draw no entity, the scene goldens draw no `RT_MODEL`,
-//! and the ghoul2 vertex golden locks a vertex stream rather than pixels, so the migrated `MOD_MESH` arm had no
-//! proof that it puts anything on screen. This test draws both migrated arms in one scene and locks the result.
+//! This is the gate gh#31 step-004 needed.
+//! The world goldens draw no entity, the scene goldens draw no `RT_MODEL`, and the ghoul2 vertex golden locks a vertex stream rather than pixels,
+//! so the migrated `MOD_MESH` arm had no proof that it puts anything on screen.
+//! This test draws both migrated arms in one scene and locks the result.
 //! DEC-54 names image goldens on fixed scenes as the verification shape.
 //!
-//! The scene boots exactly like `tests/world_golden.rs`: the same `BootConfig`, the `JKA_BASEPATH` override, an
-//! offscreen `Gpu`, and `maps/mp/duel1.bsp`. It then registers `models/map_objects/bespin/twinpodcc.md3` through
-//! `boot::register_model` and inits one stormtrooper through the `init_ghoul2` recipe, adds both as `RT_MODEL`
-//! entities at fixed origins in front of the eye, and records one frame at the frozen clock.
+//! The scene boots exactly like `tests/world_golden.rs`:
+//! the same `BootConfig`, the `JKA_BASEPATH` override, an offscreen `Gpu`, and `maps/mp/duel1.bsp`.
+//! It then registers `models/map_objects/bespin/twinpodcc.md3` through `boot::register_model`
+//! and inits one stormtrooper through the `init_ghoul2` recipe,
+//! adds both as `RT_MODEL` entities at fixed origins in front of the eye, and records one frame at the frozen clock.
 //! Both entities carry a zero radius, which pins the Ghoul2 LOD to 0.
 //!
-//! Bless provenance: blessed on 2026-08-05 during gh#31 step-004, on the client register path with `dedicated` at
-//! `"0"`.
+//! Bless provenance: blessed on 2026-08-05 during gh#31 step-004, on the client register path with `dedicated` at `"0"`.
 //! The origins below are the blessed placement, and moving any of them moves the image.
 //!
-//! The test is `#[ignore]`d, matching the other image goldens: it needs the retail assets and a GPU, so it runs
-//! locally, not in CI.
+//! The test is `#[ignore]`d, matching the other image goldens: it needs the retail assets and a GPU, so it runs locally, not in CI.
 //! Run it with `cargo test -p mp_renderer_gpu --test entity_golden -- --ignored --test-threads=1`.
 //! Serial only: two engine boots in parallel threads crash in the GPU init.
 //!
 //! Bless flow: set `JKA_GOLDEN_BLESS=1` to write the golden and pass.
-//! On a mismatch without that env var, the test writes the actual image next to the golden as
-//! `entity_duel1.actual.png` and fails.
+//! On a mismatch without that env var, the test writes the actual image next to the golden as `entity_duel1.actual.png` and fails.
 
 use std::fs::File;
 use std::io::BufReader;
@@ -68,7 +66,8 @@ const EYE_HEIGHT: f32 = 40.0;
 /// The horizontal field of view in degrees, matching `world_golden`.
 const FOV_X: f64 = 90.0;
 
-/// The per-channel match tolerance. Zero means an exact match.
+/// The per-channel match tolerance.
+/// Zero means an exact match.
 const CHANNEL_TOLERANCE: u8 = 0;
 
 /// The shipped map object the `MOD_MESH` arm draws, the one `world_harness` already mounts.
@@ -77,8 +76,8 @@ const MD3_MODEL_NAME: &str = "models/map_objects/bespin/twinpodcc.md3";
 /// The shipped player model the `MOD_MDXM` arm draws in its base skeleton pose.
 const GHOUL2_MODEL_NAME: &str = "models/players/stormtrooper/model.glm";
 
-/// The MD3 map object stands this far in front of the eye and this far to the left. Yaw and pitch are zero, so
-/// forward is `+X` and left is `+Y`.
+/// The MD3 map object stands this far in front of the eye and this far to the left.
+/// Yaw and pitch are zero, so forward is `+X` and left is `+Y`.
 const MD3_FORWARD_DIST: f32 = 260.0;
 const MD3_SIDE_OFFSET: f32 = 110.0;
 const MD3_DROP: f32 = 60.0;
@@ -91,8 +90,7 @@ const GHOUL2_DROP: f32 = 40.0;
 /// Builds the frozen scene refdef at `eye`, looking straight ahead (yaw 0, pitch 0), through the fixed viewport.
 /// This mirrors `world_golden::build_refdef`.
 fn build_refdef(eye: [f32; 3]) -> refdef_t {
-    // SAFETY: `refdef_t` is a frozen `#[repr(C)]` POD of scalars, fixed arrays, and `vec3_t`, so an all-zero value
-    // is valid.
+    // SAFETY: `refdef_t` is a frozen `#[repr(C)]` POD of scalars, fixed arrays, and `vec3_t`, so an all-zero value is valid.
     let mut rd: refdef_t = unsafe { core::mem::zeroed() };
     rd.x = 0;
     rd.y = 0;
@@ -114,8 +112,7 @@ fn build_refdef(eye: [f32; 3]) -> refdef_t {
     rd
 }
 
-/// Inits one Ghoul2 model instance through the real `mp_engine_ghoul2` init path, the same call
-/// `ghoul2_vertex_golden::init_ghoul2` makes.
+/// Inits one Ghoul2 model instance through the real `mp_engine_ghoul2` init path, the same call `ghoul2_vertex_golden::init_ghoul2` makes.
 /// Returns `None` when the model file is absent (a negative model index).
 fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Handle, qhandle_t)> {
     let mut g2 = Ghoul2System::default();
@@ -200,27 +197,25 @@ fn compare(golden: &[u8], actual: &[u8]) -> (usize, u8) {
     (differing_pixels, max_delta)
 }
 
-/// Boots duel1, registers both entity models, draws one frame with both in view, and compares the pixels to the
-/// committed golden.
+/// Boots duel1, registers both entity models, draws one frame with both in view, and compares the pixels to the committed golden.
 #[test]
 #[ignore = "needs retail assets and a GPU; run locally with --ignored"]
 fn golden_entity_duel1() {
     // ---- boot and load the world ---------------------------------------
-    // The default basepath points at one user's home. Read `JKA_BASEPATH` so another machine can re-bless the
-    // golden without editing the default.
+    // The default basepath points at one user's home.
+    // Read `JKA_BASEPATH` so another machine can re-bless the golden without editing the default.
     let mut cfg = BootConfig::default();
     if let Ok(basepath) = std::env::var("JKA_BASEPATH") {
         cfg.basepath = basepath;
     }
     let mut host = boot::boot(&cfg);
-    // The terrain surface `load_world` returns is the null-landscape seed. The executor owns its own copy since
-    // W2-F6, so this one is dropped.
+    // The terrain surface `load_world` returns is the null-landscape seed.
+    // The executor owns its own copy since W2-F6, so this one is dropped.
     let (loaded, _land_scape): (bool, srfTerrain_t) =
         boot::load_world(&mut host, "maps/mp/duel1.bsp");
     assert!(loaded, "maps/mp/duel1.bsp did not load");
 
-    // Force the first `R_MarkLeaves` to re-mark, and set the registered flag the ui boot path never sets, the same
-    // two settings `world_golden` makes.
+    // Force the first `R_MarkLeaves` to re-mark, and set the registered flag the ui boot path never sets, the same two settings `world_golden` makes.
     host.re.frame.view_cluster = -1;
     Arc::make_mut(&mut host.re.sim.published).registered = true;
 
@@ -303,8 +298,7 @@ fn golden_entity_duel1() {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
-    // The executor owns the Ghoul2 instances since W2-F5, so the stormtrooper this test built moves in before the
-    // frame runs.
+    // The executor owns the Ghoul2 instances since W2-F5, so the stormtrooper this test built moves in before the frame runs.
     executor.set_ghoul2(g2);
     let bmodel_table = BModelTable::build(&host.models);
     if let Some(world) = host.re.sim.published.world.as_ref() {
@@ -317,8 +311,7 @@ fn golden_entity_duel1() {
     gpu.clear_headless(&target);
     let float_time = FROZEN_TIME_MS as f32 * 0.001;
 
-    // Drain the staged image uploads against the sim-published master before the split borrow, the same pre-drain
-    // `world_golden` does.
+    // Drain the staged image uploads against the sim-published master before the split borrow, the same pre-drain `world_golden` does.
     let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     let stats = {

@@ -218,7 +218,8 @@ fn r_compute_lod(
         Some(header) if current_model.num_lods >= 2 => {
             // multiple LODs exist, so compute projected bounding sphere and use
             // that as a criteria for selecting LOD.
-            // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before the LOD read. See [`read_md3_frame`].
+            // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before the LOD read.
+            // See [`read_md3_frame`].
             let (bounds, _, _) = unsafe { read_md3_frame(header, ent_frame) };
             let radius = RadiusFromBounds(bounds[0], bounds[1]);
 
