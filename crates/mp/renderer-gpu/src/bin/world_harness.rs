@@ -62,6 +62,7 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_engine_ghoul2::token::ghoul2_token_encode;
 use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
@@ -709,7 +710,7 @@ impl App {
     fn record_scene(&mut self, refdef: &refdef_t) -> FrameData {
         let mut frame_data = FrameData { events: Vec::new() };
 
-        RE_ClearScene(&mut frame_data, &mut self.host.scene);
+        RE_ClearScene(&mut frame_data, &mut self.host.re.scene);
         self.record_test_entity(&mut frame_data, refdef.time);
         self.record_md3_entity(&mut frame_data, refdef.time);
         self.record_ghoul2_entity(&mut frame_data, refdef.time);
@@ -717,11 +718,11 @@ impl App {
         RE_RenderScene(
             refdef,
             &mut frame_data,
-            &self.host.sim.published,
-            &self.host.cvars,
-            &mut self.host.scene,
+            &self.host.re.sim.published,
+            &self.host.re.cvars,
+            &mut self.host.re.scene,
             &mut self.host.engine.common,
-            &self.host.sim.light_styles,
+            &self.host.re.sim.light_styles,
         );
         frame_data
     }
@@ -748,7 +749,12 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(
+            frame_data,
+            &self.host.re.sim.published,
+            &mut self.host.re.scene,
+            &ent,
+        );
     }
 
     /// Records the MD3 map-object entity through `RE_AddRefEntityToScene`. It
@@ -779,7 +785,12 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(
+            frame_data,
+            &self.host.re.sim.published,
+            &mut self.host.re.scene,
+            &ent,
+        );
     }
 
     /// Records the Ghoul2 skinned test entity through `RE_AddRefEntityToScene`.
@@ -816,7 +827,12 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
 
-        RE_AddRefEntityToScene(frame_data, &self.host.sim.published, &mut self.host.scene, &ent);
+        RE_AddRefEntityToScene(
+            frame_data,
+            &self.host.re.sim.published,
+            &mut self.host.re.scene,
+            &ent,
+        );
     }
 
     /// One frame: advance the camera, record the scene, draw it.
@@ -891,24 +907,33 @@ impl App {
                 // and lightmap for good. Every registration writes the one
                 // published registry (A9), so the drain resolves the staged
                 // handles there.
-                let uploaded = images.upload_pending(gpu, &mut host.img_state, &host.sim.published);
+                let uploaded =
+                    images.upload_pending(gpu, &mut host.re.img_state, &host.re.sim.published);
 
                 let mut stats = {
+                    // The frame pins the published registry, because `G2_SetupModelPointers` re-registers on every entity walk.
+                    // The client `RE_RegisterModel` hook then calls `Arc::make_mut(&mut re.sim.published)` through the seated `re` slot.
+                    // The clone holds a second reference, so that call copies on write instead of mutating the allocation this frame reads.
+                    let pinned = Arc::clone(&host.re.sim.published);
                     // Split the host and engine into disjoint borrows, the same
                     // shape `load_world_and_render` builds.
+                    let re_ptr: *mut RendererFrontend = &mut host.re;
                     let UiHost {
                         engine,
                         models,
-                        sim,
-                        world_load,
-                        img_state,
-                        noise,
+                        re:
+                            RendererFrontend {
+                                world_load,
+                                img_state,
+                                noise,
+                                ..
+                            },
                         ..
                     } = host;
                     let models_ptr: *mut RenderModels = &mut *models;
                     let Engine { common, cm, sv, .. } = &mut **engine;
                     let sv_ptr: *mut () = sv as *mut Server as *mut ();
-                    let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
+                    let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
                     // The persisted Ghoul2 state threads into the frame, so the
                     // bone caches the render path builds survive across frames
@@ -922,7 +947,7 @@ impl App {
                         gpu,
                         &target,
                         frame_data,
-                        &sim.published,
+                        &pinned,
                         world_load,
                         Some(&mut entity_host),
                         img_state.pending_uploads.drain().collect(),
@@ -983,7 +1008,7 @@ impl ApplicationHandler for App {
         // Upload the loaded world's geometry once, before the first frame. The
         // brush-submodel rows the same map load registered go with it (W2-F8).
         let bmodel_table = BModelTable::build(&self.host.models);
-        if let Some(world) = self.host.sim.published.world.as_ref() {
+        if let Some(world) = self.host.re.sim.published.world.as_ref() {
             executor.set_world(&gpu, world, bmodel_table);
         }
 
@@ -1131,11 +1156,12 @@ fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Han
     info.alloc(&mut g2);
 
     let model_index = {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost { engine, models, .. } = &mut *host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
     };
     if model_index < 0 {
@@ -1212,16 +1238,17 @@ fn main() {
     // Force the first frame's `R_MarkLeaves` to re-mark regardless of the
     // leftover view cluster, the same first-mark guarantee `load_world_and_render`
     // gets from forcing `areamask_modified`.
-    host.frame.view_cluster = -1;
+    host.re.frame.view_cluster = -1;
 
     // `RE_RenderScene` returns before it pushes the scene event while the
     // renderer is unregistered. Only `RE_BeginRegistration` sets the flag
     // (`tr_model/frontend.rs:791`), and this harness boots through the ui
     // path without it, so we set the flag here.
-    Arc::make_mut(&mut host.sim.published).registered = true;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
 
     // Start the camera at a spawn origin, bumped to eye height.
     let eye = host
+        .re
         .sim
         .published
         .world
@@ -1239,6 +1266,7 @@ fn main() {
     // Inline brush geometry sits at absolute map coordinates, so the entity
     // shows at its compile spot. Aim the starting camera at that spot.
     let entity_center = host
+        .re
         .sim
         .published
         .world

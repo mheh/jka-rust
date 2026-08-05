@@ -34,25 +34,18 @@ use mp_engine_qcommon::stringed::api::SE_Init;
 use mp_engine_qcommon::z_memman_pc::{Com_InitHunkMemory, Com_InitZoneMemory};
 use mp_engine_server::botlib_import::{arm_botlib_slot, botlib_import_table};
 use mp_engine_server::Server;
-use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::cvar::CVAR_INIT;
 use mp_qshared::shared::qfalse;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
-use mp_renderer::render_state::light_style_table::LightStyleTable;
 use mp_renderer::render_state::render_assets::RenderAssets;
-use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
-use mp_renderer::render_state::world_load_state::WorldLoadState;
-use mp_renderer::render_state::renderer_cvars::RendererCvars;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::renderer_frontend::{
-    empty_render_assets, zeroed_frame_state, zeroed_view_parms,
+    empty_render_assets, zeroed_view_parms, RendererFrontend,
 };
 use mp_renderer::tr_bsp::RE_LoadWorldMap;
-use mp_renderer::tr_font::FontState;
-use mp_renderer::tr_image::TrImageState;
 use mp_renderer::tr_init::R_Init;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
@@ -64,14 +57,10 @@ use mp_renderer::tr_main::{
 };
 use mp_renderer::tr_model::frontend::RE_RegisterModel;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_noise::NoiseState;
-use mp_renderer::tr_scene::SceneState;
 use mp_renderer::tr_terrain::R_TerrainInit;
-use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
 use mp_uishared::shared::display_context::DisplayContext;
 use mp_uishared::ui_shared::{Menu_Count, Menus_ActivateByName, Menus_CloseAll, String_Init};
-use native_math::rng::Rng;
 
 use crate::pipeline2d::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::ui_host::display::HarnessDc;
@@ -130,24 +119,22 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
 
-    // gh#35: `RE_RegisterModel` routes to the server registration path, because the view's `re` slot is NULL in this harness.
-    // The ghoul2 vertex fixture holds server-path output (bless commit `bc856508`, 2026-07-31), and the 2026-08-04 control run matched it byte for byte.
-    // Raven's `G2_SetupModelPointers` re-registers on every frame's entity walk, so the client path needs a seated `re` for the whole frame render.
-    // The override stands until `UiHost` owns a real `RendererFrontend`, the named prerequisite of gh#31 step-003.
-    // The two hooks have one signature, so the reassignment needs no adapter.
-    engine.common.hooks.RE_RegisterModel = engine.common.hooks.R_RegisterServerModel;
-
     // The renderer's model pool, built before the engine subset because
     // `Com_InitHunkMemory` -> `Hunk_Clear` calls the `R_HunkClearCrap` hook,
     // which casts the view's `rm` slot before doing anything else.
     let mut models = RenderModels::default();
 
+    // The carrier bundle is built before the engine subset, so every view this boot makes seats a real `re` slot.
+    // It moves into the `UiHost` literal below, the same way `models` does.
+    let mut re = RendererFrontend::new();
+
     // ---- engine subset -------------------------------------------------
     {
         let models_ptr: *mut RenderModels = &mut models;
+        let re_ptr: *mut RendererFrontend = &mut re;
         let Engine { common, cm, sv, .. } = &mut *engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         Cvar_Init(&mut view);
         Cbuf_Init(view.common);
         Com_InitZoneMemory(&mut view);
@@ -186,23 +173,7 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     let mut host = UiHost {
         engine,
         models,
-        cvars: RendererCvars::default(),
-        sim: RenderAssetsSim {
-            published: Arc::new(empty_assets()),
-            light_styles: LightStyleTable {
-                colors: [[0u8; 4]; mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES],
-            },
-        },
-        img_state: TrImageState::default(),
-        frame: zeroed_frame_state(),
-        world_load: WorldLoadState::default(),
-        scene: SceneState::default(),
-        noise: NoiseState::default(),
-        rng: Rng::new(),
-        font: FontState::default(),
-        world_effects: WorldEffectsState::default(),
-        qs: QSharedScratch::zeroed(),
-        sky_view: zeroed_view_parms(),
+        re,
         ui: UiState::default(),
         input: InputState::default(),
         stubs: StubLog::default(),
@@ -211,28 +182,34 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
 
     // ---- R_Init (the real one) -----------------------------------------
     {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            cvars,
-            sim,
-            img_state,
-            frame,
-            world_load,
-            scene,
-            noise,
-            rng,
-            font,
-            world_effects,
-            qs,
-            sky_view,
+            re:
+                RendererFrontend {
+                    cvars,
+                    sim,
+                    img_state,
+                    frame,
+                    world_load,
+                    scene,
+                    noise,
+                    rng,
+                    font,
+                    world_effects,
+                    qs,
+                    sky_view,
+                    ..
+                },
             ..
         } = &mut host;
+        // Ruling 1 keeps the event stream per-call, so `re.frame_data` stays inert in this harness.
         let mut frame_data = FrameData { events: Vec::new() };
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         R_Init(
             &mut view,
             cvars,
@@ -253,8 +230,8 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     }
     println!(
         "ui_harness: R_Init done — {} shaders, {} images registered",
-        host.sim.published.shaders.iter().count(),
-        host.sim.published.images.iter().count()
+        host.re.sim.published.shaders.iter().count(),
+        host.re.sim.published.images.iter().count()
     );
 
     host
@@ -280,9 +257,10 @@ fn ui_init_equivalent(host: &mut UiHost, cfg: &BootConfig) {
     host.engine.bot.botimport = botlib_import_table();
     {
         let models_ptr: *mut RenderModels = &mut host.models;
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let Engine { common, cm, sv, .. } = &mut *host.engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         arm_botlib_slot(&mut view, sv);
     }
     // `trap_GetGlconfig` — the harness IS the renderer, so the virtual screen
@@ -357,13 +335,17 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
     let UiHost {
         engine,
         models,
-        cvars,
-        sim,
-        img_state,
-        world_load,
-        font,
-        qs,
-        sky_view,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                font,
+                qs,
+                sky_view,
+                ..
+            },
         ui,
         input,
         stubs,
@@ -382,7 +364,9 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
         ..
     } = &mut **engine;
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
-    let view = host_view(common, cm, sv_ptr, models_ptr);
+    // The `re` slot stays null on the 2D paint path.
+    // The dc holds `&mut` borrows into the bundle's own fields, and no menu draw reaches a hook that casts the slot.
+    let view = host_view(common, cm, sv_ptr, models_ptr, null_mut());
     let mut dc = HarnessDc {
         view,
         bot,
@@ -413,16 +397,22 @@ pub fn with_dc<R>(host: &mut UiHost, body: impl FnOnce(&mut HarnessDc, &mut UiSt
 /// this slot before testing the game VM, so a null slot is a hard crash rather
 /// than a no-op.
 ///
-/// `rm` points at the harness's own [`RenderModels`] (the renderer's model
-/// pool), not `engine.render_models` — the engine's copy belongs to the
-/// headless server subset and is not what `R_Init` initialised. Every other
-/// opaque slot is null: no path this harness runs reads them, and a null slot
-/// makes that a loud crash rather than a silent wrong-island read.
+/// `rm` points at the harness's own [`RenderModels`] (the renderer's model pool), not `engine.render_models`.
+/// The engine's copy belongs to the headless server subset, and it is not what `R_Init` initialised.
+///
+/// `re` points at the harness's own [`RendererFrontend`], the slot the live client fills from `Engine.re`.
+/// Ghoul2 registration is the only path that reaches it:
+/// `G2_SetupModelPointers` takes the client leg and calls `RE_RegisterModel`, whose hook casts this slot back to the bundle.
+/// A caller passes null when it holds `&mut` borrows into the bundle's fields and reaches no hook, which is [`with_dc`]'s 2D paint case.
+///
+/// Every remaining opaque slot is null, because no path this harness runs reads them.
+/// A null slot makes a stray read a loud crash rather than a silent wrong-island read.
 pub fn host_view<'a>(
     common: &'a mut Common,
     cm: &'a mut CollisionWorld,
     sv: *mut (),
     rm: *mut RenderModels,
+    re: *mut RendererFrontend,
 ) -> EngineHostView<'a> {
     EngineHostView {
         common,
@@ -432,9 +422,7 @@ pub fn host_view<'a>(
         snd: SlotSoundSystem::from_raw(null_mut()),
         bot: SlotBotLib::from_raw(null_mut()),
         rm: SlotRenderModels::from_raw(rm as *mut ()),
-        // The harness holds its carriers as `UiHost` fields and splits them at
-        // each call, so it never reaches the renderer through this slot.
-        re: SlotRenderer::from_raw(null_mut()),
+        re: SlotRenderer::from_raw(re as *mut ()),
         rmg: SlotRmManager::from_raw(null_mut()),
         g2: SlotGhoul2::from_raw(null_mut()),
         fx: SlotFxSystem::from_raw(null_mut()),
@@ -484,23 +472,28 @@ pub struct WorldSpikeReport {
 pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
     // ---- load the BSP --------------------------------------------------
     {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            cvars,
-            sim,
-            img_state,
-            world_load,
-            scene,
-            qs,
-            sky_view,
-            world_effects,
+            re:
+                RendererFrontend {
+                    cvars,
+                    sim,
+                    img_state,
+                    world_load,
+                    scene,
+                    qs,
+                    sky_view,
+                    world_effects,
+                    ..
+                },
             ..
         } = &mut *host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         RE_LoadWorldMap(
             qs,
             world_load,
@@ -516,7 +509,7 @@ pub fn load_world(host: &mut UiHost, map: &str) -> (bool, srfTerrain_t) {
         );
     }
 
-    let loaded = host.sim.published.world.is_some();
+    let loaded = host.re.sim.published.world.is_some();
     println!(
         "world_harness: RE_LoadWorldMap(\"{map}\") -> {}",
         if loaded { "loaded" } else { "NOT LOADED" }
@@ -537,17 +530,17 @@ pub fn init_terrain(host: &mut UiHost) -> srfTerrain_t {
     // overwrites both its fields with the null-landscape terrain surface, which
     // makes `R_AddTerrainSurfaces` return early.
     let mut land_scape: srfTerrain_t = unsafe { core::mem::zeroed() };
+    let re_ptr: *mut RendererFrontend = &mut host.re;
     let UiHost {
         engine,
         models,
-        cvars,
-        sim,
+        re: RendererFrontend { cvars, sim, .. },
         ..
     } = &mut *host;
     let models_ptr: *mut RenderModels = &mut *models;
     let Engine { common, cm, sv, .. } = &mut **engine;
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
-    let mut view = host_view(common, cm, sv_ptr, models_ptr);
+    let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
     R_TerrainInit(&mut view, cvars, Arc::make_mut(&mut sim.published), &mut land_scape);
     land_scape
 }
@@ -556,22 +549,27 @@ pub fn init_terrain(host: &mut UiHost) -> srfTerrain_t {
 /// the host bundle the loader needs, and returns its handle (0 when the file is
 /// absent). The world harness registers a map object this way.
 pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
     let UiHost {
         engine,
         models,
-        cvars,
-        sim,
-        img_state,
-        world_load,
-        qs,
-        sky_view,
-        world_effects,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                qs,
+                sky_view,
+                world_effects,
+                ..
+            },
         ..
     } = &mut *host;
     let models_ptr: *mut RenderModels = &mut *models;
     let Engine { common, cm, sv, .. } = &mut **engine;
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
-    let mut view = host_view(common, cm, sv_ptr, models_ptr);
+    let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
     RE_RegisterModel(
         qs,
         world_load,
@@ -597,23 +595,28 @@ pub fn register_model(host: &mut UiHost, name: &str) -> qhandle_t {
 pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
     // ---- load the BSP --------------------------------------------------
     {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            cvars,
-            sim,
-            img_state,
-            world_load,
-            scene,
-            qs,
-            sky_view,
-            world_effects,
+            re:
+                RendererFrontend {
+                    cvars,
+                    sim,
+                    img_state,
+                    world_load,
+                    scene,
+                    qs,
+                    sky_view,
+                    world_effects,
+                    ..
+                },
             ..
         } = &mut *host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         RE_LoadWorldMap(
             qs,
             world_load,
@@ -629,7 +632,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         );
     }
 
-    let loaded = host.sim.published.world.is_some();
+    let loaded = host.re.sim.published.world.is_some();
     println!(
         "world_spike: RE_LoadWorldMap(\"{map}\") -> {}",
         if loaded { "loaded" } else { "NOT LOADED" }
@@ -637,6 +640,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
 
     // A spawn origin from the stored entity lump, bumped to eye height.
     let eye = host
+        .re
         .sim
         .published
         .world
@@ -676,6 +680,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         // frontend fog-num math reads. The spike adds no entities, so the list
         // only feeds `R_RenderView`'s fog tagging.
         let fogs: Vec<fog_t> = host
+            .re
             .sim
             .published
             .world
@@ -710,15 +715,22 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         let fov_x = parms.fovX;
         let fov_y = parms.fovY;
 
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            cvars,
-            sim,
-            frame,
-            world_load,
+            re:
+                RendererFrontend {
+                    cvars,
+                    sim,
+                    frame,
+                    world_load,
+                    ..
+                },
             ..
         } = &mut *host;
+        // The spike adds no entity, so its walk never reaches the ghoul2 register hook and this frame needs no pinned registry clone.
+        // `R_TerrainInit` writes the assets, so the site keeps the `&mut`.
         let assets = Arc::make_mut(&mut sim.published);
         // Force `R_MarkLeaves` to re-mark this frame regardless of the leftover
         // view cluster.
@@ -736,7 +748,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = host_view(common, cm, sv_ptr, models_ptr);
+        let mut engine_view = host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
         // Register the terrain cvars (`r_drawTerrain`, siblings) and init the
         // null-landscape terrain surface. `R_Init`'s ui subset skips this, so

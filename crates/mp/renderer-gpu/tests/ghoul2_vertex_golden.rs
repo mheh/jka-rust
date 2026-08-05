@@ -17,6 +17,13 @@
 //! frozen clock. The capture sink on `FrameExecutor` records each decoded ghoul2
 //! surface stream in draw-surf order.
 //!
+//! Bless provenance: the fixture ran on the server registration path until gh#31 step-003 on 2026-08-04.
+//! `UiHost` now owns a real `RendererFrontend`, so the view's `re` slot is seated and the init runs Raven's client `RE_RegisterModel`.
+//! The re-bless under that path reproduced the committed bytes exactly.
+//! Every `mdxmSurfHierarchy_t` in the stormtrooper `.glm` carries an empty shader name, so `R_FindShader` returns the default shader
+//! and the client leg writes `shaderIndex = 0`, the value the server leg forced.
+//! The 22 sort keys therefore stay tied, the draw-surf order holds, and the stormtrooper's 53 bones keep the 72-bone `_humanoid` remap off.
+//!
 //! Fixture format (`tests/goldens/ghoul2_verts_stormtrooper.bin`, all
 //! little-endian):
 //! - header: surface count, one `u32`.
@@ -57,6 +64,7 @@ use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_engine_ghoul2::token::ghoul2_token_encode;
@@ -130,13 +138,14 @@ fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Han
     info.alloc(&mut g2);
 
     let model_index = {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine, models, ..
         } = &mut *host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
         g2api_init_ghoul2_model(&mut g2, &mut view, &mut info, name, 0, 0, 0, 0, 0)
     };
     if model_index < 0 {
@@ -363,8 +372,8 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag the
     // ui boot path never sets, the same two settings `world_golden` makes.
-    host.frame.view_cluster = -1;
-    Arc::make_mut(&mut host.sim.published).registered = true;
+    host.re.frame.view_cluster = -1;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
 
     // Init one stormtrooper in its default skeleton pose. No animation call runs,
     // so the pose is deterministic.
@@ -373,6 +382,7 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // The camera sits at a spawn origin, bumped to eye height.
     let eye = host
+        .re
         .sim
         .published
         .world
@@ -387,7 +397,7 @@ fn golden_ghoul2_verts_stormtrooper() {
     // The model stands a fixed distance in front of the eye with an identity
     // axis, so its surfaces reach the draw-surf list at the frozen clock.
     let mut frame_data = FrameData { events: Vec::new() };
-    RE_ClearScene(&mut frame_data, &mut host.scene);
+    RE_ClearScene(&mut frame_data, &mut host.re.scene);
 
     let mut ent = refEntity_t::zeroed();
     ent.reType = refEntityType_t::RT_MODEL;
@@ -406,16 +416,21 @@ fn golden_ghoul2_verts_stormtrooper() {
     ent.oldframe = 0;
     ent.shaderRGBA = [255, 255, 255, 255];
     AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
-    RE_AddRefEntityToScene(&mut frame_data, &host.sim.published, &mut host.scene, &ent);
+    RE_AddRefEntityToScene(
+        &mut frame_data,
+        &host.re.sim.published,
+        &mut host.re.scene,
+        &ent,
+    );
 
     RE_RenderScene(
         &refdef,
         &mut frame_data,
-        &host.sim.published,
-        &host.cvars,
-        &mut host.scene,
+        &host.re.sim.published,
+        &host.re.cvars,
+        &mut host.re.scene,
         &mut host.engine.common,
-        &host.sim.light_styles,
+        &host.re.sim.light_styles,
     );
 
     // ---- headless GPU and the render resources -------------------------
@@ -426,7 +441,7 @@ fn golden_ghoul2_verts_stormtrooper() {
     // this test built moves in before the frame runs.
     executor.set_ghoul2(g2);
     let bmodel_table = BModelTable::build(&host.models);
-    if let Some(world) = host.sim.published.world.as_ref() {
+    if let Some(world) = host.re.sim.published.world.as_ref() {
         executor.set_world(&gpu, world, bmodel_table);
     }
 
@@ -438,26 +453,34 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // Drain the staged image uploads against the sim-published master before the
     // split borrow, the same pre-drain `world_golden` does.
-    let _uploaded = images.upload_pending(&mut gpu, &mut host.img_state, &host.sim.published);
+    let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     executor.set_ghoul2_capture(true);
 
     {
+        // The frame pins the published registry, because `G2_SetupModelPointers` re-registers on every entity walk.
+        // The client `RE_RegisterModel` hook then calls `Arc::make_mut(&mut re.sim.published)` through the seated `re` slot.
+        // The clone holds a second reference, so that call copies on write instead of mutating the allocation this frame reads.
+        let pinned = Arc::clone(&host.re.sim.published);
         // Split the host and engine into disjoint borrows, the shape
         // `world_golden` builds.
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            sim,
-            world_load,
-            img_state,
-            noise,
+            re:
+                RendererFrontend {
+                    world_load,
+                    img_state,
+                    noise,
+                    ..
+                },
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
         // The live Ghoul2 state threads into the frame, so the render path builds
         // the stormtrooper skeleton and deforms its surfaces.
@@ -470,7 +493,7 @@ fn golden_ghoul2_verts_stormtrooper() {
             &mut gpu,
             &target,
             &frame_data,
-            &sim.published,
+            &pinned,
             world_load,
             Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),

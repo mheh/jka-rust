@@ -22,7 +22,7 @@
 //! registry the registration never reached.
 //!
 //! Source: `docs/decisions.md` DEC-42.3, DEC-55.2, DEC-59.1;
-//! `crates/mp/renderer-gpu/src/ui_host/state.rs` (the harness's seated twin).
+//! `crates/mp/renderer-gpu/src/ui_host/state.rs` (the harness's own seat).
 
 use core::ffi::c_int;
 use std::sync::Arc;
@@ -62,9 +62,10 @@ use crate::tr_worldeffects::world_effects::WorldEffectsState;
 /// Every `RE_*` receiver except the model registry, which stays the one
 /// `Engine.render_models` the server and the client share (`view.rm`).
 ///
-/// `Engine.re` holds this as an `Option`, `Some` on a client build and `None`
-/// on dedicated — the same shape `Engine.cl` and `Engine.snd` already use. The
-/// seating constructor lands with the platform shell (the winit boot, DEC-56).
+/// `Engine.re` holds this as an `Option`, `Some` on a client build and `None` on dedicated, the same shape `Engine.cl` and `Engine.snd` already use.
+/// The seating constructor lands with the platform shell (the winit boot, DEC-56).
+/// The `mp_renderer_gpu` harness owns one on `UiHost.re` and seats it into every view it builds.
+/// Its ghoul2 registration then runs Raven's client path (gh#31 step-003).
 pub struct RendererFrontend {
     /// The registered `r_*` cvar handles.
     pub cvars: RendererCvars,

@@ -31,6 +31,7 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
@@ -95,11 +96,11 @@ fn record_scene(host: &mut UiHost, refdef: &refdef_t) -> FrameData {
     RE_RenderScene(
         refdef,
         &mut frame_data,
-        &host.sim.published,
-        &host.cvars,
-        &mut host.scene,
+        &host.re.sim.published,
+        &host.re.cvars,
+        &mut host.re.scene,
         &mut host.engine.common,
-        &host.sim.light_styles,
+        &host.re.sim.light_styles,
     );
     frame_data
 }
@@ -184,11 +185,12 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
 
     // Force the first `R_MarkLeaves` to re-mark, and set the registered flag
     // the ui boot path never sets, the same two settings `world_harness` makes.
-    host.frame.view_cluster = -1;
-    Arc::make_mut(&mut host.sim.published).registered = true;
+    host.re.frame.view_cluster = -1;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
 
     // The camera sits at a spawn origin, bumped to eye height.
     let eye = host
+        .re
         .sim
         .published
         .world
@@ -205,7 +207,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
     let bmodel_table = BModelTable::build(&host.models);
-    if let Some(world) = host.sim.published.world.as_ref() {
+    if let Some(world) = host.re.sim.published.world.as_ref() {
         executor.set_world(&gpu, world, bmodel_table);
     }
 
@@ -221,24 +223,31 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     // the split borrow, the same pre-drain `world_harness` does. A drain inside
     // `execute_frame` would resolve against the dummy registry and drop every
     // staged world texture.
-    let _uploaded = images.upload_pending(&mut gpu, &mut host.img_state, &host.sim.published);
+    let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     {
+        // The frame pins the published registry, so a mid-frame `Arc::make_mut` through the seated `re` slot copies on write.
+        // This map draws no ghoul2 entity, so no register hook fires here, and the pin keeps every entity-walk site one shape.
+        let pinned = Arc::clone(&host.re.sim.published);
         // Split the host and engine into disjoint borrows, the shape
         // `world_harness::draw_world_frame` builds.
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            sim,
-            world_load,
-            img_state,
-            noise,
+            re:
+                RendererFrontend {
+                    world_load,
+                    img_state,
+                    noise,
+                    ..
+                },
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
         // The golden test has no live Ghoul2 state, and the executor's own
         // empty system is what the world pass uses (W2-F5).
@@ -253,7 +262,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
             &mut gpu,
             &target,
             &frame_data,
-            &sim.published,
+            &pinned,
             world_load,
             Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),
