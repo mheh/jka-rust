@@ -41,6 +41,11 @@ pub struct ShaderAsset {
     /// Source: `oracle/codemp/renderer/tr_shader.cpp:2507-2530` (parse),
     /// `oracle/codemp/renderer/tr_world.cpp:158,264` (read)
     pub cull_type: CullType,
+    /// `polygonOffset` - the shader draws every pass with the decal depth bias (`glPolygonOffset(-1, -2)` in the oracle).
+    ///
+    /// Raven: set for decals and other items that must be offset.
+    /// Source: `oracle/codemp/renderer/tr_local.h:495` (field), `oracle/codemp/renderer/tr_shade.cpp:2264-2267` (read)
+    pub polygon_offset: bool,
     /// `surfaceFlags` — if explicitlyDefined, this will have `SURF_*` flags.
     pub surface_flags: i32,
     /// `contentFlags`.
