@@ -95,3 +95,5 @@ The draft awaits the user audit, and no lane spawns before the approval. After a
 ## Amendments
 
 **2026-08-04 - the draft awaits the user audit.**
+
+**2026-08-04 - the four open rulings are taken.** The user ruled all four at the packet audit, each on the recommendation: (1) `frame_data` stays per-call construction and `re.frame_data` sits inert; (2) the frame-pinned registry clone is confirmed at the four `execute_frame` sites; (3) step-004 reads the published copy through view helpers on `PublishedModel`; (4) step-004 resolves entity `model_type` from the published entry, and `BModelTable` keeps only its brush-submodel fields. Rulings 1 and 2 bind this packet as written in the surface contract. Rulings 3 and 4 bind the step-004 draft and are recorded here for it. The lane go is pending.
