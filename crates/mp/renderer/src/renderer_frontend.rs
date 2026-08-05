@@ -53,6 +53,7 @@ use crate::render_state::world_generation::WorldGeneration;
 use crate::tr_font::FontState;
 use crate::tr_image::TrImageState;
 use crate::tr_local::view_parms_t::viewParms_t;
+use crate::tr_marks::MarkState;
 use crate::tr_noise::NoiseState;
 use crate::tr_scene::SceneState;
 use crate::tr_sky::SkyState;
@@ -128,6 +129,8 @@ pub struct RendererFrontend {
     // neither.
     /// `tr_world.cpp`'s wireframe-automap generator state.
     pub automap: WireframeAutomap,
+    /// The decal walk's generation state (`tr.viewCount` and the per-surface stamps), which `R_MarkFragments` reads and bumps at trap time.
+    pub mark_state: MarkState,
 }
 
 /// `MAX_SHADERS` (non-`_XBOX`) - the shader arena's soft cap.
@@ -277,6 +280,7 @@ impl RendererFrontend {
             qs: QSharedScratch::zeroed(),
             sky_view: zeroed_view_parms(),
             automap: WireframeAutomap::default(),
+            mark_state: MarkState::default(),
         }
     }
 }
