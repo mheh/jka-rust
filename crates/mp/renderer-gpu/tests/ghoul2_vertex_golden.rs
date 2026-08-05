@@ -458,6 +458,13 @@ fn golden_ghoul2_verts_stormtrooper() {
     executor.set_ghoul2_capture(true);
 
     {
+        // `RE_EndFrame` drains the registered model blocks into the published registry, and no test reaches it, so
+        // the drain runs here.
+        // It must land before the pin below, or the pinned assets carry no blocks and every entity arm draws nothing.
+        // Source: crates/mp/renderer/src/tr_cmds.rs:354-358
+        if let Some(blocks) = host.models.publish_blocks() {
+            host.re.sim.publish_models(blocks);
+        }
         // The frame pins the published registry, because `G2_SetupModelPointers` re-registers on every entity walk.
         // The client `RE_RegisterModel` hook then calls `Arc::make_mut(&mut re.sim.published)` through the seated `re` slot.
         // The clone holds a second reference, so that call copies on write instead of mutating the allocation this frame reads.

@@ -401,6 +401,13 @@ fn run_scene(scene: &Scene) {
     let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     let stats = {
+        // `RE_EndFrame` drains the registered model blocks into the published registry, and no test reaches it, so
+        // the drain runs here.
+        // It must land before the pin below, or the pinned assets carry no blocks and every entity arm draws nothing.
+        // Source: crates/mp/renderer/src/tr_cmds.rs:354-358
+        if let Some(blocks) = host.models.publish_blocks() {
+            host.re.sim.publish_models(blocks);
+        }
         // The frame pins the published registry, so a mid-frame `Arc::make_mut` through the seated `re` slot copies on write.
         // This scene draws no ghoul2 entity, so no register hook fires here, and the pin keeps every entity-walk site one shape.
         let pinned = Arc::clone(&host.re.sim.published);
