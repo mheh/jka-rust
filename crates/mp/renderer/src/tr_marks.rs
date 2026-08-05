@@ -13,25 +13,25 @@ use native_math::qmath::{
 
 use mp_qshared::shared::q_math::BoxOnPlaneSideRef;
 use mp_qshared::shared::surface_flags::{CONTENTS_FOG, SURF_NOIMPACT, SURF_NOMARKS};
-use mp_qshared::shared::{cplane_t, markFragment_t, vec3_t};
+use mp_qshared::shared::{markFragment_t, vec3_t};
 
-// `R_BoxSurfaces_r` walks the world's BSP node/surface tree, which per the
-// tier-2 transition audit (Group 1: `mnode_t`/`msurface_t` rows) resolves to
-// an index-linked node/surface arena owned by `tr_bsp`/`tr_world` and homed
-// at `RenderAssets::world` (an `Option<WorldAsset>`, still an empty R3-wave
-// placeholder in `render_state::placeholders`). This wave (`tr_marks`) may
-// not touch `tr_bsp.rs`/`placeholders.rs` to grow that shape, so `MarkNode`/
-// `MarkSurface`/`MarkSurfaceData` below are a scoped-local stand-in carrying
-// only the fields this file's walk reads — owned (`Box` for the child links,
-// never a raw pointer), per the interior-safety law. Reconciling this shape
-// with `tr_bsp`'s own node/surface arena is an integration-time field-merge,
-// not a second port of `tr.world`.
+use crate::render_state::arena::Arena;
+use crate::render_state::placeholders::WorldAsset;
+use crate::render_state::render_assets::RenderAssets;
+use crate::render_state::shader_asset::ShaderAsset;
+use crate::tr_bsp::SurfaceData;
+
+// `R_BoxSurfaces_r` walks the world's BSP node/surface tree, which per the tier-2 transition audit
+// (Group 1: `mnode_t`/`msurface_t` rows) resolves to the index-linked node/surface arena `tr_bsp` loads into `RenderAssets::world`.
+// gh#31 step-006 completed that field-merge: the scoped-local `MarkNode`/`MarkSurface` stand-ins are gone,
+// and both walks read `WorldAsset::nodes`, `surfaces`, `mark_surfaces`, and `planes` directly.
+// A leaf's surfaces resolve through `WorldAsset::mark_surfaces`, and the collected list carries flat
+// `WorldAsset::surfaces` indices in place of Raven's `surfaceType_t *` pointers.
 //
-// `tr.viewCount` is threaded via [`MarkState::view_count`], this file's own
-// counter. Raven shares one `tr.viewCount` between the world walk and the
-// decal walk, and the two walks stamp different arrays, so W2-F4 gives the
-// decal path its own generation. The stamps stay internally consistent inside
-// each walk, which is all either one reads the counter for.
+// `tr.viewCount` is threaded via [`MarkState::view_count`], this file's own counter.
+// Raven shares one `tr.viewCount` between the world walk and the decal walk, and the two walks stamp different arrays,
+// so W2-F4 gives the decal path its own generation.
+// The stamps stay internally consistent inside each walk, which is all either one reads the counter for.
 
 /// Renderer-local `MAX_VERTS_ON_POLY` — the max vertex count
 /// `R_ChopPolyBehindPlane` clips against (distinct from `mp_cgame`'s
@@ -53,9 +53,12 @@ const MAX_VERTS_ON_POLY: usize = 64;
 /// Source: `oracle/codemp/renderer/tr_local.h:1315`
 #[derive(Default)]
 pub struct MarkState {
-    /// `tr.viewCount` as this walk reads it. `R_MarkFragments` bumps it once
-    /// per call, and `R_BoxSurfaces_r` compares each candidate surface to it.
+    /// `tr.viewCount` as this walk reads it.
+    /// `R_MarkFragments` bumps it once per call, and `R_BoxSurfaces_r` compares each candidate surface to it.
     pub view_count: i32,
+    /// The per-surface stamp that replaces `msurface_t::viewCount` for this walk, indexed by the flat `WorldAsset::surfaces` index (W2-F4 pattern).
+    /// `R_MarkFragments` resizes it with zeros when the world's surface count changes, so a map change resets every stamp.
+    pub surf_view_count: Vec<i32>,
 }
 
 /// `SIDE_FRONT`/`SIDE_BACK`/`SIDE_ON` — planar-side classification, used here
@@ -148,86 +151,6 @@ pub fn R_ChopPolyBehindPlane(
     out_points
 }
 
-/// Scoped-local stand-in for Raven `mnode_t`'s node/leaf shape — see the
-/// module-level note above. `contents == -1` marks an interior node (Raven
-/// convention preserved); leaves carry their `mark_surfaces` directly rather
-/// than a `firstmarksurface`/`nummarksurfaces` pointer+count pair into a
-/// shared table.
-///
-/// Type definition source: `oracle/codemp/renderer/tr_local.h:917-934`
-pub struct MarkNode {
-    /// -1 for nodes, to differentiate from leafs
-    pub contents: i32,
-    pub plane: cplane_t,
-    pub children: [Option<Box<MarkNode>>; 2],
-    pub mark_surfaces: Vec<MarkSurface>,
-}
-
-/// Scoped-local stand-in for the fields of Raven `msurface_t` (plus its
-/// `shader_t`'s two flag words) that `R_BoxSurfaces_r` reads/writes — see the
-/// module-level note above.
-///
-/// Type definition source: `oracle/codemp/renderer/tr_local.h:872-878`
-pub struct MarkSurface {
-    /// if == the current view count, already added
-    pub view_count: i32,
-    pub surface_flags: i32,
-    pub content_flags: i32,
-    /// any of srf*_t
-    pub data: MarkSurfaceData,
-}
-
-/// Owned replacement for `msurface_t.data`'s tagged `surfaceType_t *` union.
-///
-/// `R_BoxSurfaces_r` (wave 0) only ever needed `SF_FACE`'s plane to decide
-/// view-count skips, so it defined `Face`/`Grid`/`Other` with the plane as
-/// the sole payload. `R_MarkFragments` (this wave) walks the *geometry*
-/// itself — the grid's triangulated quads and the face's index-addressed
-/// point soup — which the skip-only shape can't carry. Both payload-bearing
-/// variants are extended here with the same fields the tier-2 quarantine
-/// accessors already expose for the real oracle types (`srfSurfaceFace_t
-/// ::point`/`::indices`, `srfGridMesh_t::width`/`height`/`verts` —
-/// `tr_local/{srf_surface_face_t,srf_grid_mesh_s}.rs`), so reconciling this
-/// scoped-local stand-in with the real world arena at integration is a
-/// straight field rename, not a reshape. All-owned per the interior-safety
-/// law — no raw pointers.
-///
-/// Type definition source: `oracle/codemp/renderer/tr_local.h:656-678,799-812`
-#[derive(Clone)]
-pub enum MarkSurfaceData {
-    /// `srfSurfaceFace_t`'s plane plus its point/index soup — `points[i]` is
-    /// the `srfSurfaceFace_t::point(i)` result (leading xyz triple of vertex
-    /// `i`), `indexes` is `srfSurfaceFace_t::indices()`.
-    Face {
-        plane: cplane_t,
-        points: Vec<vec3_t>,
-        indexes: Vec<i32>,
-    },
-    /// `srfGridMesh_t`'s `width`/`height`/flattened `verts` (row-major,
-    /// `width * height` entries) — only `xyz`/`normal` survive per vertex,
-    /// the only fields `R_MarkFragments`'s grid walk reads.
-    Grid {
-        width: i32,
-        height: i32,
-        verts: Vec<MarkGridVert>,
-    },
-    Other,
-}
-
-/// Scoped-local stand-in for the `drawVert_t` fields `R_MarkFragments`'s grid
-/// walk reads (`xyz`, `normal`) — see [`MarkSurfaceData::Grid`]'s doc. Not a
-/// second port of `drawVert_t` (`crates/mp/engine/qcommon/src/qfiles/
-/// draw_vert_t.rs`, which carries `st`/`lightmap`/`color` too and isn't
-/// `Clone`); this file needs `Clone` (`MarkSurfaceData` derives it) and only
-/// these two fields.
-///
-/// Type definition source: `oracle/codemp/qcommon/../qcommon/qfiles.h:514-520`
-#[derive(Clone, Copy)]
-pub struct MarkGridVert {
-    pub xyz: vec3_t,
-    pub normal: vec3_t,
-}
-
 /// Raven `R_BoxSurfaces_r`.
 ///
 /// PORT-NOTE: Raven does the descent as "tail recursion in a loop" (an
@@ -237,70 +160,91 @@ pub struct MarkGridVert {
 /// `list`/`mark.view_count` accumulation, control-flow shape only
 /// (porting-rules §10).
 ///
+/// PORT-NOTE: Raven collects `surfaceType_t *` pointers into `tr.world`.
+/// This walk collects flat `WorldAsset::surfaces` indices instead, which is this codebase's pointer replacement (DEC-43.1).
+/// The `msurface_t::viewCount` stamp lives on `MarkState::surf_view_count` at the same index, because the loaded world is immutable (W2-F4).
+///
 /// Source: `oracle/codemp/renderer/tr_marks.cpp:116-178`
+#[allow(clippy::too_many_arguments)]
 pub fn R_BoxSurfaces_r(
-    node: &mut MarkNode,
+    world: &WorldAsset,
+    shaders: &Arena<ShaderAsset>,
+    node_index: usize,
     mins: vec3_t,
     maxs: vec3_t,
-    list: &mut Vec<MarkSurfaceData>,
+    list: &mut Vec<u32>,
     listsize: usize,
     dir: vec3_t,
-    mark: &MarkState,
+    mark: &mut MarkState,
 ) {
+    let node = &world.nodes[node_index];
+
     if node.contents == -1 {
-        let s = BoxOnPlaneSideRef(mins, maxs, &mut node.plane);
+        // `BoxOnPlaneSideRef` wants `&mut cplane_t` and the loaded world is shared immutably, so the walk hands it a copy.
+        // `BoxOnPlaneSide` only reads the plane, so the copy is behavior-identical (porting-rules §10).
+        let mut plane = world.planes[node.plane.expect("decision node carries a plane index")];
+        let s = BoxOnPlaneSideRef(mins, maxs, &mut plane);
         if s == 1 {
-            if let Some(child) = node.children[0].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
+            if let Some(child) = node.children[0] {
+                R_BoxSurfaces_r(world, shaders, child, mins, maxs, list, listsize, dir, mark);
             }
         } else if s == 2 {
-            if let Some(child) = node.children[1].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
+            if let Some(child) = node.children[1] {
+                R_BoxSurfaces_r(world, shaders, child, mins, maxs, list, listsize, dir, mark);
             }
         } else {
-            if let Some(child) = node.children[0].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
+            if let Some(child) = node.children[0] {
+                R_BoxSurfaces_r(world, shaders, child, mins, maxs, list, listsize, dir, mark);
             }
-            if let Some(child) = node.children[1].as_deref_mut() {
-                R_BoxSurfaces_r(child, mins, maxs, list, listsize, dir, mark);
+            if let Some(child) = node.children[1] {
+                R_BoxSurfaces_r(world, shaders, child, mins, maxs, list, listsize, dir, mark);
             }
         }
         return;
     }
 
     // add the individual surfaces
-    for surf in node.mark_surfaces.iter_mut() {
+    let view_count = mark.view_count;
+    let first = node.firstmarksurface;
+    let last = first + node.nummarksurfaces as usize;
+    for &surface_index in &world.mark_surfaces[first..last] {
         if list.len() >= listsize {
             break;
         }
 
+        let surf = &world.surfaces[surface_index as usize];
+        let shader = shaders
+            .get(surf.shader)
+            .expect("a loaded world surface always resolves a registered shader");
+        let stamp = &mut mark.surf_view_count[surface_index as usize];
+
         // check if the surface has NOIMPACT or NOMARKS set
-        if (surf.surface_flags & (SURF_NOIMPACT | SURF_NOMARKS)) != 0
-            || (surf.content_flags & CONTENTS_FOG) != 0
+        if (shader.surface_flags & (SURF_NOIMPACT | SURF_NOMARKS)) != 0
+            || (shader.content_flags & CONTENTS_FOG) != 0
         {
-            surf.view_count = mark.view_count;
+            *stamp = view_count;
         }
         // extra check for surfaces to avoid list overflows
-        else if let MarkSurfaceData::Face { plane, .. } = &mut surf.data {
-            // the face plane should go through the box. Raven hands
-            // `BoxOnPlaneSide` the stored `srfSurfaceFace_t::plane` itself
-            // (`tr_marks.cpp:153`), not a copy.
-            let s = BoxOnPlaneSideRef(mins, maxs, plane);
+        else if let SurfaceData::Face(face) = &surf.data {
+            // the face plane should go through the box.
+            // Same immutable-world plane copy as the decision-node test above.
+            let mut plane = face.plane;
+            let s = BoxOnPlaneSideRef(mins, maxs, &mut plane);
             let normal = plane.normal;
             if s == 1 || s == 2 {
-                surf.view_count = mark.view_count;
+                *stamp = view_count;
             } else if normal[0] * dir[0] + normal[1] * dir[1] + normal[2] * dir[2] > -0.5 {
                 // don't add faces that make sharp angles with the projection direction
-                surf.view_count = mark.view_count;
+                *stamp = view_count;
             }
-        } else if !matches!(surf.data, MarkSurfaceData::Grid { .. }) {
-            surf.view_count = mark.view_count;
+        } else if !matches!(surf.data, SurfaceData::Grid(_)) {
+            *stamp = view_count;
         }
         // check the viewCount because the surface may have
         // already been added if it spans multiple leafs
-        if surf.view_count != mark.view_count {
-            surf.view_count = mark.view_count;
-            list.push(surf.data.clone());
+        if *stamp != view_count {
+            *stamp = view_count;
+            list.push(surface_index);
         }
     }
 }
@@ -390,25 +334,33 @@ fn marker_point(xyz: vec3_t, normal: vec3_t) -> vec3_t {
 /// because callers pass freshly-empty buffers — the precondition this fn
 /// assumes.
 ///
-/// PORT-NOTE: `tr.world->nodes` (the BSP root `R_BoxSurfaces_r` walks) has no
-/// live carrier yet — `RenderAssets::world` is still an empty R3-wave
-/// placeholder this file may not grow (module-level note above) — so the
-/// root is threaded in explicitly as `world_root`, the same shape
-/// `R_BoxSurfaces_r` itself already takes (state threaded, not reached:
-/// porting-rules §B4). `tr.viewCount` threads via `FrameState::view_count`
-/// (`frame`), mutated here then read by `R_BoxSurfaces_r`.
+/// PORT-NOTE: `tr.world->nodes` is `RenderAssets::world` here, so the walk starts at node 0 of that arena.
+/// The oracle reaches `tr.world` as a global, and this fn takes `assets` instead (state threaded, not reached: porting-rules §B4).
+/// A caller with no map loaded gets zero fragments, which is the degradation the `CG_CM_MARKFRAGMENTS` arm needs and not new oracle behavior.
+/// `tr.viewCount` threads via `MarkState::view_count`, bumped here then read by `R_BoxSurfaces_r`.
 ///
 /// Source: `oracle/codemp/renderer/tr_marks.cpp:245-448`
+#[allow(clippy::too_many_arguments)]
 pub fn R_MarkFragments(
+    assets: &RenderAssets,
+    mark: &mut MarkState,
     points: &[vec3_t],
     projection: vec3_t,
     max_points: usize,
     point_buffer: &mut Vec<vec3_t>,
     max_fragments: usize,
     fragment_buffer: &mut Vec<markFragment_t>,
-    world_root: &mut MarkNode,
-    mark: &mut MarkState,
 ) -> i32 {
+    let Some(world) = assets.world.as_deref() else {
+        return 0;
+    };
+
+    // The stamps are indexed by the flat surface index, so a map change re-sizes them and resets every generation.
+    if mark.surf_view_count.len() != world.surfaces.len() {
+        mark.surf_view_count.clear();
+        mark.surf_view_count.resize(world.surfaces.len(), 0);
+    }
+
     // increment view count for double check prevention
     mark.view_count += 1;
 
@@ -463,9 +415,11 @@ pub fn R_MarkFragments(
     // Raven: numPlanes = numPoints + 2; — folds into normals/dists.len()
     // (both sized exactly num_points + 2 above), no separate count needed.
 
-    let mut surfaces: Vec<MarkSurfaceData> = Vec::new();
+    let mut surfaces: Vec<u32> = Vec::new();
     R_BoxSurfaces_r(
-        world_root,
+        world,
+        &assets.shaders,
+        0,
         mins,
         maxs,
         &mut surfaces,
@@ -476,15 +430,12 @@ pub fn R_MarkFragments(
     //assert(numsurfaces <= 64);
     //assert(numsurfaces != 64);
 
-    for surf in &surfaces {
-        match surf {
-            MarkSurfaceData::Grid {
-                width,
-                height,
-                verts,
-            } => {
-                let width = *width as usize;
-                let height = *height as usize;
+    for &surface_index in &surfaces {
+        match &world.surfaces[surface_index as usize].data {
+            SurfaceData::Grid(grid) => {
+                let verts = &grid.verts;
+                let width = grid.width as usize;
+                let height = grid.height as usize;
                 for m in 0..height.saturating_sub(1) {
                     for n in 0..width.saturating_sub(1) {
                         // We triangulate the grid and chop all triangles within
@@ -578,11 +529,8 @@ pub fn R_MarkFragments(
                     }
                 }
             }
-            MarkSurfaceData::Face {
-                plane,
-                points: face_points,
-                indexes,
-            } => {
+            SurfaceData::Face(face) => {
+                let plane = &face.plane;
                 // check the normal of this face
                 if _DotProduct(plane.normal, projection_dir) > -0.5 {
                     continue;
@@ -592,11 +540,11 @@ pub fn R_MarkFragments(
                 // tail; the C `k += 3` loop over-reads past `numIndices` and
                 // emits a garbage fragment (`tr_marks.cpp:413`) — defined
                 // behavior picked over the UB.
-                for chunk in indexes.chunks_exact(3) {
+                for chunk in face.indices.chunks_exact(3) {
                     let clip_points: [vec3_t; 3] = [
-                        marker_point(face_points[chunk[0] as usize], plane.normal),
-                        marker_point(face_points[chunk[1] as usize], plane.normal),
-                        marker_point(face_points[chunk[2] as usize], plane.normal),
+                        marker_point(face.points[chunk[0] as usize].xyz, plane.normal),
+                        marker_point(face.points[chunk[1] as usize].xyz, plane.normal),
+                        marker_point(face.points[chunk[2] as usize].xyz, plane.normal),
                     ];
                     // add the fragments of this face
                     R_AddMarkFragments(
@@ -613,7 +561,7 @@ pub fn R_MarkFragments(
                     }
                 }
             }
-            MarkSurfaceData::Other => {
+            SurfaceData::Skip | SurfaceData::Triangles(_) | SurfaceData::Flare(_) => {
                 // ignore all other world surfaces
                 // might be cool to also project polygons on a triangle soup
                 // however this will probably create huge amounts of extra polys
