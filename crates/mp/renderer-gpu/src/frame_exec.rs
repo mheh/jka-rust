@@ -186,11 +186,9 @@ impl Warned {
     }
 }
 
-// `WorldFrame` is gone. Wave 2 emptied it one ruling at a time: W2-F3 took the
-// view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2
-// owner, W2-F6 the terrain seeds, W2-F8 the model registry. What is left is
-// the registry (a package field), the load state (a package field), and the
-// engine host, which only a sim-side caller supplies.
+// `WorldFrame` is gone, and wave 2 emptied it one ruling at a time.
+// W2-F3 took the view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2 owner, W2-F6 the terrain seeds, and W2-F8 the model registry.
+// What is left is the registry, the load state, and the engine host, which only a sim-side caller supplies.
 
 /// Owns the render-thread state one frame's execution needs: the 2D and world
 /// pipelines, the uploaded world geometry, the reused 2D batch, and the
@@ -363,12 +361,10 @@ impl FrameExecutor {
     /// Replays one package that arrived over the frame channel, and returns it
     /// so the caller can hand its event buffer back to the sim thread.
     ///
-    /// This is the live client's whole draw path. Both halves draw for real
-    /// since W2-F7: the 2D arms put menus and the HUD on the screen, and a
-    /// `RenderScene` runs the BSP walk, the sky, the fog and the dynamic
-    /// lights. MD3 entities draw here since gh#31 step-004, because they read the published model blocks off
-    /// `RenderAssets`. Only the Ghoul2 entity arms stay dark: their skeleton work is sim-confined until DEC-65
-    /// ruling 2 crosses the per-entity bone matrices in the frame package.
+    /// This is the live client's whole draw path, and both halves draw for real since W2-F7.
+    /// The 2D arms put menus and the HUD on the screen, and a `RenderScene` runs the BSP walk, the sky, the fog and the dynamic lights.
+    /// MD3 entities draw here since gh#31 step-004, because they read the published model blocks off `RenderAssets`.
+    /// The Ghoul2 entity arms stay dark, because their skeleton work is sim-confined until DEC-65 ruling 2 crosses the per-entity bone matrices.
     pub fn execute_package(
         &mut self,
         gpu: &mut Gpu,

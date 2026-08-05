@@ -225,9 +225,9 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
     let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     {
-        // `RE_EndFrame` drains the registered model blocks into the published registry, and no test reaches it, so
-        // the drain runs here.
-        // It must land before the pin below, or the pinned assets carry no blocks and every entity arm draws nothing.
+        // `RE_EndFrame` drains the registered model blocks into the published registry, and no test reaches it.
+        // The drain therefore runs here, and it must land before the pin below.
+        // A drain after the pin publishes into a generation the frame does not read, and the frame then draws nothing.
         // Source: crates/mp/renderer/src/tr_cmds.rs:354-358
         if let Some(blocks) = host.models.publish_blocks() {
             host.re.sim.publish_models(blocks);
@@ -255,8 +255,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-        // The golden test has no live Ghoul2 state, and the executor's own
-        // empty system is what the world pass uses (W2-F5).
+        // The golden test has no live Ghoul2 state, and the executor's own empty system is what the world pass uses (W2-F5).
         // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
         let stats = executor.execute_frame(
             &mut gpu,

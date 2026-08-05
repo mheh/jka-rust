@@ -971,8 +971,8 @@ mod tests {
         rm.model_init();
         let handle = rm.r_alloc_model().expect("a second slot is available");
 
-        // The block carries a `.glm` header whose `ofsEnd` sizes the view, so the view read below proves the
-        // helper resolved the right base rather than any pointer inside the block.
+        // The block carries a `.glm` header whose `ofsEnd` sizes the view.
+        // The view read below therefore proves the helper resolved the block base plus the stored offset.
         let mut bytes = [0u8; 256];
         bytes[MDXM_OFS_END..MDXM_OFS_END + 4].copy_from_slice(&200i32.to_le_bytes());
         let (ptr, _) = rm.re_register_server_models_malloc(

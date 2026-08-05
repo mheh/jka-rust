@@ -765,8 +765,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         if let Some(world) = assets.world.as_ref() {
             walk_scratch.set_world(world);
         }
-        // The spike runs on the sim thread, so it hands the entity walk the
-        // engine host (W2-F1).
+        // The spike runs on the sim thread, so it hands the entity walk the engine host (W2-F1).
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
         // The spike walks once, so its brush-submodel rows live and die with
         // this call (W2-F8).

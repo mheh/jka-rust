@@ -42,18 +42,17 @@ impl PublishedModel {
     /// The `md3Header_t` one loaded LOD publishes, `None` for an absent slot.
     pub fn md3_ptr(&self, lod: usize) -> Option<*const md3Header_t> {
         let (block, offset) = self.md3.get(lod)?.as_ref()?;
-        // SAFETY: the offset was computed at mark time by subtracting the block base from the finished `model_t`
-        // pointer, so it lands inside the block.
-        // The block is immutable while shared (`render_state/model_block.rs:127-141`), and the borrow on `self`
-        // keeps the entry's `Arc` alive for as long as the caller holds the pointer.
+        // SAFETY: `mark_block` computed this offset by subtracting the block base from the finished `model_t` pointer.
+        // The offset therefore lands inside the block, which is immutable while shared (`render_state/model_block.rs:127-141`).
+        // The borrow on `self` keeps the entry's `Arc` alive for as long as the caller holds the pointer.
         Some(unsafe { block.base_ptr().add(*offset) } as *const md3Header_t)
     }
 
     /// The DEC-35 view over the published `.glm` block, `None` for a model with no mdxm block.
     pub fn mdxm_view(&self) -> Option<MdxmView<'_>> {
         let (block, offset) = self.mdxm.as_ref()?;
-        // SAFETY: see [`Self::md3_ptr`]. The block is the endian-swap-completed `.glm` image, self-sized by its
-        // `ofsEnd` field, which is what `MdxmView::from_block` reads to bound the view.
+        // SAFETY: see [`Self::md3_ptr`].
+        // The block is the endian-swap-completed `.glm` image, self-sized by its `ofsEnd` field, which is what `MdxmView::from_block` reads.
         Some(unsafe { MdxmView::from_block(block.base_ptr().add(*offset) as *const c_void) })
     }
 

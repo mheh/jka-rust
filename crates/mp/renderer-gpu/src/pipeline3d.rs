@@ -4039,8 +4039,8 @@ fn decode_md3_surface(
     sin_table: &[f32; FUNCTABLE_SIZE],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
     let model = models.get(md3_ref.h_model)?;
-    // `md3_ptr` covers both old skips at once. An unpublished slot and an unloaded LOD are both `None`, and a
-    // published LOD never names a null pointer.
+    // `md3_ptr` covers both old skips at once.
+    // An unpublished slot and an unloaded LOD are both `None`, and a published LOD never names a null pointer.
     let header = model.md3_ptr(md3_ref.lod as usize)?;
 
     // The oracle recomputes backlerp at draw time: a still model (old frame ==
@@ -4106,9 +4106,8 @@ fn decode_ghoul2_surface(
     g2_ref: G2SurfaceRef,
     rgba: [u8; 4],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
-    // The render surface only reaches here for a live `MOD_MDXM` model whose
-    // `mdxm` block the loader filled. A model with no published block is not renderable, which is what the `None`
-    // arm of `mdxm_view` reports.
+    // The render surface only reaches here for a live `MOD_MDXM` model whose `mdxm` block the loader filled.
+    // A model with no published block is not renderable, which is what the `None` arm of `mdxm_view` reports.
     let model = models.get(g2_ref.model)?;
     let mdxm = model.mdxm_view()?;
     let surface = mdxm.find_surface(g2_ref.surface_index, g2_ref.lod);

@@ -201,10 +201,9 @@ pub fn re_get_model_bounds(_ref_ent: &RefEntity, _models: &RenderModels) -> (vec
 /// `r_lodscale`/`r_autolodscalevalue`/`r_lodbias` and clamped to
 /// `tr.currentModel->numLods`.
 ///
-/// `current_model` is `tr.currentModel`, read as the published entry (DEC-65 ruling 3); `view` is `tr.viewParms`
-/// (`ProjectRadius`); the three lod cvars arrive on the frame's
-/// [`RenderCvarSnapshot`] (W2-F1). The frame-array read for the projected
-/// radius runs through [`read_md3_frame`].
+/// `current_model` is `tr.currentModel`, read as the published entry (DEC-65 ruling 3).
+/// `view` is `tr.viewParms` (`ProjectRadius`), and the three lod cvars arrive on the frame's [`RenderCvarSnapshot`] (W2-F1).
+/// The frame-array read for the projected radius runs through [`read_md3_frame`].
 ///
 /// Source: `oracle/codemp/renderer/tr_mesh.cpp:173-236`
 fn r_compute_lod(
@@ -214,14 +213,12 @@ fn r_compute_lod(
     view: &viewParms_t,
     cvars: RenderCvarSnapshot,
 ) -> i32 {
-    // A registered multi-LOD model always publishes LOD 0, so an absent header here is unreachable in a live frame
-    // and takes the single-LOD arm.
+    // A registered multi-LOD model always publishes LOD 0, so an absent header here is unreachable and takes the single-LOD arm.
     let mut lod = match current_model.md3_ptr(0) {
         Some(header) if current_model.num_lods >= 2 => {
             // multiple LODs exist, so compute projected bounding sphere and use
             // that as a criteria for selecting LOD.
-            // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before
-            // the LOD read; see [`read_md3_frame`].
+            // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before the LOD read. See [`read_md3_frame`].
             let (bounds, _, _) = unsafe { read_md3_frame(header, ent_frame) };
             let radius = RadiusFromBounds(bounds[0], bounds[1]);
 
@@ -370,9 +367,8 @@ pub fn r_add_md3_surfaces<'a>(
     // don't add third_person objects if not in a portal
     let personal_model = (ent.e.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0;
 
-    // The dispatch resolved this handle's `model_type` out of the same published registry this frame, so a
-    // `MOD_MESH` entry with a LOD-0 header always exists here. Both skips are the defined behavior where a stale
-    // reference could reach this arm.
+    // The dispatch resolved this handle's `model_type` out of the same published registry this frame, so a `MOD_MESH` entry always exists here.
+    // Both skips are the defined behavior where a stale reference could reach this arm.
     let Some(current_model) = assets.models.get(ent.e.hModel) else {
         return;
     };
@@ -380,8 +376,7 @@ pub fn r_add_md3_surfaces<'a>(
         return;
     };
     let num_frames = {
-        // SAFETY: `md3_ptr(0)` is the LOD-0 header of a registered `MOD_MESH`
-        // model, the aligned block the loader owns.
+        // SAFETY: `md3_ptr(0)` is the LOD-0 header of a registered `MOD_MESH` model, the aligned block the loader owns.
         unsafe { (*lod0_header).numFrames }
     };
 

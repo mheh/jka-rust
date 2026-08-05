@@ -1953,12 +1953,10 @@ pub fn R_AddEntitySurfaces<'a>(
                 // publish it through for the other two callees.
                 // Source: oracle/codemp/renderer/tr_main.cpp:1421-1442
 
-                // W2-F8: `tr.currentModel`'s brush scalars arrive on the frame
-                // package's `BModelTable`, so the brush arm needs no model
-                // registry and runs render-side.
-                // DEC-65 ruling 4 splits the dispatch in two. Only `register_bmodel` sets a non-negative
-                // `bmodel_index`, and a brush handle is never marked into the published registry, so the brush test
-                // runs first and the `model_type` lookup below covers every other handle.
+                // W2-F8: `tr.currentModel`'s brush scalars arrive on the frame package's `BModelTable`, so the brush arm needs no model registry.
+                // DEC-65 ruling 4 splits the dispatch in two.
+                // Only `register_bmodel` sets a non-negative `bmodel_index`, and a brush handle is never marked into the published registry.
+                // The brush test therefore runs first, and the `model_type` lookup below covers every other handle.
                 let model = bmodels.get(ent.e.hModel);
                 if model.bmodel_index >= 0 {
                     // `R_AddBrushModelSurfaces`'s two mutators both target
@@ -2001,17 +1999,17 @@ pub fn R_AddEntitySurfaces<'a>(
 
                 //TODO: Port R_AddEntitySurfaces Ghoul2 arms render-side
                 // Source: oracle/codemp/renderer/tr_main.cpp:1444-1470
-                // The MD3 arm now reads the published blocks and runs on either thread. The Ghoul2 legs still reach
-                // `EngineHost::model_mdxm`/`model_mdxa` and the sim-confined bone caches, so they keep the host gate
-                // below and a render-side caller draws no player. DEC-65 ruling 2 moves the skeleton transform to
-                // scene-add and crosses per-entity bone matrices in the frame package, which is what closes them.
+                // The MD3 arm now reads the published blocks and runs on either thread.
+                // The Ghoul2 legs still reach `EngineHost::model_mdxm`/`model_mdxa` and the sim-confined bone caches.
+                // They therefore keep the host gate below, and a render-side caller draws no player.
+                // DEC-65 ruling 2 moves the skeleton transform to scene-add and crosses per-entity bone matrices in the frame package.
                 //
-                // The host arrives as `Option<&mut EngineHostView>`. The wrapper struct that used to carry it beside
-                // the model registry dissolved with this step, because the registry half is now `assets.models`.
+                // The host arrives as `Option<&mut EngineHostView>`.
+                // The wrapper struct that carried it beside the model registry dissolved here, because the registry half is now `assets.models`.
                 let model_type = match assets.models.get(ent.e.hModel) {
                     Some(entry) => entry.model_type,
-                    // A handle with no published entry is dead, which is the row `BModelTable::get` used to hand a
-                    // bad handle, so it lands in the `MOD_BAD` arm exactly as it did.
+                    // A handle with no published entry is dead, which is the row `BModelTable::get` used to hand a bad handle.
+                    // It lands in the `MOD_BAD` arm exactly as it did before.
                     None => modtype_t::MOD_BAD,
                 };
                 match model_type {

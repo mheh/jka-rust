@@ -910,10 +910,9 @@ impl App {
                     images.upload_pending(gpu, &mut host.re.img_state, &host.re.sim.published);
 
                 let mut stats = {
-                    // `RE_EndFrame` drains the registered model blocks into the published registry, and this harness
-                    // never reaches it, so the drain runs here.
-                    // It must land before the pin below, or the pinned assets carry no blocks and every entity arm
-                    // draws nothing.
+                    // `RE_EndFrame` drains the registered model blocks into the published registry, and this harness never reaches it.
+                    // The drain therefore runs here, and it must land before the pin below.
+                    // A drain after the pin publishes into a generation the frame does not read, and the frame then draws nothing.
                     // Source: crates/mp/renderer/src/tr_cmds.rs:354-358
                     if let Some(blocks) = host.models.publish_blocks() {
                         host.re.sim.publish_models(blocks);

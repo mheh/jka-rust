@@ -5,8 +5,7 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::tr_model::render_models::RenderModels;
 
-/// One model handle's row: the two `model_t` scalars the brush-submodel path
-/// reads and nothing else.
+/// One model handle's row: the two `model_t` scalars the brush-submodel path reads and nothing else.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:1117-1135` (`model_t`)
 #[derive(Clone, Copy)]
@@ -35,17 +34,15 @@ impl Default for BModelEntry {
 /// The model registry as the render-side walk sees it: one plain-integer row
 /// per registered handle.
 ///
-/// The registry itself cannot cross to the render thread. `ModelPool` entries
-/// own the `mdxm`/`mdxa`/`md3` raw block pointers the DEC-35 mdx views hand
-/// out, so the pool is deliberately not `Clone` and is not `Send`
-/// (`tr_model/model_pool.rs`'s own module doc). The brush-submodel path reads
-/// only the two scalars in [`BModelEntry`], so W2-F8 crosses those instead of
-/// the registry. The table travels with the world generation on the frame
-/// package, since both are rebuilt by the same map load.
+/// The registry itself cannot cross to the render thread.
+/// `ModelPool` entries own the `mdxm`/`mdxa`/`md3` raw block pointers the DEC-35 mdx views hand out.
+/// The pool is therefore deliberately not `Clone` and is not `Send`.
+/// The brush-submodel path reads only the two scalars in [`BModelEntry`], so W2-F8 crosses those instead of the registry.
+/// The table travels with the world generation on the frame package, because both are rebuilt by the same map load.
 ///
-/// DEC-65 ruling 4 splits the entity walk's two model reads. The brush test reads `bmodel_index` here, because a
-/// brush handle never enters the published registry, and `model_type` resolves from `RenderAssets::models`, which
-/// republishes at every `RE_EndFrame` drain.
+/// DEC-65 ruling 4 splits the entity walk's two model reads.
+/// The brush test reads `bmodel_index` here, because a brush handle never enters the published registry.
+/// `model_type` resolves from `RenderAssets::models`, which republishes at every `RE_EndFrame` drain.
 pub struct BModelTable {
     /// Indexed by the bare `qhandle_t`, which is the pool slot (DEC-42.2).
     entries: Vec<BModelEntry>,
@@ -82,10 +79,9 @@ impl BModelTable {
 
     /// The row `handle` resolves to.
     ///
-    /// Raven's `R_GetModelByHandle` hands an out-of-range handle the default
-    /// model, and `ModelPool::by_handle` reproduces that with slot 0's zeroed
-    /// entry. This returns the same all-zero row, so a bad handle fails the brush test and resolves `MOD_BAD`
-    /// through the published registry, exactly as it does today.
+    /// Raven's `R_GetModelByHandle` hands an out-of-range handle the default model.
+    /// `ModelPool::by_handle` reproduces that with slot 0's zeroed entry, and this returns the same all-zero row.
+    /// A bad handle therefore fails the brush test and resolves `MOD_BAD` through the published registry, exactly as it did.
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:1665-1680`
     pub fn get(&self, handle: qhandle_t) -> BModelEntry {

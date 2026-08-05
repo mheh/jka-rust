@@ -664,8 +664,8 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// `ProjectRadius`/`myftol` are the cross-file in-module callees.
 /// `project_radius` takes the live `viewParms_t` (E2), so `view` threads
 /// straight through to it.
-/// `currentModel->numLods` is the one field the oracle body reads, so `num_lods` arrives on its own and the caller
-/// takes it off the published entry (DEC-65 ruling 3).
+/// `currentModel->numLods` is the one field the oracle body reads, so `num_lods` arrives on its own.
+/// The caller takes it off the published entry (DEC-65 ruling 3).
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:967-1041`
 pub fn g2_compute_lod(
@@ -830,9 +830,8 @@ pub fn g2_process_generated_surface_bolts(
 /// the LOD, the surface index, and the bone-cache id, so the backend re-locates
 /// the surface and reads the cache from the arena.
 ///
-/// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it
-/// through `mdxm_view()`. Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle
-/// it already holds and `G2SurfaceRef` stores that.
+/// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it through `mdxm_view()`.
+/// Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle it already holds and `G2SurfaceRef` stores that.
 ///
 /// DEFERRED in this arm: the stencil- and projection-shadow pushes
 /// (`r_shadows == 2`/`3`) and the `_G2_GORE` overlay chain. Both build extra
@@ -2376,8 +2375,8 @@ pub fn r_add_ghoul_surfaces<'a>(
                 (None, None)
             };
 
-        // The instance names its own model handle, which the entity dispatch never resolved, so an unregistered or
-        // evicted slot skips this model instead of drawing a default row.
+        // The instance names its own model handle, which the entity dispatch never resolved.
+        // An unregistered or evicted slot therefore skips this model instead of drawing a default row.
         let Some(current_model) = assets.models.get(inst.model) else {
             continue;
         };
