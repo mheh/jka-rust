@@ -4087,18 +4087,14 @@ fn decode_md3_surface(
     }
 }
 
-/// Deforms one Ghoul2 (`MOD_MDXM`) surface into GPU vertices and triangle
-/// indices. Each vertex sums its weighted bones (`RB_SurfaceGhoul`, the non-gore
-/// main arm): the bone matrix per weight comes off the entity's
-/// `Ghoul2RenderPayload`, which the sim-side builder composed with `EvalRender`
-/// (DEC-65 ruling 2). The decoded per-vertex normal rides a parallel `[f32; 4]`
-/// slice, so the CPU lighting evaluators can read it without changing
-/// [`WorldVertex`]. The texcoords come from the parallel texcoord array, and
-/// the vertex colour is the entity's `shaderRGBA`.
+/// Deforms one Ghoul2 (`MOD_MDXM`) surface into GPU vertices and triangle indices.
+/// Each vertex sums its weighted bones (`RB_SurfaceGhoul`, the non-gore main arm):
+/// the bone matrix per weight comes off the entity's `Ghoul2RenderPayload`, which the sim-side builder composed with `EvalRender` (DEC-65 ruling 2).
+/// A parallel `[f32; 4]` slice carries the decoded per-vertex normal, so the CPU lighting evaluators can read it without changing [`WorldVertex`].
+/// The texcoords come from the parallel texcoord array, and the vertex colour is the entity's `shaderRGBA`.
 ///
-/// Returns `None` when the model has no mdxm block, when the entity carries no
-/// payload, or when the payload holds no model at this ordinal, so the caller
-/// counts a decode failure and skips the surface.
+/// Returns `None` when the model has no mdxm block, when the entity carries no payload, or when the payload holds no model at this ordinal,
+/// so the caller counts a decode failure and skips the surface.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451` (the non-gore main
 /// arm)
@@ -4127,8 +4123,7 @@ fn decode_ghoul2_surface(
         indices.push(t[2] as u32);
     }
 
-    // A missing payload or an out-of-range ordinal means the skeleton never crossed, so the
-    // surface is not renderable (Raven's null `boneCache`).
+    // A missing payload or an out-of-range ordinal means the skeleton never crossed, so the surface is not renderable (Raven's null `boneCache`).
     let payload = payloads.get(entity_num as usize)?.as_ref()?;
     let bones = &payload.models.get(g2_ref.model_ordinal as usize)?.bones;
 

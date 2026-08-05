@@ -708,7 +708,6 @@ impl FrameExecutor {
             .collect();
 
         // The DEC-65 ruling 2 crossings, taken from the same scene window that builds `entities`, so the two slices index alike.
-        // The `Arc` clone is one refcount bump per entity.
         let payloads: Vec<Option<Arc<Ghoul2RenderPayload>>> = self.scene_entities
             [self.first_scene_entity..]
             .iter()

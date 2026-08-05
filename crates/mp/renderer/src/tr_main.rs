@@ -204,11 +204,10 @@ pub enum SurfaceGeometry<'a> {
 /// The `drawSurf_t::surface` payload for a **Ghoul2** (`MOD_MDXM`) surface: a
 /// `Copy` handle the backend deforms by its lerped bone matrices per frame.
 /// Raven hands the render list a raw-pointer `CRenderableSurface` carrying a
-/// `mdxmSurface_t *` and a `CBoneCache *`. Under the owned model this ref
-/// carries the instance's model handle, the resolved LOD, the surface ordinal,
-/// and the ordinal of the model inside the entity's `Ghoul2RenderPayload`, so the
-/// backend re-locates the surface and reads the composed matrices off that
-/// crossing instead of holding raw pointers.
+/// `mdxmSurface_t *` and a `CBoneCache *`.
+/// Under the owned model this ref carries the instance's model handle, the resolved LOD, the surface ordinal,
+/// and the ordinal of the model inside the entity's `Ghoul2RenderPayload`,
+/// so the backend re-locates the surface and reads the composed matrices off that crossing instead of holding raw pointers.
 ///
 /// The gore fields (`scale`/`fade`/`impactTime`/`alternateTex`/`goreChain`)
 /// stay out of this wave — gore rendering is a later wave.
@@ -1800,7 +1799,7 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
 /// `R_RotateForEntity`); `models` is the live `RenderModels` registry
 /// (`R_GetModelByHandle` -> `models.get_model`/`models.num_models`);
 /// `payloads` is the per-entity Ghoul2 crossing of DEC-65 ruling 2, parallel to
-/// `entities` under the same scene-window rule; `fogs` is `tr.world->fogs`
+/// `entities` under the same scene-window rule. `fogs` is `tr.world->fogs`
 /// (`R_SpriteFogNum`'s own established parameter); `refdef_rdflags` is
 /// `tr.refdef.rdflags` (`R_SpriteFogNum`'s `rdflags` +
 /// `R_AddBrushModelSurfaces`'s `refdef_rdflags`); `dlights`/`draw_surfs` are
@@ -1809,11 +1808,9 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
 /// established `R_AddDrawSurf` precedent, `tr_scene.rs`'s
 /// `R_AddPolygonSurfaces` twin).
 ///
-/// `r_drawentities`/`r_nocull`/`r_shadows` (`RendererCvars`, DEC-37 A13.1)
-/// arrive on the `cvars` snapshot this fn already carries for the shader and
-/// model lookups below.
-/// There is therefore no leaf-function reason to split the cvar reads out as
-/// separate parameters the way `R_CullLocalBox`'s `r_nocull_integer` does.
+/// `r_drawentities`/`r_nocull`/`r_shadows` (`RendererCvars`, DEC-37 A13.1) arrive on the `cvars` snapshot this fn already carries
+/// for the shader and model lookups below.
+/// There is therefore no leaf-function reason to split the cvar reads out as separate parameters the way `R_CullLocalBox`'s `r_nocull_integer` does.
 ///
 /// `entitySurface` (file-scope `static surfaceType_t entitySurface =
 /// SF_ENTITY;`, a kind-1 const per the fn-scope-statics three-kind rule,
@@ -2186,8 +2183,7 @@ pub fn R_AddEntitySurfaces<'a>(
 /// `R_AddTerrainSurfaces`'s own PORT-NOTE already documents (ambient state
 /// set by this fn's caller, `R_RenderView`, not yet in this wave's packet —
 /// threaded in rather than guessed at a fixed value, porting-rules §A2).
-/// `payloads`/`assets`/`cvars`/`entities`/`scratch`/`view`/`draw_surfs` are
-/// `R_AddEntitySurfaces`/`R_AddTerrainSurfaces`/`R_SetupProjection`'s own
+/// `payloads`/`assets`/`cvars`/`entities`/`scratch`/`view`/`draw_surfs` are `R_AddEntitySurfaces`/`R_AddTerrainSurfaces`/`R_SetupProjection`'s own
 /// already-ported parameters, threaded straight through.
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1516-1531`

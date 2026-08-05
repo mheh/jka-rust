@@ -830,10 +830,9 @@ pub fn g2_process_generated_surface_bolts(
 /// as the shader arena slot number, so the handle reads back through
 /// `Arena::handle_at_slot`.
 ///
-/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than Raven's raw-pointer
-/// `CRenderableSurface` (R2 Group-4 table): it carries the model handle,
-/// the LOD, the surface index, and the payload ordinal, so the backend re-locates
-/// the surface and reads the bone matrices off the entity's crossing.
+/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than Raven's raw-pointer `CRenderableSurface` (R2 Group-4 table):
+/// it carries the model handle, the LOD, the surface index, and the payload ordinal,
+/// so the backend re-locates the surface and reads the bone matrices off the entity's crossing.
 ///
 /// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it through `mdxm_view()`.
 /// Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle it already holds and `G2SurfaceRef` stores that.
