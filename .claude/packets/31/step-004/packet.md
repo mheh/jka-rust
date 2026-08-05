@@ -107,3 +107,5 @@ The draft awaits the user audit, and no lane spawns before the approval. After a
 ## Amendments
 
 **2026-08-04 - the draft awaits the user audit.**
+
+**2026-08-04 - ruling A is taken.** The user ruled option A at the packet audit: the new entity image golden lands as commit 4, written as the contract already states. Ruling B stays recorded as deferred on the survey's evidence. The lane go is pending.
