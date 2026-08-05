@@ -119,13 +119,6 @@ pub fn boot_renderer(cfg: &BootConfig) -> UiHost {
     mp_engine_server::hook_install::install_engine_hooks(&mut engine.common.hooks);
     mp_renderer::hook_install::install_engine_hooks(&mut engine.common.hooks);
 
-    // gh#35: `RE_RegisterModel` routes to the server registration path, because the view's `re` slot is NULL in this harness.
-    // The ghoul2 vertex fixture holds server-path output (bless commit `bc856508`, 2026-07-31), and the 2026-08-04 control run matched it byte for byte.
-    // Raven's `G2_SetupModelPointers` re-registers on every frame's entity walk, so the client path needs a seated `re` for the whole frame render.
-    // The override stands until `UiHost` owns a real `RendererFrontend`, the named prerequisite of gh#31 step-003.
-    // The two hooks have one signature, so the reassignment needs no adapter.
-    engine.common.hooks.RE_RegisterModel = engine.common.hooks.R_RegisterServerModel;
-
     // The renderer's model pool, built before the engine subset because
     // `Com_InitHunkMemory` -> `Hunk_Clear` calls the `R_HunkClearCrap` hook,
     // which casts the view's `rm` slot before doing anything else.

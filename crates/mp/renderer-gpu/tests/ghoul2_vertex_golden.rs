@@ -17,6 +17,13 @@
 //! frozen clock. The capture sink on `FrameExecutor` records each decoded ghoul2
 //! surface stream in draw-surf order.
 //!
+//! Bless provenance: the fixture ran on the server registration path until gh#31 step-003 on 2026-08-04.
+//! `UiHost` now owns a real `RendererFrontend`, so the view's `re` slot is seated and the init runs Raven's client `RE_RegisterModel`.
+//! The re-bless under that path reproduced the committed bytes exactly.
+//! Every `mdxmSurfHierarchy_t` in the stormtrooper `.glm` carries an empty shader name, so `R_FindShader` returns the default shader
+//! and the client leg writes `shaderIndex = 0`, the value the server leg forced.
+//! The 22 sort keys therefore stay tied, the draw-surf order holds, and the stormtrooper's 53 bones keep the 72-bone `_humanoid` remap off.
+//!
 //! Fixture format (`tests/goldens/ghoul2_verts_stormtrooper.bin`, all
 //! little-endian):
 //! - header: surface count, one `u32`.
