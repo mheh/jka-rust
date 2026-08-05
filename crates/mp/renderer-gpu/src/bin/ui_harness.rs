@@ -243,13 +243,13 @@ impl App {
                     gpu,
                     &view,
                     &frame_data,
-                    &self.host.sim.published,
-                    &self.host.world_load,
-                    // Menu frames draw 2D only; no entity walk to host.
+                    &self.host.re.sim.published,
+                    &self.host.re.world_load,
+                    // Menu frames draw 2D only, so there is no entity walk to host.
                     None,
-                    self.host.img_state.pending_uploads.drain().collect(),
+                    self.host.re.img_state.pending_uploads.drain().collect(),
                     images,
-                    &self.host.noise,
+                    &self.host.re.noise,
                     float_time,
                     // No live cvar table in the harness, so the retail defaults
                     // apply.

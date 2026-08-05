@@ -44,6 +44,7 @@ use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, 
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
+use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_public::ref_flags::{RDF_DRAWSKYBOX, RDF_NOWORLDMODEL};
 use mp_renderer::tr_scene::{
@@ -94,7 +95,7 @@ struct Scene {
 /// here use.
 fn record_entities(host: &mut UiHost, frame_data: &mut FrameData, entities: &[refEntity_t]) {
     for ent in entities {
-        RE_AddRefEntityToScene(frame_data, &host.sim.published, &mut host.scene, ent);
+        RE_AddRefEntityToScene(frame_data, &host.re.sim.published, &mut host.re.scene, ent);
     }
 }
 
@@ -248,7 +249,7 @@ fn boot_synthetic() -> UiHost {
     let mut host = boot::boot_renderer(&cfg);
     // The ui boot path is what normally sets this; every `RE_Add*ToScene` trap
     // drops its submission while it is false.
-    Arc::make_mut(&mut host.sim.published).registered = true;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
     host
 }
 
@@ -256,21 +257,26 @@ fn boot_synthetic() -> UiHost {
 /// images on disk, every name resolves to the procedurally built default
 /// shader, which is exactly the asset-free surface this gate wants.
 fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
     let UiHost {
         engine,
         models,
-        cvars,
-        sim,
-        img_state,
-        world_load,
-        qs,
-        sky_view,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                qs,
+                sky_view,
+                ..
+            },
         ..
     } = host;
     let models_ptr: *mut RenderModels = &mut *models;
     let Engine { common, cm, sv, .. } = &mut **engine;
     let sv_ptr: *mut () = sv as *mut Server as *mut ();
-    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr);
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
     RE_RegisterShader(
         name,
         qs,
@@ -373,11 +379,11 @@ fn run_scene(scene: &Scene) {
     RE_RenderScene(
         &refdef,
         &mut frame_data,
-        &host.sim.published,
-        &host.cvars,
-        &mut host.scene,
+        &host.re.sim.published,
+        &host.re.cvars,
+        &mut host.re.scene,
         &mut host.engine.common,
-        &host.sim.light_styles,
+        &host.re.sim.light_styles,
     );
 
     // ---- headless GPU and the render resources -------------------------
@@ -392,22 +398,29 @@ fn run_scene(scene: &Scene) {
     gpu.clear_headless(&target);
     let float_time = FROZEN_TIME_MS as f32 * 0.001;
 
-    let _uploaded = images.upload_pending(&mut gpu, &mut host.img_state, &host.sim.published);
+    let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     let stats = {
+        // The frame pins the published registry, so a mid-frame `Arc::make_mut` through the seated `re` slot copies on write.
+        // This scene draws no ghoul2 entity, so no register hook fires here, and the pin keeps every entity-walk site one shape.
+        let pinned = Arc::clone(&host.re.sim.published);
+        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
             engine,
             models,
-            sim,
-            world_load,
-            img_state,
-            noise,
+            re:
+                RendererFrontend {
+                    world_load,
+                    img_state,
+                    noise,
+                    ..
+                },
             ..
         } = &mut host;
         let models_ptr: *mut RenderModels = &mut *models;
         let Engine { common, cm, sv, .. } = &mut **engine;
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr);
+        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
         // A sim-side caller hands the entity walk the full host bundle, so
         // every `RT_MODEL` arm runs (W2-F8).
@@ -420,7 +433,7 @@ fn run_scene(scene: &Scene) {
             &mut gpu,
             &target,
             &frame_data,
-            &sim.published,
+            &pinned,
             world_load,
             Some(&mut entity_host),
             img_state.pending_uploads.drain().collect(),
@@ -636,7 +649,7 @@ fn scene_polys(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t)
 
         RE_AddPolyToScene(
             frame_data,
-            &host.sim.published,
+            &host.re.sim.published,
             &mut host.engine.common,
             shader,
             &verts,
@@ -664,7 +677,7 @@ fn scene_dlights(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_
     ] {
         RE_AddDynamicLightToScene(
             frame_data,
-            &host.sim.published,
+            &host.re.sim.published,
             org,
             intensity,
             color[0],

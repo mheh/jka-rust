@@ -1,32 +1,19 @@
-//! `UiHost` — everything one harness process owns, plus the two small
-//! bookkeeping types the [`super::display::HarnessDc`] slots need.
+//! `UiHost` holds everything one harness process owns.
+//! It also holds the two small bookkeeping types the [`super::display::HarnessDc`] slots need.
 
 use std::collections::BTreeMap;
 
 use mp_engine_core::Engine;
-use mp_qshared::shared::com_parse::QSharedScratch;
-use mp_renderer::render_state::frame_state::FrameState;
-use mp_renderer::render_state::render_assets_sim::RenderAssetsSim;
-use mp_renderer::render_state::renderer_cvars::RendererCvars;
-use mp_renderer::render_state::world_load_state::WorldLoadState;
-use mp_renderer::tr_font::FontState;
-use mp_renderer::tr_image::TrImageState;
-use mp_renderer::tr_local::view_parms_t::viewParms_t;
+use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_noise::NoiseState;
-use mp_renderer::tr_scene::SceneState;
-use mp_renderer::tr_worldeffects::world_effects::WorldEffectsState;
 use mp_ui::world::ui_state::UiState;
-use native_math::rng::Rng;
 
 /// The whole harness process state: the engine island booted to its FS/cvar/
 /// cmd subset, the renderer's DEC-42.3 carrier bundle, and the ui module's
 /// own `UiState`.
 ///
-/// Deliberately one flat owner rather than nested structs: every frame
-/// re-splits it into disjoint `&mut` field borrows to build a
-/// [`super::display::HarnessDc`], and a flat struct is what makes that split
-/// borrow-checkable.
+/// Every frame re-splits the host into disjoint `&mut` field borrows to build a [`super::display::HarnessDc`].
+/// The split is two-level: `re`'s own fields borrow disjointly inside it, and `models` stays outside `re`, so one caller can hold both.
 pub struct UiHost {
     // ---- engine island -------------------------------------------------
     /// Booted through the ordered FS/cvar/cmd prefix of `Com_Init` only —
@@ -36,23 +23,10 @@ pub struct UiHost {
     pub engine: Box<Engine>,
 
     // ---- renderer carrier bundle (DEC-42.3) ----------------------------
+    /// The model registry the bundle excludes, which the live engine holds at `Engine.render_models` behind the view's `rm` slot.
     pub models: RenderModels,
-    pub cvars: RendererCvars,
-    /// The one CPU registry. Every registration writes `sim.published`, so a
-    /// harness draw reads the generation the registration produced.
-    pub sim: RenderAssetsSim,
-    pub img_state: TrImageState,
-    pub frame: FrameState,
-    /// The `tr` fields the sim writes at load and the render side only reads
-    /// (W2-F3), the harness twin of `RendererFrontend::world_load`.
-    pub world_load: WorldLoadState,
-    pub scene: SceneState,
-    pub noise: NoiseState,
-    pub rng: Rng,
-    pub font: FontState,
-    pub world_effects: WorldEffectsState,
-    pub qs: QSharedScratch,
-    pub sky_view: viewParms_t,
+    /// The renderer's DEC-42.3 carrier bundle, the same struct the live client seats at `Engine.re`.
+    pub re: RendererFrontend,
     // W2-F3: the sky scratch is render-thread-resident on `FrameExecutor`.
 
     // ---- the ui module -------------------------------------------------
