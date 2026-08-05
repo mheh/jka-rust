@@ -5,8 +5,11 @@
 //! the world asset.
 //! Every entry names its blocks by `Arc` and byte offset, so nothing here is a raw pointer.
 
+use core::ffi::c_void;
 use std::sync::Arc;
 
+use mp_engine_qcommon::qfiles::md3_header_t::md3Header_t;
+use mp_host_interface::mdx::mdxm::MdxmView;
 use mp_qshared::shared::qhandle_t;
 
 use crate::render_state::model_block::ModelBlock;
@@ -30,9 +33,30 @@ pub struct PublishedModel {
     pub mdxm: Option<(Arc<ModelBlock>, usize)>,
     /// `model_t::mdxa`.
     pub mdxa: Option<(Arc<ModelBlock>, usize)>,
+    /// `model_t::name`, the registered file name the bad-frame warning prints.
+    /// The on-disk `md3Header_t::name` is a different string, so the warning reads this instead.
+    pub name: String,
 }
 
 impl PublishedModel {
+    /// The `md3Header_t` one loaded LOD publishes, `None` for an absent slot.
+    pub fn md3_ptr(&self, lod: usize) -> Option<*const md3Header_t> {
+        let (block, offset) = self.md3.get(lod)?.as_ref()?;
+        // SAFETY: the offset was computed at mark time by subtracting the block base from the finished `model_t`
+        // pointer, so it lands inside the block.
+        // The block is immutable while shared (`render_state/model_block.rs:127-141`), and the borrow on `self`
+        // keeps the entry's `Arc` alive for as long as the caller holds the pointer.
+        Some(unsafe { block.base_ptr().add(*offset) } as *const md3Header_t)
+    }
+
+    /// The DEC-35 view over the published `.glm` block, `None` for a model with no mdxm block.
+    pub fn mdxm_view(&self) -> Option<MdxmView<'_>> {
+        let (block, offset) = self.mdxm.as_ref()?;
+        // SAFETY: see [`Self::md3_ptr`]. The block is the endian-swap-completed `.glm` image, self-sized by its
+        // `ofsEnd` field, which is what `MdxmView::from_block` reads to bound the view.
+        Some(unsafe { MdxmView::from_block(block.base_ptr().add(*offset) as *const c_void) })
+    }
+
     /// `true` when any family slot names this exact block.
     fn holds(&self, block: &Arc<ModelBlock>) -> bool {
         let names = |slot: &Option<(Arc<ModelBlock>, usize)>| {
