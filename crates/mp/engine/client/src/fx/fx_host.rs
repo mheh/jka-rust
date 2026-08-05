@@ -36,7 +36,9 @@ use mp_qshared::shared::{fileHandle_t, CHAN_AUTO, ENTITYNUM_NONE, FS_READ};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::tr_cmds::RE_StretchPic;
 use mp_renderer::tr_model::frontend::RE_RegisterModel;
-use mp_renderer::tr_scene::{RE_AddLightToScene, RE_AddMiniRefEntityToScene, RE_AddPolyToScene};
+use mp_renderer::tr_scene::{
+    RE_AddDecalToScene, RE_AddLightToScene, RE_AddMiniRefEntityToScene, RE_AddPolyToScene,
+};
 use mp_renderer::tr_shader::RE_RegisterShader;
 use native_math::rng::QRand;
 use native_math::vector::vec3_t;
@@ -376,14 +378,6 @@ impl FxHost<'_, '_> {
 
     /// Raven `SFxHelper::AddDecalToScene`.
     ///
-    //TODO: Port RE_AddDecalToScene world root
-    // Source: oracle/codemp/client/FxSystem.h:212-215
-    // `RE_AddDecalToScene` takes a `world_root: &mut MarkNode`, and no carrier
-    // owns a root until the renderer census merges that node arena (gh#31). The
-    // `CG_R_ADDDECALTOSCENE` arm in `cl_cgame.rs` is parked on the same owner,
-    // so the FX decal follows it and adds nothing on the live client. The parity
-    // arm still records the call, so the decal computation stays gated.
-    ///
     /// Source: `oracle/codemp/client/FxSystem.h:212-215`
     #[allow(clippy::too_many_arguments)]
     pub fn AddDecalToScene(
@@ -401,7 +395,32 @@ impl FxHost<'_, '_> {
         temporary: bool,
     ) {
         match self {
-            FxHost::Engine { .. } => {}
+            FxHost::Engine { view, .. } => {
+                // SAFETY: view-constructor slot, single-threaded, no other live cast.
+                let re = unsafe { re_from_view(view) };
+                // `tr.refdef.time` is the last committed scene's time, which `RE_RenderScene` also latches into `last_time`.
+                let refdef_time = re.scene.last_time;
+                RE_AddDecalToScene(
+                    &mut re.frame_data,
+                    &re.sim.published,
+                    &mut re.scene,
+                    &re.cvars,
+                    view.common,
+                    &mut re.mark_state,
+                    refdef_time,
+                    shader,
+                    origin,
+                    dir,
+                    orientation,
+                    r,
+                    g,
+                    b,
+                    a,
+                    alpha_fade,
+                    radius,
+                    temporary,
+                );
+            }
             FxHost::Harness(h) => h.emit(format!(
                 "DECAL shader {} origin {} dir {} orientation {} rgba {} {} {} {} alphaFade {} \
                  radius {} temporary {}",

@@ -111,6 +111,7 @@ use mp_qshared::shared::file_mode::fsMode_t;
 use mp_qshared::shared::game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 use mp_qshared::shared::keycatch::KEYCATCH_CGAME;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_GENTITIES, SNAPFLAG_NOT_ACTIVE};
+use mp_qshared::shared::mark_fragment::markFragment_t;
 use mp_qshared::shared::q_math::Sys_SnapVector;
 use mp_qshared::shared::q_string::Com_sprintf;
 use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
@@ -133,9 +134,10 @@ use mp_renderer::tr_init::{RE_EndRegistration, RE_GetLightStyle, RE_SetLightStyl
 use mp_renderer::tr_light::R_LightForPoint;
 use mp_renderer::tr_model::frontend::{r_lerp_tag, r_model_bounds, RE_RegisterModel};
 use mp_renderer::tr_model::render_models::RenderModels;
+use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_scene::{
-    RE_AddAdditiveLightToScene, RE_AddLightToScene, RE_AddPolyToScene, RE_AddRefEntityToScene,
-    RE_ClearDecals, RE_ClearScene, RE_RenderScene,
+    RE_AddAdditiveLightToScene, RE_AddDecalToScene, RE_AddLightToScene, RE_AddPolyToScene,
+    RE_AddRefEntityToScene, RE_ClearDecals, RE_ClearScene, RE_RenderScene,
 };
 use mp_renderer::tr_shader::{RE_RegisterShader, RE_RegisterShaderNoMip, R_RemapShader};
 use mp_renderer::tr_terrain::RE_InitRendererTerrain;
@@ -1683,13 +1685,45 @@ pub fn CL_CgameSystemCalls(
         );
         0
     } else if op == MpCgameImport::CG_CM_MARKFRAGMENTS as c_int {
-        //TODO: Port R_MarkFragments world root
-        // Source: oracle/codemp/client/cl_cgame.cpp:719 (`re.MarkFragments`)
-        // `R_MarkFragments` takes a `world_root: &mut MarkNode`, and `MarkNode`
-        // is still the scoped-local stand-in `tr_marks.rs` declares. No carrier
-        // owns a root, so the arm reports zero fragments until the renderer
-        // census merges that node arena into `RenderAssets::world` (gh#31).
-        0
+        // Source: oracle/codemp/client/cl_cgame.cpp:805-806 (`re.MarkFragments`)
+        let num_points = arg(1) as usize;
+        let max_points = arg(4) as usize;
+        let max_fragments = arg(6) as usize;
+        // SAFETY: `VMA(2)` is the module's `vec3_t` run and `VMA(3)` its projection vector (porting-rules §D11).
+        let points =
+            unsafe { core::slice::from_raw_parts(vma(vc, args, 2) as *const vec3_t, num_points) };
+        let projection = unsafe { *(vma(vc, args, 3) as *const vec3_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // `R_MarkFragments` counts its output through the buffer lengths, so both accumulators start empty.
+        let mut point_buffer: Vec<vec3_t> = Vec::new();
+        let mut fragment_buffer: Vec<markFragment_t> = Vec::new();
+        let num_fragments = R_MarkFragments(
+            &re.sim.published,
+            &mut re.mark_state,
+            points,
+            projection,
+            max_points,
+            &mut point_buffer,
+            max_fragments,
+            &mut fragment_buffer,
+        );
+        // SAFETY: `VMA(5)` is the module's `float` run, which the caller sized at `maxPoints` vectors (porting-rules §D11).
+        let out_points = unsafe {
+            core::slice::from_raw_parts_mut(vma(vc, args, 5) as *mut f32, point_buffer.len() * 3)
+        };
+        for (i, point) in point_buffer.iter().enumerate() {
+            out_points[i * 3..i * 3 + 3].copy_from_slice(point);
+        }
+        // SAFETY: `VMA(7)` is the module's `markFragment_t` run, sized at `maxFragments` (porting-rules §D11).
+        let out_fragments = unsafe {
+            core::slice::from_raw_parts_mut(
+                vma(vc, args, 7) as *mut markFragment_t,
+                fragment_buffer.len(),
+            )
+        };
+        out_fragments.copy_from_slice(&fragment_buffer);
+        num_fragments
     } else if op == MpCgameImport::CG_S_GETVOICEVOLUME as c_int {
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let snd = unsafe { snd_from_view(view) };
@@ -2112,12 +2146,34 @@ pub fn CL_CgameSystemCalls(
         );
         0
     } else if op == MpCgameImport::CG_R_ADDDECALTOSCENE as c_int {
-        //TODO: Port RE_AddDecalToScene world root
-        // Source: oracle/codemp/client/cl_cgame.cpp:1027 (`re.AddDecalToScene`)
-        // Same open owner as `CG_CM_MARKFRAGMENTS` above: `RE_AddDecalToScene`
-        // takes a `world_root: &mut MarkNode`, and no carrier owns a root until
-        // the renderer census merges that node arena (gh#31). The arm adds no
-        // decal until then.
+        // Source: oracle/codemp/client/cl_cgame.cpp:903-904 (`re.AddDecalToScene`)
+        // SAFETY: `VMA(2)` and `VMA(3)` are the module's origin and direction vectors (porting-rules §D11).
+        let origin = unsafe { *(vma(vc, args, 2) as *const vec3_t) };
+        let dir = unsafe { *(vma(vc, args, 3) as *const vec3_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        // `tr.refdef.time` is the last committed scene's time, which `RE_RenderScene` also latches into `last_time`.
+        let refdef_time = re.scene.last_time;
+        RE_AddDecalToScene(
+            &mut re.frame_data,
+            &re.sim.published,
+            &mut re.scene,
+            &re.cvars,
+            view.common,
+            &mut re.mark_state,
+            refdef_time,
+            arg(1),
+            origin,
+            dir,
+            vmf(vc, args, 4),
+            vmf(vc, args, 5),
+            vmf(vc, args, 6),
+            vmf(vc, args, 7),
+            vmf(vc, args, 8),
+            arg(9) != 0,
+            vmf(vc, args, 10),
+            arg(11) != 0,
+        );
         0
     } else if op == MpCgameImport::CG_R_LIGHTFORPOINT as c_int {
         let point = unsafe { *(vma(vc, args, 1) as *const vec3_t) };
