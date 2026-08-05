@@ -155,3 +155,5 @@ Both rulings are settled and the packet is ready for the lane, which spawns only
 - The two feat commit messages end on a `Gates:` line that git parses as a trailer. Accepted for these commits. Future packets write gate results as plain sentences, so no line parses as a trailer.
 - `RenderCvarSnapshot::no_server_ghoul2` keeps one reader in the tree (`world_harness.rs`). Noted, no action: field removal is out of this packet's scope.
 - House-style findings on added lines (one semicolon, the word "rides", six column-wrapped comment blocks, one mechanics-narrating line) close in one style commit on the branch. The "seam" flag is discarded: seam is repo vocabulary.
+
+The frozen record of the review is `docs/audits/2026-08-05-bone-matrix-crossing-landing.md`.
