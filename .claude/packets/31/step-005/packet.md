@@ -146,3 +146,12 @@ Both rulings are settled and the packet is ready for the lane, which spawns only
 **2026-08-05 - rulings A and B are taken.** The user ruled both open questions on the recommendations: ruling A accepts the transform-before-cull deviation as the direct consequence of DEC-65's scene-add ruling, with two comment lines at the builder recording the divergence, and ruling B puts the `r_noServerGhoul2` check in the builder, preserving Raven's check-before-transform order, with a suppressed instance crossing as an empty payload. No open question remains, and the packet is ready for the lane. The lane go is pending.
 
 **2026-08-05 - packet-skill audit folded at spawn time.** The audit adds the world-golden gate to commit 1, because the packet skill requires that gate on every renderer-touching commit. No other change.
+
+**2026-08-05 - lane-review closed with dispositioned findings.** The clerk walked all 21 files and reproduced every gate. Findings and dispositions:
+
+- The two empty-payload paths (a suppressed `r_noServerGhoul2` instance, a failed model-pointer setup) now run the render-side cull, `R_SetupEntityLighting`, and the lighting write-back, where Raven returned first. Accepted: this is the direct consequence of ruling B's empty-payload crossing, the entity draws nothing either way, and no gate exercises the nonzero cvar path.
+- The `MOD_MDXM` guard reads the payload where it read the token, so an invalid instance skips the branch instead of running a no-op lighting copy. Accepted: the output is identical.
+- `render_state/mod.rs` was edited outside the enumerated write scope. Accepted: the two contracted new files need module declarations, so this is a packet enumeration gap.
+- The two feat commit messages end on a `Gates:` line that git parses as a trailer. Accepted for these commits. Future packets write gate results as plain sentences, so no line parses as a trailer.
+- `RenderCvarSnapshot::no_server_ghoul2` keeps one reader in the tree (`world_harness.rs`). Noted, no action: field removal is out of this packet's scope.
+- House-style findings on added lines (one semicolon, the word "rides", six column-wrapped comment blocks, one mechanics-narrating line) close in one style commit on the branch. The "seam" flag is discarded: seam is repo vocabulary.
