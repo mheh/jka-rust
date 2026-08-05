@@ -53,7 +53,6 @@ use mp_renderer::tr_scene::{
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer::tr_main::EntityWalkHost;
 use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
@@ -401,6 +400,13 @@ fn run_scene(scene: &Scene) {
     let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
 
     let stats = {
+        // `RE_EndFrame` drains the registered model blocks into the published registry, and no test reaches it.
+        // The drain therefore runs here, and it must land before the pin below.
+        // A drain after the pin publishes into a generation the frame does not read, and the frame then draws nothing.
+        // Source: crates/mp/renderer/src/tr_cmds.rs:354-358
+        if let Some(blocks) = host.models.publish_blocks() {
+            host.re.sim.publish_models(blocks);
+        }
         // The frame pins the published registry, so a mid-frame `Arc::make_mut` through the seated `re` slot copies on write.
         // This scene draws no ghoul2 entity, so no register hook fires here, and the pin keeps every entity-walk site one shape.
         let pinned = Arc::clone(&host.re.sim.published);
@@ -422,20 +428,14 @@ fn run_scene(scene: &Scene) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-        // A sim-side caller hands the entity walk the full host bundle, so
-        // every `RT_MODEL` arm runs (W2-F8).
-        let mut entity_host = EntityWalkHost {
-            engine_view: &mut engine_view,
-            models: &*models,
-        };
-
+        // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
         executor.execute_frame(
             &mut gpu,
             &target,
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut entity_host),
+            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,

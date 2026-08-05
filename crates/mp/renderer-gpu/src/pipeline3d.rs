@@ -52,6 +52,7 @@ use mp_qshared::shared::q_math::{
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::image_asset::ImageHandle;
+use mp_renderer::render_state::model_blocks::ModelBlocks;
 use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -72,8 +73,6 @@ use mp_renderer::tr_main::{
     DrawSurf, G2SurfaceRef, Md3SurfaceRef, R_DecomposeSort, R_RotateForEntity, SurfaceGeometry,
     TrMainScratch, WorldSurfaceRef,
 };
-use mp_renderer::tr_model::frontend::mdxm_view_of;
-use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use mp_renderer::tr_shade::RB_FogPass;
@@ -1127,7 +1126,6 @@ impl Pipeline3d {
         view: &viewParms_t,
         entities: &[trRefEntity_t],
         scratch: &mut TrMainScratch,
-        models: Option<&RenderModels>,
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
@@ -1164,7 +1162,6 @@ impl Pipeline3d {
             &mut stats,
             &slot_map,
             entities,
-            models,
             g2,
             frame,
             sky,
@@ -1424,7 +1421,6 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        models: Option<&RenderModels>,
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
@@ -1467,12 +1463,6 @@ impl Pipeline3d {
                     );
                 }
                 SurfaceGeometry::Md3(md3_ref) => {
-                    // W2-F8: the frontend only appends this arm when a
-                    // sim-side caller supplied the model registry, so a
-                    // render-side frame never reaches it.
-                    let Some(models) = models else {
-                        continue;
-                    };
                     self.collect_md3_surface(
                         surf.sort,
                         md3_ref,
@@ -1484,7 +1474,6 @@ impl Pipeline3d {
                         stats,
                         slot_map,
                         entities,
-                        models,
                         frame,
                         sky,
                         view,
@@ -1497,10 +1486,6 @@ impl Pipeline3d {
                     );
                 }
                 SurfaceGeometry::Ghoul2(g2_ref) => {
-                    // Same gate as the MD3 arm above (W2-F8).
-                    let Some(models) = models else {
-                        continue;
-                    };
                     self.collect_ghoul2_surface(
                         surf.sort,
                         g2_ref,
@@ -1512,7 +1497,6 @@ impl Pipeline3d {
                         stats,
                         slot_map,
                         entities,
-                        models,
                         g2,
                         frame,
                         sky,
@@ -2008,7 +1992,6 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        models: &RenderModels,
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
@@ -2037,7 +2020,12 @@ impl Pipeline3d {
 
         // Decode the keyframe-lerped vertices, normals, and triangle indices.
         let Some((md3_vertices, md3_index_block, md3_normals)) =
-            decode_md3_surface(models, md3_ref, rgba, &assets.function_tables.sin_table)
+            decode_md3_surface(
+                &assets.models,
+                md3_ref,
+                rgba,
+                &assets.function_tables.sin_table,
+            )
         else {
             stats.md3_decode_failed += 1;
             return;
@@ -2173,7 +2161,6 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        models: &RenderModels,
         g2: &mut Ghoul2System,
         frame: &mut FrameState,
         sky: &mut SkyState,
@@ -2204,7 +2191,7 @@ impl Pipeline3d {
         // Deform the surface by the lerped bones, decode the bone-0 normals, and
         // read the triangle indices.
         let Some((g2_vertices, g2_index_block, g2_normals)) =
-            decode_ghoul2_surface(models, g2, g2_ref, rgba)
+            decode_ghoul2_surface(&assets.models, g2, g2_ref, rgba)
         else {
             stats.ghoul2_decode_failed += 1;
             return;
@@ -4046,16 +4033,14 @@ fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVerte
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1235-1397`
 fn decode_md3_surface(
-    models: &RenderModels,
+    models: &ModelBlocks,
     md3_ref: Md3SurfaceRef,
     rgba: [u8; 4],
     sin_table: &[f32; FUNCTABLE_SIZE],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
-    let model = models.get_model(md3_ref.h_model);
-    let header = *model.md3.get(md3_ref.lod as usize)?;
-    if header.is_null() {
-        return None;
-    }
+    let model = models.get(md3_ref.h_model)?;
+    // An unpublished slot and an unloaded LOD are both `None`, and a published LOD never names a null pointer.
+    let header = model.md3_ptr(md3_ref.lod as usize)?;
 
     // The oracle recomputes backlerp at draw time: a still model (old frame ==
     // current frame) lerps nothing.
@@ -4115,19 +4100,15 @@ fn decode_md3_surface(
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451` (the non-gore main
 /// arm)
 fn decode_ghoul2_surface(
-    models: &RenderModels,
+    models: &ModelBlocks,
     g2: &mut Ghoul2System,
     g2_ref: G2SurfaceRef,
     rgba: [u8; 4],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
-    let model = models.get_model(g2_ref.model);
-    // The render surface only reaches here for a live `MOD_MDXM` model whose
-    // `mdxm` block the loader filled. A null block is not renderable, so it
-    // drops rather than reach `mdxm_view_of`'s null deref.
-    if model.mdxm.is_null() {
-        return None;
-    }
-    let mdxm = mdxm_view_of(model);
+    // The render surface only reaches here for a live `MOD_MDXM` model whose `mdxm` block the loader filled.
+    // A model with no published block is not renderable, which is what the `None` arm of `mdxm_view` reports.
+    let model = models.get(g2_ref.model)?;
+    let mdxm = model.mdxm_view()?;
     let surface = mdxm.find_surface(g2_ref.surface_index, g2_ref.lod);
 
     let num_verts = surface.num_verts();

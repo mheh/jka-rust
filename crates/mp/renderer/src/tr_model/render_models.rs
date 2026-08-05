@@ -395,6 +395,7 @@ impl RenderModels {
         let md3 = model.md3;
         let mdxm = model.mdxm;
         let mdxa = model.mdxa;
+        let name = read_qpath(&model.name);
 
         let entry = PublishedModel {
             model_type,
@@ -406,6 +407,7 @@ impl RenderModels {
             ],
             mdxm: self.block_containing(mdxm as *const u8),
             mdxa: self.block_containing(mdxa as *const u8),
+            name,
         };
 
         self.blocks.set(handle, entry);

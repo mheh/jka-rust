@@ -47,6 +47,7 @@ use std::mem;
 
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
+use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
@@ -68,8 +69,7 @@ use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    tr_ref_entity_from_ref_entity, DrawSurf, EntityWalkHost, R_RenderView, SurfaceGeometry,
-    TrMainScratch,
+    tr_ref_entity_from_ref_entity, DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch,
 };
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
@@ -186,11 +186,9 @@ impl Warned {
     }
 }
 
-// `WorldFrame` is gone. Wave 2 emptied it one ruling at a time: W2-F3 took the
-// view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2
-// owner, W2-F6 the terrain seeds, W2-F8 the model registry. What is left is
-// the registry (a package field), the load state (a package field), and
-// `EntityWalkHost`, which only a sim-side caller supplies.
+// `WorldFrame` is gone, and wave 2 emptied it one ruling at a time.
+// W2-F3 took the view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2 owner, W2-F6 the terrain seeds, and W2-F8 the model registry.
+// What is left is the registry, the load state, and the engine host, which only a sim-side caller supplies.
 
 /// Owns the render-thread state one frame's execution needs: the 2D and world
 /// pipelines, the uploaded world geometry, the reused 2D batch, and the
@@ -363,11 +361,10 @@ impl FrameExecutor {
     /// Replays one package that arrived over the frame channel, and returns it
     /// so the caller can hand its event buffer back to the sim thread.
     ///
-    /// This is the live client's whole draw path. Both halves draw for real
-    /// since W2-F7: the 2D arms put menus and the HUD on the screen, and a
-    /// `RenderScene` runs the BSP walk, the sky, the fog and the dynamic
-    /// lights. Only the MD3 and Ghoul2 entity arms stay dark, since the model
-    /// blocks do not cross yet (W2-F8, wave 3).
+    /// This is the live client's whole draw path, and both halves draw for real since W2-F7.
+    /// The 2D arms put menus and the HUD on the screen, and a `RenderScene` runs the BSP walk, the sky, the fog and the dynamic lights.
+    /// MD3 entities draw here since gh#31 step-004, because they read the published model blocks off `RenderAssets`.
+    /// The Ghoul2 entity arms stay dark, because their skeleton work is sim-confined until DEC-65 ruling 2 crosses the per-entity bone matrices.
     pub fn execute_package(
         &mut self,
         gpu: &mut Gpu,
@@ -432,7 +429,7 @@ impl FrameExecutor {
         frame_data: &FrameData,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
-        mut entity_host: Option<&mut EntityWalkHost>,
+        mut entity_host: Option<&mut EngineHostView>,
         uploads: Vec<(ImageHandle, PendingUpload)>,
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
@@ -680,7 +677,7 @@ impl FrameExecutor {
         target: &TextureView,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
-        entity_host: Option<&mut EntityWalkHost>,
+        entity_host: Option<&mut EngineHostView>,
         frame_data: &'f FrameData,
         refdef: &TrRefdef,
         light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
@@ -804,10 +801,6 @@ impl FrameExecutor {
         let mut draw_surfs: Vec<DrawSurf<SurfaceGeometry<'f>>> = Vec::new();
         let mut view = zeroed_view_parms();
 
-        // The backend needs the same registry the frontend walked with, so it
-        // reads it back off the optional host bundle (W2-F8).
-        let backend_models = entity_host.as_deref().map(|host| host.models);
-
         R_RenderView(
             &parms,
             frame_scene_num,
@@ -863,7 +856,6 @@ impl FrameExecutor {
             &view,
             &entities,
             &mut self.tr_main_scratch,
-            backend_models,
             &mut self.ghoul2,
             &mut self.view_state,
             &mut self.sky,

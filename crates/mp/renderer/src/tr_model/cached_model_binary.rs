@@ -761,6 +761,13 @@ mod tests {
 
     use crate::mdx_format::mdxm_header_t::mdxmHeader_t;
     use crate::tr_local::modtype_t::modtype_t;
+    use crate::tr_model::server_load::write_qpath;
+
+    /// The byte offset of `mdxmHeader_t::ofsEnd`, which is what `MdxmView::from_block` reads to size the view.
+    /// `mdx_format.h` keeps every field 4-byte aligned, so the offset is the plain field sum.
+    ///
+    /// Source: `oracle/codemp/renderer/mdx_format.h:153-172`
+    const MDXM_OFS_END: usize = 160;
 
     /// Build a `CachedEndianedModelBinary` cache entry directly (bypassing the
     /// registration path) for eviction/dump tests that only care about the
@@ -955,6 +962,51 @@ mod tests {
             .publish_blocks()
             .expect("the eviction sets the dirty flag");
         assert!(published.get(handle).is_none());
+    }
+
+    #[test]
+    fn published_views_reproduce_the_model_t_pointers() {
+        let mut rm = RenderModels::default();
+        let mut host = MockHost::new();
+        rm.model_init();
+        let handle = rm.r_alloc_model().expect("a second slot is available");
+
+        // The block carries a `.glm` header whose `ofsEnd` sizes the view.
+        // The view read below therefore proves the helper resolved the block base plus the stored offset.
+        let mut bytes = [0u8; 256];
+        bytes[MDXM_OFS_END..MDXM_OFS_END + 4].copy_from_slice(&200i32.to_le_bytes());
+        let (ptr, _) = rm.re_register_server_models_malloc(
+            &mut host,
+            bytes.len() as i32,
+            Some(&bytes),
+            "models/foo.glm",
+            memtag_t::TAG_MODEL_GLM,
+        );
+        {
+            let slot = rm.models.slot_mut(handle as usize);
+            slot.r#type = modtype_t::MOD_MDXM;
+            slot.numLods = 1;
+            slot.mdxm = ptr as *mut mdxmHeader_t;
+            slot.md3[0] = unsafe { ptr.add(8) } as *mut md3Header_t;
+            write_qpath(&mut slot.name, "models/foo.glm");
+        }
+
+        rm.mark_block(handle);
+        let published = rm.publish_blocks().expect("the mark sets the dirty flag");
+        let entry = published.get(handle).expect("the slot is published");
+
+        assert_eq!(entry.name, "models/foo.glm");
+        assert_eq!(
+            entry.md3_ptr(0),
+            Some(unsafe { ptr.add(8) } as *const md3Header_t),
+        );
+        assert!(entry.md3_ptr(1).is_none(), "LOD 1 names no block");
+        assert!(entry.md3_ptr(9).is_none(), "an out-of-range LOD is absent");
+        let view = entry.mdxm_view().expect("the mdxm slot names a block");
+        assert_eq!(view.ofs_end(), 200);
+
+        // A handle that was never marked has no entry at all, so both helpers are unreachable through it.
+        assert!(published.get(handle + 1).is_none());
     }
 
     #[test]

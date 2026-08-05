@@ -59,6 +59,7 @@ use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::model_blocks::PublishedModel;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -663,17 +664,19 @@ pub fn g2_get_vert_bone_weight_not_slow(p_vert: &mdxmVertex_t, i_weight_num: i32
 /// `ProjectRadius`/`myftol` are the cross-file in-module callees.
 /// `project_radius` takes the live `viewParms_t` (E2), so `view` threads
 /// straight through to it.
+/// `currentModel->numLods` is the one field the oracle body reads, so `num_lods` arrives on its own.
+/// The caller takes it off the published entry (DEC-65 ruling 3).
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:967-1041`
 pub fn g2_compute_lod(
     ent: &RefEntity,
-    current_model: &model_t,
+    num_lods: i32,
     lod_bias: i32,
     view: &viewParms_t,
     cvars: RenderCvarSnapshot,
 ) -> i32 {
     // model has only 1 LOD level, skip computations and bias
-    if current_model.numLods < 2 {
+    if num_lods < 2 {
         return 0;
     }
 
@@ -717,19 +720,19 @@ pub fn g2_compute_lod(
         // object intersects near view plane, e.g. view weapon
         flod = 0.0;
     }
-    flod *= current_model.numLods as f32;
+    flod *= num_lods as f32;
     let mut lod = myftol(flod);
 
     if lod < 0 {
         lod = 0;
-    } else if lod >= current_model.numLods {
-        lod = current_model.numLods - 1;
+    } else if lod >= num_lods {
+        lod = num_lods - 1;
     }
 
     lod += lod_bias;
 
-    if lod >= current_model.numLods {
-        lod = current_model.numLods - 1;
+    if lod >= num_lods {
+        lod = num_lods - 1;
     }
     if lod < 0 {
         lod = 0;
@@ -827,6 +830,9 @@ pub fn g2_process_generated_surface_bolts(
 /// the LOD, the surface index, and the bone-cache id, so the backend re-locates
 /// the surface and reads the cache from the arena.
 ///
+/// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it through `mdxm_view()`.
+/// Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle it already holds and `G2SurfaceRef` stores that.
+///
 /// DEFERRED in this arm: the stencil- and projection-shadow pushes
 /// (`r_shadows == 2`/`3`) and the `_G2_GORE` overlay chain. Both build extra
 /// draw surfs from tier-2 fields and land with the shadow/gore backend waves.
@@ -839,14 +845,18 @@ pub fn g2_process_generated_surface_bolts(
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2521-2735`
 pub fn render_surfaces<'a>(
     rs: &mut CRenderSurface,
-    current_model: &model_t,
+    current_model: &PublishedModel,
+    model_handle: qhandle_t,
     assets: &RenderAssets,
     shifted_entity_num: i32,
     rdf_nofog: bool,
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
     // back track and get the surfinfo struct for this surface
-    let mdxm = mdxm_view_of(current_model);
+    // A `MOD_MDXM` entry always publishes its `.glm` block, so an absent view is unreachable in a live frame.
+    let Some(mdxm) = current_model.mdxm_view() else {
+        return;
+    };
     let surface = mdxm.find_surface(rs.surface_num, rs.lod);
     let surf_info = mdxm.surf_hierarchy(surface.this_surface_index());
 
@@ -917,7 +927,7 @@ pub fn render_surfaces<'a>(
                 // that body stay unported.
                 R_AddDrawSurf(
                     SurfaceGeometry::Ghoul2(G2SurfaceRef {
-                        model: current_model.index,
+                        model: model_handle,
                         lod: rs.lod,
                         surface_index: rs.surface_num,
                         bone_cache,
@@ -944,6 +954,7 @@ pub fn render_surfaces<'a>(
         render_surfaces(
             rs,
             current_model,
+            model_handle,
             assets,
             shifted_entity_num,
             rdf_nofog,
@@ -2256,7 +2267,6 @@ pub fn r_add_ghoul_surfaces<'a>(
     handle: Ghoul2Handle,
     host: &mut EngineHostView,
     assets: &RenderAssets,
-    models: &RenderModels,
     view: &viewParms_t,
     ori: &orientationr_t,
     cvars: RenderCvarSnapshot,
@@ -2365,8 +2375,12 @@ pub fn r_add_ghoul_surfaces<'a>(
                 (None, None)
             };
 
-        let current_model = models.get_model(inst.model);
-        let which_lod = g2_compute_lod(ent, current_model, inst.lod_bias, view, cvars);
+        // The instance names its own model handle, which the entity dispatch never resolved.
+        // An unregistered or evicted slot therefore skips this model instead of drawing a default row.
+        let Some(current_model) = assets.models.get(inst.model) else {
+            continue;
+        };
+        let which_lod = g2_compute_lod(ent, current_model.num_lods, inst.lod_bias, view, cvars);
 
         // The bone transforms already ran through `g2_construct_render_skeleton`
         // above, so the render only reads the built cache. Clone the surface
@@ -2406,6 +2420,7 @@ pub fn r_add_ghoul_surfaces<'a>(
         render_surfaces(
             &mut rs,
             current_model,
+            inst.model,
             assets,
             shifted_entity_num,
             rdf_nofog,
