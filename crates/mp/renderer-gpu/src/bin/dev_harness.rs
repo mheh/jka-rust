@@ -156,8 +156,6 @@ impl ApplicationHandler for App {
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
                             &WorldLoadState::default(),
-                            // 2D-only harness: no entity walk to host.
-                            None,
                             self.registries.img_state.pending_uploads.drain().collect(),
                             images,
                             &NoiseState::default(),

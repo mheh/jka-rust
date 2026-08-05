@@ -122,6 +122,7 @@ use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::world_generation::WorldGeneration;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_font::{
     AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
     RE_Font_DrawString, RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels,
@@ -2048,13 +2049,27 @@ pub fn CL_CgameSystemCalls(
         RE_ClearDecals(&mut re.scene);
         0
     } else if op == MpCgameImport::CG_R_ADDREFENTITYTOSCENE as c_int {
-        let ent = vma(vc, args, 1) as *const refEntity_t;
+        // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
+        let ent = unsafe { &*(vma(vc, args, 1) as *const refEntity_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let g2 = unsafe { g2_from_view(view) };
+        // The DEC-65 ruling 2 crossing is built before the `re` cast, and that order is what keeps the two casts apart.
+        // The build can re-register a model through the `re` hooks, which call `Arc::make_mut` on the published registry.
+        let no_server_ghoul2 = {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let re = unsafe { re_from_view(view) };
+            view.common.cvar(re.cvars.r_noServerGhoul2).integer
+        };
+        let payload = build_ghoul2_render_payload(g2, view, ent, no_server_ghoul2);
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
-        RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, unsafe {
-            &*ent
-        });
+        RE_AddRefEntityToScene(
+            &mut re.frame_data,
+            &re.sim.published,
+            &mut re.scene,
+            ent,
+            payload,
+        );
         0
     } else if op == MpCgameImport::CG_R_ADDPOLYTOSCENE as c_int {
         let num_verts = arg(2) as usize;

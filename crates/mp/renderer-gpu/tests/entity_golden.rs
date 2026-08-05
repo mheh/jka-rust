@@ -45,6 +45,7 @@ use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
+use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
@@ -222,7 +223,7 @@ fn golden_entity_duel1() {
     // Register both entity models through Raven's client register path.
     let md3_model = boot::register_model(&mut host, MD3_MODEL_NAME);
     assert!(md3_model > 0, "{MD3_MODEL_NAME} did not register");
-    let (g2, ghoul2_handle, ghoul2_model) =
+    let (mut g2, ghoul2_handle, ghoul2_model) =
         init_ghoul2(&mut host, GHOUL2_MODEL_NAME).expect("stormtrooper .glm did not init");
 
     // The camera sits at a spawn origin, bumped to eye height.
@@ -260,6 +261,7 @@ fn golden_entity_duel1() {
         &host.re.sim.published,
         &mut host.re.scene,
         &md3_ent,
+        None,
     );
 
     let mut g2_ent = refEntity_t::zeroed();
@@ -277,11 +279,27 @@ fn golden_entity_duel1() {
     g2_ent.oldframe = 0;
     g2_ent.shaderRGBA = [255, 255, 255, 255];
     AnglesToAxis([0.0, 0.0, 0.0], g2_ent.axis.as_mut_ptr());
+
+    // The DEC-65 ruling 2 crossing is built here, on the same host view `init_ghoul2` builds.
+    // The build ends before the add, because the setup inside it can re-register a model through the `re` hooks.
+    let g2_payload = {
+        let re_ptr: *mut RendererFrontend = &mut host.re;
+        let UiHost {
+            engine, models, ..
+        } = &mut host;
+        let models_ptr: *mut RenderModels = &mut *models;
+        let Engine { common, cm, sv, .. } = &mut **engine;
+        let sv_ptr: *mut () = sv as *mut Server as *mut ();
+        let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+        build_ghoul2_render_payload(&mut g2, &mut view, &g2_ent, 0)
+    };
+
     RE_AddRefEntityToScene(
         &mut frame_data,
         &host.re.sim.published,
         &mut host.re.scene,
         &g2_ent,
+        g2_payload,
     );
 
     RE_RenderScene(
@@ -298,8 +316,6 @@ fn golden_entity_duel1() {
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
-    // The executor owns the Ghoul2 instances since W2-F5, so the stormtrooper this test built moves in before the frame runs.
-    executor.set_ghoul2(g2);
     let bmodel_table = BModelTable::build(&host.models);
     if let Some(world) = host.re.sim.published.world.as_ref() {
         executor.set_world(&gpu, world, bmodel_table);
@@ -322,15 +338,12 @@ fn golden_entity_duel1() {
         if let Some(blocks) = host.models.publish_blocks() {
             host.re.sim.publish_models(blocks);
         }
-        // The frame pins the published registry, because `G2_SetupModelPointers` re-registers on every entity walk.
+        // The frame pins the published registry, because `G2_SetupModelPointers` re-registers at scene-add, ahead of the drain above.
         // The client `RE_RegisterModel` hook then calls `Arc::make_mut(&mut re.sim.published)` through the seated `re` slot.
         // The clone holds a second reference, so that call copies on write instead of mutating the allocation this frame reads.
         let pinned = Arc::clone(&host.re.sim.published);
-        // Split the host and engine into disjoint borrows, the shape `world_golden` builds.
-        let re_ptr: *mut RendererFrontend = &mut host.re;
+        // Split the host into disjoint borrows, the shape `world_golden` builds.
         let UiHost {
-            engine,
-            models,
             re:
                 RendererFrontend {
                     world_load,
@@ -340,10 +353,6 @@ fn golden_entity_duel1() {
                 },
             ..
         } = &mut host;
-        let models_ptr: *mut RenderModels = &mut *models;
-        let Engine { common, cm, sv, .. } = &mut **engine;
-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
         executor.execute_frame(
             &mut gpu,
@@ -351,7 +360,6 @@ fn golden_entity_duel1() {
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,

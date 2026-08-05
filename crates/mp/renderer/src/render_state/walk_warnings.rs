@@ -30,12 +30,6 @@ pub struct WalkWarnings {
     ///
     /// Source: `oracle/codemp/renderer/tr_mesh.cpp:370-373`
     pub md3_skin_shader: bool,
-    /// `R_AddEntitySurfaces`' `RT_MODEL` arm needs the model registry, and the
-    /// Ghoul2 sub-arm needs the engine host on top of it. Neither reaches the
-    /// render thread yet, so that arm draws nothing there and says so once.
-    ///
-    /// Source: `oracle/codemp/renderer/tr_main.cpp:1421-1470`
-    pub entity_models: bool,
     /// `R_MirrorViewBySurface`'s recursive-portal refusal.
     ///
     /// Source: `oracle/codemp/renderer/tr_main.cpp:1112-1113`

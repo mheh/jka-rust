@@ -43,6 +43,7 @@ use mp_engine_qcommon::vm::ui_syscall_trampoline_words;
 use mp_engine_qcommon::vm_fns::{VM_ArgPtrWord, VM_Call, VM_Create, VM_Free};
 use mp_engine_qcommon::z_memman_pc::{Hunk_MemoryRemaining, Z_Free};
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -54,6 +55,7 @@ use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
 use mp_renderer::tr_cmds::{RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_font::{
     AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
     RE_Font_DrawString, RE_Font_HeightPixels, RE_Font_StrLenChars, RE_Font_StrLenPixels,
@@ -76,7 +78,7 @@ use native_string::{latin1_to_string, string_to_latin1};
 use crate::cl_keys::{Key_KeynumToString, Key_SetBinding};
 use crate::client::client_static_t::{MAX_GLOBAL_SERVERS, MAX_OTHER_SERVERS};
 use crate::client::server_info_t::serverInfo_t;
-use crate::client_host::{bot_from_view, client_legacy_syscall, sv_from_view};
+use crate::client_host::{bot_from_view, client_legacy_syscall, g2_from_view, sv_from_view};
 use crate::client_host::snd_from_view;
 use crate::snd_dma::{S_RegisterSound, S_StartLocalSound, S_StopBackgroundTrack};
 use crate::snd_dma::S_StartBackgroundTrack;
@@ -1310,11 +1312,27 @@ pub fn CL_UISystemCalls(
         RE_ClearScene(&mut re.frame_data, &mut re.scene);
         0
     } else if trap == MpUiImport::UI_R_ADDREFENTITYTOSCENE as c_int {
-        unsafe {
-            let ent = &*(vma(view.common, args, 1) as *const _);
-            let re = re_from_view(view);
-            RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, ent)
+        // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
+        let ent = unsafe { &*(vma(view.common, args, 1) as *const refEntity_t) };
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let g2 = unsafe { g2_from_view(view) };
+        // The DEC-65 ruling 2 crossing is built before the `re` cast, and that order is what keeps the two casts apart.
+        // The build can re-register a model through the `re` hooks, which call `Arc::make_mut` on the published registry.
+        let no_server_ghoul2 = {
+            // SAFETY: view-constructor slot, single-threaded, no other live cast.
+            let re = unsafe { re_from_view(view) };
+            view.common.cvar(re.cvars.r_noServerGhoul2).integer
         };
+        let payload = build_ghoul2_render_payload(g2, view, ent, no_server_ghoul2);
+        // SAFETY: view-constructor slot, single-threaded, no other live cast.
+        let re = unsafe { re_from_view(view) };
+        RE_AddRefEntityToScene(
+            &mut re.frame_data,
+            &re.sim.published,
+            &mut re.scene,
+            ent,
+            payload,
+        );
         0
     } else if trap == MpUiImport::UI_R_ADDPOLYTOSCENE as c_int {
         unsafe {

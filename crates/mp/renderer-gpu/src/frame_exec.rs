@@ -44,15 +44,15 @@
 //! the quad.
 
 use std::mem;
+use std::sync::Arc;
 
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
-use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::frame_package::FramePackage;
 use mp_renderer::render_state::frame_state::FrameState;
+use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::placeholders::{RefEntity, TrRefdef, WorldAsset};
 use mp_renderer::render_state::render_assets::RenderAssets;
@@ -188,7 +188,7 @@ impl Warned {
 
 // `WorldFrame` is gone, and wave 2 emptied it one ruling at a time.
 // W2-F3 took the view state and the sky scratch, W2-F4 the walk marks, W2-F5 the Ghoul2 owner, W2-F6 the terrain seeds, and W2-F8 the model registry.
-// What is left is the registry, the load state, and the engine host, which only a sim-side caller supplies.
+// DEC-65 ruling 2 then handed the Ghoul2 owner back to the sim, so what is left is the registry and the load state.
 
 /// Owns the render-thread state one frame's execution needs: the 2D and world
 /// pipelines, the uploaded world geometry, the reused 2D batch, and the
@@ -211,10 +211,6 @@ pub struct FrameExecutor {
     /// writes and `R_WorldNormalToEntity` reads back inside one walk.
     /// Render-thread-resident since W2-F3.
     tr_main_scratch: TrMainScratch,
-    /// `tr.theGhoul2InfoArray` and its bone caches. W2-F5 homes the instance
-    /// owner here, so the caches the render path builds persist across frames
-    /// without a caller threading them in.
-    ghoul2: Ghoul2System,
     /// `tr_sky.cpp`'s per-view scratch: the projected sky-box extents and the
     /// grid the backend snapshots per face. W2-F3 homes it here, and the
     /// parse-time cloud tables it used to sit beside ride the published
@@ -281,7 +277,6 @@ impl FrameExecutor {
             tr_main_scratch: TrMainScratch {
                 pre_trans_ent_matrix: [0.0; 16],
             },
-            ghoul2: Ghoul2System::default(),
             sky: empty_sky_state(),
             view_state: zeroed_frame_state(),
             // SAFETY: `srfTerrain_t` is a frozen `#[repr(C)]` POD of scalars
@@ -324,22 +319,6 @@ impl FrameExecutor {
         self.bmodel_table = bmodels;
     }
 
-    /// Installs a prepared Ghoul2 instance owner, replacing the empty one the
-    /// executor starts with.
-    ///
-    /// W2-F5 homes the owner here, and a harness that built its instances
-    /// through `G2API_InitGhoul2Model` before the GPU came up hands the result
-    /// over with this. The bone caches then persist for the process lifetime.
-    pub fn set_ghoul2(&mut self, g2: Ghoul2System) {
-        self.ghoul2 = g2;
-    }
-
-    /// The executor's Ghoul2 instance owner, for a caller that drives
-    /// `G2API_*` between frames.
-    pub fn ghoul2_mut(&mut self) -> &mut Ghoul2System {
-        &mut self.ghoul2
-    }
-
     /// Recreates the world depth texture on a window resize.
     pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32) {
         self.pipeline3d.resize(gpu, width, height);
@@ -364,7 +343,8 @@ impl FrameExecutor {
     /// This is the live client's whole draw path, and both halves draw for real since W2-F7.
     /// The 2D arms put menus and the HUD on the screen, and a `RenderScene` runs the BSP walk, the sky, the fog and the dynamic lights.
     /// MD3 entities draw here since gh#31 step-004, because they read the published model blocks off `RenderAssets`.
-    /// The Ghoul2 entity arms stay dark, because their skeleton work is sim-confined until DEC-65 ruling 2 crosses the per-entity bone matrices.
+    /// Both entity arms draw from the package since gh#31 step-005.
+    /// DEC-65 ruling 2 crosses the per-entity bone matrices, so the Ghoul2 legs need no host.
     pub fn execute_package(
         &mut self,
         gpu: &mut Gpu,
@@ -394,7 +374,6 @@ impl FrameExecutor {
             &package.frame_data,
             &package.assets,
             &package.world_load,
-            None,
             uploads,
             gpu_images,
             noise,
@@ -429,7 +408,6 @@ impl FrameExecutor {
         frame_data: &FrameData,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
-        mut entity_host: Option<&mut EngineHostView>,
         uploads: Vec<(ImageHandle, PendingUpload)>,
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
@@ -571,7 +549,6 @@ impl FrameExecutor {
                         target,
                         assets,
                         world_load,
-                        entity_host.as_deref_mut(),
                         frame_data,
                         refdef,
                         light_styles,
@@ -677,7 +654,6 @@ impl FrameExecutor {
         target: &TextureView,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
-        entity_host: Option<&mut EngineHostView>,
         frame_data: &'f FrameData,
         refdef: &TrRefdef,
         light_styles: &[[u8; 4]; MAX_LIGHT_STYLES],
@@ -729,6 +705,13 @@ impl FrameExecutor {
         let mut entities: Vec<trRefEntity_t> = self.scene_entities[self.first_scene_entity..]
             .iter()
             .map(tr_ref_entity_from_ref_entity)
+            .collect();
+
+        // The DEC-65 ruling 2 crossings, taken from the same scene window that builds `entities`, so the two slices index alike.
+        let payloads: Vec<Option<Arc<Ghoul2RenderPayload>>> = self.scene_entities
+            [self.first_scene_entity..]
+            .iter()
+            .map(|re| re.ghoul2_render.clone())
             .collect();
 
         // Build the view parameters from the scene refdef.
@@ -806,14 +789,13 @@ impl FrameExecutor {
             frame_scene_num,
             refdef_time,
             &mut view,
-            entity_host,
             assets,
             &self.bmodel_table,
             cvars,
             world_load,
             &mut self.view_state,
             &mut self.walk_scratch,
-            &mut self.ghoul2,
+            &payloads,
             frame_data,
             &abi_refdef,
             refdef_rdflags,
@@ -856,7 +838,7 @@ impl FrameExecutor {
             &view,
             &entities,
             &mut self.tr_main_scratch,
-            &mut self.ghoul2,
+            &payloads,
             &mut self.view_state,
             &mut self.sky,
             &abi_fogs,

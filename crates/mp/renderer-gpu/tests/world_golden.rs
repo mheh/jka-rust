@@ -25,15 +25,12 @@ use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
 
-use mp_engine_core::Engine;
-use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -237,10 +234,7 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         let pinned = Arc::clone(&host.re.sim.published);
         // Split the host and engine into disjoint borrows, the shape
         // `world_harness::draw_world_frame` builds.
-        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
-            engine,
-            models,
             re:
                 RendererFrontend {
                     world_load,
@@ -250,20 +244,14 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
                 },
             ..
         } = &mut host;
-        let models_ptr: *mut RenderModels = &mut *models;
-        let Engine { common, cm, sv, .. } = &mut **engine;
-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-        // The golden test has no live Ghoul2 state, and the executor's own empty system is what the world pass uses (W2-F5).
-        // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
+        // The world scenes add no entity, so every entity arm sits idle here.
         let stats = executor.execute_frame(
             &mut gpu,
             &target,
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,

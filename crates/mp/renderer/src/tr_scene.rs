@@ -6,6 +6,8 @@
 // transcription, matching the rest of the renderer/engine crates.
 #![allow(non_snake_case)]
 
+use std::sync::Arc;
+
 use native_math::qmath::{
     _DotProduct, _VectorScale, _VectorSubtract, CrossProduct, PerpendicularVectorMP,
     RotatePointAroundVector, VectorNormalize2,
@@ -25,6 +27,7 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
+use crate::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use crate::render_state::light_style_table::LightStyleTable;
 use crate::render_state::placeholders::{PolyVert, RefEntity, TrRefdef, Vec3};
 use crate::render_state::render_assets::RenderAssets;
@@ -314,12 +317,16 @@ pub fn RE_AddPolyToScene(
 
 /// Raven `RE_AddRefEntityToScene`.
 ///
+/// `ghoul2_render` is the DEC-65 ruling 2 crossing the caller built before this call.
+/// A caller with no Ghoul2 entity to add passes `None`.
+///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:194-255`
 pub fn RE_AddRefEntityToScene(
     frame: &mut FrameData,
     assets: &RenderAssets,
     scene: &mut SceneState,
     ent: &refEntity_t,
+    ghoul2_render: Option<Arc<Ghoul2RenderPayload>>,
 ) {
     if !assets.registered {
         return;
@@ -388,6 +395,7 @@ pub fn RE_AddRefEntityToScene(
         angles: ent.angles,
         model_scale: ent.modelScale,
         ghoul2: ghoul2_token_decode(ent.ghoul2),
+        ghoul2_render,
         need_dlights: false,
         lighting_calculated: false,
         light_dir: [0.0; 3],
@@ -607,7 +615,8 @@ pub fn RE_AddMiniRefEntityToScene(
     temp_ent.shaderTime = ent.shaderTime;
     temp_ent.frame = ent.frame;
 
-    RE_AddRefEntityToScene(frame, assets, scene, &temp_ent);
+    // A mini ref-entity carries no Ghoul2 token, so it crosses with no payload.
+    RE_AddRefEntityToScene(frame, assets, scene, &temp_ent, None);
 }
 
 /// Raven `RE_AddLightToScene`.

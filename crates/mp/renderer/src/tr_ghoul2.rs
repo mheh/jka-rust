@@ -12,6 +12,9 @@
 //! function below likewise drops its own `#ifdef G2_PERFORMANCE_ANALYSIS`
 //! timer touches per the same ruling (DEC-37 A13.5) without a per-site note.
 
+use std::sync::Arc;
+
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
@@ -32,8 +35,9 @@ use mp_host_interface::EngineHost;
 use mp_engine_ghoul2::bolts::g2_find_bolt_surface_num;
 use mp_engine_ghoul2::bones::{g2_add_bone, g2_find_bone};
 use mp_engine_ghoul2::api_collision::g2api_get_time;
-use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
-use mp_engine_ghoul2::info_array::Ghoul2Handle;
+use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
+use mp_engine_ghoul2::token::ghoul2_token_decode;
+use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, Ghoul2System};
 use mp_engine_ghoul2::misc::{g2_setup_model_pointers, g2_setup_model_pointers_v};
 use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_ghoul2::render::bone_cache::CBoneCache;
@@ -59,6 +63,8 @@ use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::ghoul2_model_render::Ghoul2ModelRender;
+use crate::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use crate::render_state::model_blocks::PublishedModel;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
@@ -231,11 +237,10 @@ pub struct CRenderSurface<'a> {
     pub fog_num: i32,
     /// Raven `qboolean personalModel` (`bool` per §C7).
     pub personal_model: bool,
-    /// Raven `CBoneCache *boneCache` — the canonical generational handle into
-    /// `Ghoul2System.bone_caches` (DEC-35 `G2SV-D9`) rather than an aliasing
-    /// borrow: the render pass that reads this field evaluates bones, which
-    /// needs `&mut CBoneCache` out of the arena (§B5).
-    pub bone_cache: Option<BoneCacheId>,
+    /// Raven `CBoneCache *boneCache`, now the ordinal of this model inside the entity's `Ghoul2RenderPayload` (DEC-65 ruling 2).
+    /// The bone matrices are already composed there, so the render pass reads them by index and touches no arena.
+    /// `None` when the model's bone table is empty, which is Raven's null `boneCache`.
+    pub model_ordinal: Option<u32>,
     /// Raven `int renderfx`.
     pub renderfx: i32,
     /// Raven `skin_t *skin`.
@@ -265,7 +270,7 @@ impl<'a> CRenderSurface<'a> {
         cust_shader: Option<ShaderHandle>,
         fog_num: i32,
         personal_model: bool,
-        bone_cache: Option<BoneCacheId>,
+        model_ordinal: Option<u32>,
         renderfx: i32,
         skin: Option<SkinHandle>,
         current_model: Option<ModelHandle>,
@@ -280,7 +285,7 @@ impl<'a> CRenderSurface<'a> {
             cust_shader,
             fog_num,
             personal_model,
-            bone_cache,
+            model_ordinal,
             renderfx,
             skin,
             current_model,
@@ -825,10 +830,9 @@ pub fn g2_process_generated_surface_bolts(
 /// as the shader arena slot number, so the handle reads back through
 /// `Arena::handle_at_slot`.
 ///
-/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than Raven's raw-pointer
-/// `CRenderableSurface` (R2 Group-4 table): it carries the model handle,
-/// the LOD, the surface index, and the bone-cache id, so the backend re-locates
-/// the surface and reads the cache from the arena.
+/// The draw surf is a `Copy` [`G2SurfaceRef`] rather than Raven's raw-pointer `CRenderableSurface` (R2 Group-4 table):
+/// it carries the model handle, the LOD, the surface index, and the payload ordinal,
+/// so the backend re-locates the surface and reads the bone matrices off the entity's crossing.
 ///
 /// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it through `mdxm_view()`.
 /// Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle it already holds and `G2SurfaceRef` stores that.
@@ -909,10 +913,9 @@ pub fn render_surfaces<'a>(
 
         // don't add third_person objects if not viewing through a portal
         if !rs.personal_model {
-            // A live render surface always has a built bone cache
-            // (`G2_TransformGhoulBones` ran first). A missing cache means the
-            // surface is not renderable, so it is dropped.
-            if let Some(bone_cache) = rs.bone_cache {
+            // A live render surface always has a built bone table, because the builder transformed the skeleton at scene-add.
+            // An empty table means the surface is not renderable, so it is dropped.
+            if let Some(model_ordinal) = rs.model_ordinal {
                 let sorted_index = assets
                     .shaders
                     .get(shader)
@@ -930,7 +933,7 @@ pub fn render_surfaces<'a>(
                         model: model_handle,
                         lod: rs.lod,
                         surface_index: rs.surface_num,
-                        bone_cache,
+                        model_ordinal,
                     }),
                     sorted_index,
                     shifted_entity_num,
@@ -2235,19 +2238,109 @@ const GHOUL2_NORENDER: i32 = 0x002;
 /// slot carries no model.
 const GHOUL2_NOMODEL: i32 = 0x004;
 
+/// Builds the DEC-65 ruling 2 crossing for one scene entity, or `None` when the entity carries no live Ghoul2 instance.
+/// The caller must finish this call before it takes any `re`-slot borrow, because the setup path can re-register a model through the `re` hooks.
+///
+/// This is the sim-side front half of [`r_add_ghoul_surfaces`]: the setup, the transform, and the per-bone evaluation the render side used to run.
+/// A stale replay token returns `None`, which the walk reads as an absent instance, exactly as it read a dead handle before.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538`
+pub fn build_ghoul2_render_payload(
+    g2: &mut Ghoul2System,
+    host: &mut EngineHostView,
+    ent: &refEntity_t,
+    no_server_ghoul2: i32,
+) -> Option<Arc<Ghoul2RenderPayload>> {
+    let handle = ghoul2_token_decode(ent.ghoul2)?;
+    let mut ghoul2 = CGhoul2Info_v { mItem: handle.0 };
+
+    if !ghoul2.is_valid(g2) {
+        return None;
+    }
+
+    // The `MOD_BAD` arm reads this answer in place of the instance list, so it is taken before the setup can move any `mModelindex`.
+    let have_models = g2api_have_we_ghoul2_models(g2, &ghoul2);
+
+    // Raven checks `r_noServerGhoul2` before the transform, and ruling B keeps that order here.
+    // A suppressed instance crosses with no models, so both dispatch arms draw what they drew before.
+    if no_server_ghoul2 != 0 {
+        return Some(Arc::new(Ghoul2RenderPayload {
+            have_models,
+            models: Vec::new(),
+        }));
+    }
+
+    if !g2_setup_model_pointers_v(g2, host, &ghoul2) {
+        return Some(Arc::new(Ghoul2RenderPayload {
+            have_models,
+            models: Vec::new(),
+        }));
+    }
+
+    // `G2API_GetTime` never reads its argument, so the builder needs no refdef clock.
+    // Source: oracle/codemp/ghoul2/G2_API.cpp:179-188
+    let current_time = g2api_get_time(g2, 0);
+
+    // Raven culls the entity and transforms only what survives (`R_GCullModel`, `:3383-3538`), and the view does not exist at scene-add.
+    // Ruling A accepts the consequence: every added instance transforms.
+    // The smoothing history therefore advances for entities the render cull would have left stale.
+    let model_list =
+        g2_construct_render_skeleton(g2, host, &mut ghoul2, current_time, ent.modelScale);
+
+    let mut models: Vec<Ghoul2ModelRender> = Vec::with_capacity(model_list.len());
+    for &i in &model_list {
+        let item = ghoul2.mItem;
+        let inst = &g2.info_array.get(item)[i as usize];
+
+        if !inst.valid || (inst.flags & GHOUL2_NOMODEL) != 0 || (inst.flags & GHOUL2_NORENDER) != 0
+        {
+            continue;
+        }
+
+        let model = inst.model;
+        let custom_skin = inst.custom_skin;
+        let skin = inst.skin;
+        let lod_bias = inst.lod_bias;
+        let surface_root = inst.surface_root;
+        let slist = inst.slist.clone();
+        let bltlist = inst.bltlist.clone();
+        let bone_cache = inst.bone_cache;
+
+        // Raven evaluates a bone at backend draw time, and only the bones a drawn surface references.
+        // This eager pass marks every bone rendered, which only `CBoneCache::WasRendered` observes, and its one consumer is the deferred gore chain.
+        let bones: Vec<mdxaBone_t> = match bone_cache.and_then(|id| g2.bone_caches.get_mut(id)) {
+            Some(cache) => (0..cache.final_bones.len())
+                .map(|bone| cache.eval_render(bone as i32))
+                .collect(),
+            None => Vec::new(),
+        };
+
+        models.push(Ghoul2ModelRender {
+            model,
+            custom_skin,
+            skin,
+            lod_bias,
+            surface_root,
+            slist,
+            bltlist,
+            bones,
+        });
+    }
+
+    Some(Arc::new(Ghoul2RenderPayload {
+        have_models,
+        models,
+    }))
+}
+
 /// Raven `void R_AddGhoulSurfaces( trRefEntity_t *ent )` — the per-frame
 /// entry point that culls, sorts, transforms and renders every Ghoul2
 /// construct bolted to `ent`.
 ///
-/// `ent->e.ghoul2` is decoded into `handle` at the entry seam
-/// (`R_AddEntitySurfaces`, `tr_main.rs`), so this body reaches the instance
-/// list through `CGhoul2Info_v { mItem: handle }` and the threaded
-/// `&mut Ghoul2System` (design point 1/2). The oracle's inline per-model
-/// transform loop is `g2_construct_render_skeleton` (`mp_engine_ghoul2`): it
-/// computes the root matrix (`RootMatrix`), sorts the models, and transforms
-/// each render-visible model off its bolt or the root matrix, exactly as this
-/// oracle body does before it renders. It returns the sorted model list, so the
-/// render loop reads the built caches in the same order with no second sort.
+/// [`build_ghoul2_render_payload`] ran the front half sim-side (DEC-65 ruling 2).
+/// That half is the token decode, the validity and `r_noServerGhoul2` checks, the setup, and the transform.
+/// This body is the render half, and it reads `payload` where the oracle reads the live instance list.
+/// The models arrive in `G2_Sort_Models` order, so bolt-ons still render against the right parent with no second sort.
 ///
 /// This body calls `R_SetupEntityLighting` (`:3438-3443`) and the caller folds
 /// the lit fields onto `entities[n]` through `write_back_lighting`. The backend
@@ -2264,8 +2357,7 @@ const GHOUL2_NOMODEL: i32 = 0x004;
 #[allow(clippy::too_many_arguments)]
 pub fn r_add_ghoul_surfaces<'a>(
     ent: &mut RefEntity,
-    handle: Ghoul2Handle,
-    host: &mut EngineHostView,
+    payload: &Ghoul2RenderPayload,
     assets: &RenderAssets,
     view: &viewParms_t,
     ori: &orientationr_t,
@@ -2273,31 +2365,12 @@ pub fn r_add_ghoul_surfaces<'a>(
     warnings: &mut WalkWarnings,
     world_load: &WorldLoadState,
     frame: &FrameState,
-    g2: &mut Ghoul2System,
     fogs: &[fog_t],
     refdef_rdflags: i32,
     shifted_entity_num: i32,
     dlights: &[dlight_t],
     draw_surfs: &mut Vec<DrawSurf<SurfaceGeometry<'a>>>,
 ) {
-    let mut ghoul2 = CGhoul2Info_v { mItem: handle.0 };
-
-    if !ghoul2.is_valid(g2) {
-        return;
-    }
-
-    // if we don't want server ghoul2 models and this is one, or we just don't
-    // want ghoul2 models at all, then return
-    if cvars.no_server_ghoul2 != 0 {
-        return;
-    }
-
-    if !g2_setup_model_pointers_v(g2, host, &ghoul2) {
-        return;
-    }
-
-    let current_time = g2api_get_time(g2, frame.refdef.time);
-
     // cull the entire model if the merged bounding box is outside the frustum
     let r_nocull_integer = cvars.nocull;
     let mut cull_out = 0;
@@ -2330,25 +2403,11 @@ pub fn r_add_ghoul_surfaces<'a>(
     // see if we are in a fog volume
     let fog_num = r_g_compute_fog_num(ent, fogs, refdef_rdflags);
 
-    // Transform every render-visible model's skeleton (root matrix + sort +
-    // per-model bolt or root transform, flags-gated). This is the oracle's
-    // inline transform loop. It returns the sort order so bolt-ons render
-    // against the right parent model without a second sort.
-    let model_list = g2_construct_render_skeleton(g2, host, &mut ghoul2, current_time, ent.model_scale);
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
     // walk each model for this entity and render it out
-    for &i in &model_list {
-        let item = ghoul2.mItem;
-        let inst = &g2.info_array.get(item)[i as usize];
-
-        if !inst.valid
-            || (inst.flags & GHOUL2_NOMODEL) != 0
-            || (inst.flags & GHOUL2_NORENDER) != 0
-        {
-            continue;
-        }
-
+    // The builder already dropped the invalid, NOMODEL and NORENDER models, so every entry here renders.
+    for (ordinal, inst) in payload.models.iter().enumerate() {
         // figure out the custom shader or the custom skin for this model
         let (cust_shader, skin): (Option<ShaderHandle>, Option<SkinHandle>) =
             if ent.custom_shader != 0 {
@@ -2382,13 +2441,15 @@ pub fn r_add_ghoul_surfaces<'a>(
         };
         let which_lod = g2_compute_lod(ent, current_model.num_lods, inst.lod_bias, view, cvars);
 
-        // The bone transforms already ran through `g2_construct_render_skeleton`
-        // above, so the render only reads the built cache. Clone the surface
-        // and bolt lists into owned locals so the render surface borrows them
-        // instead of the arena (which the loop still reads by index).
-        let root_s_list = inst.slist.clone();
+        // The bone matrices already crossed on the payload, so the render only reads them by index.
+        // An empty table is Raven's null `boneCache`, and `render_surfaces` drops the model's surfaces on it.
+        let root_s_list = &inst.slist;
         let mut bolt_list = inst.bltlist.clone();
-        let bone_cache = inst.bone_cache;
+        let model_ordinal = if inst.bones.is_empty() {
+            None
+        } else {
+            Some(ordinal as u32)
+        };
         let surface_root = inst.surface_root;
         // `render_surfaces` reads the model through its own `current_model`
         // parameter, so the render surface's own `current_model` field is unread
@@ -2403,11 +2464,11 @@ pub fn r_add_ghoul_surfaces<'a>(
 
         let mut rs = CRenderSurface::new(
             surface_root,
-            &root_s_list,
+            root_s_list,
             cust_shader,
             fog_num,
             personal_model,
-            bone_cache,
+            model_ordinal,
             renderfx,
             skin,
             model_handle,

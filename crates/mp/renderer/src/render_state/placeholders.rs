@@ -25,6 +25,8 @@
 //! `PolyVert` alias `mp_qshared`'s `vec3_t`/`polyVert_t` rather than duplicate
 //! them.
 
+use std::sync::Arc;
+
 use mp_engine_ghoul2::info_array::Ghoul2Handle;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -32,6 +34,7 @@ use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::cgame::texture_compression_t::textureCompression_t;
 use mp_qshared::shared::{cplane_t, qhandle_t, vec2_t, vec3_t};
 
+use crate::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use crate::render_state::image_asset::ImageHandle;
 use crate::tr_bsp::{BModel, DShader, Fog, Node, Surface};
 use crate::tr_local::mgrid_t::mgrid_t;
@@ -169,10 +172,11 @@ pub struct RefEntity {
     pub model_scale: Vec3,
     /// The entity's attached Ghoul2 instance list, decoded from the tier-1
     /// `*mut c_void ghoul2` token (`ghoul2_token_decode`, `mp_engine_ghoul2::token`). Raven
-    /// carries a raw `CGhoul2Info_v *`. The render side threads a
-    /// `&mut Ghoul2System` and looks the list up by this `Ghoul2Handle`, so no
-    /// raw pointer crosses the seam.
+    /// carries a raw `CGhoul2Info_v *`, so no raw pointer crosses the seam here.
     pub ghoul2: Option<Ghoul2Handle>,
+    /// The DEC-65 ruling 2 crossing, built sim-side at scene-add and read by the render-side walk and decoder.
+    /// The `Arc` keeps the scene-list clone cheap.
+    pub ghoul2_render: Option<Arc<Ghoul2RenderPayload>>,
     /// `needDlights` — Raven: true for bmodels that touch a dlight.
     pub need_dlights: bool,
     /// `lightingCalculated`.
@@ -228,6 +232,7 @@ impl Default for RefEntity {
             angles: [0.0; 3],
             model_scale: [0.0; 3],
             ghoul2: None,
+            ghoul2_render: None,
             need_dlights: false,
             lighting_calculated: false,
             light_dir: [0.0; 3],

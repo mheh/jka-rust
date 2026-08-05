@@ -30,6 +30,8 @@ pub mod frame_event;
 pub mod frame_package;
 pub mod frame_sink;
 pub mod frame_state;
+pub mod ghoul2_model_render;
+pub mod ghoul2_render_payload;
 pub mod handle;
 pub mod image_asset;
 pub mod light_style_table;

@@ -94,7 +94,7 @@ struct Scene {
 /// here use.
 fn record_entities(host: &mut UiHost, frame_data: &mut FrameData, entities: &[refEntity_t]) {
     for ent in entities {
-        RE_AddRefEntityToScene(frame_data, &host.re.sim.published, &mut host.re.scene, ent);
+        RE_AddRefEntityToScene(frame_data, &host.re.sim.published, &mut host.re.scene, ent, None);
     }
 }
 
@@ -410,10 +410,7 @@ fn run_scene(scene: &Scene) {
         // The frame pins the published registry, so a mid-frame `Arc::make_mut` through the seated `re` slot copies on write.
         // This scene draws no ghoul2 entity, so no register hook fires here, and the pin keeps every entity-walk site one shape.
         let pinned = Arc::clone(&host.re.sim.published);
-        let re_ptr: *mut RendererFrontend = &mut host.re;
         let UiHost {
-            engine,
-            models,
             re:
                 RendererFrontend {
                     world_load,
@@ -423,19 +420,14 @@ fn run_scene(scene: &Scene) {
                 },
             ..
         } = &mut host;
-        let models_ptr: *mut RenderModels = &mut *models;
-        let Engine { common, cm, sv, .. } = &mut **engine;
-        let sv_ptr: *mut () = sv as *mut Server as *mut ();
-        let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-        // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
+        // No scene here carries a Ghoul2 token, so every entity crosses with no payload.
         executor.execute_frame(
             &mut gpu,
             &target,
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,
