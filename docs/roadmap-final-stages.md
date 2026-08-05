@@ -16,12 +16,7 @@ same FP regime (no fast-math/FMA contraction; parity defined against oracle
 built under OUR FP regime — 2003 x87 is unmatchable and not the target), same
 iteration order. An hour of recorded dueling replaying byte-identical ≈ proof.
 
-> Status (2026-07-08): the in-repo mock-engine referee is live
-> (`crates/jampgame/tests/referee.rs`, landed 6c34b9d8+) and is a local gate on
-> the dev platform; its CI job was removed by user ruling (b91ee8b6) due to
-> cross-host gcc-vs-LLVM float divergence, not a regression. The external
-> engine-vs-engine variant described above is parked
-> (`docs/plans/2026-07-07-rust-referee.md`).
+> Status (2026-08-05): the mock-engine referee stays a local gate (`crates/jampgame/tests/referee.rs`, CI job removed by ruling `b91ee8b6`). The engine-vs-engine variant is no longer parked: the lockstep-referee suite (`tools/lockstep-referee/`, plan `docs/plans/2026-07-13-engine-lockstep-referee.md`) replays mock and real-map scenarios byte-identical oracle-vs-rust as the local per-commit gate.
 
 ## Stage W — Wiring to runnable (partly pre-parity)
 
@@ -31,9 +26,7 @@ asserts → boot under stock jampded (drop-in `jampgamex86.dll`). 64-bit build
 of the same source targets our engine later (registers/SSE2/addr-space wins;
 32-bit stays for stock interop).
 
-> Status (2026-07-08): essentially done except the i686/ILP32 layout-assert
-> pass — CI's 32-bit lanes are allowed-failure pending it
-> (`.github/workflows/build.yml`).
+> Status (2026-08-05): done. The ILP32 assert pass landed 2026-07-13 (`43f730aa`) and every CI lane is enforced (`.github/workflows/build.yml`).
 
 ## Stage 1 — Safe-state migration (post-parity, mechanical, behind green diff)
 
@@ -173,3 +166,5 @@ patterns once, cheaply, before stamping them into two more modules.
 > a full `jamp` client (`docs/plans/2026-07-24-client-port/`). Threading (a
 > prerequisite framing for Stage 3) is permanently out of scope for this repo;
 > it lives in the fork.
+
+> Update (2026-08-05): the `ui` module port is done (U6 closed 2026-08-01). The work plan now lives on the wayfinder map, `github.com/mheh/jka-rust/issues/2` (DEC-52). Read the map, not a plan doc, for the frontier. The renderer census (gh#31, DEC-54/DEC-65) is in flight with steps 001-004 merged.

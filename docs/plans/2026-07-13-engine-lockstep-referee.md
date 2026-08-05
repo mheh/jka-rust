@@ -1,6 +1,8 @@
 # Engine lockstep referee — plan (SETTLED 2026-07-13)
 
-> **Status: COMPLETED — the lockstep referee is live (9 scenarios incl. real-map) and gates every commit.**
+> **Status: COMPLETED — the lockstep referee is live (9 scenarios incl. real-map) as the local per-commit gate.**
+>
+> *Correction (2026-08-05): CI never ran this rig. Every referee test carries `#[ignore]`, and no CI step passes `--ignored`. CI runs the workspace build, the workspace tests, and the i686 check (`.github/workflows/build.yml`). The referee stays the local gate on the dev platform (ruling `b91ee8b6`, 2026-07-06). The README carries the same fix (`2c02f566`).*
 
 User directive (2026-07-13, halting the statistical bot A/B): *"Make the
 referee in the engine work so we can run jampgame from Raven AND run our

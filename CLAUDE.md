@@ -80,8 +80,7 @@ and closed: zero stubs, zero `TODO: Port` markers, zero extern forward-decl
 blocks. Closure and boot-seam rulings are DEC-13…DEC-23; the ILP32 assert pass
 (cfg-32 twin asserts, i686 cross-check) and every CI lane are enforced. The
 lockstep-referee suite (mock + real-map mp/duel1 + ffa1 scenarios, up to 2000
-frames / 430k syscalls; 9 tests) runs byte-identical oracle-vs-rust and gates
-every commit;
+frames / 430k syscalls; 9 tests) runs byte-identical oracle-vs-rust as the local per-commit gate (CI runs no referee);
 the server boots, loads maps, and has hosted live players since 2026-07-12.
 
 **The idiomatic consolidation campaigns are done and merged to master:** the #13

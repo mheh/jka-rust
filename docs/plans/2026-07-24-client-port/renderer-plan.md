@@ -122,3 +122,15 @@ step never queues. cgame (its own plan, after ui) consumes the frozen
 - Census: renderer's module-facing structs confirmed Class B (copy-at-call,
   `tr_scene.cpp:194-254` cite in the scoping doc).
 - Adversarial review run 2026-07-24; findings folded in.
+
+## Reconciliation postscript (2026-08-05)
+
+The body above is the 2026-07-24 record and stays as written. Execution through DEC-65 (gh#31 steps 001-004) settled its forward-looking claims:
+
+- **Model memory.** "Extend, never fork" held for load, but publication settled as DEC-65 ruling 1: the parsed md3/mdxm/mdxa blocks sit in Arc-published immutable `ModelBlocks` on `RenderAssets` (`crates/mp/renderer/src/render_state/render_assets.rs`), and the render thread reads them directly.
+- **Mdx skinning.** DEC-65 ruling 2 moves the skeleton transform sim-side to scene-add time, and bone matrices cross in the frame package. Open as gh#31 step-005. The ghoul2 draw legs keep their host gate until it lands.
+- **Threading.** The backEndData double buffer was not built. The split is the `jamp-sim` and `jamp-render` threads (DEC-56.2) with one owned `FramePackage` per frame over a bounded channel (`crates/mp/renderer/src/render_state/frame_package.rs`).
+- **R4 gate.** The image-golden half landed: two world, seven scene, and one entity fixture plus the ghoul2 vertex golden (`crates/mp/renderer-gpu/tests/`). The wgpu command capture was not built, and DEC-54's trace census defines the live-play gate instead.
+- **`refexport_t`/`refimport_t`** became DEC-59.1 direct calls, not traits.
+- The GPU backend grew as the sibling crate `crates/mp/renderer-gpu`. The CPU frontend stayed in `crates/mp/renderer` per the R0.3 fence.
+- The ghoul2 handle stayed opaque as `scoping.md` predicted. The concrete shape is the `Ghoul2Handle + 1` token (DEC-65 ruling 3, landed 2026-08-03).

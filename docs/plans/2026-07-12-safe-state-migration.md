@@ -10,7 +10,7 @@ comparison strength.
 
 Progress lives in §4 (execution log). The referee (six scenarios incl. three
 real-map runs over `mp/duel1`, per-frame playerState/entityState byte-diff +
-syscall digest) gates every commit.
+syscall digest) is the local per-commit gate.
 
 ---
 

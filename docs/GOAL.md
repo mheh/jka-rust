@@ -4,7 +4,7 @@ Build Rust implementations of Jedi Academy's modules and engine that speak
 the same engine/module ABI as Raven's shipped binaries — drop-in
 replacements, verified against the oracle.
 
-## MP game module (`jampgame`): ABI target ACHIEVED, parity campaign closing
+## MP game module (`jampgame`): ABI target ACHIEVED, parity campaign CLOSED
 
 The original checklist (ABI vocabulary, `dllEntry`/`vmMain` contract,
 `PASSFLOAT`, layout asserts, engine-named artifacts, smoke + golden differential
@@ -31,9 +31,7 @@ frozen by DEC-31 (2026-07-16) and superseded by the idiom era — the #13 string
 DEC-32 dedup, DEC-34 qsort, DEC-35/#17 ghoul2, and #19 ctx-threading campaigns,
 all merged to master. The bg crate split (item 7) is done: `mp_bg` now holds the
 `bg_*` function bodies. Typed entity-view refactors (item 8) are deferred to the
-post-full-port great refactor. The active track is the client port
-(`docs/plans/2026-07-24-client-port/`). The historical checklist follows;
-F-items float unordered.
+post-full-port great refactor. The active track is the `jamp` client on the wayfinder map (`github.com/mheh/jka-rust/issues/2`, DEC-52). The `ui` module port closed 2026-08-01, and the renderer census (gh#31) is in flight: MD3 entities draw from the published model registry, and ghoul2 players wait on DEC-65 ruling 2. The design groundwork stays in `docs/plans/2026-07-24-client-port/`. The historical checklist follows. F-items float unordered.
 
 1. **DONE 2026-07-15 (`d6ef7674`) — item-toss velocity.** `crandom()` is
    double-typed C; retyped f64, 27 sites audited. Replay-verified: digest at
@@ -75,10 +73,11 @@ F-items float unordered.
    audit found 25 vec3_t out-params ported by-value (silent no-ops) plus
    the FuzzyWeight `EVALUATERECURSIVELY` arm — all fixed, adversarially
    validated. Live-session syscall histogram: JKA MP bots call only the EA
-   layer (audited clean) — findings were latent for FFA. OPEN TAIL:
-   behavioral A/B vs OpenJK jampded for the bot-feel verdict.
+   layer (audited clean) — findings were latent for FFA. The tail closed
+   2026-07-16: the five-lane A/B ran, and DEC-30 ruled the weak bot feel
+   is retail-SDK behavior, not a defect.
 
-5. **Translation-bug audit — file-by-file oracle comparison of `mp_game`**
+5. **DONE 2026-07-15 (DEC-25, `last-c-golden`) — translation-bug audit.** Waves 1-6 plus the F1/F2/F3 sweeps landed in eight referee-gated fix batches (`docs/audits/translation-audit-2026-07.md`, `31d25232`). The wave-7 verification tracks (scenario burn-down, expression-width harness, dual-host referee) stay queued per DEC-25. Original brief: **file-by-file oracle comparison of `mp_game`**
    (ordered before the pointer scrub while ported bodies still mirror the C
    line-for-line; side-by-side comparison gets harder after every
    structural pass). All 108 files / ~206k lines audited against their

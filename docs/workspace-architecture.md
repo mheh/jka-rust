@@ -104,21 +104,34 @@ crates/
                              #   *recovery*; com_error itself is defined one tier
                              #   lower in qcommon, state-ownership.md STATE-D7)
       qcommon/  server/  client/  botlib/  ghoul2/  icarus/  rmg/
-    renderer/                # codemp/renderer (per-mode, split for authenticity)
-    app/                     # openjk (client) + openjkded (dedicated); thin
-                             #   bin shell depending on mp_engine_core
+    renderer/                # mp_renderer: codemp/renderer CPU frontend
+                             #   (per-mode, split for authenticity)
+    renderer-gpu/            # mp_renderer_gpu: the wgpu backend the render
+                             #   thread owns, plus the world/ui_host harness bins
+    app/                     # mp_app: the jampded dedicated-server bin; target
+                             #   shape is a thin shell over mp_engine_core
+                             #   (legacy leaf edges remain, see its Cargo.toml)
+    client-app/              # mp_client_app: the jamp client bin (DEC-56).
+                             #   Main thread = winit loop, "jamp-sim" = com
+                             #   loop, "jamp-render" = the wgpu device
 
   sp/
     qshared/  bg/  uishared/
     abi/                     # SP: GetGameAPI table (game) + dllEntry/vmMain (cgame/ui)
     game/                    # sp_game logic (transport-agnostic; jagame shell wraps it)
     cgame/  ui/               # statically linked into sp/app via vmachine shim (DEC-07)
-    engine/
-      core/                  # sp_engine_core facade (mirrors mp_engine_core)
+    engine/                  # no sp_engine_core exists yet; the facade that
+                             #   mirrors mp_engine_core is future work
       qcommon/  server/  client/  ghoul2/  icarus/  rmg/
     renderer/                # code/renderer (per-mode)
-    app/                     # openjk_sp (client); thin bin shell depending on
-                             #   sp_engine_core
+    app/                     # sp_app (client); bin shell over
+                             #   sp_engine_{qcommon,server,client} +
+                             #   sp_renderer + sp_abi (no core facade yet)
+
+  testkit/                   # shared test fixtures; dev-dependency only
+
+tools/cgame-referee/         # probe + shim recorder packages; standalone
+                             #   (empty [workspace] table), NOT workspace members
 ```
 
 ## Tier definitions (mapped to Raven compile-lists)
@@ -132,15 +145,13 @@ crates/
 | 2 uishared | `mp/uishared`, `sp/uishared` | `ui_shared` | cgame + ui (per mode) |
 | 3 module (logic) | `mp/game`, `mp/cgame`, `mp/ui`, `sp/game` (+ `sp/cgame`, `sp/ui`, statically linked) | `g_*` / `cg_*`+`fx_*` / `ui_*` | transport-agnostic; wrapped by the shell crates below (or statically linked into `sp/app`) |
 | shell | `jampgame`, `cgame`, `ui`, `jagame` | `dllEntry`/`vmMain`/`GetGameAPI` export shape | thin cdylib shells: `ENGINE` `OnceLock` + entrypoints + `Dispatch` match (MP shells only — `jagame` fills the `game_export_t` table directly, no command dispatch; settled SP mapping 2026-07-03, state-ownership.md) |
-| engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `*/engine/core` is the aggregate facade (`Engine` + `com_init`/`com_frame`/`com_shutdown`, plus `com_error`'s *recovery* — `com_error` itself is defined one tier lower in `*/engine/qcommon`, state-ownership.md STATE-D7) depended on by `*/app` |
-
-> `MAX_GENTITIES` currently sits in `mp_engine_server` from the mechanical
-> type-port but belongs in `mp_qshared` (oracle home
-> `codemp/game/q_shared.h:1996,2004`); relocation is a slice-0 wiring task.
+| engine | `*/engine/*`, `*/renderer`, `mp/renderer-gpu` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `mp/engine/core` is the aggregate facade (no SP twin exists yet) (`Engine` + `com_init`/`com_frame`/`com_shutdown`, plus `com_error`'s *recovery* — `com_error` itself is defined one tier lower in `*/engine/qcommon`, state-ownership.md STATE-D7) depended on by `*/app` |
 
 ## Dependency edges
 
 Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
+
+The rows list the tier and seam edges. Most per-mode crates also take the `native/*` runtime crates (`native_math`, `native_string`, `native_types`, and `native_sort` where qsort is used) as plain leaf edges. The tables do not repeat them.
 
 | Crate | Depends on |
 | --- | --- |
@@ -152,7 +163,7 @@ Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 | `mp/bg` | `mp/qshared` |
 | `mp/uishared` | `mp/qshared`, `mp/bg` (dev-only: `mp/engine/botlib`, driving the real tokenizer in the menu-parse golden test — not a shipping edge) |
 | `mp/abi` | `abi-transport`, `mp/qshared` |
-| `mp/qshared` | `native/math`, `native/platform` |
+| `mp/qshared` | `native/math`, `native/platform`, `native/string`, `native/types` |
 | `abi-transport` | `native/platform` (re-exports its `RawSyscall`/`RawVmMain` fn-pointer aliases) |
 
 `mp/abi` **re-exports the four `abi-transport` seam traits**
@@ -178,7 +189,7 @@ SP `cgame`/`ui` have no separate shell — they are statically linked into
 > (disambiguation, 2026-07-03): `mp_engine_select::Engine` is the module-side
 > cfg'd transport-backend alias (CEngine/Static) that `mod trap` wrappers
 > take as `engine: &Engine`; `mp_engine_core::Engine` is the engine-island
-> aggregate struct (`{common, sv, cl, cm, snd}`, state-ownership.md STATE-D5).
+> aggregate struct (`{common, sv, cl, cm, snd, icarus, rmg, render_models, re, fx, nav, roff, bot}`, state-ownership.md STATE-D5).
 > Module crates cannot reach core; engine crates do not import select. Doc text
 > must always crate-qualify the two.
 
@@ -192,24 +203,19 @@ select crate: `sp/game`'s `mod gi` binds the `game_import_t` table directly
 (SEAM-D2, always native) and SP `cgame`/`ui` are always `Static` — their
 aliases are fixed.
 
-Engine (per mode): `mp/engine/*` depend on `mp/qshared`, `abi-transport`, and
-`native/*`; `ghoul2` is depended on by both `engine/*` and `cgame` (Raven shares
-it that way). `mp/engine/core` (package `mp_engine_core`) is the aggregate
+Engine (per mode): every `mp/engine/*` crate depends on `mp/qshared` and `native/*`. Only `mp/engine/qcommon` holds the `abi-transport` edge. Six engine crates (`qcommon`, `server`, `client`, `ghoul2`, `icarus`, `rmg`) also take `mp/host-interface`, the Stage-0 `EngineHost` services trait (ruling 56c). `ghoul2` is depended on by `server`, `client`, `core`, `mp/renderer`, and `mp/renderer-gpu`; `cgame` reaches it only through traps, not a crate edge. Three engine-to-module edges exist for shared helpers and the listen server: `botlib -> mp/game`, `client -> mp/game` + `mp/ui`. `server` and `client` also link `mp/renderer` (in `server` under the alias `mp_engine_renderer`). `mp/renderer` itself depends on `mp/qshared`, `mp/engine/qcommon`, `mp/host-interface`, `mp/engine/ghoul2`, and `native/*`. `mp/renderer-gpu` stacks the wgpu backend on `mp/renderer` and hosts the `ui_host` harness, whose extra edges (`mp/ui`, `mp/uishared`, `mp/bg`, `mp/engine/botlib`, `mp/engine/core`, `mp/engine/server`) belong to the harness bins, not the renderer. `mp/engine/core` (package `mp_engine_core`) is the aggregate
 facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
 `pub struct Engine`, and hosts `com_init`/`com_frame`/`com_shutdown` (plus
 `com_error`'s recovery; `com_error` itself is defined one tier lower in
 `mp/engine/qcommon` — state-ownership.md STATE-D7).
-`mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
-module cdylib shells; it is the `jampded` dedicated server.
+`mp/app` is the `jampded` dedicated-server bin. Its target shape is a thin shell over `mp/engine/core`; legacy leaf edges (`qcommon`, `server`, `client`, `renderer`, `abi`, `native/platform`) remain until their consumers migrate.
 `mp/client-app` (package `mp_client_app`) is its client twin, the `jamp`
 platform shell (DEC-56): the main thread runs the winit event loop, the sim
 thread runs the com loop, and the render thread owns the wgpu device it takes
 from `mp/renderer-gpu`. It is the only crate that turns on `mp_engine_client`'s
 `sound_device` feature, so the cpal edge never reaches the `-p mp_app`
 dedicated-server or ILP32 lanes.
-SP mirrors the same edges via `sp/engine/core` (package
-`sp_engine_core`); SP `game` uses the `GetGameAPI` table half of
-`abi-transport` instead of `dllEntry`/`vmMain`.
+SP has no core facade yet; `sp/app` links `sp/engine/{qcommon,server,client}` + `sp/renderer` + `sp/abi` directly. SP `game` uses the `GetGameAPI` table half of `abi-transport` instead of `dllEntry`/`vmMain`.
 
 ## Migration mapping (current `src/` -> target crate)
 
@@ -238,24 +244,11 @@ SP mirrors the same edges via `sp/engine/core` (package
 
 ## Call-site ergonomics
 
-Each module crate has a `prelude` module re-exporting its dependency crates under
-stable, Ravenish paths:
-
-```rust
-// mp/cgame/src/prelude.rs
-pub use qshared::*;        // vec3_t, entityState_t, playerState_t, trace_t, ...
-pub use bg::{self, *};     // pmove, weapon/saber defs
-pub use uishared as ui_shared;
-pub use abi::trap;         // trap::CG_* call sites
-```
-
-Call sites do `use crate::prelude::*;` and keep Raven's flat feel while the crate
-graph enforces the tier boundaries underneath.
+Two crates carry a `prelude` module: `mp/game` and `mp/bg`. Each prelude is pure re-exports, routed through the crate's frozen dependency set, so the skeleton-landed files open with `use crate::prelude::*;` and resolve Raven spellings without per-file import ceremony (see `crates/mp/game/src/prelude.rs`). The other module crates import the real package names directly (`use mp_qshared::…`, `use mp_bg::…`) at file top, per the import rules in `docs/porting-rules.md`. The crate graph enforces the tier boundaries either way.
 
 ## Open items
 
-- **Renderer:** per-mode split (chosen, for authenticity). Revisit an
-  OpenJK-style unified `rd-common` + backends only if a real need appears.
+- **Renderer:** per-mode split (chosen, for authenticity) and landed for MP as `mp/renderer` (frontend) + `mp/renderer-gpu` (wgpu backend). Revisit an OpenJK-style unified `rd-common` + backends only if a real need appears.
 - **`native/` may stay small:** most "shared" types trace to `q_shared.h` and are
   therefore per-mode. `native/math` is the main genuine cross-mode crate.
 - **SP `cgame`/`ui` transport:** ~~confirm whether SP builds these as QVM modules
