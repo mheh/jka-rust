@@ -53,7 +53,7 @@ use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_main::{
-    DrawSurf, EntityWalkHost, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
+    DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch, WorldSurfaceRef,
 };
 use mp_renderer::tr_model::frontend::RE_RegisterModel;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -766,22 +766,18 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             walk_scratch.set_world(world);
         }
         // The spike runs on the sim thread, so it hands the entity walk the
-        // full host bundle (W2-F1).
+        // engine host (W2-F1).
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
         // The spike walks once, so its brush-submodel rows live and die with
         // this call (W2-F8).
         let bmodel_table = BModelTable::build(models);
-        let mut entity_host = EntityWalkHost {
-            engine_view: &mut engine_view,
-            models,
-        };
         let mut view = zeroed_view_parms();
         R_RenderView(
             &parms,
             frame_scene_num,
             0,
             &mut view,
-            Some(&mut entity_host),
+            Some(&mut engine_view),
             assets,
             &bmodel_table,
             cvar_snapshot,

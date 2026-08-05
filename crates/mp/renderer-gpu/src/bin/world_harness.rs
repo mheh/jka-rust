@@ -68,7 +68,6 @@ use mp_engine_ghoul2::token::ghoul2_token_encode;
 use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer::tr_main::EntityWalkHost;
 use mp_renderer_gpu::{FrameExecutor, FrameStats, Gpu, GpuImages};
 use native_math::qmath::{AngleVectors, AnglesToAxis};
 use winit::application::ApplicationHandler;
@@ -946,18 +945,13 @@ impl App {
                     // The persisted Ghoul2 state threads into the frame, so the
                     // bone caches the render path builds survive across frames
                     // (design point 2).
-                    let mut entity_host = EntityWalkHost {
-                        engine_view: &mut engine_view,
-                        models: &*models,
-                    };
-
                     executor.execute_frame(
                         gpu,
                         &target,
                         frame_data,
                         &pinned,
                         world_load,
-                        Some(&mut entity_host),
+                        Some(&mut engine_view),
                         img_state.pending_uploads.drain().collect(),
                         images,
                         noise,

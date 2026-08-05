@@ -37,7 +37,6 @@ use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_scene::RE_RenderScene;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer::tr_main::EntityWalkHost;
 use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
@@ -258,20 +257,14 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
 
         // The golden test has no live Ghoul2 state, and the executor's own
         // empty system is what the world pass uses (W2-F5).
-        // A sim-side caller hands the entity walk the full host bundle, so
-        // every `RT_MODEL` arm runs (W2-F8).
-        let mut entity_host = EntityWalkHost {
-            engine_view: &mut engine_view,
-            models: &*models,
-        };
-
+        // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
         let stats = executor.execute_frame(
             &mut gpu,
             &target,
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut entity_host),
+            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,

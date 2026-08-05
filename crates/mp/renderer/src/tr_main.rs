@@ -43,7 +43,6 @@ use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
 use crate::tr_local::tr_refdef_t::trRefdef_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_mesh::r_add_md3_surfaces;
-use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_AUTOMAP, RDF_NOFOG, RDF_NOWORLDMODEL, RF_FIRST_PERSON};
 use crate::render_state::bmodel_table::BModelTable;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -155,26 +154,6 @@ pub struct TrMainScratch {
     ///
     /// Source: `oracle/codemp/renderer/tr_main.cpp` (file-scope static)
     pub pre_trans_ent_matrix: [f32; 16],
-}
-
-/// What `R_AddEntitySurfaces`' `RT_MODEL` arm needs on top of the frame's own
-/// state: the model registry every arm resolves `hModel` through, and the
-/// engine host the Ghoul2 arms reach `EngineHost::model_mdxm`/`model_mdxa`
-/// through.
-///
-/// W2-F1 moved the walk to the render thread, and neither of these two crosses
-/// yet: `ModelPool` is deliberately not `Clone` and holds raw block pointers,
-/// so it cannot enter an `Arc`-published registry
-/// (`tr_model/model_pool.rs`'s own module doc). A render-side caller therefore
-/// passes `None` and the `RT_MODEL` arm draws nothing, which is this wave's
-/// stated model scope. A sim-side caller (harness, golden test) passes `Some`
-/// and every arm runs as before.
-///
-/// DEC-65 ruling 1 publishes the model bytes as `Arc<ModelBlocks>` on `RenderAssets`, so the render thread now
-/// has the blocks even though the pool stays sim-side. Migrating these arms to read that copy is gh#31 step-003.
-pub struct EntityWalkHost<'a, 'e> {
-    pub engine_view: &'a mut EngineHostView<'e>,
-    pub models: &'a RenderModels,
 }
 
 /// A minimal borrowed view over Raven's `surfaceType_t *` tagged-union
@@ -1871,7 +1850,7 @@ pub fn R_AddEntitySurfaces<'a>(
     entities: &mut [trRefEntity_t],
     view: &viewParms_t,
     scratch: &mut TrMainScratch,
-    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
@@ -1974,11 +1953,14 @@ pub fn R_AddEntitySurfaces<'a>(
                 // publish it through for the other two callees.
                 // Source: oracle/codemp/renderer/tr_main.cpp:1421-1442
 
-                // W2-F8: `tr.currentModel`'s three scalars arrive on the frame
+                // W2-F8: `tr.currentModel`'s brush scalars arrive on the frame
                 // package's `BModelTable`, so the brush arm needs no model
                 // registry and runs render-side.
+                // DEC-65 ruling 4 splits the dispatch in two. Only `register_bmodel` sets a non-negative
+                // `bmodel_index`, and a brush handle is never marked into the published registry, so the brush test
+                // runs first and the `model_type` lookup below covers every other handle.
                 let model = bmodels.get(ent.e.hModel);
-                if matches!(model.model_type, modtype_t::MOD_BRUSH) {
+                if model.bmodel_index >= 0 {
                     // `R_AddBrushModelSurfaces`'s two mutators both target
                     // `*tr.currentEntity` in the oracle — one object — but land
                     // in different carriers here: `R_SetupEntityLighting`
@@ -2017,29 +1999,25 @@ pub fn R_AddEntitySurfaces<'a>(
                     continue;
                 }
 
-                //TODO: Port R_AddEntitySurfaces MD3 and Ghoul2 arms render-side
+                //TODO: Port R_AddEntitySurfaces Ghoul2 arms render-side
                 // Source: oracle/codemp/renderer/tr_main.cpp:1444-1470
-                // Both arms read the `md3`/`mdxm`/`mdxa` blocks themselves, and
-                // the Ghoul2 arm reaches them through the engine host. W2-F8
-                // part 2 keeps them gated: a render-side caller passes `None`
-                // and they draw nothing. Who owns those blocks is wave 3's
-                // opening question.
-                let Some(host) = entity_host.as_deref_mut() else {
-                    if !walk_scratch.warnings.entity_models {
-                        walk_scratch.warnings.entity_models = true;
-                        eprintln!(
-                            "mp_renderer: R_AddEntitySurfaces draws no MD3 or Ghoul2 entity render-side yet",
-                        );
-                    }
-                    continue;
+                // The MD3 arm now reads the published blocks and runs on either thread. The Ghoul2 legs still reach
+                // `EngineHost::model_mdxm`/`model_mdxa` and the sim-confined bone caches, so they keep the host gate
+                // below and a render-side caller draws no player. DEC-65 ruling 2 moves the skeleton transform to
+                // scene-add and crosses per-entity bone matrices in the frame package, which is what closes them.
+                //
+                // The host arrives as `Option<&mut EngineHostView>`. The wrapper struct that used to carry it beside
+                // the model registry dissolved with this step, because the registry half is now `assets.models`.
+                let model_type = match assets.models.get(ent.e.hModel) {
+                    Some(entry) => entry.model_type,
+                    // A handle with no published entry is dead, which is the row `BModelTable::get` used to hand a
+                    // bad handle, so it lands in the `MOD_BAD` arm exactly as it did.
+                    None => modtype_t::MOD_BAD,
                 };
-                let models = host.models;
-                let engine_view = &mut *host.engine_view;
-                match model.model_type {
+                match model_type {
                     modtype_t::MOD_MESH => {
                         r_add_md3_surfaces(
                             ent,
-                            models,
                             view,
                             &ori,
                             cvars,
@@ -2056,11 +2034,20 @@ pub fn R_AddEntitySurfaces<'a>(
                         );
                     }
 
-                    // `MOD_BRUSH` took the branch above, before the host gate.
+                    // `MOD_BRUSH` took the branch above, before the model-type lookup.
                     modtype_t::MOD_BRUSH => {}
 
                     // g2r
                     modtype_t::MOD_MDXM => {
+                        let Some(engine_view) = entity_host.as_deref_mut() else {
+                            if !walk_scratch.warnings.entity_models {
+                                walk_scratch.warnings.entity_models = true;
+                                eprintln!(
+                                    "mp_renderer: R_AddEntitySurfaces draws no Ghoul2 entity render-side yet",
+                                );
+                            }
+                            continue;
+                        };
                         // `r_add_ghoul_surfaces` lights the `&mut RefEntity` it
                         // takes, matching the MD3 sibling. The lit fields fold
                         // back onto `entities[n]` so the backend reads them by
@@ -2072,7 +2059,6 @@ pub fn R_AddEntitySurfaces<'a>(
                                 handle,
                                 engine_view,
                                 assets,
-                                models,
                                 view,
                                 &ori,
                                 cvars,
@@ -2107,12 +2093,20 @@ pub fn R_AddEntitySurfaces<'a>(
                         if let Some(handle) = re.ghoul2 {
                             let ghoul2 = CGhoul2Info_v { mItem: handle.0 };
                             if g2api_have_we_ghoul2_models(g2, &ghoul2) {
+                                let Some(engine_view) = entity_host.as_deref_mut() else {
+                                    if !walk_scratch.warnings.entity_models {
+                                        walk_scratch.warnings.entity_models = true;
+                                        eprintln!(
+                                            "mp_renderer: R_AddEntitySurfaces draws no Ghoul2 entity render-side yet",
+                                        );
+                                    }
+                                    continue;
+                                };
                                 r_add_ghoul_surfaces(
                                     &mut re,
                                     handle,
                                     engine_view,
                                     assets,
-                                    models,
                                     view,
                                     &ori,
                                     cvars,
@@ -2233,7 +2227,7 @@ pub fn R_AddEntitySurfaces<'a>(
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1516-1531`
 pub fn R_GenerateDrawSurfs<'a>(
-    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
@@ -2422,7 +2416,7 @@ pub fn R_MirrorViewBySurface<'a>(
     entity_num: i32,
     frame_scene_num: i32,
     refdef_time: i32,
-    entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
@@ -2596,7 +2590,7 @@ pub fn R_SortDrawSurfs<'a>(
     first_draw_surf: usize,
     frame_scene_num: i32,
     refdef_time: i32,
-    mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    mut entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
@@ -2732,7 +2726,7 @@ pub fn R_RenderView<'a>(
     frame_scene_num: i32,
     refdef_time: i32,
     view: &mut viewParms_t,
-    mut entity_host: Option<&mut EntityWalkHost<'_, '_>>,
+    mut entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,

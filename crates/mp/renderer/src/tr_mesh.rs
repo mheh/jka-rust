@@ -16,6 +16,7 @@ use mp_qshared::shared::{cplane_t, vec3_t};
 use native_math::qmath::RadiusFromBounds;
 
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::model_blocks::PublishedModel;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -27,7 +28,6 @@ use crate::tr_image::R_GetSkinByHandle;
 use crate::tr_light::R_SetupEntityLighting;
 use crate::tr_local::dlight_s::dlight_t;
 use crate::tr_local::fog_t::fog_t;
-use crate::tr_local::model_s::model_t;
 use crate::tr_local::orientationr_t::orientationr_t;
 use crate::tr_local::tr_ref_entity_t::trRefEntity_t;
 use crate::tr_local::view_parms_t::viewParms_t;
@@ -201,61 +201,63 @@ pub fn re_get_model_bounds(_ref_ent: &RefEntity, _models: &RenderModels) -> (vec
 /// `r_lodscale`/`r_autolodscalevalue`/`r_lodbias` and clamped to
 /// `tr.currentModel->numLods`.
 ///
-/// `current_model` is `tr.currentModel`; `view` is `tr.viewParms`
+/// `current_model` is `tr.currentModel`, read as the published entry (DEC-65 ruling 3); `view` is `tr.viewParms`
 /// (`ProjectRadius`); the three lod cvars arrive on the frame's
 /// [`RenderCvarSnapshot`] (W2-F1). The frame-array read for the projected
 /// radius runs through [`read_md3_frame`].
 ///
 /// Source: `oracle/codemp/renderer/tr_mesh.cpp:173-236`
 fn r_compute_lod(
-    current_model: &model_t,
+    current_model: &PublishedModel,
     ent_frame: i32,
     ent_origin: vec3_t,
     view: &viewParms_t,
     cvars: RenderCvarSnapshot,
 ) -> i32 {
-    let mut lod;
+    // A registered multi-LOD model always publishes LOD 0, so an absent header here is unreachable in a live frame
+    // and takes the single-LOD arm.
+    let mut lod = match current_model.md3_ptr(0) {
+        Some(header) if current_model.num_lods >= 2 => {
+            // multiple LODs exist, so compute projected bounding sphere and use
+            // that as a criteria for selecting LOD.
+            // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before
+            // the LOD read; see [`read_md3_frame`].
+            let (bounds, _, _) = unsafe { read_md3_frame(header, ent_frame) };
+            let radius = RadiusFromBounds(bounds[0], bounds[1]);
 
-    if current_model.numLods < 2 {
-        // model has only 1 LOD level, skip computations and bias
-        lod = 0;
-    } else {
-        // multiple LODs exist, so compute projected bounding sphere and use
-        // that as a criteria for selecting LOD.
-        // SAFETY: `ent_frame` is clamped to `numFrames` by the caller before
-        // the LOD read; see [`read_md3_frame`].
-        let (bounds, _, _) = unsafe { read_md3_frame(current_model.md3[0], ent_frame) };
-        let radius = RadiusFromBounds(bounds[0], bounds[1]);
-
-        let projected_radius = project_radius(radius, ent_origin, view);
-        let flod;
-        if projected_radius != 0.0 {
-            let mut lodscale = cvars.lodscale + cvars.autolodscalevalue;
-            if lodscale > 20.0 {
-                lodscale = 20.0;
-            } else if lodscale < 0.0 {
-                lodscale = 0.0;
+            let projected_radius = project_radius(radius, ent_origin, view);
+            let flod;
+            if projected_radius != 0.0 {
+                let mut lodscale = cvars.lodscale + cvars.autolodscalevalue;
+                if lodscale > 20.0 {
+                    lodscale = 20.0;
+                } else if lodscale < 0.0 {
+                    lodscale = 0.0;
+                }
+                flod = 1.0f32 - projected_radius * lodscale;
+            } else {
+                // object intersects near view plane, e.g. view weapon
+                flod = 0.0;
             }
-            flod = 1.0f32 - projected_radius * lodscale;
-        } else {
-            // object intersects near view plane, e.g. view weapon
-            flod = 0.0;
-        }
 
-        let flod = flod * current_model.numLods as f32;
-        lod = myftol(flod);
+            let flod = flod * current_model.num_lods as f32;
+            let mut lod = myftol(flod);
 
-        if lod < 0 {
-            lod = 0;
-        } else if lod >= current_model.numLods {
-            lod = current_model.numLods - 1;
+            if lod < 0 {
+                lod = 0;
+            } else if lod >= current_model.num_lods {
+                lod = current_model.num_lods - 1;
+            }
+            lod
         }
-    }
+        // model has only 1 LOD level, skip computations and bias
+        _ => 0,
+    };
 
     lod += cvars.lodbias;
 
-    if lod >= current_model.numLods {
-        lod = current_model.numLods - 1;
+    if lod >= current_model.num_lods {
+        lod = current_model.num_lods - 1;
     }
     if lod < 0 {
         lod = 0;
@@ -333,7 +335,7 @@ fn r_cull_model(
 /// box, sets up lighting, resolves the fog volume, then walks every MD3
 /// surface resolving its shader and pushing a draw surf.
 ///
-/// `models` resolves `tr.currentModel` (`R_GetModelByHandle`).
+/// `assets.models` resolves `tr.currentModel` (`R_GetModelByHandle`) as the published entry (DEC-65 ruling 3).
 /// `view` is `tr.viewParms` (`.isPortal`/`.frustum`).
 /// `ori` is the entity orientation `R_RotateForEntity` built.
 /// The cvars arrive on the frame's [`RenderCvarSnapshot`] (W2-F1), and the
@@ -351,7 +353,6 @@ fn r_cull_model(
 #[allow(clippy::too_many_arguments)]
 pub fn r_add_md3_surfaces<'a>(
     ent: &mut trRefEntity_t,
-    models: &RenderModels,
     view: &viewParms_t,
     ori: &orientationr_t,
     cvars: RenderCvarSnapshot,
@@ -369,11 +370,19 @@ pub fn r_add_md3_surfaces<'a>(
     // don't add third_person objects if not in a portal
     let personal_model = (ent.e.renderfx & RF_THIRD_PERSON) != 0 && view.isPortal == 0;
 
-    let current_model = models.get_model(ent.e.hModel);
+    // The dispatch resolved this handle's `model_type` out of the same published registry this frame, so a
+    // `MOD_MESH` entry with a LOD-0 header always exists here. Both skips are the defined behavior where a stale
+    // reference could reach this arm.
+    let Some(current_model) = assets.models.get(ent.e.hModel) else {
+        return;
+    };
+    let Some(lod0_header) = current_model.md3_ptr(0) else {
+        return;
+    };
     let num_frames = {
-        // SAFETY: `md3[0]` is the LOD-0 header of a registered `MOD_MESH`
+        // SAFETY: `md3_ptr(0)` is the LOD-0 header of a registered `MOD_MESH`
         // model, the aligned block the loader owns.
-        unsafe { (*current_model.md3[0]).numFrames }
+        unsafe { (*lod0_header).numFrames }
     };
 
     // Wrap and validate the frames so there is no chance of a crash. The wrap
@@ -393,7 +402,7 @@ pub fn r_add_md3_surfaces<'a>(
                 S_COLOR_RED.to_str().expect("S_COLOR_RED is ASCII"),
                 ent.e.oldframe,
                 ent.e.frame,
-                md3_name(&current_model.name),
+                current_model.name,
             );
         }
         ent.e.frame = 0;
@@ -403,7 +412,10 @@ pub fn r_add_md3_surfaces<'a>(
     // compute LOD
     let lod = r_compute_lod(current_model, ent.e.frame, ent.e.origin, view, cvars);
 
-    let header = current_model.md3[lod as usize];
+    // The LOD the computation picked is always loaded, because `r_compute_lod` clamps to `num_lods`.
+    let Some(header) = current_model.md3_ptr(lod as usize) else {
+        return;
+    };
 
     // cull the whole model if the merged bounding box of both frames is
     // outside the view frustum

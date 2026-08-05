@@ -53,7 +53,6 @@ use mp_renderer::tr_scene::{
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
-use mp_renderer::tr_main::EntityWalkHost;
 use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
 use native_math::qmath::AnglesToAxis;
 
@@ -429,20 +428,14 @@ fn run_scene(scene: &Scene) {
         let sv_ptr: *mut () = sv as *mut Server as *mut ();
         let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-        // A sim-side caller hands the entity walk the full host bundle, so
-        // every `RT_MODEL` arm runs (W2-F8).
-        let mut entity_host = EntityWalkHost {
-            engine_view: &mut engine_view,
-            models: &*models,
-        };
-
+        // A sim-side caller hands the entity walk the engine host, so the Ghoul2 arms run too.
         executor.execute_frame(
             &mut gpu,
             &target,
             &frame_data,
             &pinned,
             world_load,
-            Some(&mut entity_host),
+            Some(&mut engine_view),
             img_state.pending_uploads.drain().collect(),
             &mut images,
             noise,

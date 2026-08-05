@@ -3,17 +3,14 @@
 
 use mp_qshared::shared::qhandle_t;
 
-use crate::tr_local::modtype_t::modtype_t;
 use crate::tr_model::render_models::RenderModels;
 
-/// One model handle's row: the three `model_t` scalars the brush-submodel path
+/// One model handle's row: the two `model_t` scalars the brush-submodel path
 /// reads and nothing else.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:1117-1135` (`model_t`)
 #[derive(Clone, Copy)]
 pub struct BModelEntry {
-    /// `model_t::type`, which the entity walk switches on.
-    pub model_type: modtype_t,
     /// `model_t::bmodel` as an index into `WorldAsset::bmodels`, or `-1` for a
     /// handle that names no brush submodel. The pointer itself has no twin:
     /// `RenderModels::register_bmodel` records the index instead.
@@ -29,7 +26,6 @@ impl Default for BModelEntry {
     /// handle.
     fn default() -> BModelEntry {
         BModelEntry {
-            model_type: modtype_t::MOD_BAD,
             bmodel_index: -1,
             bsp_instance: 0,
         }
@@ -43,12 +39,13 @@ impl Default for BModelEntry {
 /// own the `mdxm`/`mdxa`/`md3` raw block pointers the DEC-35 mdx views hand
 /// out, so the pool is deliberately not `Clone` and is not `Send`
 /// (`tr_model/model_pool.rs`'s own module doc). The brush-submodel path reads
-/// only the three scalars in [`BModelEntry`], so W2-F8 crosses those instead of
+/// only the two scalars in [`BModelEntry`], so W2-F8 crosses those instead of
 /// the registry. The table travels with the world generation on the frame
 /// package, since both are rebuilt by the same map load.
 ///
-/// MD3 and Ghoul2 need the blocks themselves, so their arms stay gated off
-/// render-side until the model-block ownership ruling lands (wave 3).
+/// DEC-65 ruling 4 splits the entity walk's two model reads. The brush test reads `bmodel_index` here, because a
+/// brush handle never enters the published registry, and `model_type` resolves from `RenderAssets::models`, which
+/// republishes at every `RE_EndFrame` drain.
 pub struct BModelTable {
     /// Indexed by the bare `qhandle_t`, which is the pool slot (DEC-42.2).
     entries: Vec<BModelEntry>,
@@ -66,7 +63,6 @@ impl BModelTable {
         for slot in 0..count {
             let model = models.get_model(slot as qhandle_t);
             entries.push(BModelEntry {
-                model_type: model.r#type,
                 bmodel_index: match models.bmodel_index(slot as qhandle_t) {
                     Some(index) => index as i32,
                     None => -1,
@@ -88,8 +84,8 @@ impl BModelTable {
     ///
     /// Raven's `R_GetModelByHandle` hands an out-of-range handle the default
     /// model, and `ModelPool::by_handle` reproduces that with slot 0's zeroed
-    /// entry. This returns the same all-zero row, so a bad handle lands in the
-    /// walk's `MOD_BAD` arm exactly as it does today.
+    /// entry. This returns the same all-zero row, so a bad handle fails the brush test and resolves `MOD_BAD`
+    /// through the published registry, exactly as it does today.
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:1665-1680`
     pub fn get(&self, handle: qhandle_t) -> BModelEntry {
