@@ -133,3 +133,12 @@ Both rulings are settled and the packet is ready for the lane, which spawns only
 **2026-08-05 - the draft awaits the user audit.**
 
 **2026-08-05 - rulings A and B are taken.** The user ruled both open questions on the recommendations: ruling A wires the `CG_R_ADDDECALTOSCENE` and `FxHost::AddDecalToScene` arms live in this step, and ruling B accepts the duel1-floor rivetmark golden with the blessed image gated on the user's eyes. The decal wiring is now unconditional in the surface contract, the commit bundle, and the write scopes. No open question remains, and the packet is ready for the lane. The lane go is pending.
+
+**2026-08-05 - lane-review closed with dispositioned findings.** The clerk walked the whole diff and reproduced every gate, with the new mark golden verified live at one fragment. Findings and dispositions:
+
+- Two `#[allow(clippy::too_many_arguments)]` attributes are outside the contract's quoted signatures. Accepted: clippy is not a repo gate, the attributes are inert, and the parked clippy lane meets them later.
+- The `build_refdef` and `record_scene` test-helper signature changes (confessed deviation 2) are private test machinery, not `pub` surface. Accepted.
+- Four unconfessed fixture details are accepted: the `PerpendicularVectorMP` MP twin, the literal `0.0` orientation, the `register_shader` raw-pointer split on the `boot.rs` precedent, and the diagnostic `println`.
+- The pitch-90 view, the measured `MARK_DROP = 64`, and the corrected oracle cites (deviations 1, 3, 4) fill gaps the packet left. Accepted.
+- Style items close in one commit on the branch: the four over-150-column module-note lines in `tr_marks.rs`, the 80-column-wrapped doc block and the `cg_marks.c:110-211` cite in `world_golden.rs`, the continued wrapped sentence in `tr_scene.rs`, and the import order in `cl_cgame.rs`.
+- Discarded clerk flags: the SAFETY noun-phrase form, the `#[ignore]` string, the assert-message form, and the preserved Raven comments are established repo convention.
