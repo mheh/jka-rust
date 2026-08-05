@@ -142,3 +142,5 @@ Both rulings are settled and the packet is ready for the lane, which spawns only
 - The pitch-90 view, the measured `MARK_DROP = 64`, and the corrected oracle cites (deviations 1, 3, 4) fill gaps the packet left. Accepted.
 - Style items close in one commit on the branch: the four over-150-column module-note lines in `tr_marks.rs`, the 80-column-wrapped doc block and the `cg_marks.c:110-211` cite in `world_golden.rs`, the continued wrapped sentence in `tr_scene.rs`, and the import order in `cl_cgame.rs`.
 - Discarded clerk flags: the SAFETY noun-phrase form, the `#[ignore]` string, the assert-message form, and the preserved Raven comments are established repo convention.
+
+The frozen record of the review is `docs/audits/2026-08-05-mark-fragments-landing.md`.
