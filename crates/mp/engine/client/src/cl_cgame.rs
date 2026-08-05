@@ -132,9 +132,9 @@ use mp_renderer::tr_font::{
 use mp_renderer::tr_image::{RE_RegisterImages_LevelLoadEnd, RE_RegisterSkin};
 use mp_renderer::tr_init::{RE_EndRegistration, RE_GetLightStyle, RE_SetLightStyle};
 use mp_renderer::tr_light::R_LightForPoint;
+use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_model::frontend::{r_lerp_tag, r_model_bounds, RE_RegisterModel};
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_scene::{
     RE_AddAdditiveLightToScene, RE_AddDecalToScene, RE_AddLightToScene, RE_AddPolyToScene,
     RE_AddRefEntityToScene, RE_ClearDecals, RE_ClearScene, RE_RenderScene,

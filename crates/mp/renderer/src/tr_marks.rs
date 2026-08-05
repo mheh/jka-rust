@@ -21,12 +21,16 @@ use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::shader_asset::ShaderAsset;
 use crate::tr_bsp::SurfaceData;
 
-// `R_BoxSurfaces_r` walks the world's BSP node/surface tree, which per the tier-2 transition audit (Group 1: `mnode_t`/`msurface_t` rows) resolves to the index-linked node/surface arena `tr_bsp` loads into `RenderAssets::world`.
-// gh#31 step-006 completed that field-merge: the scoped-local `MarkNode`/`MarkSurface` stand-ins are gone, and both walks read `WorldAsset::nodes`, `surfaces`, `mark_surfaces`, and `planes` directly.
-// A leaf's surfaces resolve through `WorldAsset::mark_surfaces`, and the collected list carries flat `WorldAsset::surfaces` indices in place of Raven's `surfaceType_t *` pointers.
+// `R_BoxSurfaces_r` walks the world's BSP node/surface tree, which per the tier-2 transition audit
+// (Group 1: `mnode_t`/`msurface_t` rows) resolves to the index-linked node/surface arena `tr_bsp` loads into `RenderAssets::world`.
+// gh#31 step-006 completed that field-merge: the scoped-local `MarkNode`/`MarkSurface` stand-ins are gone,
+// and both walks read `WorldAsset::nodes`, `surfaces`, `mark_surfaces`, and `planes` directly.
+// A leaf's surfaces resolve through `WorldAsset::mark_surfaces`, and the collected list carries flat
+// `WorldAsset::surfaces` indices in place of Raven's `surfaceType_t *` pointers.
 //
 // `tr.viewCount` is threaded via [`MarkState::view_count`], this file's own counter.
-// Raven shares one `tr.viewCount` between the world walk and the decal walk, and the two walks stamp different arrays, so W2-F4 gives the decal path its own generation.
+// Raven shares one `tr.viewCount` between the world walk and the decal walk, and the two walks stamp different arrays,
+// so W2-F4 gives the decal path its own generation.
 // The stamps stay internally consistent inside each walk, which is all either one reads the counter for.
 
 /// Renderer-local `MAX_VERTS_ON_POLY` — the max vertex count

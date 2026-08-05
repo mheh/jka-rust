@@ -969,11 +969,9 @@ const MAX_DECAL_POINTS: usize = 384;
 
 /// Raven `RE_AddDecalToScene`.
 ///
-/// `frame`/`assets`/`scene`/`cvars`/`common` mirror this file's established
-/// wave-2 `R_AddDecals`/`RE_AllocDecal` threading; `refdef_time` stands in for
-/// `tr.refdef.time` for the same STATE HOMES reason those two fns already
-/// carry it as an explicit param (`TrRefdef` has no `time` field yet, this
-/// wave is scoped to `tr_scene.rs` only).
+/// `frame`/`assets`/`scene`/`cvars`/`common` mirror this file's established wave-2 `R_AddDecals`/`RE_AllocDecal` threading;
+/// `refdef_time` stands in for `tr.refdef.time` for the same STATE HOMES reason those two fns already carry it as an explicit param
+/// (`TrRefdef` has no `time` field yet, this wave is scoped to `tr_scene.rs` only).
 /// `mark` is the one extra param `R_MarkFragments` needs, and gh#31 step-006 homes it on `RendererFrontend::mark_state`.
 /// The BSP walk reads `assets.world` directly since that step, so this fn hands `R_MarkFragments` the `assets` it already holds.
 ///

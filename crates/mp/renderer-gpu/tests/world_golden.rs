@@ -71,8 +71,7 @@ const CHANNEL_TOLERANCE: u8 = 0;
 /// The horizontal field of view in degrees, matching `world_harness`.
 const FOV_X: f64 = 90.0;
 
-/// Builds the frozen scene refdef at `eye`, looking along `angles`, through the
-/// fixed golden viewport.
+/// Builds the frozen scene refdef at `eye`, looking along `angles`, through the fixed golden viewport.
 fn build_refdef(eye: [f32; 3], angles: [f32; 3]) -> refdef_t {
     // SAFETY: `refdef_t` is a frozen `#[repr(C)]` POD of scalars, fixed arrays,
     // and `vec3_t`, so an all-zero value is valid.
@@ -448,7 +447,7 @@ const MARK_SHADER: &str = "gfx/damage/rivetmark";
 /// The texture math is Raven's own, `st = 0.5 + DotProduct(delta, axis) * 0.5 / radius`.
 /// The step panics when the walk returns no fragment, so an inert walk can never bless an empty image.
 ///
-/// Source: `oracle/codemp/cgame/cg_marks.c:110-220`
+/// Source: `oracle/codemp/cgame/cg_marks.c:110-211`
 fn duel1_floor_mark(host: &mut UiHost, frame_data: &mut FrameData, eye: [f32; 3]) {
     let shader = register_shader(host, MARK_SHADER);
     assert!(shader != 0, "{MARK_SHADER} did not register");
