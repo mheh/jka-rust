@@ -25,17 +25,29 @@ use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
 
+use mp_engine_core::Engine;
+use mp_engine_server::Server;
+use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::shared::mark_fragment::markFragment_t;
+use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
-use mp_renderer::tr_scene::RE_RenderScene;
+use mp_renderer::tr_marks::R_MarkFragments;
+use mp_renderer::tr_model::render_models::RenderModels;
+use mp_renderer::tr_scene::{RE_AddPolyToScene, RE_RenderScene};
+use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
 use mp_renderer_gpu::{read_target_rgba, FrameExecutor, Gpu, GpuImages};
-use native_math::qmath::AnglesToAxis;
+use native_math::qmath::{
+    AnglesToAxis, CrossProduct, PerpendicularVectorMP, RotatePointAroundVector, VectorNormalize2,
+    _DotProduct,
+};
+use native_math::vector::vec3_t;
 
 /// The golden viewport in physical pixels. Fixed so the projection and the
 /// read-back image never depend on a window size.
@@ -59,9 +71,9 @@ const CHANNEL_TOLERANCE: u8 = 0;
 /// The horizontal field of view in degrees, matching `world_harness`.
 const FOV_X: f64 = 90.0;
 
-/// Builds the frozen scene refdef at `eye`, looking straight ahead (yaw 0,
-/// pitch 0), through the fixed golden viewport.
-fn build_refdef(eye: [f32; 3]) -> refdef_t {
+/// Builds the frozen scene refdef at `eye`, looking along `angles`, through the
+/// fixed golden viewport.
+fn build_refdef(eye: [f32; 3], angles: [f32; 3]) -> refdef_t {
     // SAFETY: `refdef_t` is a frozen `#[repr(C)]` POD of scalars, fixed arrays,
     // and `vec3_t`, so an all-zero value is valid.
     let mut rd: refdef_t = unsafe { core::mem::zeroed() };
@@ -77,7 +89,6 @@ fn build_refdef(eye: [f32; 3]) -> refdef_t {
     rd.fov_y = fov_y as f32;
 
     rd.vieworg = eye;
-    let angles = [0.0f32, 0.0, 0.0];
     rd.viewangles = angles;
     AnglesToAxis(angles, rd.viewaxis.as_mut_ptr());
 
@@ -87,18 +98,54 @@ fn build_refdef(eye: [f32; 3]) -> refdef_t {
 }
 
 /// Records the frozen scene through the trap-side `RE_RenderScene`.
-fn record_scene(host: &mut UiHost, refdef: &refdef_t) -> FrameData {
-    let mut frame_data = FrameData { events: Vec::new() };
+/// The caller appends its own scene primitives to `frame_data` first, because the render command must sit after them.
+fn record_scene(host: &mut UiHost, refdef: &refdef_t, frame_data: &mut FrameData) {
     RE_RenderScene(
         refdef,
-        &mut frame_data,
+        frame_data,
         &host.re.sim.published,
         &host.re.cvars,
         &mut host.re.scene,
         &mut host.engine.common,
         &host.re.sim.light_styles,
     );
-    frame_data
+}
+
+/// Registers `name` against the loaded world and returns its handle.
+///
+/// The destructuring matches `boot::load_world`'s own split, which is what lets one `host` hand `RE_RegisterShader` every receiver it takes.
+fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
+    let UiHost {
+        engine,
+        models,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                qs,
+                sky_view,
+                ..
+            },
+        ..
+    } = host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+    RE_RegisterShader(
+        name,
+        qs,
+        world_load,
+        Arc::make_mut(&mut sim.published),
+        &mut view,
+        cvars,
+        models,
+        img_state,
+        sky_view,
+    )
 }
 
 /// The absolute path of the committed golden for `stem`.
@@ -161,11 +208,26 @@ fn compare(golden: &[u8], actual: &[u8]) -> (usize, u8) {
     (differing_pixels, max_delta)
 }
 
+/// A scene step that appends its own primitives to the frame before the render command.
+/// The two plain world fixtures pass `None`, and the marks fixture passes its projection step.
+type SceneStep = fn(&mut UiHost, &mut FrameData, [f32; 3]);
+
 /// Renders `map` through the whole chain at the frozen clock and compares the
 /// pixels to the committed golden named `stem`. `require_sky_and_fog` adds the
 /// two stat gates a fogged open-sky fixture must clear, so an inert sky or fog
 /// chain cannot silently bless.
 fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
+    run_golden_scene(map, stem, require_sky_and_fog, [0.0, 0.0, 0.0], None);
+}
+
+/// The body behind [`run_golden`], with the two knobs the marks fixture needs: the view angles and one scene step.
+fn run_golden_scene(
+    map: &str,
+    stem: &str,
+    require_sky_and_fog: bool,
+    angles: [f32; 3],
+    step: Option<SceneStep>,
+) {
     // ---- boot and load the world ---------------------------------------
     // The default basepath points at one user's home. Read `JKA_BASEPATH` so
     // another machine can re-bless the golden without editing the default.
@@ -195,8 +257,12 @@ fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
         .map(|o| [o[0], o[1], o[2] + EYE_HEIGHT])
         .unwrap_or([0.0, 0.0, 0.0]);
 
-    let refdef = build_refdef(eye);
-    let frame_data = record_scene(&mut host, &refdef);
+    let refdef = build_refdef(eye, angles);
+    let mut frame_data = FrameData { events: Vec::new() };
+    if let Some(step) = step {
+        step(&mut host, &mut frame_data, eye);
+    }
+    record_scene(&mut host, &refdef, &mut frame_data);
 
     // ---- headless GPU and the render resources -------------------------
     let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
@@ -353,4 +419,130 @@ fn golden_world_duel1() {
 #[ignore = "needs retail assets and a GPU; run locally with --ignored"]
 fn golden_world_ffa2() {
     run_golden("maps/mp/ffa2.bsp", "world_ffa2", true);
+}
+
+/// Raven `MAX_MARK_FRAGMENTS` and `MAX_MARK_POINTS`, the two caps `CG_ImpactMark` passes to the trap.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:107-108`
+const MAX_MARK_FRAGMENTS: usize = 128;
+const MAX_MARK_POINTS: usize = 384;
+
+/// Raven cgame's `MAX_VERTS_ON_POLY` - the per-fragment vertex cap `CG_ImpactMark` clamps to.
+/// This is the cgame value, not the renderer-local one of the same name.
+///
+/// Source: `oracle/codemp/cgame/cg_local.h:56`
+const MAX_VERTS_ON_POLY: usize = 10;
+
+/// The mark's radius in world units, and the drop from the eye to the mark plane.
+/// The duel1 spawn eye sits at z 192 and the floor under it at z 128, so a 64-unit drop puts the mark on the floor.
+/// `CG_ImpactMark` wants the origin within a unit of the surface it marks, and this is that placement.
+const MARK_RADIUS: f32 = 16.0;
+const MARK_DROP: f32 = 64.0;
+
+/// The census's top mark shader, at 292,999 poly submissions across the four traces.
+const MARK_SHADER: &str = "gfx/damage/rivetmark";
+
+/// Projects one mark straight down under the eye and submits its fragments as scene polygons.
+///
+/// This is Raven `CG_ImpactMark`'s `temporary` path: build the texture axis, build the four-corner quad, get the fragments, then draw each one.
+/// The texture math is Raven's own, `st = 0.5 + DotProduct(delta, axis) * 0.5 / radius`.
+/// The step panics when the walk returns no fragment, so an inert walk can never bless an empty image.
+///
+/// Source: `oracle/codemp/cgame/cg_marks.c:110-220`
+fn duel1_floor_mark(host: &mut UiHost, frame_data: &mut FrameData, eye: [f32; 3]) {
+    let shader = register_shader(host, MARK_SHADER);
+    assert!(shader != 0, "{MARK_SHADER} did not register");
+
+    let origin: vec3_t = [eye[0], eye[1], eye[2] - MARK_DROP];
+    let dir: vec3_t = [0.0, 0.0, 1.0];
+
+    // create the texture axis
+    let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+    VectorNormalize2(dir, &mut axis[0]);
+    let axis0 = axis[0];
+    PerpendicularVectorMP(&mut axis[1], axis0);
+    let axis1 = axis[1];
+    RotatePointAroundVector(&mut axis[2], axis0, axis1, 0.0);
+    let axis2 = axis[2];
+    CrossProduct(axis0, axis2, &mut axis[1]);
+    let axis1 = axis[1];
+
+    let tex_coord_scale = 0.5 * 1.0 / MARK_RADIUS;
+
+    // create the full polygon
+    let mut original_points: [vec3_t; 4] = [[0.0; 3]; 4];
+    for i in 0..3usize {
+        original_points[0][i] = origin[i] - MARK_RADIUS * axis1[i] - MARK_RADIUS * axis2[i];
+        original_points[1][i] = origin[i] + MARK_RADIUS * axis1[i] - MARK_RADIUS * axis2[i];
+        original_points[2][i] = origin[i] + MARK_RADIUS * axis1[i] + MARK_RADIUS * axis2[i];
+        original_points[3][i] = origin[i] - MARK_RADIUS * axis1[i] + MARK_RADIUS * axis2[i];
+    }
+
+    // get the fragments
+    let projection: vec3_t = [dir[0] * -20.0, dir[1] * -20.0, dir[2] * -20.0];
+    let mut mark_points: Vec<vec3_t> = Vec::new();
+    let mut mark_fragments: Vec<markFragment_t> = Vec::new();
+    let num_fragments = R_MarkFragments(
+        &host.re.sim.published,
+        &mut host.re.mark_state,
+        &original_points,
+        projection,
+        MAX_MARK_POINTS,
+        &mut mark_points,
+        MAX_MARK_FRAGMENTS,
+        &mut mark_fragments,
+    );
+    println!("world_marks_duel1: {num_fragments} fragments under the eye at {origin:?}");
+    assert!(
+        num_fragments > 0,
+        "the mark walk returned no fragment, so the golden would bless an empty floor",
+    );
+
+    let colors: [u8; 4] = [255, 255, 255, 255];
+    for mf in mark_fragments.iter().take(num_fragments as usize) {
+        // we have an upper limit on the complexity of polygons that we store persistantly
+        let num_points = (mf.numPoints as usize).min(MAX_VERTS_ON_POLY);
+        let verts: Vec<polyVert_t> = (0..num_points)
+            .map(|j| {
+                let xyz = mark_points[mf.firstPoint as usize + j];
+                let delta: vec3_t = [
+                    xyz[0] - origin[0],
+                    xyz[1] - origin[1],
+                    xyz[2] - origin[2],
+                ];
+                polyVert_t {
+                    xyz,
+                    st: [
+                        0.5 + _DotProduct(delta, axis1) * tex_coord_scale,
+                        0.5 + _DotProduct(delta, axis2) * tex_coord_scale,
+                    ],
+                    modulate: colors,
+                }
+            })
+            .collect();
+        RE_AddPolyToScene(
+            frame_data,
+            &host.re.sim.published,
+            &mut host.engine.common,
+            shader,
+            &verts,
+            num_points,
+            1,
+        );
+    }
+}
+
+/// The marks fixture: the duel1 room again, with one `gfx/damage/rivetmark` decal on the floor under the eye.
+/// The camera looks straight down, so the whole mark sits in frame.
+/// This is the gate on the census's `marks/MarkFragments` group, 92,322 trap calls across the four traces.
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_marks_duel1() {
+    run_golden_scene(
+        "maps/mp/duel1.bsp",
+        "world_marks_duel1",
+        false,
+        [90.0, 0.0, 0.0],
+        Some(duel1_floor_mark),
+    );
 }
