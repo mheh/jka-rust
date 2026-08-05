@@ -758,12 +758,14 @@ impl BackendMode {
 }
 
 /// The pipeline cache key: one pipeline per distinct blend state and depth
-/// state. `BlendState` is `Hash`; the two depth choices are booleans.
+/// state. `BlendState` is `Hash`; the three depth choices are booleans.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PipelineKey {
     blend: BlendState,
     depth_equal: bool,
     depth_write: bool,
+    /// The shader carries `polygonOffset`, so every pass draws with the decal depth bias.
+    depth_bias: bool,
 }
 
 /// The resolved state one stage pass draws with, collected before the render
@@ -1654,6 +1656,7 @@ impl Pipeline3d {
                     &verts,
                     sf,
                     shader.fog_pass,
+                    shader.polygon_offset,
                     assets.fog_image,
                     first_index,
                     index_count,
@@ -1764,6 +1767,7 @@ impl Pipeline3d {
                     &verts,
                     sf,
                     shader.fog_pass,
+                    shader.polygon_offset,
                     assets.fog_image,
                     first_index,
                     index_count,
@@ -1950,6 +1954,7 @@ impl Pipeline3d {
                     cpu,
                     sf,
                     shader.fog_pass,
+                    shader.polygon_offset,
                     assets.fog_image,
                     draw_range.first_index,
                     draw_range.index_count,
@@ -2114,6 +2119,7 @@ impl Pipeline3d {
                     &md3_vertices,
                     sf,
                     shader.fog_pass,
+                    shader.polygon_offset,
                     assets.fog_image,
                     first_index,
                     index_count,
@@ -2290,6 +2296,7 @@ impl Pipeline3d {
                     &g2_vertices,
                     sf,
                     shader.fog_pass,
+                    shader.polygon_offset,
                     assets.fog_image,
                     first_index,
                     index_count,
@@ -2384,10 +2391,12 @@ impl Pipeline3d {
 
         // The GL_State(0) sky-box pass: no blend, depth compare less-or-equal,
         // depth writes off.
+        // The sky never carries `polygonOffset`, so the box pass keys unbiased.
         let box_key = PipelineKey {
             blend: blend_state_from_gls(0),
             depth_equal: false,
             depth_write: false,
+            depth_bias: false,
         };
         let color = sky_identity_color();
 
@@ -2539,6 +2548,7 @@ impl Pipeline3d {
             blend: blend_state_from_gls(state_bits),
             depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
             depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            depth_bias: shader.polygon_offset,
         };
 
         // The `ComputeColors` tail modulates the stage colours by fog density
@@ -2753,6 +2763,7 @@ impl Pipeline3d {
             blend: blend_state_from_gls(state_bits),
             depth_equal: (state_bits & GLS_DEPTHFUNC_EQUAL as u32) != 0,
             depth_write: (state_bits & GLS_DEPTHMASK_TRUE as u32) != 0,
+            depth_bias: shader.polygon_offset,
         };
 
         // The fog-density colour modulation runs on the per-frame block when the
@@ -2829,13 +2840,19 @@ impl Pipeline3d {
     /// with `GLS_DEPTHFUNC_EQUAL` when the shader's `fogPass` is `FP_EQUAL`.
     /// Depth writes stay off, the same as the oracle's fog `GL_State`.
     ///
-    /// Source: `oracle/codemp/renderer/tr_shade.cpp:1182-1209`
+    /// `depth_bias` carries the shader's `polygonOffset`.
+    /// The oracle keeps `GL_POLYGON_OFFSET_FILL` enabled from the head of `RB_StageIteratorGeneric` until after the fog pass.
+    /// A decal's fog pass therefore biases with its stages.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:1182-1209`,
+    /// `oracle/codemp/renderer/tr_shade.cpp:2264-2267,2361` (the enable window)
     #[allow(clippy::too_many_arguments)]
     fn build_fog_stage_item(
         &mut self,
         cpu: &[WorldVertex],
         surface_fog: SurfaceFog,
         fog_pass: FogPass,
+        depth_bias: bool,
         fog_image: Option<ImageHandle>,
         first_index: u32,
         index_count: u32,
@@ -2874,6 +2891,7 @@ impl Pipeline3d {
             blend: blend_state_from_gls(state_bits),
             depth_equal: fog_pass == FogPass::Equal,
             depth_write: false,
+            depth_bias,
         };
 
         Some(StageDrawItem {
@@ -2975,7 +2993,22 @@ impl Pipeline3d {
                     depth_write_enabled: Some(key.depth_write),
                     depth_compare: Some(depth_compare),
                     stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
+                    // Raven: qglPolygonOffset(r_offsetFactor->value, r_offsetUnits->value), factor -1, units -2.
+                    // `slope_scale` is GL's factor and `constant` is GL's units.
+                    // The two values bake into the pipeline from the retail defaults,
+                    // because both cvars are CVAR_CHEAT and a changed cheat value does not re-key the cache.
+                    // wgpu's constant bias on Depth32Float steps by the float exponent, where GL steps by the format's minimum resolvable difference.
+                    // The sign and the slope match, the magnitudes differ, and the image golden pins the outcome.
+                    // Source: oracle/codemp/renderer/tr_shade.cpp:2264-2267, oracle/codemp/renderer/tr_init.cpp:1135-1136
+                    bias: if key.depth_bias {
+                        wgpu::DepthBiasState {
+                            constant: -2,
+                            slope_scale: -1.0,
+                            clamp: 0.0,
+                        }
+                    } else {
+                        wgpu::DepthBiasState::default()
+                    },
                 }),
                 multisample: wgpu::MultisampleState::default(),
                 fragment: Some(wgpu::FragmentState {

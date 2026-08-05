@@ -395,6 +395,7 @@ fn shader_asset(name: &str, stages: Vec<ShaderStage>) -> ShaderAsset {
         sort: 0.0,
         sorted_index: 0,
         cull_type: CullType::FrontSided,
+        polygon_offset: false,
         surface_flags: 0,
         content_flags: 0,
         multitexture_env: 0,
