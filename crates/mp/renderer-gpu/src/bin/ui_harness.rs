@@ -245,8 +245,6 @@ impl App {
                     &frame_data,
                     &self.host.re.sim.published,
                     &self.host.re.world_load,
-                    // Menu frames draw 2D only, so there is no entity walk to host.
-                    None,
                     self.host.re.img_state.pending_uploads.drain().collect(),
                     images,
                     &self.host.re.noise,

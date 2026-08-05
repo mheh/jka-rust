@@ -31,9 +31,9 @@
 use core::f64::consts::PI;
 use std::collections::HashMap;
 use std::mem::size_of;
+use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
@@ -51,6 +51,7 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
+use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::model_blocks::ModelBlocks;
 use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
@@ -1126,7 +1127,7 @@ impl Pipeline3d {
         view: &viewParms_t,
         entities: &[trRefEntity_t],
         scratch: &mut TrMainScratch,
-        g2: &mut Ghoul2System,
+        payloads: &[Option<Arc<Ghoul2RenderPayload>>],
         frame: &mut FrameState,
         sky: &mut SkyState,
         fogs: &[fog_t],
@@ -1162,7 +1163,7 @@ impl Pipeline3d {
             &mut stats,
             &slot_map,
             entities,
-            g2,
+            payloads,
             frame,
             sky,
             view,
@@ -1421,7 +1422,7 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        g2: &mut Ghoul2System,
+        payloads: &[Option<Arc<Ghoul2RenderPayload>>],
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
@@ -1497,7 +1498,7 @@ impl Pipeline3d {
                         stats,
                         slot_map,
                         entities,
-                        g2,
+                        payloads,
                         frame,
                         sky,
                         view,
@@ -2161,7 +2162,7 @@ impl Pipeline3d {
         stats: &mut WorldStats,
         slot_map: &HashMap<i32, u32>,
         entities: &[trRefEntity_t],
-        g2: &mut Ghoul2System,
+        payloads: &[Option<Arc<Ghoul2RenderPayload>>],
         frame: &mut FrameState,
         sky: &mut SkyState,
         view: &viewParms_t,
@@ -2191,7 +2192,7 @@ impl Pipeline3d {
         // Deform the surface by the lerped bones, decode the bone-0 normals, and
         // read the triangle indices.
         let Some((g2_vertices, g2_index_block, g2_normals)) =
-            decode_ghoul2_surface(&assets.models, g2, g2_ref, rgba)
+            decode_ghoul2_surface(&assets.models, payloads, entity_num, g2_ref, rgba)
         else {
             stats.ghoul2_decode_failed += 1;
             return;
@@ -4088,20 +4089,23 @@ fn decode_md3_surface(
 
 /// Deforms one Ghoul2 (`MOD_MDXM`) surface into GPU vertices and triangle
 /// indices. Each vertex sums its weighted bones (`RB_SurfaceGhoul`, the non-gore
-/// main arm): the bone matrix per weight comes from the surface's bone-cache
-/// `EvalRender`. The decoded per-vertex normal rides a parallel `[f32; 4]`
+/// main arm): the bone matrix per weight comes off the entity's
+/// `Ghoul2RenderPayload`, which the sim-side builder composed with `EvalRender`
+/// (DEC-65 ruling 2). The decoded per-vertex normal rides a parallel `[f32; 4]`
 /// slice, so the CPU lighting evaluators can read it without changing
 /// [`WorldVertex`]. The texcoords come from the parallel texcoord array, and
 /// the vertex colour is the entity's `shaderRGBA`.
 ///
-/// Returns `None` when the model has no mdxm block or the bone-cache handle is
-/// stale, so the caller skips the surface.
+/// Returns `None` when the model has no mdxm block, when the entity carries no
+/// payload, or when the payload holds no model at this ordinal, so the caller
+/// counts a decode failure and skips the surface.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:4060-4451` (the non-gore main
 /// arm)
 fn decode_ghoul2_surface(
     models: &ModelBlocks,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
+    entity_num: i32,
     g2_ref: G2SurfaceRef,
     rgba: [u8; 4],
 ) -> Option<(Vec<WorldVertex>, Vec<u32>, Vec<[f32; 4]>)> {
@@ -4123,9 +4127,10 @@ fn decode_ghoul2_surface(
         indices.push(t[2] as u32);
     }
 
-    // A stale or absent bone-cache handle means the skeleton never built, so the
+    // A missing payload or an out-of-range ordinal means the skeleton never crossed, so the
     // surface is not renderable (Raven's null `boneCache`).
-    let cache = g2.bone_caches.get_mut(g2_ref.bone_cache)?;
+    let payload = payloads.get(entity_num as usize)?.as_ref()?;
+    let bones = &payload.models.get(g2_ref.model_ordinal as usize)?.bones;
 
     // This loop is Raven's shipped weight arm (`:4313-4374`): it special-cases
     // 1 and 2 weights (`fBoneWeight * (t1 - t2) + t2` for two weights) and
@@ -4140,7 +4145,7 @@ fn decode_ghoul2_surface(
         let vert_coords = vert.vert_coords();
 
         // `bone` is bone 0, the normal bone and the first position bone.
-        let bone = cache.eval_render(surface.bone_ref(vert.bone_index(0)));
+        let bone = bones[surface.bone_ref(vert.bone_index(0)) as usize];
 
         // The normal transforms by bone 0 only, a genuine Raven asymmetry: the
         // position blends every weight, the normal does not.
@@ -4171,7 +4176,7 @@ fn decode_ghoul2_surface(
             let mut bone_weight = vert.bone_weight_not_slow(0);
             if num_weights == 2 {
                 // Two bones: interpolate each component between bone 0 and bone 1.
-                let bone2 = cache.eval_render(surface.bone_ref(vert.bone_index(1)));
+                let bone2 = bones[surface.bone_ref(vert.bone_index(1)) as usize];
                 for row in 0..3 {
                     let t1 = affine(&bone, row);
                     let t2 = affine(&bone2, row);
@@ -4186,7 +4191,7 @@ fn decode_ghoul2_surface(
                 let mut total_weight = bone_weight;
                 let mut k = 1;
                 while k < num_weights - 1 {
-                    let bone = cache.eval_render(surface.bone_ref(vert.bone_index(k)));
+                    let bone = bones[surface.bone_ref(vert.bone_index(k)) as usize];
                     bone_weight = vert.bone_weight_not_slow(k);
                     total_weight += bone_weight;
                     for row in 0..3 {
@@ -4194,7 +4199,7 @@ fn decode_ghoul2_surface(
                     }
                     k += 1;
                 }
-                let bone = cache.eval_render(surface.bone_ref(vert.bone_index(k)));
+                let bone = bones[surface.bone_ref(vert.bone_index(k)) as usize];
                 bone_weight = 1.0 - total_weight;
                 for row in 0..3 {
                     p[row] += bone_weight * affine(&bone, row);

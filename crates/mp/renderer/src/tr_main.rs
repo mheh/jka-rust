@@ -23,8 +23,11 @@
 // `view`/`ori`/`refdef` fields land with real shapes, call sites here take
 // `&frame.view`/`&frame.ori` slices instead of the tier-2 types directly.
 
+use std::sync::Arc;
+
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
@@ -55,12 +58,9 @@ use crate::tr_world::{R_AddBrushModelSurfaces, R_AddWorldSurfaces};
 
 use core::f64::consts::PI;
 
-use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
-use mp_engine_ghoul2::ghoul2_system::{BoneCacheId, Ghoul2System};
-use mp_engine_ghoul2::shared::cghoul2_info_v::CGhoul2Info_v;
 use mp_engine_ghoul2::token::{ghoul2_token_decode, ghoul2_token_encode};
 use mp_engine_qcommon::cm_terrain::CmLandScape;
-use mp_engine_qcommon::common::{com_error, EngineHostView};
+use mp_engine_qcommon::common::com_error;
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
@@ -206,9 +206,9 @@ pub enum SurfaceGeometry<'a> {
 /// Raven hands the render list a raw-pointer `CRenderableSurface` carrying a
 /// `mdxmSurface_t *` and a `CBoneCache *`. Under the owned model this ref
 /// carries the instance's model handle, the resolved LOD, the surface ordinal,
-/// and the bone-cache arena id, so the backend re-locates the surface and
-/// reads the cache from `Ghoul2System.bone_caches` instead of holding raw
-/// pointers.
+/// and the ordinal of the model inside the entity's `Ghoul2RenderPayload`, so the
+/// backend re-locates the surface and reads the composed matrices off that
+/// crossing instead of holding raw pointers.
 ///
 /// The gore fields (`scale`/`fade`/`impactTime`/`alternateTex`/`goreChain`)
 /// stay out of this wave — gore rendering is a later wave.
@@ -224,8 +224,9 @@ pub struct G2SurfaceRef {
     pub lod: i32,
     /// The surface ordinal inside the model (`RS.surfaceNum`).
     pub surface_index: i32,
-    /// The bone-cache arena id (`RS.boneCache`), the deform's bone matrices.
-    pub bone_cache: BoneCacheId,
+    /// The model's ordinal in `Ghoul2RenderPayload::models` (`RS.boneCache`), whose bone table the deform reads.
+    /// The entity number needs no field here, because `R_DecomposeSort` already yields it at the decode site.
+    pub model_ordinal: u32,
 }
 
 /// The `drawSurf_t::surface` payload for an **MD3** entity surface: a `Copy`
@@ -1798,9 +1799,8 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
 /// `preTransEntMatrix` (`TrMainScratch`, threaded through to
 /// `R_RotateForEntity`); `models` is the live `RenderModels` registry
 /// (`R_GetModelByHandle` -> `models.get_model`/`models.num_models`);
-/// `engine_view` is the host bundle `R_AddBrushModelSurfaces`'s own already
-/// -ported signature demands (`view` there — renamed here to avoid colliding
-/// with this fn's own `view: &viewParms_t`); `fogs` is `tr.world->fogs`
+/// `payloads` is the per-entity Ghoul2 crossing of DEC-65 ruling 2, parallel to
+/// `entities` under the same scene-window rule; `fogs` is `tr.world->fogs`
 /// (`R_SpriteFogNum`'s own established parameter); `refdef_rdflags` is
 /// `tr.refdef.rdflags` (`R_SpriteFogNum`'s `rdflags` +
 /// `R_AddBrushModelSurfaces`'s `refdef_rdflags`); `dlights`/`draw_surfs` are
@@ -1810,12 +1810,10 @@ pub fn tr_ref_entity_from_ref_entity(re: &RefEntity) -> trRefEntity_t {
 /// `R_AddPolygonSurfaces` twin).
 ///
 /// `r_drawentities`/`r_nocull`/`r_shadows` (`RendererCvars`, DEC-37 A13.1)
-/// are read through the live cvar table (`engine_view.common.cvar`) at the
-/// point they are needed rather than threaded as pre-resolved integers —
-/// this fn already carries `engine_view`/`cvars` for the shader/model
-/// -lookup calls below, so there is no leaf-function reason to split the
-/// cvar reads out as separate parameters the way `R_CullLocalBox`'s
-/// `r_nocull_integer` does.
+/// arrive on the `cvars` snapshot this fn already carries for the shader and
+/// model lookups below.
+/// There is therefore no leaf-function reason to split the cvar reads out as
+/// separate parameters the way `R_CullLocalBox`'s `r_nocull_integer` does.
 ///
 /// `entitySurface` (file-scope `static surfaceType_t entitySurface =
 /// SF_ENTITY;`, a kind-1 const per the fn-scope-statics three-kind rule,
@@ -1852,14 +1850,13 @@ pub fn R_AddEntitySurfaces<'a>(
     entities: &mut [trRefEntity_t],
     view: &viewParms_t,
     scratch: &mut TrMainScratch,
-    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
     refdef_rdflags: i32,
     fogs: &[fog_t],
     dlights: &mut [dlight_t],
@@ -1868,8 +1865,6 @@ pub fn R_AddEntitySurfaces<'a>(
     if cvars.drawentities == 0 {
         return;
     }
-
-    let mut entity_host = entity_host;
 
     let rdf_nofog = refdef_rdflags & RDF_NOFOG != 0;
 
@@ -1999,15 +1994,9 @@ pub fn R_AddEntitySurfaces<'a>(
                     continue;
                 }
 
-                //TODO: Port R_AddEntitySurfaces Ghoul2 arms render-side
+                // Both entity arms read the published blocks and run on either thread.
+                // DEC-65 ruling 2 moved the Ghoul2 skeleton transform to scene-add, so the legs below read `payloads[n]` and reach no host.
                 // Source: oracle/codemp/renderer/tr_main.cpp:1444-1470
-                // The MD3 arm now reads the published blocks and runs on either thread.
-                // The Ghoul2 legs still reach `EngineHost::model_mdxm`/`model_mdxa` and the sim-confined bone caches.
-                // They therefore keep the host gate below, and a render-side caller draws no player.
-                // DEC-65 ruling 2 moves the skeleton transform to scene-add and crosses per-entity bone matrices in the frame package.
-                //
-                // The host arrives as `Option<&mut EngineHostView>`.
-                // The wrapper struct that carried it beside the model registry dissolved here, because the registry half is now `assets.models`.
                 let model_type = match assets.models.get(ent.e.hModel) {
                     Some(entry) => entry.model_type,
                     // A handle with no published entry is dead, which is the row `BModelTable::get` used to hand a bad handle.
@@ -2039,25 +2028,18 @@ pub fn R_AddEntitySurfaces<'a>(
 
                     // g2r
                     modtype_t::MOD_MDXM => {
-                        let Some(engine_view) = entity_host.as_deref_mut() else {
-                            if !walk_scratch.warnings.entity_models {
-                                walk_scratch.warnings.entity_models = true;
-                                eprintln!(
-                                    "mp_renderer: R_AddEntitySurfaces draws no Ghoul2 entity render-side yet",
-                                );
-                            }
-                            continue;
-                        };
                         // `r_add_ghoul_surfaces` lights the `&mut RefEntity` it
                         // takes, matching the MD3 sibling. The lit fields fold
                         // back onto `entities[n]` so the backend reads them by
                         // entity index.
                         let mut re = ref_entity_from_tr(ent);
-                        if let Some(handle) = re.ghoul2 {
+                        if let Some(payload) = payloads
+                            .get(current_entity_num)
+                            .and_then(|p| p.as_ref())
+                        {
                             r_add_ghoul_surfaces(
                                 &mut re,
-                                handle,
-                                engine_view,
+                                payload,
                                 assets,
                                 view,
                                 &ori,
@@ -2065,7 +2047,6 @@ pub fn R_AddEntitySurfaces<'a>(
                                 &mut walk_scratch.warnings,
                                 world_load,
                                 frame,
-                                g2,
                                 fogs,
                                 refdef_rdflags,
                                 shifted_entity_num,
@@ -2086,26 +2067,16 @@ pub fn R_AddEntitySurfaces<'a>(
                             continue;
                         }
 
-                        // The oracle's `ent->e.ghoul2 &&
-                        // G2API_HaveWeGhoul2Models(...)` pair: the handle is
-                        // the decoded token, and the instance list is rebuilt
-                        // around it the same way `r_add_ghoul_surfaces` does.
-                        if let Some(handle) = re.ghoul2 {
-                            let ghoul2 = CGhoul2Info_v { mItem: handle.0 };
-                            if g2api_have_we_ghoul2_models(g2, &ghoul2) {
-                                let Some(engine_view) = entity_host.as_deref_mut() else {
-                                    if !walk_scratch.warnings.entity_models {
-                                        walk_scratch.warnings.entity_models = true;
-                                        eprintln!(
-                                            "mp_renderer: R_AddEntitySurfaces draws no Ghoul2 entity render-side yet",
-                                        );
-                                    }
-                                    continue;
-                                };
+                        // The oracle's `ent->e.ghoul2 && G2API_HaveWeGhoul2Models(...)` pair.
+                        // The builder took that answer at scene-add, so an instance whose models all decline to render still skips the null axis.
+                        if let Some(payload) = payloads
+                            .get(current_entity_num)
+                            .and_then(|p| p.as_ref())
+                        {
+                            if payload.have_models {
                                 r_add_ghoul_surfaces(
                                     &mut re,
-                                    handle,
-                                    engine_view,
+                                    payload,
                                     assets,
                                     view,
                                     &ori,
@@ -2113,7 +2084,6 @@ pub fn R_AddEntitySurfaces<'a>(
                                     &mut walk_scratch.warnings,
                                     world_load,
                                     frame,
-                                    g2,
                                     fogs,
                                     refdef_rdflags,
                                     shifted_entity_num,
@@ -2216,25 +2186,19 @@ pub fn R_AddEntitySurfaces<'a>(
 /// `R_AddTerrainSurfaces`'s own PORT-NOTE already documents (ambient state
 /// set by this fn's caller, `R_RenderView`, not yet in this wave's packet —
 /// threaded in rather than guessed at a fixed value, porting-rules §A2).
-/// `engine_view`/`assets`/`cvars`/`models`/`entities`/`scratch`/`view`/
-/// `draw_surfs` are `R_AddEntitySurfaces`/`R_AddTerrainSurfaces`/
-/// `R_SetupProjection`'s own already-ported parameters, threaded straight
-/// through; `common` for the calls that don't take the full `engine_view`
-/// bundle is `engine_view.common`, reborrowed per call (this file's
-/// established `engine_view.common` pattern, e.g. `R_AddEntitySurfaces`'s
-/// `MOD_MESH`/`RT_ENT_CHAIN` arms above) rather than threaded as a second
-/// top-level parameter.
+/// `payloads`/`assets`/`cvars`/`entities`/`scratch`/`view`/`draw_surfs` are
+/// `R_AddEntitySurfaces`/`R_AddTerrainSurfaces`/`R_SetupProjection`'s own
+/// already-ported parameters, threaded straight through.
 ///
 /// Source: `oracle/codemp/renderer/tr_main.cpp:1516-1531`
 pub fn R_GenerateDrawSurfs<'a>(
-    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2306,14 +2270,13 @@ pub fn R_GenerateDrawSurfs<'a>(
         entities,
         view,
         scratch,
-        entity_host,
         assets,
         bmodels,
         cvars,
         world_load,
         frame,
         walk_scratch,
-        g2,
+        payloads,
         refdef_rdflags,
         fogs,
         dlights,
@@ -2416,14 +2379,13 @@ pub fn R_MirrorViewBySurface<'a>(
     entity_num: i32,
     frame_scene_num: i32,
     refdef_time: i32,
-    entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2515,14 +2477,13 @@ pub fn R_MirrorViewBySurface<'a>(
         frame_scene_num,
         refdef_time,
         view,
-        entity_host,
         assets,
         bmodels,
         cvars,
         world_load,
         frame,
         walk_scratch,
-        g2,
+        payloads,
         frame_data,
         refdef,
         refdef_rdflags,
@@ -2590,14 +2551,13 @@ pub fn R_SortDrawSurfs<'a>(
     first_draw_surf: usize,
     frame_scene_num: i32,
     refdef_time: i32,
-    mut entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
     frame_data: &'a FrameData,
     view: &mut viewParms_t,
     refdef: &trRefdef_t,
@@ -2664,14 +2624,13 @@ pub fn R_SortDrawSurfs<'a>(
             entity_num,
             frame_scene_num,
             refdef_time,
-            entity_host.as_deref_mut(),
             assets,
             bmodels,
             cvars,
             world_load,
             frame,
             walk_scratch,
-            g2,
+            payloads,
             frame_data,
             view,
             refdef,
@@ -2726,14 +2685,13 @@ pub fn R_RenderView<'a>(
     frame_scene_num: i32,
     refdef_time: i32,
     view: &mut viewParms_t,
-    mut entity_host: Option<&mut EngineHostView<'_>>,
     assets: &RenderAssets,
     bmodels: &BModelTable,
     cvars: RenderCvarSnapshot,
     world_load: &WorldLoadState,
     frame: &mut FrameState,
     walk_scratch: &mut WorldWalkScratch,
-    g2: &mut Ghoul2System,
+    payloads: &[Option<Arc<Ghoul2RenderPayload>>],
     frame_data: &'a FrameData,
     refdef: &trRefdef_t,
     refdef_rdflags: i32,
@@ -2790,14 +2748,13 @@ pub fn R_RenderView<'a>(
     frame.view.vis_bounds = view.visBounds;
 
     R_GenerateDrawSurfs(
-        entity_host.as_deref_mut(),
         assets,
         bmodels,
         cvars,
         world_load,
         frame,
         walk_scratch,
-        g2,
+        payloads,
         frame_data,
         view,
         refdef,
@@ -2821,14 +2778,13 @@ pub fn R_RenderView<'a>(
         first_draw_surf,
         frame_scene_num,
         refdef_time,
-        entity_host,
         assets,
         bmodels,
         cvars,
         world_load,
         frame,
         walk_scratch,
-        g2,
+        payloads,
         frame_data,
         view,
         refdef,

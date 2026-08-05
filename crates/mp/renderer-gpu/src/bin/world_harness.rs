@@ -44,7 +44,6 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -63,6 +62,7 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
+use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_engine_ghoul2::token::ghoul2_token_encode;
 use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
@@ -828,12 +828,28 @@ impl App {
         ent.shaderRGBA = [255, 255, 255, 255];
         AnglesToAxis([0.0, yaw, 0.0], ent.axis.as_mut_ptr());
 
+        // The DEC-65 ruling 2 crossing is built here, and the build ends before the add takes any renderer borrow.
+        // The setup inside it can re-register a model through the `re` hooks, so no `re` borrow may be live across it.
+        let no_server_ghoul2 = self.cvars.no_server_ghoul2;
+        let payload = {
+            let App { host, g2, .. } = self;
+            let re_ptr: *mut RendererFrontend = &mut host.re;
+            let UiHost {
+                engine, models, ..
+            } = &mut *host;
+            let models_ptr: *mut RenderModels = &mut *models;
+            let Engine { common, cm, sv, .. } = &mut **engine;
+            let sv_ptr: *mut () = sv as *mut Server as *mut ();
+            let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+            build_ghoul2_render_payload(g2, &mut view, &ent, no_server_ghoul2)
+        };
+
         RE_AddRefEntityToScene(
             frame_data,
             &self.host.re.sim.published,
             &mut self.host.re.scene,
             &ent,
-            None,
+            payload,
         );
     }
 
@@ -920,16 +936,12 @@ impl App {
                     if let Some(blocks) = host.models.publish_blocks() {
                         host.re.sim.publish_models(blocks);
                     }
-                    // The frame pins the published registry, because `G2_SetupModelPointers` re-registers on every entity walk.
+                    // The frame pins the published registry, because `G2_SetupModelPointers` re-registers at scene-add, ahead of the drain above.
                     // The client `RE_RegisterModel` hook then calls `Arc::make_mut(&mut re.sim.published)` through the seated `re` slot.
                     // The clone holds a second reference, so that call copies on write instead of mutating the allocation this frame reads.
                     let pinned = Arc::clone(&host.re.sim.published);
-                    // Split the host and engine into disjoint borrows, the same
-                    // shape `load_world_and_render` builds.
-                    let re_ptr: *mut RendererFrontend = &mut host.re;
+                    // Split the host into disjoint borrows, the same shape `load_world_and_render` builds.
                     let UiHost {
-                        engine,
-                        models,
                         re:
                             RendererFrontend {
                                 world_load,
@@ -939,21 +951,13 @@ impl App {
                             },
                         ..
                     } = host;
-                    let models_ptr: *mut RenderModels = &mut *models;
-                    let Engine { common, cm, sv, .. } = &mut **engine;
-                    let sv_ptr: *mut () = sv as *mut Server as *mut ();
-                    let mut engine_view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
 
-                    // The persisted Ghoul2 state threads into the frame, so the
-                    // bone caches the render path builds survive across frames
-                    // (design point 2).
                     executor.execute_frame(
                         gpu,
                         &target,
                         frame_data,
                         &pinned,
                         world_load,
-                        Some(&mut engine_view),
                         img_state.pending_uploads.drain().collect(),
                         images,
                         noise,
@@ -1004,10 +1008,6 @@ impl ApplicationHandler for App {
         let gpu = Gpu::new(window.clone());
         let images = GpuImages::new(&gpu);
         let mut executor = FrameExecutor::new(&gpu, &images);
-
-        // The executor owns the Ghoul2 instances since W2-F5, so the set this
-        // harness built before the GPU came up moves in here.
-        executor.set_ghoul2(mem::take(&mut self.g2));
 
         // Upload the loaded world's geometry once, before the first frame. The
         // brush-submodel rows the same map load registered go with it (W2-F8).

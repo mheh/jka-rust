@@ -16,7 +16,6 @@ use std::sync::Arc;
 
 use mp_engine_botlib::l_precomp_fns::PC_SetBaseFolder;
 use mp_engine_core::Engine;
-use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cm_terrain::CmLandScape;
 use mp_engine_qcommon::cmd_common::{Cbuf_Init, Cmd_Init};
 use mp_engine_qcommon::collision_world::CollisionWorld;
@@ -38,6 +37,7 @@ use mp_qshared::shared::cvar::CVAR_INIT;
 use mp_qshared::shared::qfalse;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -756,16 +756,14 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         R_TerrainInit(&mut engine_view, cvars, assets, &mut land_scape);
         let distance_cull = assets.distance_cull;
 
-        // The ui background render has no live Ghoul2 state, so it threads an
-        // empty owned system (design point 2).
-        let mut g2_system = Ghoul2System::default();
+        // The spike adds no entity, so it walks with an empty crossing slice (DEC-65 ruling 2).
+        let payloads: Vec<Option<Arc<Ghoul2RenderPayload>>> = Vec::new();
         // The spike walks the world once, so its marks live and die with this
         // call (W2-F4).
         let mut walk_scratch = WorldWalkScratch::default();
         if let Some(world) = assets.world.as_ref() {
             walk_scratch.set_world(world);
         }
-        // The spike runs on the sim thread, so it hands the entity walk the engine host (W2-F1).
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
         // The spike walks once, so its brush-submodel rows live and die with
         // this call (W2-F8).
@@ -776,14 +774,13 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
             frame_scene_num,
             0,
             &mut view,
-            Some(&mut engine_view),
             assets,
             &bmodel_table,
             cvar_snapshot,
             world_load,
             frame,
             &mut walk_scratch,
-            &mut g2_system,
+            &payloads,
             &frame_data,
             &refdef,
             0,
