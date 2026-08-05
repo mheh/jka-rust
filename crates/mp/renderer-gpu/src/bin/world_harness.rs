@@ -753,6 +753,7 @@ impl App {
             &self.host.re.sim.published,
             &mut self.host.re.scene,
             &ent,
+            None,
         );
     }
 
@@ -789,6 +790,7 @@ impl App {
             &self.host.re.sim.published,
             &mut self.host.re.scene,
             &ent,
+            None,
         );
     }
 
@@ -831,6 +833,7 @@ impl App {
             &self.host.re.sim.published,
             &mut self.host.re.scene,
             &ent,
+            None,
         );
     }
 

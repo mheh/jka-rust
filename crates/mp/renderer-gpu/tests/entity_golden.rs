@@ -260,6 +260,7 @@ fn golden_entity_duel1() {
         &host.re.sim.published,
         &mut host.re.scene,
         &md3_ent,
+        None,
     );
 
     let mut g2_ent = refEntity_t::zeroed();
@@ -282,6 +283,7 @@ fn golden_entity_duel1() {
         &host.re.sim.published,
         &mut host.re.scene,
         &g2_ent,
+        None,
     );
 
     RE_RenderScene(

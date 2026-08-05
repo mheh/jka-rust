@@ -1313,7 +1313,7 @@ pub fn CL_UISystemCalls(
         unsafe {
             let ent = &*(vma(view.common, args, 1) as *const _);
             let re = re_from_view(view);
-            RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, ent)
+            RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, ent, None)
         };
         0
     } else if trap == MpUiImport::UI_R_ADDPOLYTOSCENE as c_int {

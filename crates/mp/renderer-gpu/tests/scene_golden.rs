@@ -94,7 +94,7 @@ struct Scene {
 /// here use.
 fn record_entities(host: &mut UiHost, frame_data: &mut FrameData, entities: &[refEntity_t]) {
     for ent in entities {
-        RE_AddRefEntityToScene(frame_data, &host.re.sim.published, &mut host.re.scene, ent);
+        RE_AddRefEntityToScene(frame_data, &host.re.sim.published, &mut host.re.scene, ent, None);
     }
 }
 

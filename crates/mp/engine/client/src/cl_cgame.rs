@@ -2052,9 +2052,13 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: `VMA(1)` is the module's `refEntity_t` (porting-rules §D11).
-        RE_AddRefEntityToScene(&mut re.frame_data, &re.sim.published, &mut re.scene, unsafe {
-            &*ent
-        });
+        RE_AddRefEntityToScene(
+            &mut re.frame_data,
+            &re.sim.published,
+            &mut re.scene,
+            unsafe { &*ent },
+            None,
+        );
         0
     } else if op == MpCgameImport::CG_R_ADDPOLYTOSCENE as c_int {
         let num_verts = arg(2) as usize;

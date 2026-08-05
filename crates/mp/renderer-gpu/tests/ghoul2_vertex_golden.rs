@@ -420,6 +420,7 @@ fn golden_ghoul2_verts_stormtrooper() {
         &host.re.sim.published,
         &mut host.re.scene,
         &ent,
+        None,
     );
 
     RE_RenderScene(

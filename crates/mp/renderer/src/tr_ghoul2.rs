@@ -12,6 +12,9 @@
 //! function below likewise drops its own `#ifdef G2_PERFORMANCE_ANALYSIS`
 //! timer touches per the same ruling (DEC-37 A13.5) without a per-site note.
 
+use std::sync::Arc;
+
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::com_parse::QSharedScratch;
 use mp_qshared::shared::q_color::S_COLOR_YELLOW;
@@ -32,6 +35,8 @@ use mp_host_interface::EngineHost;
 use mp_engine_ghoul2::bolts::g2_find_bolt_surface_num;
 use mp_engine_ghoul2::bones::{g2_add_bone, g2_find_bone};
 use mp_engine_ghoul2::api_collision::g2api_get_time;
+use mp_engine_ghoul2::api_models::g2api_have_we_ghoul2_models;
+use mp_engine_ghoul2::token::ghoul2_token_decode;
 use mp_engine_ghoul2::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
 use mp_engine_ghoul2::info_array::Ghoul2Handle;
 use mp_engine_ghoul2::misc::{g2_setup_model_pointers, g2_setup_model_pointers_v};
@@ -59,6 +64,8 @@ use crate::mdx_format::mdxm_surf_hierarchy_t::mdxmSurfHierarchy_t;
 use crate::mdx_format::mdxm_surface_t::mdxmSurface_t;
 use crate::mdx_format::mdxm_vertex_t::mdxmVertex_t;
 use crate::render_state::frame_state::FrameState;
+use crate::render_state::ghoul2_model_render::Ghoul2ModelRender;
+use crate::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use crate::render_state::model_blocks::PublishedModel;
 use crate::render_state::placeholders::RefEntity;
 use crate::render_state::render_assets::RenderAssets;
@@ -2234,6 +2241,100 @@ const GHOUL2_NORENDER: i32 = 0x002;
 /// Raven `#define GHOUL2_NOMODEL 0x004` (`ghoul2_shared.h:231`) — this model
 /// slot carries no model.
 const GHOUL2_NOMODEL: i32 = 0x004;
+
+/// Builds the DEC-65 ruling 2 crossing for one scene entity, or `None` when the entity carries no live Ghoul2 instance.
+/// The caller must finish this call before it takes any `re`-slot borrow, because the setup path can re-register a model through the `re` hooks.
+///
+/// This is the sim-side front half of [`r_add_ghoul_surfaces`]: the setup, the transform, and the per-bone evaluation the render side used to run.
+/// A stale replay token returns `None`, which the walk reads as an absent instance, exactly as it read a dead handle before.
+///
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:3383-3538`
+pub fn build_ghoul2_render_payload(
+    g2: &mut Ghoul2System,
+    host: &mut EngineHostView,
+    ent: &refEntity_t,
+    no_server_ghoul2: i32,
+) -> Option<Arc<Ghoul2RenderPayload>> {
+    let handle = ghoul2_token_decode(ent.ghoul2)?;
+    let mut ghoul2 = CGhoul2Info_v { mItem: handle.0 };
+
+    if !ghoul2.is_valid(g2) {
+        return None;
+    }
+
+    // The `MOD_BAD` arm reads this answer in place of the instance list, so it is taken before the setup can move any `mModelindex`.
+    let have_models = g2api_have_we_ghoul2_models(g2, &ghoul2);
+
+    // Raven checks `r_noServerGhoul2` before the transform, and ruling B keeps that order here.
+    // A suppressed instance crosses with no models, so both dispatch arms draw what they drew before.
+    if no_server_ghoul2 != 0 {
+        return Some(Arc::new(Ghoul2RenderPayload {
+            have_models,
+            models: Vec::new(),
+        }));
+    }
+
+    if !g2_setup_model_pointers_v(g2, host, &ghoul2) {
+        return Some(Arc::new(Ghoul2RenderPayload {
+            have_models,
+            models: Vec::new(),
+        }));
+    }
+
+    // `G2API_GetTime` never reads its argument, so the builder needs no refdef clock.
+    // Source: oracle/codemp/ghoul2/G2_API.cpp:179-188
+    let current_time = g2api_get_time(g2, 0);
+
+    // Raven culls the entity and transforms only what survives (`R_GCullModel`, `:3383-3538`), and the view does not exist at scene-add.
+    // Ruling A accepts the consequence: every added instance transforms, so the smoothing history advances for entities the render cull would have left stale.
+    let model_list =
+        g2_construct_render_skeleton(g2, host, &mut ghoul2, current_time, ent.modelScale);
+
+    let mut models: Vec<Ghoul2ModelRender> = Vec::with_capacity(model_list.len());
+    for &i in &model_list {
+        let item = ghoul2.mItem;
+        let inst = &g2.info_array.get(item)[i as usize];
+
+        if !inst.valid || (inst.flags & GHOUL2_NOMODEL) != 0 || (inst.flags & GHOUL2_NORENDER) != 0
+        {
+            continue;
+        }
+
+        let model = inst.model;
+        let custom_skin = inst.custom_skin;
+        let skin = inst.skin;
+        let lod_bias = inst.lod_bias;
+        let surface_root = inst.surface_root;
+        let slist = inst.slist.clone();
+        let bltlist = inst.bltlist.clone();
+        let bone_cache = inst.bone_cache;
+
+        // Raven evaluates a bone at backend draw time, and only the bones a drawn surface references.
+        // This eager pass marks every bone rendered, which only `CBoneCache::WasRendered` observes, and its one consumer is the deferred gore chain.
+        let bones: Vec<mdxaBone_t> = match bone_cache.and_then(|id| g2.bone_caches.get_mut(id)) {
+            Some(cache) => (0..cache.final_bones.len())
+                .map(|bone| cache.eval_render(bone as i32))
+                .collect(),
+            None => Vec::new(),
+        };
+
+        models.push(Ghoul2ModelRender {
+            model,
+            custom_skin,
+            skin,
+            lod_bias,
+            surface_root,
+            slist,
+            bltlist,
+            bones,
+        });
+    }
+
+    Some(Arc::new(Ghoul2RenderPayload {
+        have_models,
+        models,
+    }))
+}
 
 /// Raven `void R_AddGhoulSurfaces( trRefEntity_t *ent )` — the per-frame
 /// entry point that culls, sorts, transforms and renders every Ghoul2

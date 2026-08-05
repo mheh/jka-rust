@@ -1696,6 +1696,8 @@ pub(crate) fn ref_entity_from_tr(ent: &trRefEntity_t) -> RefEntity {
         angles: ent.e.angles,
         model_scale: ent.e.modelScale,
         ghoul2: ghoul2_token_decode(ent.e.ghoul2),
+        // The ABI entity carries no crossing, and the walk reads the payload off its own parallel slice.
+        ghoul2_render: None,
         need_dlights: ent.needDlights != 0,
         lighting_calculated: ent.lightingCalculated != 0,
         light_dir: ent.lightDir,
