@@ -85,8 +85,8 @@ struct Scene {
     /// exercises the same seam a module frame does.
     record: fn(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t),
     /// How many dynamic lights the scene expects to reach `tr.refdef.dlights`.
-    /// The lights are not visible yet (`ProjectDlightTexture` is a later wave),
-    /// so this counter is what holds the replay chain in place.
+    /// A no-world scene has no dlight-receiving surface, so this counter is what
+    /// holds the replay chain in place.
     expect_dlights: u32,
 }
 
@@ -654,10 +654,10 @@ fn scene_polys(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t)
 /// Census row `dlight/calls` (112,514 submissions): three dynamic lights beside
 /// the sprite trio, one of them additive.
 ///
-/// The lights change no pixel yet, so this scene's golden is the sprite image
-/// again and the light chain is held by the `expect_dlights` counter. That is
-/// the honest state: the replay reaches `tr.refdef.dlights`, and
-/// `ProjectDlightTexture` is the remaining piece.
+/// The dlight passes are live, and they light world and brush surfaces only.
+/// This scene is `RDF_NOWORLDMODEL`, so no surface here carries a dlight mask
+/// and the golden stays the sprite image. That makes this fixture the leak
+/// guard: a moved pixel means the pass reached an entity surface.
 ///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:326-345`
 fn scene_dlights(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
