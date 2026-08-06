@@ -149,7 +149,7 @@ Everything else is read-only, including `oracle/`, `tr_world.rs`, `tr_light.rs`,
 
 ## Disposition
 
-Both rulings are settled. The packet is ready for the user audit AFTER step-006b lands, because the polygon-offset fix runs first and this packet re-audits on the post-006b master. The lane spawns only on the user's explicit go after that audit. After a clean lane-review: merge to master locally. No push, and no pull request.
+Both rulings are settled, step-006b is merged (`f3b3239f`), and the post-006b audit passed with the go given 2026-08-05. The packet is ready for the lane. After a clean lane-review: merge to master locally. No push, and no pull request.
 
 ## Amendments
 
