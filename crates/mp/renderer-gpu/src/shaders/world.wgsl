@@ -12,6 +12,9 @@
 // One pass draws one shader stage. `SurfaceFlags.mode` picks the path:
 //   mode 0 (single texture): `texture(uv) * color`, the common stage pass.
 //   mode 1 (two texture): `diffuse.rgb * lightmap.rgb`, the GL_MODULATE collapse.
+//   mode 2 (dlight): `diffuse.rgb * dlight.rgb * color.rgb`, the dlight pass.
+// Mode 2 binds the dlight image in the lightmap slot and reads the projected
+// dlight texcoords from `lightmap_st`.
 // In mode 0, `tex_from_lightmap` reads the lightmap st for a lightmap stage;
 // a dynamic stage instead writes its resolved st into the `st` field, so the
 // flag stays 0. The per-vertex `color` carries the stage's rgbGen/alphaGen
@@ -67,6 +70,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         let diffuse = textureSample(t_diffuse, s_diffuse, input.st);
         let lightmap = textureSample(t_lightmap, s_lightmap, input.lightmap_st);
         color = vec4<f32>(diffuse.rgb * lightmap.rgb, diffuse.a);
+    } else if (surface.mode == 2u) {
+        let diffuse = textureSample(t_diffuse, s_diffuse, input.st);
+        let dlight = textureSample(t_lightmap, s_lightmap, input.lightmap_st);
+        color = vec4<f32>(diffuse.rgb * dlight.rgb * input.color.rgb, input.color.a);
     } else {
         var uv = input.st;
         if (surface.tex_from_lightmap != 0u) {

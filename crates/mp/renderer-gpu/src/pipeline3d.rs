@@ -37,6 +37,7 @@ use bytemuck::{Pod, Zeroable};
 use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
+use mp_engine_qcommon::qfiles::shader_limits::SHADER_MAX_VERTEXES;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
@@ -46,9 +47,11 @@ use mp_qshared::common::mp::cgame::tr_types::{
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
-    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    vec3_origin, CrossProduct, VectorNormalize,
+    _DotProduct, _VectorMA as VectorMA, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, VectorCompare,
+    VectorNormalize,
 };
+use mp_qshared::shared::surface_flags::{SURF_NODLIGHT, SURF_SKY};
 use mp_qshared::shared::vec3_t;
 use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
@@ -65,8 +68,10 @@ use mp_renderer::tr_curve::GridMesh;
 use mp_renderer::tr_local::acff_t::acff_t;
 use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
+use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::orientationr_t::orientationr_t;
+use mp_renderer::tr_local::shader_sort_t::shaderSort_t;
 use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
 use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
@@ -84,7 +89,8 @@ use mp_renderer::tr_shade_calc::{
 };
 use mp_renderer::tr_shader::{
     FogPass, GLS_ATEST_GE_80, GLS_ATEST_GE_C0, GLS_ATEST_GT_0, GLS_ATEST_LT_80,
-    GLS_DEPTHFUNC_EQUAL, GLS_DEPTHMASK_TRUE, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA,
+    GLS_DEPTHFUNC_EQUAL, GLS_DEPTHMASK_TRUE, GLS_DSTBLEND_BITS, GLS_DSTBLEND_ONE,
+    GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA, GLS_SRCBLEND_BITS, GLS_SRCBLEND_DST_COLOR, GLS_SRCBLEND_ONE,
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
@@ -104,8 +110,7 @@ use crate::stage2d::{
 /// The GPU vertex the three CPU surface shapes converge on. `FaceVertex`
 /// (`tr_bsp`), `drawVert_t` (`qfiles`), and grid `drawVert_t` verts
 /// (`tr_curve`) all collapse to this row. Lightmap style 0 and color style 0
-/// are kept. The `drawVert_t` normal is dropped for this wave — the world
-/// backend does no per-vertex lighting yet.
+/// are kept.
 ///
 /// `#[repr(C)]` here is a GPU-layout requirement (it must match the
 /// `VertexBufferLayout` below), not an ABI seam.
@@ -120,29 +125,37 @@ pub struct WorldVertex {
     st: [f32; 2],
     lightmap_st: [f32; 2],
     color: [u8; 4],
+    /// The vertex normal, which only the CPU-side style-0 dlight projection reads.
+    /// No WGSL attribute maps it: the stride covers it and the GPU skips it.
+    normal: [f32; 3],
 }
 
 impl WorldVertex {
     /// Converges a `FaceVertex` (`SF_FACE` points row, no normal) into the GPU
     /// vertex, keeping lightmap style 0 and color style 0.
-    pub fn from_face_vertex(v: &FaceVertex) -> WorldVertex {
+    ///
+    /// `plane_normal` is the face's own plane normal, which the oracle floods
+    /// across every vertex of a face surface.
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:1405-1506` (`RB_SurfaceFace`)
+    pub fn from_face_vertex(v: &FaceVertex, plane_normal: [f32; 3]) -> WorldVertex {
         WorldVertex {
             position: v.xyz,
             st: v.st,
             lightmap_st: v.lightmap[0],
             color: v.color[0],
+            normal: plane_normal,
         }
     }
 
     /// Converges a `drawVert_t` (grid and triangle-soup verts) into the GPU
-    /// vertex, keeping lightmap style 0 and color style 0. The normal is
-    /// dropped for this wave.
+    /// vertex, keeping lightmap style 0 and color style 0.
     pub fn from_draw_vert(v: &drawVert_t) -> WorldVertex {
         WorldVertex {
             position: v.xyz,
             st: v.st,
             lightmap_st: v.lightmap[0],
             color: v.color[0],
+            normal: v.normal,
         }
     }
 
@@ -153,12 +166,23 @@ impl WorldVertex {
     }
 }
 
+/// The four attributes the world shaders declare. `WorldVertex::normal` has no
+/// entry here, so the pipeline stride covers it and the GPU steps over it.
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
     0 => Float32x3,
     1 => Float32x2,
     2 => Float32x2,
     3 => Unorm8x4,
 ];
+
+// The vertex row is packed, so the four mapped attributes keep the offsets the
+// pipeline layout declares and `normal` lands in the trailing 12 bytes.
+const _: () = assert!(size_of::<WorldVertex>() == 44);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, position) == 0);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, st) == 12);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, lightmap_st) == 20);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, color) == 28);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, normal) == 32);
 
 /// One surface's slice of the concatenated world buffers, addressable by the
 /// `WorldSurfaceRef` index. `base_vertex` is added to every index by
@@ -310,7 +334,7 @@ pub fn build_world_mesh(world: &WorldAsset) -> (Vec<WorldVertex>, Vec<u32>, Vec<
         match &surface.data {
             SurfaceData::Face(face) => {
                 for point in &face.points {
-                    vertices.push(WorldVertex::from_face_vertex(point));
+                    vertices.push(WorldVertex::from_face_vertex(point, face.plane.normal));
                 }
                 for &index in &face.indices {
                     indices.push(index as u32);
@@ -637,6 +661,8 @@ const MODE_SINGLE: u32 = 0;
 /// draw its lightmap as its own single-texture stage through the
 /// `tex_from_lightmap` flag.
 const MODE_MULTITEXTURE: u32 = 1;
+/// The dlight multitexture pass: bundle 0 times the dlight texture times the per-vertex light color, `ProjectDlightTexture2`'s `dStage` arm.
+const MODE_DLIGHT: u32 = 2;
 
 /// The shader features the world backend cannot render yet, tracked so each one
 /// logs once per process rather than once per surface.
@@ -728,6 +754,11 @@ pub struct WorldStats {
     /// Fog passes drawn — one extra pass per fogged surface whose shader
     /// declares a `fogPass` (`RB_FogPass` at the tail of `RB_StageIteratorGeneric`).
     pub fog_passes_drawn: u32,
+    /// Dlight passes drawn - one per reaching light per world surface that carries a mask.
+    /// This is `backEnd.pc.c_dlightIndexes` reduced to a pass count.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:827,1168`
+    pub dlight_passes: u32,
 }
 
 /// The shader backend the world pass draws one frame with (DEC-37 ruling 5).
@@ -1115,6 +1146,10 @@ impl Pipeline3d {
     /// The pass clears the depth buffer to 1.0 per view but loads the color
     /// target, because `Gpu::begin_frame` already cleared color for the frame.
     /// A later 2D pass or a second scene draws over the world.
+    ///
+    /// `dlights` holds the scene lights the caller already transformed into the
+    /// world frame, and `surf_dlight_bits` holds the world walk's per-surface
+    /// light mask, indexed by the world surface number.
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
@@ -1134,6 +1169,8 @@ impl Pipeline3d {
         sky: &mut SkyState,
         fogs: &[fog_t],
         cvars: RenderCvarSnapshot,
+        dlights: &[dlight_t],
+        surf_dlight_bits: &[i32],
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -1172,6 +1209,8 @@ impl Pipeline3d {
             fogs,
             &oris,
             cvars,
+            dlights,
+            surf_dlight_bits,
         );
 
         if items.is_empty() {
@@ -1402,15 +1441,8 @@ impl Pipeline3d {
     /// and empty entries are counted into `stats`, and a sky-parms entry forks
     /// into the sky-box and cloud chain (`collect_sky_surface`).
     ///
-    //TODO: Port ProjectDlightTexture
-    // Source: oracle/codemp/renderer/tr_shade.cpp:840-1010
-    // `RB_StageIteratorGeneric` appends one additive pass per dynamic light
-    // that the surface's `dlightBits` marks. The scene's dlights reach
-    // `tr.refdef.dlights` and the sort keys carry the dlight map, so the
-    // frontend half is live; the pass itself picks a texcoord axis from
-    // `tess.normal[i]`, and `WorldVertex` carries no normal, so a world surface
-    // has nothing to project along. Landing the pass means widening the vertex
-    // format first.
+    /// `dlights` and `surf_dlight_bits` reach the world arm only, because no
+    /// entity surface ever carries a dlight mask in the oracle.
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
@@ -1431,6 +1463,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        dlights: &[dlight_t],
+        surf_dlight_bits: &[i32],
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
         // The two scene-wide inputs the renderfx colour overrides read: the
@@ -1462,6 +1496,8 @@ impl Pipeline3d {
                         cvars,
                         refdef_time,
                         view_axis,
+                        dlights,
+                        surf_dlight_bits,
                         &mut items,
                     );
                 }
@@ -1608,6 +1644,8 @@ impl Pipeline3d {
                 st: v.st,
                 lightmap_st: [0.0, 0.0],
                 color: v.modulate,
+                // `RB_SurfacePolychain` writes no `tess.normal`, and no dlight pass ever reads a poly.
+                normal: [0.0, 0.0, 0.0],
             })
             .collect();
         let mut index_block: Vec<u32> = Vec::with_capacity((poly_verts.len() - 2) * 3);
@@ -1815,6 +1853,8 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
         refdef_time: i32,
         view_axis: [f32; 3],
+        dlights: &[dlight_t],
+        surf_dlight_bits: &[i32],
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -1824,7 +1864,7 @@ impl Pipeline3d {
             return;
         }
 
-        let (entity_num, shader_handle, fog_num, _dlight_map) =
+        let (entity_num, shader_handle, fog_num, dlight_map) =
             R_DecomposeSort(sort, &assets.sorted_shaders);
         let Some(shader) = assets.shaders.get(shader_handle) else {
             return;
@@ -1897,6 +1937,8 @@ impl Pipeline3d {
         // Source: oracle/codemp/renderer/tr_surface.cpp:1594-1638,1740-1755
         let mut draw_range = range;
         let mut index_dynamic = false;
+        // The reduced block is kept, because the dlight passes must light the same lattice the stages draw.
+        let mut lod_block: Option<Vec<u32>> = None;
         if let (Some(grid), Some(ori)) =
             (world_surface_grid(assets, index), oris.get(slot as usize))
         {
@@ -1908,6 +1950,7 @@ impl Pipeline3d {
                 draw_range.index_count = lod_indices.len() as u32;
                 dynamic_indices.extend_from_slice(&lod_indices);
                 index_dynamic = true;
+                lod_block = Some(lod_indices);
             }
         }
 
@@ -1948,6 +1991,44 @@ impl Pipeline3d {
         // the surface as drawn.
         let stages_end = items.len();
 
+        // The dynamic lights draw after the surface's stages and before its fog, the order `RB_StageIteratorGeneric` runs them in.
+        // `dlight_map` is the sort key's flag, and the mask itself is the world walk's per-surface value.
+        //TODO: Port ProjectDlightTexture2 bmodel-entity pass
+        // Source: oracle/codemp/renderer/tr_backend.cpp:926,948 (`R_TransformDlights` per entity)
+        // A brush-model entity's surfaces do carry masks, but their pass needs the light transformed into the entity's frame,
+        // and this step transforms once with the world orientation.
+        // The gate therefore keeps the pass on the world entity.
+        if dlight_map != 0
+            && entity_num == TR_WORLDENT
+            && shader.sort <= shaderSort_t::SS_OPAQUE as i32 as f32
+            && shader.surface_flags & (SURF_NODLIGHT | SURF_SKY) == 0
+        {
+            let surf_bits = surf_dlight_bits.get(index as usize).copied().unwrap_or(0);
+            if surf_bits != 0 {
+                let static_indexes = &geometry.cpu_indices
+                    [range.first_index as usize..(range.first_index + range.index_count) as usize];
+                let surface_indexes: &[u32] = match &lod_block {
+                    Some(block) => block,
+                    None => static_indexes,
+                };
+                self.collect_dlight_items(
+                    surf_bits,
+                    dlights,
+                    cvars.dlight_style,
+                    shader,
+                    cpu,
+                    surface_indexes,
+                    entity_float_time,
+                    assets,
+                    globals_offset,
+                    dynamic_vertices,
+                    dynamic_indices,
+                    stats,
+                    items,
+                );
+            }
+        }
+
         if let Some(sf) = surface_fog {
             if shader.fog_pass != FogPass::None {
                 let item = self.build_fog_stage_item(
@@ -1975,6 +2056,107 @@ impl Pipeline3d {
             if entity_num != TR_WORLDENT {
                 stats.entity_surfaces_drawn += 1;
             }
+        }
+    }
+
+    /// Builds the additive dlight passes for one world surface:
+    /// the `ProjectDlightTexture2` and `ProjectDlightTexture` transcriptions behind the `r_dlightStyle` dispatch.
+    /// One item per reaching light, appended after the surface's stage items and before its fog item.
+    ///
+    /// The oracle disables `GL_FOG` around the pass so a redraw does not double the fog.
+    /// This backend has no global fog state and draws fog as its own pass, so that window is inert here.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:523-1180,2330-2336`
+    #[allow(clippy::too_many_arguments)]
+    fn collect_dlight_items(
+        &mut self,
+        surf_bits: i32,
+        dlights: &[dlight_t],
+        dlight_style: i32,
+        shader: &ShaderAsset,
+        cpu: &[WorldVertex],
+        indexes: &[u32],
+        entity_float_time: f32,
+        assets: &RenderAssets,
+        globals_offset: u32,
+        dynamic_vertices: &mut Vec<WorldVertex>,
+        dynamic_indices: &mut Vec<u32>,
+        stats: &mut WorldStats,
+        items: &mut Vec<StageDrawItem>,
+    ) {
+        let time = StageTime::new(entity_float_time, shader.time_offset);
+        // The style-1 pass rejects an environment or fog tcGen when it picks the stage, and the style-0 pass does not.
+        let style_two = dlight_style > 0;
+
+        for (l, dl) in dlights.iter().enumerate() {
+            if surf_bits & (1 << l) == 0 {
+                // this surface definately doesn't have any of this light
+                continue;
+            }
+
+            let pass = if style_two {
+                project_dlight_texture2(dl, cpu, indexes)
+            } else {
+                project_dlight_texture(dl, cpu, indexes)
+            };
+            let Some(pass) = pass else {
+                continue;
+            };
+
+            // The multitexture arm modulates an opaque stage's own image by the dlight texture.
+            // Without a qualifying stage the plain arm draws the dlight image alone, blended by the light's `additive` flag.
+            let (mode, diffuse, lightmap, tex_from_lightmap, state_bits) =
+                match dlight_stage_bundle(shader, style_two) {
+                    Some(bundle) => (
+                        MODE_DLIGHT,
+                        stage_image(bundle, time.shader_time),
+                        assets.dlight_image,
+                        false,
+                        (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) as u32,
+                    ),
+                    None => (
+                        MODE_SINGLE,
+                        assets.dlight_image,
+                        None,
+                        true,
+                        if dl.additive != 0 {
+                            (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) as u32
+                        } else {
+                            (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ONE) as u32
+                        },
+                    ),
+                };
+
+            let base_vertex = dynamic_vertices.len() as i32;
+            let first_index = dynamic_indices.len() as u32;
+            let index_count = pass.indexes.len() as u32;
+            dynamic_vertices.extend_from_slice(&pass.verts);
+            dynamic_indices.extend_from_slice(&pass.indexes);
+
+            items.push(StageDrawItem {
+                key: PipelineKey {
+                    blend: blend_state_from_gls(state_bits),
+                    // `GLS_DEPTHFUNC_EQUAL` keeps an alpha-tested surface from adding light where it did not draw.
+                    depth_equal: true,
+                    depth_write: false,
+                    depth_bias: shader.polygon_offset,
+                },
+                diffuse,
+                lightmap,
+                mode,
+                tex_from_lightmap,
+                alpha_func: 0,
+                reads_lightmap: false,
+                first_index,
+                index_count,
+                base_vertex,
+                dynamic: true,
+                index_dynamic: true,
+                globals_offset,
+                depth_far: false,
+                depth_range: DepthRange::Normal,
+            });
+            stats.dlight_passes += 1;
         }
     }
 
@@ -2452,6 +2634,7 @@ impl Pipeline3d {
                     st: *st,
                     lightmap_st: *st,
                     color: [255, 255, 255, 255],
+                    normal: [0.0, 0.0, 0.0],
                 })
                 .collect();
 
@@ -2883,6 +3066,7 @@ impl Pipeline3d {
                 st: data.tex_coords[i],
                 lightmap_st: data.tex_coords[i],
                 color: data.colors[i],
+                normal: v.normal,
             });
         }
 
@@ -3145,6 +3329,416 @@ fn pbr_lit_flag(item: &StageDrawItem) -> bool {
     !item.depth_far && item.key.blend == OPAQUE
 }
 
+/// Raven `maxScale` - the distance-scale cap on the x and y dominant axes.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:919`
+const DLIGHT_MAX_SCALE: f32 = 1.5;
+
+/// Raven `maxGroundScale` - the same cap on the z dominant axis.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:920`
+const DLIGHT_MAX_GROUND_SCALE: f32 = 1.4;
+
+/// Raven `lightScaleTolerance` - a normal component past this makes the surface not perfectly flat, so the pass falls back to the constant distance.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:921`
+const DLIGHT_LIGHT_SCALE_TOLERANCE: f32 = 0.1;
+
+/// One light's surviving geometry, ready for the per-frame buffers.
+/// `st` carries the surface's own base texcoords and `lightmap_st` carries the projected dlight texcoords, so the two draw arms read the same block.
+struct DlightPass {
+    verts: Vec<WorldVertex>,
+    indexes: Vec<u32>,
+}
+
+/// Raven `ProjectDlightTexture2` - the style-1 dlight projection over one surface.
+///
+/// The pass clips every vertex against the light box,
+/// then per triangle derives a face normal from the edge cross product, rejects a backface, a junk triangle, and a triangle past the radius,
+/// and projects texcoords onto an orthonormal basis scaled by the falloff.
+/// Each kept triangle gets three fresh vertices, so the returned block is a triangle soup rather than the surface's own lattice.
+/// The oracle's `r_dlightBacks` half of the backface test is commented out at the site, so the reject always runs.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:523-720`
+fn project_dlight_texture2(
+    dl: &dlight_t,
+    cpu: &[WorldVertex],
+    indexes: &[u32],
+) -> Option<DlightPass> {
+    let origin = dl.transformed;
+    let radius = dl.radius;
+
+    let mut clipall = 63i32;
+    let mut clip_bits: Vec<u8> = Vec::with_capacity(cpu.len());
+    for v in cpu {
+        let mut dist: vec3_t = [0.0; 3];
+        VectorSubtract(origin, v.position, &mut dist);
+
+        let mut clip = 0i32;
+        if dist[0] < -radius {
+            clip |= 1;
+        } else if dist[0] > radius {
+            clip |= 2;
+        }
+        if dist[1] < -radius {
+            clip |= 4;
+        } else if dist[1] > radius {
+            clip |= 8;
+        }
+        if dist[2] < -radius {
+            clip |= 16;
+        } else if dist[2] > radius {
+            clip |= 32;
+        }
+
+        clip_bits.push(clip as u8);
+        clipall &= clip;
+    }
+    if clipall != 0 {
+        // this surface doesn't have any of this light
+        return None;
+    }
+
+    let float_color = [
+        dl.color[0] * 255.0f32,
+        dl.color[1] * 255.0f32,
+        dl.color[2] * 255.0f32,
+    ];
+
+    // build a list of triangles that need light
+    let mut verts: Vec<WorldVertex> = Vec::new();
+    let mut hit_indexes: Vec<u32> = Vec::new();
+    for tri in indexes.chunks_exact(3) {
+        let a = tri[0] as usize;
+        let b = tri[1] as usize;
+        let c = tri[2] as usize;
+        if clip_bits[a] & clip_bits[b] & clip_bits[c] != 0 {
+            continue; // not lighted
+        }
+
+        // copy the vertex positions
+        let posa = cpu[a].position;
+        let posb = cpu[b].position;
+        let posc = cpu[c].position;
+
+        let mut e1: vec3_t = [0.0; 3];
+        let mut e2: vec3_t = [0.0; 3];
+        VectorSubtract(posa, posb, &mut e1);
+        VectorSubtract(posc, posb, &mut e2);
+        let mut normal: vec3_t = [0.0; 3];
+        CrossProduct(e1, e2, &mut normal);
+        if _DotProduct(normal, origin) - _DotProduct(normal, posa) <= 0.0f32
+            || _DotProduct(normal, normal) < 1E-8f32
+        {
+            // a backface or a junk triangle
+            continue;
+        }
+        VectorNormalize(&mut normal);
+        let mut fac = _DotProduct(normal, origin) - _DotProduct(normal, posa);
+        if fac >= radius {
+            continue; // out of range
+        }
+        let modulate = 1.0f32 - ((fac * fac) / (radius * radius));
+        fac = 0.5f32 / (radius * radius - fac * fac).sqrt();
+
+        // now we need e1 and e2 to be an orthonormal basis
+        if _DotProduct(e1, e1) > _DotProduct(e2, e2) {
+            VectorNormalize(&mut e1);
+            CrossProduct(e1, normal, &mut e2);
+        } else {
+            VectorNormalize(&mut e2);
+            CrossProduct(normal, e2, &mut e1);
+        }
+        VectorScale(e1, fac, &mut e1);
+        VectorScale(e2, fac, &mut e2);
+
+        let mut projected: [[f32; 2]; 3] = [[0.0; 2]; 3];
+        for (corner, pos) in [posa, posb, posc].into_iter().enumerate() {
+            let mut dist: vec3_t = [0.0; 3];
+            VectorSubtract(pos, origin, &mut dist);
+            projected[corner][0] = _DotProduct(dist, e1) + 0.5f32;
+            projected[corner][1] = _DotProduct(dist, e2) + 0.5f32;
+        }
+
+        if (projected[0][0] < 0.0f32 && projected[1][0] < 0.0f32 && projected[2][0] < 0.0f32)
+            || (projected[0][0] > 1.0f32 && projected[1][0] > 1.0f32 && projected[2][0] > 1.0f32)
+            || (projected[0][1] < 0.0f32 && projected[1][1] < 0.0f32 && projected[2][1] < 0.0f32)
+            || (projected[0][1] > 1.0f32 && projected[1][1] > 1.0f32 && projected[2][1] > 1.0f32)
+        {
+            continue; // didn't end up hitting this tri
+        }
+
+        let color = [
+            myftol(float_color[0] * modulate) as u8,
+            myftol(float_color[1] * modulate) as u8,
+            myftol(float_color[2] * modulate) as u8,
+            255,
+        ];
+
+        let base = verts.len() as u32;
+        for (corner, vertex) in [a, b, c].into_iter().enumerate() {
+            verts.push(WorldVertex {
+                position: cpu[vertex].position,
+                // The oracle reads `tess.texCoords[..][0]`, the surface's own base texcoords, not the stage-computed ones.
+                st: cpu[vertex].st,
+                lightmap_st: projected[corner],
+                color,
+                normal: [0.0, 0.0, 0.0],
+            });
+        }
+        hit_indexes.extend_from_slice(&[base, base + 1, base + 2]);
+
+        if verts.len() >= SHADER_MAX_VERTEXES - 3 {
+            break; // we are out of space, so we are done :)
+        }
+    }
+
+    if hit_indexes.is_empty() {
+        return None;
+    }
+    Some(DlightPass {
+        verts,
+        indexes: hit_indexes,
+    })
+}
+
+/// Raven `ProjectDlightTexture` - the style-0 dlight projection over one surface.
+///
+/// The pass projects each vertex along the dominant axis of its normal, scales the distance by the clamped `dUse` factor,
+/// and keeps every triangle whose three clip codes do not all overlap.
+/// The block keeps the surface's own lattice, so the returned indices are the surface's own vertex numbers.
+///
+/// The oracle binds `tess.svars.texcoords[0]` on the multitexture arm here, which is the last stage's computed texcoords.
+/// This port binds the surface's base texcoords, the same input the style-1 arm reads.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:840-1068`
+fn project_dlight_texture(
+    dl: &dlight_t,
+    cpu: &[WorldVertex],
+    indexes: &[u32],
+) -> Option<DlightPass> {
+    let origin = dl.transformed;
+    let radius = dl.radius;
+
+    let float_color = [
+        dl.color[0] * 255.0f32,
+        dl.color[1] * 255.0f32,
+        dl.color[2] * 255.0f32,
+    ];
+
+    let mut clip_bits: Vec<u8> = Vec::with_capacity(cpu.len());
+    let mut verts: Vec<WorldVertex> = Vec::with_capacity(cpu.len());
+    for v in cpu {
+        let mut dist: vec3_t = [0.0; 3];
+        VectorSubtract(origin, v.position, &mut dist);
+
+        // The greatest-axis scan. A zero normal has no dominant axis, so it takes the ground axis.
+        let mut l = 1usize;
+        let mut best_index = 0usize;
+        let mut greatest = v.normal[0];
+        if greatest < 0.0f32 {
+            greatest = -greatest;
+        }
+
+        if VectorCompare(v.normal, vec3_origin) {
+            // damn you terrain!
+            best_index = 2;
+        } else {
+            while l < 3 {
+                if (v.normal[l] > greatest && v.normal[l] > 0.0f32)
+                    || (v.normal[l] < -greatest && v.normal[l] < 0.0f32)
+                {
+                    greatest = v.normal[l];
+                    if greatest < 0.0f32 {
+                        greatest = -greatest;
+                    }
+                    best_index = l;
+                }
+                l += 1;
+            }
+        }
+
+        // The oracle declares `scale` outside the vertex loop, and every arm below writes it before the read.
+        let scale: f32;
+        let mut tex_coords = [0.0f32; 2];
+        if best_index == 2 {
+            let mut d_use = origin[2] - v.position[2];
+            if d_use < 0.0f32 {
+                d_use = -d_use;
+            }
+            d_use = (radius * 0.5f32) / d_use;
+            if d_use > DLIGHT_MAX_GROUND_SCALE {
+                d_use = DLIGHT_MAX_GROUND_SCALE;
+            } else if d_use < 0.1f32 {
+                d_use = 0.1f32;
+            }
+
+            if VectorCompare(v.normal, vec3_origin)
+                || v.normal[0] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[0] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[1] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[1] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+            {
+                // if not perfectly flat, we must use a constant dist
+                scale = 1.0f32 / radius;
+            } else {
+                scale = 1.0f32 / (radius * d_use);
+            }
+
+            tex_coords[0] = 0.5f32 + dist[0] * scale;
+            tex_coords[1] = 0.5f32 + dist[1] * scale;
+        } else if best_index == 1 {
+            let mut d_use = origin[1] - v.position[1];
+            if d_use < 0.0f32 {
+                d_use = -d_use;
+            }
+            d_use = (radius * 0.5f32) / d_use;
+            if d_use > DLIGHT_MAX_SCALE {
+                d_use = DLIGHT_MAX_SCALE;
+            } else if d_use < 0.1f32 {
+                d_use = 0.1f32;
+            }
+            if v.normal[0] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[0] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[2] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[2] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+            {
+                // if not perfectly flat, we must use a constant dist
+                scale = 1.0f32 / radius;
+            } else {
+                scale = 1.0f32 / (radius * d_use);
+            }
+
+            tex_coords[0] = 0.5f32 + dist[0] * scale;
+            tex_coords[1] = 0.5f32 + dist[2] * scale;
+        } else {
+            let mut d_use = origin[0] - v.position[0];
+            if d_use < 0.0f32 {
+                d_use = -d_use;
+            }
+            d_use = (radius * 0.5f32) / d_use;
+            if d_use > DLIGHT_MAX_SCALE {
+                d_use = DLIGHT_MAX_SCALE;
+            } else if d_use < 0.1f32 {
+                d_use = 0.1f32;
+            }
+            if v.normal[2] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[2] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[1] > DLIGHT_LIGHT_SCALE_TOLERANCE
+                || v.normal[1] < -DLIGHT_LIGHT_SCALE_TOLERANCE
+            {
+                // if not perfectly flat, we must use a constant dist
+                scale = 1.0f32 / radius;
+            } else {
+                scale = 1.0f32 / (radius * d_use);
+            }
+
+            tex_coords[0] = 0.5f32 + dist[1] * scale;
+            tex_coords[1] = 0.5f32 + dist[2] * scale;
+        }
+
+        let mut clip = 0i32;
+        if tex_coords[0] < 0.0f32 {
+            clip |= 1;
+        } else if tex_coords[0] > 1.0f32 {
+            clip |= 2;
+        }
+        if tex_coords[1] < 0.0f32 {
+            clip |= 4;
+        } else if tex_coords[1] > 1.0f32 {
+            clip |= 8;
+        }
+        // modulate the strength based on the height and color
+        let modulate;
+        if dist[best_index] > radius {
+            clip |= 16;
+            modulate = 0.0f32;
+        } else if dist[best_index] < -radius {
+            clip |= 32;
+            modulate = 0.0f32;
+        } else {
+            dist[best_index] = Q_fabs(dist[best_index]);
+            if dist[best_index] < radius * 0.5f32 {
+                modulate = 1.0f32;
+            } else {
+                modulate = 2.0f32 * (radius - dist[best_index]) * scale;
+            }
+        }
+        clip_bits.push(clip as u8);
+
+        verts.push(WorldVertex {
+            position: v.position,
+            st: v.st,
+            lightmap_st: tex_coords,
+            color: [
+                myftol(float_color[0] * modulate) as u8,
+                myftol(float_color[1] * modulate) as u8,
+                myftol(float_color[2] * modulate) as u8,
+                255,
+            ],
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    // build a list of triangles that need light
+    let mut hit_indexes: Vec<u32> = Vec::new();
+    for tri in indexes.chunks_exact(3) {
+        let a = tri[0] as usize;
+        let b = tri[1] as usize;
+        let c = tri[2] as usize;
+        if clip_bits[a] & clip_bits[b] & clip_bits[c] != 0 {
+            continue; // not lighted
+        }
+        hit_indexes.extend_from_slice(&[tri[0], tri[1], tri[2]]);
+    }
+
+    if hit_indexes.is_empty() {
+        return None;
+    }
+    Some(DlightPass {
+        verts,
+        indexes: hit_indexes,
+    })
+}
+
+/// Picks the bundle the dlight multitexture arm modulates, or `None` when the shader offers no qualifying stage.
+///
+/// The oracle scans for the first opaque stage with a non-lightmap, tex-mod-free bundle,
+/// then binds bundle 0 when it qualifies and bundle 1 otherwise.
+/// The two conditions are the same test, so this returns the bound bundle directly.
+/// `style_two` adds the style-1 pass's extra reject of an environment or fog tcGen.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:741-781,1093-1123`
+fn dlight_stage_bundle(shader: &ShaderAsset, style_two: bool) -> Option<&TextureBundle> {
+    let blend_bits = (GLS_SRCBLEND_BITS + GLS_DSTBLEND_BITS) as u32;
+    let qualifies = |bundle: &TextureBundle| {
+        bundle.image.is_some()
+            && !bundle.is_lightmap
+            && bundle.tex_mods.is_empty()
+            && (!style_two
+                || (bundle.tc_gen != texCoordGen_t::TCGEN_ENVIRONMENT_MAPPED
+                    && bundle.tc_gen != texCoordGen_t::TCGEN_FOG))
+    };
+
+    for stage in shader
+        .stages
+        .iter()
+        .take(shader.num_unfogged_passes.max(0) as usize)
+    {
+        // only use non-lightmap opaque stages
+        if (stage.state_bits & blend_bits) != 0 {
+            continue;
+        }
+        if qualifies(&stage.bundle[0]) {
+            return Some(&stage.bundle[0]);
+        }
+        if qualifies(&stage.bundle[1]) {
+            return Some(&stage.bundle[1]);
+        }
+    }
+    None
+}
+
 /// Builds one clip matrix per distinct entity number the draw list carries,
 /// the matching model orientation, and the entity-number-to-slot map. Slot 0 is
 /// always the world (`view.world`). Each real entity's orientation comes from
@@ -3302,6 +3896,7 @@ fn build_sky_face_block(
                     st,
                     lightmap_st: st,
                     color,
+                    normal: [0.0, 0.0, 0.0],
                 });
             }
             strip_len += 2;
@@ -3617,6 +4212,7 @@ fn build_dynamic_block(
             st: st[i],
             lightmap_st: cpu[i].lightmap_st,
             color: colors[i],
+            normal: cpu[i].normal,
         });
     }
 
@@ -3857,6 +4453,7 @@ fn add_quad_stamp_ext(
             st,
             lightmap_st: [0.0, 0.0],
             color,
+            normal: [0.0, 0.0, 0.0],
         });
     }
 }
@@ -3924,6 +4521,7 @@ fn do_line(
             st,
             lightmap_st: [0.0, 0.0],
             color,
+            normal: [0.0, 0.0, 0.0],
         });
     }
 
@@ -4241,6 +4839,8 @@ fn decode_ghoul2_surface(
             st,
             lightmap_st: st,
             color: rgba,
+            // A ghoul2 surface never carries a dlight mask, so the parallel `normals` slice below stays its only normal home.
+            normal: [0.0, 0.0, 0.0],
         });
         normals.push(normal);
     }
@@ -4325,6 +4925,7 @@ unsafe fn lerp_md3_vertexes(
             st,
             lightmap_st: st,
             color: rgba,
+            normal: [normal[0], normal[1], normal[2]],
         });
         normals.push(normal);
     }
@@ -4457,10 +5058,11 @@ mod tests {
 
     #[test]
     fn face_and_draw_vert_converge_to_the_same_world_vertex() {
-        let from_face = WorldVertex::from_face_vertex(&sample_face_vertex());
+        // The face takes the plane normal the `drawVert_t` carries per vertex, so both rows agree.
+        let from_face = WorldVertex::from_face_vertex(&sample_face_vertex(), [0.0, 0.0, 1.0]);
         let from_draw = WorldVertex::from_draw_vert(&sample_draw_vert());
-        // The two shapes carry the same xyz, st, style-0 lightmap and style-0
-        // color, so they converge exactly. The `drawVert_t` normal is dropped.
+        // The two shapes carry the same xyz, st, style-0 lightmap, style-0
+        // color, and normal, so they converge exactly.
         assert_eq!(from_face, from_draw);
     }
 
@@ -4471,6 +5073,7 @@ mod tests {
         assert_eq!(vertex.st, [0.25, 0.5]);
         assert_eq!(vertex.lightmap_st, [0.1, 0.2]);
         assert_eq!(vertex.color, [10, 20, 30, 40]);
+        assert_eq!(vertex.normal, [0.0, 0.0, 1.0]);
         assert_eq!(MAXLIGHTMAPS, 4);
     }
 
@@ -4638,6 +5241,7 @@ mod tests {
             st,
             lightmap_st,
             color,
+            normal: [0.0, 0.0, 0.0],
         }
     }
 

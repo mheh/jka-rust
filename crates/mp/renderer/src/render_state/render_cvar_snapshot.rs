@@ -108,6 +108,11 @@ pub struct RenderCvarSnapshot {
     pub no_server_ghoul2: i32,
     /// `r_drawSun->integer`. Default `0`.
     pub draw_sun: i32,
+    /// `r_dlightStyle->integer` - default `"1"`.
+    /// A style above zero runs the `ProjectDlightTexture2` pass, and zero runs `ProjectDlightTexture`.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2330-2336`
+    pub dlight_style: i32,
 }
 
 impl RenderCvarSnapshot {
@@ -147,6 +152,7 @@ impl RenderCvarSnapshot {
             flares: common.cvar(cvars.r_flares).integer,
             no_server_ghoul2: common.cvar(cvars.r_noServerGhoul2).integer,
             draw_sun: common.cvar(cvars.r_drawSun).integer,
+            dlight_style: common.cvar(cvars.r_dlightStyle).integer,
         }
     }
 }
@@ -185,6 +191,7 @@ impl Default for RenderCvarSnapshot {
             flares: 1,
             no_server_ghoul2: 0,
             draw_sun: 0,
+            dlight_style: 1,
         }
     }
 }

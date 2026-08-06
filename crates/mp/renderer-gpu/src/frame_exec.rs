@@ -62,6 +62,7 @@ use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::world_load_state::WorldLoadState;
 use mp_renderer::render_state::world_walk_scratch::WorldWalkScratch;
 use mp_renderer::tr_image::PendingUpload;
+use mp_renderer::tr_light::R_TransformDlights;
 use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
@@ -818,6 +819,12 @@ impl FrameExecutor {
         // Source: oracle/codemp/renderer/tr_backend.cpp:570
         self.view_state.sky_rendered_this_view = false;
 
+        // `RB_RenderDrawSurfList` transforms the scene lights into each entity's own frame as the entity changes.
+        // The world entity is the one frame this step serves, so the transform runs once here with the world orientation.
+        // The dlight passes read `dl.transformed`, which this call fills.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:926,948,1028,1049 (`R_TransformDlights`)
+        R_TransformDlights(dlights.as_mut_slice(), &view.world);
+
         // The world walk above is frontend work and ran already. The draw below
         // is the backend submit, so `r_skipBackEnd` drops it and reports empty
         // world stats.
@@ -843,6 +850,8 @@ impl FrameExecutor {
             &mut self.sky,
             &abi_fogs,
             cvars,
+            &dlights,
+            &self.walk_scratch.surf_dlight_bits,
         )
     }
 
