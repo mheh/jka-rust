@@ -558,7 +558,8 @@ fn golden_world_marks_duel1() {
     );
 }
 
-/// The three lights the dlight fixture adds, each relative to the eye: the offset from the eye, the radius, the color, and whether the light is additive.
+/// The three lights the dlight fixture adds, each relative to the eye:
+/// the offset from the eye, the radius, the color, and whether the light is additive.
 /// The camera looks along +x from the duel1 spawn, so every light sits in front of it.
 /// The first light drops to the floor the marks fixture already proved is 64 units under the eye.
 const DUEL1_DLIGHTS: [([f32; 3], f32, [f32; 3], bool); 3] = [

@@ -1995,7 +1995,8 @@ impl Pipeline3d {
         // `dlight_map` is the sort key's flag, and the mask itself is the world walk's per-surface value.
         //TODO: Port ProjectDlightTexture2 bmodel-entity pass
         // Source: oracle/codemp/renderer/tr_backend.cpp:926,948 (`R_TransformDlights` per entity)
-        // A brush-model entity's surfaces do carry masks, but their pass needs the light transformed into the entity's frame, and this step transforms once with the world orientation.
+        // A brush-model entity's surfaces do carry masks, but their pass needs the light transformed into the entity's frame,
+        // and this step transforms once with the world orientation.
         // The gate therefore keeps the pass on the world entity.
         if dlight_map != 0
             && entity_num == TR_WORLDENT
@@ -2058,7 +2059,8 @@ impl Pipeline3d {
         }
     }
 
-    /// Builds the additive dlight passes for one world surface: the `ProjectDlightTexture2` and `ProjectDlightTexture` transcriptions behind the `r_dlightStyle` dispatch.
+    /// Builds the additive dlight passes for one world surface:
+    /// the `ProjectDlightTexture2` and `ProjectDlightTexture` transcriptions behind the `r_dlightStyle` dispatch.
     /// One item per reaching light, appended after the surface's stage items and before its fog item.
     ///
     /// The oracle disables `GL_FOG` around the pass so a redraw does not double the fog.
@@ -3351,7 +3353,9 @@ struct DlightPass {
 
 /// Raven `ProjectDlightTexture2` - the style-1 dlight projection over one surface.
 ///
-/// The pass clips every vertex against the light box, then per triangle derives a face normal from the edge cross product, rejects a backface, a junk triangle, and a triangle past the radius, and projects texcoords onto an orthonormal basis scaled by the falloff.
+/// The pass clips every vertex against the light box,
+/// then per triangle derives a face normal from the edge cross product, rejects a backface, a junk triangle, and a triangle past the radius,
+/// and projects texcoords onto an orthonormal basis scaled by the falloff.
 /// Each kept triangle gets three fresh vertices, so the returned block is a triangle soup rather than the surface's own lattice.
 /// The oracle's `r_dlightBacks` half of the backface test is commented out at the site, so the reject always runs.
 ///
@@ -3500,7 +3504,8 @@ fn project_dlight_texture2(
 
 /// Raven `ProjectDlightTexture` - the style-0 dlight projection over one surface.
 ///
-/// The pass projects each vertex along the dominant axis of its normal, scales the distance by the clamped `dUse` factor, and keeps every triangle whose three clip codes do not all overlap.
+/// The pass projects each vertex along the dominant axis of its normal, scales the distance by the clamped `dUse` factor,
+/// and keeps every triangle whose three clip codes do not all overlap.
 /// The block keeps the surface's own lattice, so the returned indices are the surface's own vertex numbers.
 ///
 /// The oracle binds `tess.svars.texcoords[0]` on the multitexture arm here, which is the last stage's computed texcoords.
@@ -3698,7 +3703,8 @@ fn project_dlight_texture(
 
 /// Picks the bundle the dlight multitexture arm modulates, or `None` when the shader offers no qualifying stage.
 ///
-/// The oracle scans for the first opaque stage with a non-lightmap, tex-mod-free bundle, then binds bundle 0 when it qualifies and bundle 1 otherwise.
+/// The oracle scans for the first opaque stage with a non-lightmap, tex-mod-free bundle,
+/// then binds bundle 0 when it qualifies and bundle 1 otherwise.
 /// The two conditions are the same test, so this returns the bound bundle directly.
 /// `style_two` adds the style-1 pass's extra reject of an environment or fog tcGen.
 ///
