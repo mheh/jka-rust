@@ -38,7 +38,7 @@ use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_scene::{RE_AddPolyToScene, RE_RenderScene};
+use mp_renderer::tr_scene::{RE_AddDynamicLightToScene, RE_AddPolyToScene, RE_RenderScene};
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -216,16 +216,18 @@ type SceneStep = fn(&mut UiHost, &mut FrameData, [f32; 3]);
 /// two stat gates a fogged open-sky fixture must clear, so an inert sky or fog
 /// chain cannot silently bless.
 fn run_golden(map: &str, stem: &str, require_sky_and_fog: bool) {
-    run_golden_scene(map, stem, require_sky_and_fog, [0.0, 0.0, 0.0], None);
+    run_golden_scene(map, stem, require_sky_and_fog, [0.0, 0.0, 0.0], None, false);
 }
 
-/// The body behind [`run_golden`], with the two knobs the marks fixture needs: the view angles and one scene step.
+/// The body behind [`run_golden`], with the three knobs the later fixtures need: the view angles, one scene step, and the dlight stat gate.
+#[allow(clippy::too_many_arguments)]
 fn run_golden_scene(
     map: &str,
     stem: &str,
     require_sky_and_fog: bool,
     angles: [f32; 3],
     step: Option<SceneStep>,
+    require_dlights: bool,
 ) {
     // ---- boot and load the world ---------------------------------------
     // The default basepath points at one user's home. Read `JKA_BASEPATH` so
@@ -347,6 +349,15 @@ fn run_golden_scene(
             assert!(
                 stats.world.fog_passes_drawn > 0,
                 "no fog pass drawn: stats.world = {:?}",
+                stats.world,
+            );
+        }
+        if require_dlights {
+            // An inert pass would bless the unlit image, so the counter gates the golden.
+            println!("{stem}: {} dlight passes", stats.world.dlight_passes);
+            assert!(
+                stats.world.dlight_passes > 0,
+                "no dlight pass drawn: stats.world = {:?}",
                 stats.world,
             );
         }
@@ -543,5 +554,54 @@ fn golden_world_marks_duel1() {
         false,
         [90.0, 0.0, 0.0],
         Some(duel1_floor_mark),
+        false,
+    );
+}
+
+/// The three lights the dlight fixture adds, each relative to the eye: the offset from the eye, the radius, the color, and whether the light is additive.
+/// The camera looks along +x from the duel1 spawn, so every light sits in front of it.
+/// The first light drops to the floor the marks fixture already proved is 64 units under the eye.
+const DUEL1_DLIGHTS: [([f32; 3], f32, [f32; 3], bool); 3] = [
+    ([80.0, 0.0, -56.0], 250.0, [1.0, 0.85, 0.6], false),
+    ([200.0, 0.0, 20.0], 250.0, [0.4, 0.6, 1.0], false),
+    ([140.0, -80.0, -40.0], 200.0, [1.0, 0.4, 0.2], true),
+];
+
+/// Adds the three dynamic lights through the real `RE_AddDynamicLightToScene` trap, before the render command records.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:326-345`
+fn duel1_dlights(host: &mut UiHost, frame_data: &mut FrameData, eye: [f32; 3]) {
+    for (offset, radius, color, additive) in DUEL1_DLIGHTS {
+        let org: vec3_t = [
+            eye[0] + offset[0],
+            eye[1] + offset[1],
+            eye[2] + offset[2],
+        ];
+        RE_AddDynamicLightToScene(
+            frame_data,
+            &host.re.sim.published,
+            org,
+            radius,
+            color[0],
+            color[1],
+            color[2],
+            additive,
+        );
+    }
+}
+
+/// The dlight fixture: the duel1 room again, with three dynamic lights in front of the camera.
+/// This is the gate on the census's `dlight/calls` group, 112,514 submissions across the four traces.
+/// The `dlight_passes` counter must be nonzero, so an inert pass can never bless an unlit image.
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_dlights_duel1() {
+    run_golden_scene(
+        "maps/mp/duel1.bsp",
+        "world_dlights_duel1",
+        false,
+        [0.0, 0.0, 0.0],
+        Some(duel1_dlights),
+        true,
     );
 }
