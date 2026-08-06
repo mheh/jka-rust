@@ -84,6 +84,7 @@ pub fn run(
             RenderCommand::Present => {
                 // Take at most one new package per present, so a sim thread
                 // running ahead cannot starve the window of frames.
+                let mut took_package = false;
                 match packages.try_recv() {
                     Ok(mut package) => {
                         if let Some(previous) = held.take() {
@@ -97,9 +98,28 @@ pub fn run(
                             let _ = recycled.send(buffer);
                         }
                         held = Some(package);
+                        took_package = true;
                     }
                     Err(TryRecvError::Empty) => {}
                     Err(TryRecvError::Disconnected) => break,
+                }
+
+                // Latch `r_swapInterval` onto the surface from the frame's own snapshot, which is the crossing discipline every render cvar uses (DEC-37 A13.1).
+                // The MP oracle registers the cvar and never applies it, so retail left vsync to the Windows driver.
+                // The apply semantics port from the SP Mac glimp, which checks `modified` once per `GLimp_EndFrame` and forces the first apply at init.
+                // Source: `oracle/codemp/renderer/tr_init.cpp:1068`, `oracle/code/mac/mac_glimp.c:749-752`, `oracle/code/mac/mac_glimp.c:712`
+                if let Some(package) = held.as_ref() {
+                    gpu.set_swap_interval(package.cvars.swap_interval);
+                }
+
+                // An unsynchronized surface presents as fast as the thread asks, so replaying a held package would present the same frame many times over.
+                // Skipping the miss restores Raven's serial loop, where one sim frame yields one present and `com_maxfps` governs the rate.
+                // A vsynced surface keeps the redraw, because that is what repaints the window between packages.
+                let stale = !took_package
+                    && held.is_some()
+                    && gpu.present_mode() == wgpu::PresentMode::Immediate;
+                if stale {
+                    continue;
                 }
 
                 match gpu.begin_frame() {
