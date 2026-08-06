@@ -71,6 +71,10 @@ pub struct Gpu {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    /// True where the surface offers `PresentMode::Immediate`.
+    /// [`Gpu::set_swap_interval`] reads it, and the constructor is the only place the adapter is still alive to ask.
+    /// wgpu rejects an unsupported present mode, so the `Fifo` fallback has to come from this flag.
+    supports_immediate: bool,
 }
 
 impl Gpu {
@@ -100,6 +104,12 @@ impl Gpu {
         }))
         .expect("request_device: adapter refused the device request");
 
+        // The adapter drops at the end of this function, so the present-mode capabilities are read here or not at all.
+        let supports_immediate = surface
+            .get_capabilities(&adapter)
+            .present_modes
+            .contains(&wgpu::PresentMode::Immediate);
+
         let mut config = surface
             .get_default_config(&adapter, width, height)
             .expect("get_default_config: surface incompatible with adapter");
@@ -113,6 +123,7 @@ impl Gpu {
             device,
             queue,
             config,
+            supports_immediate,
         }
     }
 
@@ -168,6 +179,7 @@ impl Gpu {
             device,
             queue,
             config,
+            supports_immediate: false,
         })
     }
 
@@ -192,6 +204,33 @@ impl Gpu {
     /// is a readout, not a coordinate system (see `pipeline2d`).
     pub fn surface_size(&self) -> (u32, u32) {
         (self.config.width, self.config.height)
+    }
+
+    /// The present mode the surface is configured with right now.
+    /// The frame loop reads it to tell an unsynchronized present from a vsynced one.
+    pub fn present_mode(&self) -> wgpu::PresentMode {
+        self.config.present_mode
+    }
+
+    /// Latches `r_swapInterval` onto the surface: zero maps to `Immediate` when the surface offers it, else `Fifo`, and nonzero maps to `Fifo`.
+    /// A change reconfigures the surface with the same call the resize arm makes, and a match returns early, so a per-frame call costs nothing.
+    /// The headless arm is a no-op.
+    ///
+    /// `Mailbox` never appears in the mapping. Metal does not offer it, and the hal treats it as unreachable.
+    pub fn set_swap_interval(&mut self, interval: i32) {
+        let RenderTarget::Windowed(surface) = &self.target else {
+            return;
+        };
+        let mode = if interval == 0 && self.supports_immediate {
+            wgpu::PresentMode::Immediate
+        } else {
+            wgpu::PresentMode::Fifo
+        };
+        if mode == self.config.present_mode {
+            return;
+        }
+        self.config.present_mode = mode;
+        surface.configure(&self.device, &self.config);
     }
 
     /// A view of the offscreen texture to draw into. The golden test passes

@@ -113,6 +113,11 @@ pub struct RenderCvarSnapshot {
     ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:2330-2336`
     pub dlight_style: i32,
+    /// `r_swapInterval->integer` - default `"0"`.
+    /// Zero asks for an unsynchronized present, and a nonzero value asks for vsync.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_init.cpp:1068`
+    pub swap_interval: i32,
 }
 
 impl RenderCvarSnapshot {
@@ -153,6 +158,7 @@ impl RenderCvarSnapshot {
             no_server_ghoul2: common.cvar(cvars.r_noServerGhoul2).integer,
             draw_sun: common.cvar(cvars.r_drawSun).integer,
             dlight_style: common.cvar(cvars.r_dlightStyle).integer,
+            swap_interval: common.cvar(cvars.r_swapInterval).integer,
         }
     }
 }
@@ -192,6 +198,7 @@ impl Default for RenderCvarSnapshot {
             no_server_ghoul2: 0,
             draw_sun: 0,
             dlight_style: 1,
+            swap_interval: 0,
         }
     }
 }
