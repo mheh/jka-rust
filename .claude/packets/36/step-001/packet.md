@@ -68,3 +68,5 @@ The ruling and the validation are both taken, and the packet is ready for the la
 ## Amendments
 
 **2026-08-05 - drafted from the Fable validation report.** The report's four corrections are folded: the mandatory capability capture in `Gpu::new`, the MP-oracle-never-applies-it divergence note, the stale-skip guard under `Immediate`, and the render-thread-only placement constraint. The user's ruling and validation order stand as the go context.
+
+**2026-08-05 - lane-review closed, full-read.** The session read the whole diff (125 added lines, four files) against the contract and smoke-ran the gates on the worktree. One deviation, accepted: `Gpu` gained the two-line `present_mode()` readout, because the stale-skip guard must key on the actual configured mode to keep redraw-on-miss alive on a `Fifo`-fallback surface - keying on the requested interval would have broken the binding constraint. Everything else is the contract verbatim, the divergence note carries all three oracle cites, and the harnesses are untouched. The live latch check stays the user's post-merge gate.
