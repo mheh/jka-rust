@@ -7,6 +7,9 @@
 // neutral normal and roughness, which decode to a flat surface and mid
 // roughness, so the lit result reduces to the plain irradiance.
 //
+// Mode 2 is the dlight pass, which this shader draws faithfully: the albedo is
+// bundle 0 and the irradiance is the dlight texture times the light color.
+//
 // Routing (deliverable 3): `SurfaceFlags.pbr_lit` is 1 only for an opaque or
 // lightmapped world or entity stage. An additive or blended effect stage (glow,
 // sprite, blood, sky) carries 0, so this shader returns the faithful colour for
@@ -140,6 +143,15 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         albedo = diffuse.rgb;
         irradiance = lightmap.rgb;
         alpha = diffuse.a;
+    } else if (surface.mode == 2u) {
+        // The dlight pass: bundle 0 is the material, and the dlight texture times
+        // the per-vertex light color is the light reaching it. A dlight item never
+        // draws opaque, so `pbr_lit` is 0 and the lit path below stays off.
+        let diffuse = textureSample(t_diffuse, s_diffuse, input.st);
+        let dlight = textureSample(t_lightmap, s_lightmap, input.lightmap_st);
+        albedo = diffuse.rgb;
+        irradiance = dlight.rgb * input.color.rgb;
+        alpha = input.color.a;
     } else {
         if (surface.tex_from_lightmap != 0u) {
             uv = input.lightmap_st;

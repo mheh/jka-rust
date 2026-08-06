@@ -65,6 +65,7 @@ use mp_renderer::tr_curve::GridMesh;
 use mp_renderer::tr_local::acff_t::acff_t;
 use mp_renderer::tr_local::alpha_gen_t::alphaGen_t;
 use mp_renderer::tr_local::color_gen_t::colorGen_t;
+use mp_renderer::tr_local::dlight_s::dlight_t;
 use mp_renderer::tr_local::fog_t::fog_t;
 use mp_renderer::tr_local::orientationr_t::orientationr_t;
 use mp_renderer::tr_local::tex_coord_gen_t::texCoordGen_t;
@@ -104,8 +105,7 @@ use crate::stage2d::{
 /// The GPU vertex the three CPU surface shapes converge on. `FaceVertex`
 /// (`tr_bsp`), `drawVert_t` (`qfiles`), and grid `drawVert_t` verts
 /// (`tr_curve`) all collapse to this row. Lightmap style 0 and color style 0
-/// are kept. The `drawVert_t` normal is dropped for this wave — the world
-/// backend does no per-vertex lighting yet.
+/// are kept.
 ///
 /// `#[repr(C)]` here is a GPU-layout requirement (it must match the
 /// `VertexBufferLayout` below), not an ABI seam.
@@ -120,29 +120,37 @@ pub struct WorldVertex {
     st: [f32; 2],
     lightmap_st: [f32; 2],
     color: [u8; 4],
+    /// The vertex normal, which only the CPU-side style-0 dlight projection reads.
+    /// No WGSL attribute maps it: the stride covers it and the GPU skips it.
+    normal: [f32; 3],
 }
 
 impl WorldVertex {
     /// Converges a `FaceVertex` (`SF_FACE` points row, no normal) into the GPU
     /// vertex, keeping lightmap style 0 and color style 0.
-    pub fn from_face_vertex(v: &FaceVertex) -> WorldVertex {
+    ///
+    /// `plane_normal` is the face's own plane normal, which the oracle floods
+    /// across every vertex of a face surface.
+    /// Source: `oracle/codemp/renderer/tr_surface.cpp:1405-1506` (`RB_SurfaceFace`)
+    pub fn from_face_vertex(v: &FaceVertex, plane_normal: [f32; 3]) -> WorldVertex {
         WorldVertex {
             position: v.xyz,
             st: v.st,
             lightmap_st: v.lightmap[0],
             color: v.color[0],
+            normal: plane_normal,
         }
     }
 
     /// Converges a `drawVert_t` (grid and triangle-soup verts) into the GPU
-    /// vertex, keeping lightmap style 0 and color style 0. The normal is
-    /// dropped for this wave.
+    /// vertex, keeping lightmap style 0 and color style 0.
     pub fn from_draw_vert(v: &drawVert_t) -> WorldVertex {
         WorldVertex {
             position: v.xyz,
             st: v.st,
             lightmap_st: v.lightmap[0],
             color: v.color[0],
+            normal: v.normal,
         }
     }
 
@@ -153,12 +161,23 @@ impl WorldVertex {
     }
 }
 
+/// The four attributes the world shaders declare. `WorldVertex::normal` has no
+/// entry here, so the pipeline stride covers it and the GPU steps over it.
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
     0 => Float32x3,
     1 => Float32x2,
     2 => Float32x2,
     3 => Unorm8x4,
 ];
+
+// The vertex row is packed, so the four mapped attributes keep the offsets the
+// pipeline layout declares and `normal` lands in the trailing 12 bytes.
+const _: () = assert!(size_of::<WorldVertex>() == 44);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, position) == 0);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, st) == 12);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, lightmap_st) == 20);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, color) == 28);
+const _: () = assert!(core::mem::offset_of!(WorldVertex, normal) == 32);
 
 /// One surface's slice of the concatenated world buffers, addressable by the
 /// `WorldSurfaceRef` index. `base_vertex` is added to every index by
@@ -310,7 +329,7 @@ pub fn build_world_mesh(world: &WorldAsset) -> (Vec<WorldVertex>, Vec<u32>, Vec<
         match &surface.data {
             SurfaceData::Face(face) => {
                 for point in &face.points {
-                    vertices.push(WorldVertex::from_face_vertex(point));
+                    vertices.push(WorldVertex::from_face_vertex(point, face.plane.normal));
                 }
                 for &index in &face.indices {
                     indices.push(index as u32);
@@ -637,6 +656,10 @@ const MODE_SINGLE: u32 = 0;
 /// draw its lightmap as its own single-texture stage through the
 /// `tex_from_lightmap` flag.
 const MODE_MULTITEXTURE: u32 = 1;
+/// The dlight multitexture pass: bundle 0 times the dlight texture times the per-vertex light color, `ProjectDlightTexture2`'s `dStage` arm.
+// The pass that emits this mode lands in the next commit, so nothing selects it yet.
+#[allow(dead_code)]
+const MODE_DLIGHT: u32 = 2;
 
 /// The shader features the world backend cannot render yet, tracked so each one
 /// logs once per process rather than once per surface.
@@ -728,6 +751,11 @@ pub struct WorldStats {
     /// Fog passes drawn — one extra pass per fogged surface whose shader
     /// declares a `fogPass` (`RB_FogPass` at the tail of `RB_StageIteratorGeneric`).
     pub fog_passes_drawn: u32,
+    /// Dlight passes drawn - one per reaching light per world surface that carries a mask.
+    /// This is `backEnd.pc.c_dlightIndexes` reduced to a pass count.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:827,1168`
+    pub dlight_passes: u32,
 }
 
 /// The shader backend the world pass draws one frame with (DEC-37 ruling 5).
@@ -1115,6 +1143,10 @@ impl Pipeline3d {
     /// The pass clears the depth buffer to 1.0 per view but loads the color
     /// target, because `Gpu::begin_frame` already cleared color for the frame.
     /// A later 2D pass or a second scene draws over the world.
+    ///
+    /// `dlights` holds the scene lights the caller already transformed into the
+    /// world frame, and `surf_dlight_bits` holds the world walk's per-surface
+    /// light mask, indexed by the world surface number.
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
@@ -1134,6 +1166,8 @@ impl Pipeline3d {
         sky: &mut SkyState,
         fogs: &[fog_t],
         cvars: RenderCvarSnapshot,
+        dlights: &[dlight_t],
+        surf_dlight_bits: &[i32],
     ) -> WorldStats {
         let mut stats = WorldStats::default();
 
@@ -1172,6 +1206,8 @@ impl Pipeline3d {
             fogs,
             &oris,
             cvars,
+            dlights,
+            surf_dlight_bits,
         );
 
         if items.is_empty() {
@@ -1431,6 +1467,8 @@ impl Pipeline3d {
         fogs: &[fog_t],
         oris: &[orientationr_t],
         cvars: RenderCvarSnapshot,
+        dlights: &[dlight_t],
+        surf_dlight_bits: &[i32],
     ) -> Vec<StageDrawItem> {
         let mut items: Vec<StageDrawItem> = Vec::new();
         // The two scene-wide inputs the renderfx colour overrides read: the
@@ -1462,6 +1500,8 @@ impl Pipeline3d {
                         cvars,
                         refdef_time,
                         view_axis,
+                        dlights,
+                        surf_dlight_bits,
                         &mut items,
                     );
                 }
@@ -1608,6 +1648,8 @@ impl Pipeline3d {
                 st: v.st,
                 lightmap_st: [0.0, 0.0],
                 color: v.modulate,
+                // `RB_SurfacePolychain` writes no `tess.normal`, and no dlight pass ever reads a poly.
+                normal: [0.0, 0.0, 0.0],
             })
             .collect();
         let mut index_block: Vec<u32> = Vec::with_capacity((poly_verts.len() - 2) * 3);
@@ -1815,6 +1857,8 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
         refdef_time: i32,
         view_axis: [f32; 3],
+        _dlights: &[dlight_t],
+        _surf_dlight_bits: &[i32],
         items: &mut Vec<StageDrawItem>,
     ) {
         let index = world_ref_index(world_ref);
@@ -2452,6 +2496,7 @@ impl Pipeline3d {
                     st: *st,
                     lightmap_st: *st,
                     color: [255, 255, 255, 255],
+                    normal: [0.0, 0.0, 0.0],
                 })
                 .collect();
 
@@ -2883,6 +2928,7 @@ impl Pipeline3d {
                 st: data.tex_coords[i],
                 lightmap_st: data.tex_coords[i],
                 color: data.colors[i],
+                normal: v.normal,
             });
         }
 
@@ -3302,6 +3348,7 @@ fn build_sky_face_block(
                     st,
                     lightmap_st: st,
                     color,
+                    normal: [0.0, 0.0, 0.0],
                 });
             }
             strip_len += 2;
@@ -3617,6 +3664,7 @@ fn build_dynamic_block(
             st: st[i],
             lightmap_st: cpu[i].lightmap_st,
             color: colors[i],
+            normal: cpu[i].normal,
         });
     }
 
@@ -3857,6 +3905,7 @@ fn add_quad_stamp_ext(
             st,
             lightmap_st: [0.0, 0.0],
             color,
+            normal: [0.0, 0.0, 0.0],
         });
     }
 }
@@ -3924,6 +3973,7 @@ fn do_line(
             st,
             lightmap_st: [0.0, 0.0],
             color,
+            normal: [0.0, 0.0, 0.0],
         });
     }
 
@@ -4241,6 +4291,8 @@ fn decode_ghoul2_surface(
             st,
             lightmap_st: st,
             color: rgba,
+            // A ghoul2 surface never carries a dlight mask, so the parallel `normals` slice below stays its only normal home.
+            normal: [0.0, 0.0, 0.0],
         });
         normals.push(normal);
     }
@@ -4325,6 +4377,7 @@ unsafe fn lerp_md3_vertexes(
             st,
             lightmap_st: st,
             color: rgba,
+            normal: [normal[0], normal[1], normal[2]],
         });
         normals.push(normal);
     }
@@ -4457,10 +4510,11 @@ mod tests {
 
     #[test]
     fn face_and_draw_vert_converge_to_the_same_world_vertex() {
-        let from_face = WorldVertex::from_face_vertex(&sample_face_vertex());
+        // The face takes the plane normal the `drawVert_t` carries per vertex, so both rows agree.
+        let from_face = WorldVertex::from_face_vertex(&sample_face_vertex(), [0.0, 0.0, 1.0]);
         let from_draw = WorldVertex::from_draw_vert(&sample_draw_vert());
-        // The two shapes carry the same xyz, st, style-0 lightmap and style-0
-        // color, so they converge exactly. The `drawVert_t` normal is dropped.
+        // The two shapes carry the same xyz, st, style-0 lightmap, style-0
+        // color, and normal, so they converge exactly.
         assert_eq!(from_face, from_draw);
     }
 
@@ -4471,6 +4525,7 @@ mod tests {
         assert_eq!(vertex.st, [0.25, 0.5]);
         assert_eq!(vertex.lightmap_st, [0.1, 0.2]);
         assert_eq!(vertex.color, [10, 20, 30, 40]);
+        assert_eq!(vertex.normal, [0.0, 0.0, 1.0]);
         assert_eq!(MAXLIGHTMAPS, 4);
     }
 
@@ -4638,6 +4693,7 @@ mod tests {
             st,
             lightmap_st,
             color,
+            normal: [0.0, 0.0, 0.0],
         }
     }
 
