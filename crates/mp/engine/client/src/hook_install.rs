@@ -9,7 +9,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_int, c_uint};
+use core::ffi::{c_char, c_int, c_uint};
 
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::EngineHooks;
@@ -19,6 +19,7 @@ use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_types::fileHandle_t;
 
 use crate::cl_cgame::CL_GameCommand;
+use crate::cl_console::CL_ConsolePrint;
 use crate::cl_input::{CL_JoystickEvent, CL_MouseEvent};
 use crate::cl_keys::{CL_CharEvent, CL_InitKeyCommands, CL_KeyEvent, Key_WriteBindings};
 use crate::cl_main::{
@@ -56,6 +57,7 @@ pub fn install_client_engine_hooks(hooks: &mut EngineHooks) {
     hooks.CL_CharEvent = Some(CL_CharEvent_hook);
     hooks.CL_KeyEvent = Some(CL_KeyEvent_hook);
     hooks.CL_ForwardCommandToServer = Some(CL_ForwardCommandToServer_hook);
+    hooks.CL_ConsolePrint = Some(CL_ConsolePrint_hook);
     hooks.CL_GameCommand = Some(CL_GameCommand_hook);
     hooks.UI_GameCommand = Some(UI_GameCommand_hook);
     hooks.Key_WriteBindings = Some(Key_WriteBindings_hook);
@@ -157,6 +159,17 @@ fn CL_ForwardCommandToServer_hook(view: &mut EngineHostView, string: &str) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let cl = unsafe { cl_from_view(view) };
     CL_ForwardCommandToServer(view.common, cl, string);
+}
+
+/// Raven `CL_ConsolePrint`, which `com_printf` reaches through the queue on `Common`.
+/// The port keeps Raven's `char*` parameter, so the text gets a NUL terminator in a temporary buffer here.
+/// Source: `oracle/codemp/client/cl_console.cpp:356-433`
+fn CL_ConsolePrint_hook(view: &mut EngineHostView, txt: &str, silent: qboolean) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    let mut buffer: Vec<u8> = txt.as_bytes().to_vec();
+    buffer.push(0);
+    CL_ConsolePrint(view.common, cl, buffer.as_ptr() as *const c_char, silent);
 }
 
 /// Raven `CL_GameCommand`. Source: `oracle/codemp/client/cl_cgame.cpp:1815`

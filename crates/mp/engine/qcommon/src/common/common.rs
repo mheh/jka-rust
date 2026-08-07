@@ -8,7 +8,7 @@ use mp_qshared::shared::cvar::{cvar_t, CvarHandle};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS, MAX_TOKEN_CHARS};
-use mp_qshared::shared::{qboolean, qtrue};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use std::io::Write;
 
@@ -322,6 +322,13 @@ pub struct Common {
     pub rd_buffer: *mut c_char,
     pub rd_buffersize: c_int,
     pub rd_flush: *mut extern "C" fn(*mut c_char),
+    /// The console echoes `com_printf` owes `CL_ConsolePrint`, with each Raven `silent` flag.
+    /// `com_printf` holds no `EngineHostView`, so it cannot call the client hook itself.
+    /// The echo queues here and `Com_Frame` drains it before `CL_Frame`, which costs one frame of latency at most.
+    /// A dedicated build never fills the queue, because `com_dedicated` is non-zero there.
+    ///
+    /// Source: `oracle/codemp/qcommon/common.cpp:158-163`; `github.com/mheh/jka-rust/issues/40`
+    pub con_print_queue: Vec<(String, qboolean)>,
 
     // ---- `cmd_common.cpp` / `cmd_pc.cpp` command system ----
     /// Raven `cmd_wait`.
@@ -665,14 +672,26 @@ pub fn com_printf(common: &mut Common, msg: &str) {
     }
 
     // * means don't draw this console message on the player screen but put it
-    // on the console: strip the leading '*'. Raven's `silent` flag only gates
-    // the `CL_ConsolePrint` client echo, a client symbol with no engine-hook
-    // here; the DEDICATED build's `com_dedicated->integer` keeps that branch
-    // dead, so it is not wired.
+    // on the console: strip the leading '*'.
+    // Raven then tests byte 1 of the STRIPPED string, not byte 0, and `silent` gates only the `CL_ConsolePrint` notify draw.
+    // Divergence (rule 19): C reads a stale scratch byte when the stripped string is empty.
+    // We take `silent` as the defined answer for that case.
+    let mut silent = qfalse;
     let msg: String = match msg.strip_prefix('*') {
-        Some(stripped) => stripped.to_string(),
+        Some(stripped) => {
+            if stripped.as_bytes().get(1) != Some(&b'*') {
+                silent = qtrue;
+            }
+            stripped.to_string()
+        }
         None => msg.to_string(),
     };
+
+    // echo to console if we're not a dedicated server.
+    // The hook needs an `EngineHostView` this function does not hold, so the echo waits on the queue for the client frame.
+    if common.com_dedicated.is_some() && common.cvar(common.com_dedicated).integer == 0 {
+        common.con_print_queue.push((msg.clone(), silent));
+    }
 
     // echo to dedicated console and early console (Sys_Print → stdout).
     print!("{msg}");

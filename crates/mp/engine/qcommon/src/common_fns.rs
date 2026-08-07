@@ -1201,6 +1201,18 @@ pub fn Com_Frame(view: &mut EngineHostView) {
                     let _time_before_client = crate::timing::sys_milliseconds(view.common);
                 }
 
+                // Deliver the console echoes `com_printf` queued since the last frame (gh#40).
+                // The take moves the queue out first, so the borrow of `view.common` ends before the hook gets the view.
+                let queued = std::mem::take(&mut view.common.con_print_queue);
+                let con_print_fn = view
+                    .common
+                    .hooks
+                    .CL_ConsolePrint
+                    .expect("CL_ConsolePrint hook");
+                for (text, silent) in queued {
+                    con_print_fn(view, &text, silent);
+                }
+
                 let hook_fn = view.common.hooks.CL_Frame.expect("CL_Frame hook");
                 hook_fn(view, msec);
 

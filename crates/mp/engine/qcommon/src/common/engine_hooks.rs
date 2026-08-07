@@ -78,6 +78,8 @@ pub struct EngineHooks {
     pub CL_KeyEvent: Option<fn(&mut EngineHostView, c_int, bool, c_int)>,
     /// Source: `oracle/codemp/null/null_client.cpp:48-49`
     pub CL_ForwardCommandToServer: Option<fn(&mut EngineHostView, &str)>,
+    /// Source: `oracle/codemp/null/null_client.cpp:51-52`
+    pub CL_ConsolePrint: Option<fn(&mut EngineHostView, &str, qboolean)>,
     /// Source: `oracle/codemp/null/null_client.cpp:37-39`
     pub CL_GameCommand: Option<fn(&mut EngineHostView) -> qboolean>,
     /// Source: `oracle/codemp/null/null_client.cpp:44-46`
@@ -191,6 +193,7 @@ impl EngineHooks {
             CL_CharEvent: Some(CL_CharEvent_null),
             CL_KeyEvent: Some(CL_KeyEvent_null),
             CL_ForwardCommandToServer: Some(CL_ForwardCommandToServer_null),
+            CL_ConsolePrint: Some(CL_ConsolePrint_null),
             CL_GameCommand: Some(CL_GameCommand_null),
             UI_GameCommand: Some(UI_GameCommand_null),
             Key_WriteBindings: Some(Key_WriteBindings_null),
@@ -282,6 +285,10 @@ fn CL_KeyEvent_null(_view: &mut EngineHostView, _key: c_int, _down: bool, _time:
 /// Raven null `CL_ForwardCommandToServer`. Source: `oracle/codemp/null/null_client.cpp:48-49`
 #[allow(non_snake_case)]
 fn CL_ForwardCommandToServer_null(_view: &mut EngineHostView, _string: &str) {}
+
+/// Raven null `CL_ConsolePrint`. Source: `oracle/codemp/null/null_client.cpp:51-52`
+#[allow(non_snake_case)]
+fn CL_ConsolePrint_null(_view: &mut EngineHostView, _txt: &str, _silent: qboolean) {}
 
 /// Raven null `CL_GameCommand` — returns `qfalse`.
 /// Source: `oracle/codemp/null/null_client.cpp:37-39`

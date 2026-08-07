@@ -203,6 +203,10 @@ impl Engine {
             addr_of_mut!((*p).common.cmd_argv).write(Vec::with_capacity(
                 mp_qshared::shared::limits::MAX_STRING_TOKENS,
             ));
+            // Common.con_print_queue: the com_printf console echoes the client
+            // frame drains (gh#40), not zero-valid; written empty and unbounded,
+            // because one frame drains every entry.
+            addr_of_mut!((*p).common.con_print_queue).write(Vec::new());
             // CollisionWorld clipmap names: owned Strings (string-data
             // migration), not zero-valid; the rest of each clipMap_t stays
             // under the alloc_zeroed mass (pointers/ints/bools zero-valid).
