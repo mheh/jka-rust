@@ -1,38 +1,33 @@
 name: Build modules
 
-# Builds the MP server game module (`jampgame`) as a shared library for every
-# arch the engine loads, in BOTH the release and debug profiles, and packages
-# each as a zip. Adapted from the oracle port's proven pipeline
-# (oracle/.github/workflows/build.yml).
+# This workflow builds the three MP modules (`jampgame`, `cgame`, `ui`) as release shared libraries for every arch the engine loads.
+# It packages each module as a zip.
+# The pipeline comes from the oracle port (oracle/.github/workflows/build.yml).
 #
-# The file *inside* each zip keeps the exact arch-suffixed name the engine
-# expects at load time (`"jampgame" ARCH_STRING DLL_EXT`; the engine refuses to
-# load a renamed module). Profile/arch live in the zip name, never in the
-# module filename:
+# The file inside each zip keeps the exact arch-suffixed name the engine expects at load time (`"<module>" ARCH_STRING DLL_EXT`).
+# The engine refuses to load a renamed module.
+# The profile and the arch live in the zip name, never in the module filename:
 #
-#   Windows 32-bit  x86      jampgamex86.dll
-#   Windows 64-bit  x86_64   jampgamex86_64.dll
-#   Linux   32-bit  i386     jampgamei386.so
-#   Linux   64-bit  x86_64   jampgamex86_64.so
+#   Windows 32-bit  x86      jampgamex86.dll     cgamex86.dll     uix86.dll
+#   Windows 64-bit  x86_64   jampgamex86_64.dll  cgamex86_64.dll  uix86_64.dll
+#   Linux   32-bit  i386     jampgamei386.so     cgamei386.so     uii386.so
+#   Linux   64-bit  x86_64   jampgamex86_64.so   cgamex86_64.so   uix86_64.so
 #
-# All lanes are enforced: the ILP32 assert pass (2026-07-13) gave every
-# pointer-width-dependent layout assert in jampgame's crate tree a
-# cfg(target_pointer_width = "32") twin whose values are clang i386 ground
-# truth (i386-pc-windows-msvc and i386-pc-linux-gnu agree) — the retail
-# modules are 32-bit, so these are the shipping-ABI numbers. Debug builds are
-# a real link gate — the cdylib's release link catches undefined symbols a
-# local debug `cargo build` tolerates on Linux/macOS.
+# Every lane is enforced.
+# The ILP32 assert pass (2026-07-13) gave every pointer-width-dependent layout assert in jampgame's crate tree a cfg(target_pointer_width = "32") twin.
+# The twin values are clang i386 ground truth, and i386-pc-windows-msvc agrees with i386-pc-linux-gnu.
+# The retail modules are 32-bit, so these are the shipping-ABI numbers.
+# The release cdylib link is a real gate, because it catches undefined symbols that a local debug `cargo build` tolerates on Linux and macOS.
+# The user ruling of 2026-08-07 dropped the module debug lanes.
+# The `jampded` server job keeps both profiles.
 #
-# Zip names are STABLE (no version segment) so the rolling `latest` release
-# keeps stable download URLs; the built commit is recorded in the release body.
+# The zip names carry no version segment, so the rolling `latest` release keeps stable download URLs.
+# The release body records the built commit.
 #
-# The build matrix is gated behind the jampgame-lane compile + test run
-# (temporarily scoped down from full-workspace; see the gate step note). The
-# compile is this repo's layout bar (every ABI struct carries size/offset
-# static-asserts), and the test run carries the oracle differential parity
-# suites (pmove/bglib/qmath/saberload goldens under crates/mp/game/tests/).
-# Tests run single-threaded: the oracle harness convention assumes it (shared
-# global RNG seed).
+# The `test` job gates the build matrix.
+# The workspace build is this repo's layout bar, because every ABI struct carries size and offset static-asserts.
+# The test run carries the oracle differential parity suites, the pmove, bglib, qmath, and saberload goldens under crates/mp/game/tests/.
+# The tests run single-threaded, because the oracle harness convention assumes one shared global RNG seed.
 
 on:
   push:
@@ -40,7 +35,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # the release job attaches assets to the rolling release
+  contents: write # The release job attaches assets to the rolling release.
 
 concurrency:
   group: build-${{ github.ref }}
@@ -66,9 +61,9 @@ jobs:
           key: test-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: test-cargo-
 
-      # `mp_client_app` turns on `mp_engine_client`'s `sound_device` feature, so
-      # the workspace build reaches cpal, whose ALSA backend needs the headers.
-      # The `jampded` lane never enables the feature and never needs this.
+      # `mp_client_app` turns on the `sound_device` feature of `mp_engine_client`, so the workspace build reaches cpal.
+      # The ALSA backend of cpal needs these headers.
+      # The `jampded` lane never enables the feature and never needs this step.
       - name: Install the ALSA headers (cpal, DEC-57.1)
         run: |
           sudo apt-get update
@@ -86,17 +81,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-multilib
 
-      # The engine-island ILP32 layout-assert gate (2026-07-12): every
-      # pointer-width-dependent assert in mp_app's crate tree carries a
-      # cfg(target_pointer_width = "32") twin with clang i386 ground truth.
-      # `check` (not `build`): the i686 *link* is still blocked on the vm_x86
-      # QVM-JIT asm statics (callMask/callAsmCall homes — tracked PORT-NOTE),
-      # which the allowed-failure server lane below exercises.
+      # This is the engine-island ILP32 layout-assert gate (2026-07-12).
+      # Every pointer-width-dependent assert in the crate tree of mp_app carries a cfg(target_pointer_width = "32") twin with clang i386 ground truth.
+      # The step runs `check` and not `build`, because the vm_x86 QVM-JIT asm statics (the callMask and callAsmCall homes, a tracked PORT-NOTE) block the i686 link.
+      # The i386 server lane below exercises that link.
       - name: i686 layout-assert cross-check (engine island)
         run: cargo check -p mp_app --target i686-unknown-linux-gnu
 
   build:
-    name: ${{ matrix.target.module }} (${{ matrix.profile }})
+    name: ${{ matrix.family.name }} ${{ matrix.target.arch }}-${{ matrix.target.platform }}
     needs: test
     if: github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.target.runner }}
@@ -104,33 +97,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [release, debug]
+        # `name` is the engine load-name stem.
+        # `package` is the cargo package, and `lib` is the cargo lib name that gives the artifact filename.
+        family:
+          - name: jampgame
+            package: jampgame
+            lib: jampgame
+          - name: cgame
+            package: mp_cgame
+            lib: mp_cgame
+          - name: ui
+            package: mp_ui
+            lib: mp_ui
         target:
-          - module: jampgamex86.dll
-            runner: windows-latest
+          - runner: windows-latest
             triple: i686-pc-windows-msvc
-            cargo_artifact: jampgame.dll
             arch: x86
             platform: windows
             allow_failure: false
-          - module: jampgamex86_64.dll
-            runner: windows-latest
+          - runner: windows-latest
             triple: x86_64-pc-windows-msvc
-            cargo_artifact: jampgame.dll
             arch: x86_64
             platform: windows
             allow_failure: false
-          - module: jampgamei386.so
-            runner: ubuntu-latest
+          - runner: ubuntu-latest
             triple: i686-unknown-linux-gnu
-            cargo_artifact: libjampgame.so
             arch: i386
             platform: linux
             allow_failure: false
-          - module: jampgamex86_64.so
-            runner: ubuntu-latest
+          - runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            cargo_artifact: libjampgame.so
             arch: x86_64
             platform: linux
             allow_failure: false
@@ -156,31 +152,32 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.target.triple }}-${{ matrix.profile }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
-          restore-keys: ${{ matrix.target.triple }}-${{ matrix.profile }}-cargo-
+          key: ${{ matrix.target.triple }}-${{ matrix.family.name }}-release-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: ${{ matrix.target.triple }}-${{ matrix.family.name }}-release-cargo-
 
-      - name: Build (${{ matrix.profile }} cdylib)
+      - name: Build (release cdylib)
         shell: bash
-        run: |
-          if [ "${{ matrix.profile }}" = "release" ]; then
-            cargo build -p jampgame --release --target ${{ matrix.target.triple }}
-            echo "PROFILE_DIR=release" >> "$GITHUB_ENV"
-          else
-            cargo build -p jampgame --target ${{ matrix.target.triple }}
-            echo "PROFILE_DIR=debug" >> "$GITHUB_ENV"
-          fi
+        run: cargo build -p ${{ matrix.family.package }} --release --target ${{ matrix.target.triple }}
 
       - name: Package zip
         shell: bash
         run: |
-          src="target/${{ matrix.target.triple }}/${PROFILE_DIR}/${{ matrix.target.cargo_artifact }}"
+          if [ "${{ matrix.target.platform }}" = "windows" ]; then
+            artifact="${{ matrix.family.lib }}.dll"
+            ext="dll"
+          else
+            artifact="lib${{ matrix.family.lib }}.so"
+            ext="so"
+          fi
+          module="${{ matrix.family.name }}${{ matrix.target.arch }}.${ext}"
+          src="target/${{ matrix.target.triple }}/release/${artifact}"
           test -f "$src" || { echo "::error::built module not found at $src"; exit 1; }
-          zip_name="jampgame-${{ matrix.target.arch }}-${{ matrix.target.platform }}-${{ matrix.profile }}.zip"
+          zip_name="${{ matrix.family.name }}-${{ matrix.target.arch }}-${{ matrix.target.platform }}-release.zip"
           rm -rf package dist
           mkdir -p package dist
-          # rename to the engine-required load name *inside* the archive
-          cp "$src" "package/${{ matrix.target.module }}"
-          ( cd package && 7z a -tzip tmp.zip "${{ matrix.target.module }}" >/dev/null )
+          # Copy the artifact to the load name the engine requires inside the archive.
+          cp "$src" "package/${module}"
+          ( cd package && 7z a -tzip tmp.zip "${module}" >/dev/null )
           mv package/tmp.zip "dist/${zip_name}"
           echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
           ls -l dist
@@ -203,14 +200,13 @@ jobs:
       matrix:
         profile: [release, debug]
         target:
-          # The dedicated-server EXECUTABLE (mp_app, the jampded equivalent).
-          # Unix lanes only: the engine island ports Raven's unix/ platform
-          # tree (the win32 twin is unported, native_platform gates it
-          # cfg(unix)). All lanes enforced: the engine-island ILP32 assert
-          # pass (2026-07-12) covers the i386 lane, and its first run linked
-          # green in both profiles (the un-referenced vm_x86 QVM-JIT asm is
-          # GC'd at link; its callMask/callAsmCall homes remain a tracked
-          # PORT-NOTE for when the JIT path goes live).
+          # These lanes build the dedicated-server executable (mp_app, the jampded equivalent).
+          # The lanes are Unix only, because the engine island ports Raven's unix/ platform tree.
+          # The win32 twin is unported, and native_platform gates it with cfg(unix).
+          # Every lane is enforced.
+          # The engine-island ILP32 assert pass (2026-07-12) covers the i386 lane, and its first run linked green in both profiles.
+          # The linker removes the un-referenced vm_x86 QVM-JIT asm.
+          # The callMask and callAsmCall homes remain a tracked PORT-NOTE for when the JIT path goes live.
           - runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
             artifact_suffix: x86_64-linux
@@ -267,7 +263,7 @@ jobs:
           zip_name="jampded-${{ matrix.target.artifact_suffix }}-${{ matrix.profile }}.zip"
           rm -rf package dist
           mkdir -p package dist
-          # ship under the Raven-equivalent binary name
+          # Ship the executable under the Raven-equivalent binary name.
           cp "$src" "package/jampded"
           chmod +x package/jampded
           ( cd package && 7z a -tzip tmp.zip jampded >/dev/null )
@@ -285,7 +281,7 @@ jobs:
   release:
     name: Update rolling release
     needs: [build, server]
-    # Master-only (see `build`'s `if`).
+    # This job runs on master only, the same as the `build` job.
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -308,9 +304,9 @@ jobs:
             Automated build of `master` @ ${{ github.sha }}.
 
             Each module zip contains the file under the exact name the engine
-            loads (`jampgamex86_64.dll`, `jampgamex86_64.so`, …); the
-            `jampded-*` zips carry the pure-Rust dedicated-server executable
-            (linux x86_64/i386, macos arm64). Asset URLs are stable across
-            builds.
+            loads (`jampgamex86_64.dll`, `cgamex86_64.dll`, `uix86_64.so`, …).
+            The `jampded-*` zips carry the pure-Rust dedicated-server
+            executable (linux x86_64/i386, macos arm64). Asset URLs are stable
+            across builds.
           files: dist/*.zip
           fail_on_unmatched_files: false
