@@ -186,24 +186,40 @@ impl QuadBatch {
     ) {
         let (x0, y0) = (rect.x, rect.y);
         let (x1, y1) = (rect.x + rect.w, rect.y + rect.h);
+        let xy = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
+        self.push_quad_xy(xy, st, color, blend, image);
+    }
+
+    /// Appends one screen-space quad with independent per-corner positions, the shape a rotated pic needs.
+    /// `xy` and `st` are both in `RB_StretchPic`'s vertex order: top-left, top-right, bottom-right, bottom-left.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1519-1533`
+    pub fn push_quad_xy(
+        &mut self,
+        xy: [[f32; 2]; 4],
+        st: [[f32; 2]; 4],
+        color: [f32; 4],
+        blend: BlendState,
+        image: Option<ImageHandle>,
+    ) {
         let top_left = Vertex2d {
-            position: [x0, y0],
+            position: xy[0],
             uv: st[0],
             color,
         };
         let top_right = Vertex2d {
-            position: [x1, y0],
+            position: xy[1],
             uv: st[1],
             color,
         };
         let bottom_right = Vertex2d {
-            position: [x1, y1],
+            position: xy[2],
             uv: st[2],
             color,
         };
         let bottom_left = Vertex2d {
-            position: [x0, y1],
+            position: xy[3],
             uv: st[3],
             color,
         };

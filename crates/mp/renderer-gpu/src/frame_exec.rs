@@ -21,9 +21,9 @@
 //! laid out: `RE_Font_DrawString` runs the glyph walk on the sim side and
 //! records one `SetColor`/`DrawStretchPic` pair per glyph, exactly as Raven
 //! issues them, so this side needs no font tables (user ruling 2026-08-02).
-//! The rotate-pic pair and the whole scene-composition half of the enum are
-//! counted and skipped, with one `eprintln!` the first time each kind is
-//! seen. Skipping, not panicking: a real `ui` frame emits scene events from
+//! The rotate-pic pair renders too, which closes the census 2D group.
+//! The remaining scene-composition half of the enum is counted and skipped, with one `eprintln!` the first time each kind is seen.
+//! Skipping, not panicking: a real `ui` frame emits scene events from
 //! day one, and a loud-but-live frame loop is what makes the next slices
 //! bisectable.
 //!
@@ -109,8 +109,8 @@ pub struct FrameStats {
     pub draw_calls: u32,
     /// Images uploaded this frame (`pending_uploads` drained at frame start).
     pub images_uploaded: u32,
-    /// `DrawRotatePic`/`DrawRotatePic2` events skipped.
-    pub skipped_rotate_pics: u32,
+    /// Quads batched from `DrawRotatePic` and `DrawRotatePic2` events. A rotate pic whose stage 0 binds no image draws nothing and is not counted.
+    pub rotate_pics: u32,
     /// Scene-composition events skipped (lights, polys, decals, …) — later
     /// waves of backend #1's world path. `RenderScene`, `ClearScene`, and
     /// `AddRefEntityToScene` are no longer here when a world context is
@@ -132,7 +132,7 @@ pub struct FrameStats {
 impl FrameStats {
     /// Total events the executor could not render yet.
     pub fn skipped_events(&self) -> u32 {
-        self.skipped_rotate_pics + self.skipped_scene_events + self.skipped_other
+        self.skipped_scene_events + self.skipped_other
     }
 }
 
@@ -141,7 +141,6 @@ impl FrameStats {
 /// process rather than once per frame.
 #[derive(Clone, Copy, Debug)]
 enum Warned {
-    RotatePic,
     SceneEvent,
     Other,
     /// A `DrawStretchPic`'s shader handle addressed no registered shader.
@@ -158,23 +157,21 @@ enum Warned {
 }
 
 impl Warned {
-    const COUNT: usize = 7;
+    const COUNT: usize = 6;
 
     fn slot(self) -> usize {
         match self {
-            Warned::RotatePic => 0,
-            Warned::SceneEvent => 1,
-            Warned::Other => 2,
-            Warned::UnknownShader => 3,
-            Warned::NoStageImage => 4,
-            Warned::NoWorldGeometry => 5,
-            Warned::Fog => 6,
+            Warned::SceneEvent => 0,
+            Warned::Other => 1,
+            Warned::UnknownShader => 2,
+            Warned::NoStageImage => 3,
+            Warned::NoWorldGeometry => 4,
+            Warned::Fog => 5,
         }
     }
 
     fn describe(self) -> &'static str {
         match self {
-            Warned::RotatePic => "skips DrawRotatePic/DrawRotatePic2 — not rendered yet",
             Warned::SceneEvent => {
                 "skips scene composition (lights, polys, decals) — not rendered yet"
             }
@@ -524,9 +521,72 @@ impl FrameExecutor {
                     stats.quads += 1;
                 }
 
-                FrameEvent::DrawRotatePic { .. } | FrameEvent::DrawRotatePic2 { .. } => {
-                    stats.skipped_rotate_pics += 1;
-                    self.warn_once(Warned::RotatePic);
+                // Accepted divergence: the oracle draws a rotate pic immediately, ahead of the stretch pics still pending in `tess`, and this backend appends it in command order.
+                // The disruptor zoom shows the face of it: the oracle flushes the mask over the insert, and we layer the insert over the mask (`oracle/codemp/cgame/cg_draw.c:349-350,365`).
+                FrameEvent::DrawRotatePic {
+                    x,
+                    y,
+                    w,
+                    h,
+                    s1,
+                    t1,
+                    s2,
+                    t2,
+                    angle,
+                    shader,
+                } => {
+                    stats.rotate_pics += self.draw_rotate_pic(
+                        *shader,
+                        Rect {
+                            x: *x,
+                            y: *y,
+                            w: *w,
+                            h: *h,
+                        },
+                        UvRect {
+                            s1: *s1,
+                            t1: *t1,
+                            s2: *s2,
+                            t2: *t2,
+                        },
+                        *angle,
+                        color,
+                        assets,
+                        gpu_images,
+                    );
+                }
+
+                FrameEvent::DrawRotatePic2 {
+                    x,
+                    y,
+                    w,
+                    h,
+                    s1,
+                    t1,
+                    s2,
+                    t2,
+                    angle,
+                    shader,
+                } => {
+                    stats.rotate_pics += self.draw_rotate_pic2(
+                        *shader,
+                        Rect {
+                            x: *x,
+                            y: *y,
+                            w: *w,
+                            h: *h,
+                        },
+                        UvRect {
+                            s1: *s1,
+                            t1: *t1,
+                            s2: *s2,
+                            t2: *t2,
+                        },
+                        *angle,
+                        color,
+                        assets,
+                        gpu_images,
+                    );
                 }
 
                 FrameEvent::RenderScene {
@@ -936,6 +996,116 @@ impl FrameExecutor {
         drawn
     }
 
+    /// `RB_RotatePic`: one quad rotated `angle` degrees about its own top-right corner, textured from stage 0's bundle image and colored by the `RE_SetColor` register.
+    /// Returns the quads batched: one, or zero when stage 0 binds no image.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1498-1541`
+    #[allow(clippy::too_many_arguments)]
+    fn draw_rotate_pic(
+        &mut self,
+        shader: ShaderHandle,
+        rect: Rect,
+        uv: UvRect,
+        angle: f32,
+        color: [f32; 4],
+        assets: &RenderAssets,
+        gpu_images: &GpuImages,
+    ) -> u32 {
+        // The pivot is the rectangle's top-right corner, and the local corners put the unrotated quad where a stretch pic would draw it.
+        // Source: `oracle/codemp/renderer/tr_backend.cpp:1516-1533`
+        let pivot = [rect.x + rect.w, rect.y];
+        let local = [
+            [-rect.w, 0.0],
+            [0.0, 0.0],
+            [0.0, rect.h],
+            [-rect.w, rect.h],
+        ];
+        let xy = rotated_corners(pivot, local, angle);
+
+        // The oracle issues no `GL_State` for this arm, so it draws in whatever state the last flush left.
+        // We draw at `GLS_2D_DEFAULT`, the state `RB_SetGL2D` installs (`tr_backend.cpp:1282-1284`), because this backend has no flush point to inherit from.
+        let blend = blend_state_from_gls(GLS_2D_DEFAULT);
+
+        let Some(asset) = assets.shaders.get(shader) else {
+            self.warn_once(Warned::UnknownShader);
+            self.batch
+                .push_quad_xy(xy, uv.corners(), color, blend, None::<ImageHandle>);
+            return 1;
+        };
+        let Some(stage) = asset.stages.first() else {
+            return 0;
+        };
+        let Some(image) = stage.bundle[0].image.filter(|image| gpu_images.contains(*image)) else {
+            return 0;
+        };
+
+        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so for an `animMap` stage it binds the animation array's base as if that pointer were an image.
+        // Source: `oracle/codemp/renderer/tr_shader.cpp:1441-1442`
+        self.batch
+            .push_quad_xy(xy, uv.corners(), color, blend, Some(image));
+        1
+    }
+
+    /// `RB_RotatePic2`: the same quad rotated about `rect.x`/`rect.y`, which is its center here, drawn with stage 0's own blend bits.
+    /// The pass gates on `num_unfogged_passes` before it reads stage 0, exactly as the oracle does.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:1547-1602`
+    #[allow(clippy::too_many_arguments)]
+    fn draw_rotate_pic2(
+        &mut self,
+        shader: ShaderHandle,
+        rect: Rect,
+        uv: UvRect,
+        angle: f32,
+        color: [f32; 4],
+        assets: &RenderAssets,
+        gpu_images: &GpuImages,
+    ) -> u32 {
+        // The `x`/`y` pair is the quad's center in this arm, not its top-left corner.
+        // Source: `oracle/codemp/renderer/tr_backend.cpp:1575-1597`
+        let pivot = [rect.x, rect.y];
+        let (half_w, half_h) = (rect.w * 0.5, rect.h * 0.5);
+        let local = [
+            [-half_w, -half_h],
+            [half_w, -half_h],
+            [half_w, half_h],
+            [-half_w, half_h],
+        ];
+        let xy = rotated_corners(pivot, local, angle);
+
+        let Some(asset) = assets.shaders.get(shader) else {
+            self.warn_once(Warned::UnknownShader);
+            self.batch.push_quad_xy(
+                xy,
+                uv.corners(),
+                color,
+                blend_state_from_gls(GLS_2D_DEFAULT),
+                None::<ImageHandle>,
+            );
+            return 1;
+        };
+        if asset.num_unfogged_passes == 0 {
+            return 0;
+        }
+        let Some(stage) = asset.stages.first() else {
+            return 0;
+        };
+        let Some(image) = stage.bundle[0].image.filter(|image| gpu_images.contains(*image)) else {
+            return 0;
+        };
+
+        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so for an `animMap` stage it binds the animation array's base as if that pointer were an image.
+        // Source: `oracle/codemp/renderer/tr_shader.cpp:1441-1442`
+        self.batch.push_quad_xy(
+            xy,
+            uv.corners(),
+            color,
+            blend_state_from_gls(stage.state_bits),
+            Some(image),
+        );
+        1
+    }
+
     /// The white-texel fallback quad, drawn in the state `RB_SetGL2D` leaves
     /// the pass in.
     ///
@@ -959,6 +1129,20 @@ impl FrameExecutor {
         self.warned[slot] = true;
         eprintln!("mp_renderer_gpu: frame_exec {}", kind.describe());
     }
+}
+
+/// The four screen-space corners of a quad whose local corners `local` sit around `pivot`, rotated `angle` degrees.
+/// The rotation runs in the 640x480 virtual space `qglRotatef` ran in, before the ortho transform, so the sense matches the oracle.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1516-1518`
+fn rotated_corners(pivot: [f32; 2], local: [[f32; 2]; 4], angle: f32) -> [[f32; 2]; 4] {
+    let (sin, cos) = angle.to_radians().sin_cos();
+    local.map(|[lx, ly]| {
+        [
+            pivot[0] + lx * cos - ly * sin,
+            pivot[1] + lx * sin + ly * cos,
+        ]
+    })
 }
 
 /// One `RE_AddDynamicLightToScene` payload, held between the event replay and
