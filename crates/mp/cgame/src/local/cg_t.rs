@@ -393,6 +393,7 @@ impl cg_t {
     }
 }
 
+// The head of the struct carries no pointer, so these offsets hold on both pointer widths.
 const _: () = assert!(core::mem::offset_of!(cg_t, clientFrame) == 0);
 const _: () = assert!(core::mem::offset_of!(cg_t, clientNum) == 4);
 const _: () = assert!(core::mem::offset_of!(cg_t, demoPlayback) == 8);
@@ -402,278 +403,287 @@ const _: () = assert!(core::mem::offset_of!(cg_t, loading) == 20);
 const _: () = assert!(core::mem::offset_of!(cg_t, intermissionStarted) == 24);
 const _: () = assert!(core::mem::offset_of!(cg_t, latestSnapshotNum) == 28);
 const _: () = assert!(core::mem::offset_of!(cg_t, latestSnapshotTime) == 32);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, snap) == 40);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, nextSnap) == 48);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, frameInterpolation) == 56);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, mMapChange) == 60);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, thisFrameTeleport) == 64);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, nextFrameTeleport) == 68);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, frametime) == 72);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, time) == 76);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, oldTime) == 80);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, physicsTime) == 84);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, timelimitWarnings) == 88);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, fraglimitWarnings) == 92);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, mapRestart) == 96);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, mInRMG) == 100);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, mRMGWeather) == 104);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, renderingThirdPerson) == 108);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, hyperspace) == 112);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, predictedPlayerState) == 116);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, predictedVehicleState) == 1668);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, validPPS) == 3220);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, predictedErrorTime) == 3224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, predictedError) == 3228);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, eventSequence) == 3240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, predictableEvents) == 3244);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, stepChange) == 3308);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, stepTime) == 3312);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, duckChange) == 3316);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, duckTime) == 3320);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, landChange) == 3324);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, landTime) == 3328);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, weaponSelect) == 3332);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, forceSelect) == 3336);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, itemSelect) == 3340);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, autoAngles) == 3344);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, autoAxis) == 3356);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, autoAnglesFast) == 3392);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, autoAxisFast) == 3404);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, refdef) == 3440);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, zoomed) == 3824);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, zoomTime) == 3828);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, zoomSensitivity) == 3832);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, infoScreenText) == 3836);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, scoresRequestTime) == 4860);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, numScores) == 4864);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, selectedScore) == 4868);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, teamScores) == 4872);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, scores) == 4880);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, showScores) == 6800);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, scoreBoardShowing) == 6804);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, scoreFadeTime) == 6808);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, killerName) == 6812);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorList) == 6844);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorLen) == 7868);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorWidth) == 7872);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorTime) == 7876);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorPaintX) == 7880);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorPaintX2) == 7884);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorOffset) == 7888);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, spectatorPaintLen) == 7892);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, skulltrails) == 7896);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, centerPrintTime) == 11864);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, centerPrintCharWidth) == 11868);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, centerPrintY) == 11872);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, centerPrint) == 11876);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, centerPrintLines) == 12900);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, lowAmmoWarning) == 12904);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, lastKillTime) == 12908);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, crosshairClientNum) == 12912);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, crosshairClientTime) == 12916);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, crosshairVehNum) == 12920);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, crosshairVehTime) == 12924);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, powerupActive) == 12928);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, powerupTime) == 12932);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, attackerTime) == 12936);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, voiceTime) == 12940);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, rewardStack) == 12944);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, rewardTime) == 12948);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, rewardCount) == 12952);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, rewardShader) == 12992);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, rewardSound) == 13032);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, soundBufferIn) == 13072);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, soundBufferOut) == 13076);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, soundTime) == 13080);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, soundBuffer) == 13084);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, voiceChatTime) == 13164);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, voiceChatBufferIn) == 13168);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, voiceChatBufferOut) == 13172);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, warmup) == 13176);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, warmupCount) == 13180);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, itemPickup) == 13184);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, itemPickupTime) == 13188);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, itemPickupBlendTime) == 13192);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, weaponSelectTime) == 13196);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, weaponAnimation) == 13200);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, weaponAnimationTime) == 13204);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, damageTime) == 13208);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, damageX) == 13212);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, damageY) == 13216);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, damageValue) == 13220);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headYaw) == 13224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headEndPitch) == 13228);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headEndYaw) == 13232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headEndTime) == 13236);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headStartPitch) == 13240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headStartYaw) == 13244);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, headStartTime) == 13248);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, v_dmg_time) == 13252);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, v_dmg_pitch) == 13256);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, v_dmg_roll) == 13260);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, kick_angles) == 13264);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, kick_time) == 13276);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, kick_origin) == 13280);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, bobfracsin) == 13292);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, bobcycle) == 13296);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, xyspeed) == 13300);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, nextOrbitTime) == 13304);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, loadLCARSStage) == 13308);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, forceHUDTotalFlashTime) == 13312);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, forceHUDNextFlashTime) == 13316);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, forceHUDActive) == 13320);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, testModelEntity) == 13328);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, testModelName) == 13544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, testGun) == 13608);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, VHUDFlashTime) == 13612);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, VHUDTurboFlag) == 13616);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, HUDTickFlashTime) == 13620);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, HUDArmorFlag) == 13624);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, HUDHealthFlag) == 13628);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, iconHUDActive) == 13632);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, iconHUDPercent) == 13636);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, iconSelectTime) == 13640);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, invenSelectTime) == 13644);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, forceSelectTime) == 13648);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, lastFPFlashPoint) == 13652);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, testModel) == 13664);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cg_t, activeSnapshots) == 13668);
+// `snap` is a pointer, so the tail from `snap` onward goes in the width-gated blocks.
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::offset_of!(cg_t, snap) == 40);
+    assert!(core::mem::offset_of!(cg_t, nextSnap) == 48);
+    assert!(core::mem::offset_of!(cg_t, frameInterpolation) == 56);
+    assert!(core::mem::offset_of!(cg_t, mMapChange) == 60);
+    assert!(core::mem::offset_of!(cg_t, thisFrameTeleport) == 64);
+    assert!(core::mem::offset_of!(cg_t, nextFrameTeleport) == 68);
+    assert!(core::mem::offset_of!(cg_t, frametime) == 72);
+    assert!(core::mem::offset_of!(cg_t, time) == 76);
+    assert!(core::mem::offset_of!(cg_t, oldTime) == 80);
+    assert!(core::mem::offset_of!(cg_t, physicsTime) == 84);
+    assert!(core::mem::offset_of!(cg_t, timelimitWarnings) == 88);
+    assert!(core::mem::offset_of!(cg_t, fraglimitWarnings) == 92);
+    assert!(core::mem::offset_of!(cg_t, mapRestart) == 96);
+    assert!(core::mem::offset_of!(cg_t, mInRMG) == 100);
+    assert!(core::mem::offset_of!(cg_t, mRMGWeather) == 104);
+    assert!(core::mem::offset_of!(cg_t, renderingThirdPerson) == 108);
+    assert!(core::mem::offset_of!(cg_t, hyperspace) == 112);
+    assert!(core::mem::offset_of!(cg_t, predictedPlayerState) == 116);
+    assert!(core::mem::offset_of!(cg_t, predictedVehicleState) == 1668);
+    assert!(core::mem::offset_of!(cg_t, validPPS) == 3220);
+    assert!(core::mem::offset_of!(cg_t, predictedErrorTime) == 3224);
+    assert!(core::mem::offset_of!(cg_t, predictedError) == 3228);
+    assert!(core::mem::offset_of!(cg_t, eventSequence) == 3240);
+    assert!(core::mem::offset_of!(cg_t, predictableEvents) == 3244);
+    assert!(core::mem::offset_of!(cg_t, stepChange) == 3308);
+    assert!(core::mem::offset_of!(cg_t, stepTime) == 3312);
+    assert!(core::mem::offset_of!(cg_t, duckChange) == 3316);
+    assert!(core::mem::offset_of!(cg_t, duckTime) == 3320);
+    assert!(core::mem::offset_of!(cg_t, landChange) == 3324);
+    assert!(core::mem::offset_of!(cg_t, landTime) == 3328);
+    assert!(core::mem::offset_of!(cg_t, weaponSelect) == 3332);
+    assert!(core::mem::offset_of!(cg_t, forceSelect) == 3336);
+    assert!(core::mem::offset_of!(cg_t, itemSelect) == 3340);
+    assert!(core::mem::offset_of!(cg_t, autoAngles) == 3344);
+    assert!(core::mem::offset_of!(cg_t, autoAxis) == 3356);
+    assert!(core::mem::offset_of!(cg_t, autoAnglesFast) == 3392);
+    assert!(core::mem::offset_of!(cg_t, autoAxisFast) == 3404);
+    assert!(core::mem::offset_of!(cg_t, refdef) == 3440);
+    assert!(core::mem::offset_of!(cg_t, zoomed) == 3824);
+    assert!(core::mem::offset_of!(cg_t, zoomTime) == 3828);
+    assert!(core::mem::offset_of!(cg_t, zoomSensitivity) == 3832);
+    assert!(core::mem::offset_of!(cg_t, infoScreenText) == 3836);
+    assert!(core::mem::offset_of!(cg_t, scoresRequestTime) == 4860);
+    assert!(core::mem::offset_of!(cg_t, numScores) == 4864);
+    assert!(core::mem::offset_of!(cg_t, selectedScore) == 4868);
+    assert!(core::mem::offset_of!(cg_t, teamScores) == 4872);
+    assert!(core::mem::offset_of!(cg_t, scores) == 4880);
+    assert!(core::mem::offset_of!(cg_t, showScores) == 6800);
+    assert!(core::mem::offset_of!(cg_t, scoreBoardShowing) == 6804);
+    assert!(core::mem::offset_of!(cg_t, scoreFadeTime) == 6808);
+    assert!(core::mem::offset_of!(cg_t, killerName) == 6812);
+    assert!(core::mem::offset_of!(cg_t, spectatorList) == 6844);
+    assert!(core::mem::offset_of!(cg_t, spectatorLen) == 7868);
+    assert!(core::mem::offset_of!(cg_t, spectatorWidth) == 7872);
+    assert!(core::mem::offset_of!(cg_t, spectatorTime) == 7876);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintX) == 7880);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintX2) == 7884);
+    assert!(core::mem::offset_of!(cg_t, spectatorOffset) == 7888);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintLen) == 7892);
+    assert!(core::mem::offset_of!(cg_t, skulltrails) == 7896);
+    assert!(core::mem::offset_of!(cg_t, centerPrintTime) == 11864);
+    assert!(core::mem::offset_of!(cg_t, centerPrintCharWidth) == 11868);
+    assert!(core::mem::offset_of!(cg_t, centerPrintY) == 11872);
+    assert!(core::mem::offset_of!(cg_t, centerPrint) == 11876);
+    assert!(core::mem::offset_of!(cg_t, centerPrintLines) == 12900);
+    assert!(core::mem::offset_of!(cg_t, lowAmmoWarning) == 12904);
+    assert!(core::mem::offset_of!(cg_t, lastKillTime) == 12908);
+    assert!(core::mem::offset_of!(cg_t, crosshairClientNum) == 12912);
+    assert!(core::mem::offset_of!(cg_t, crosshairClientTime) == 12916);
+    assert!(core::mem::offset_of!(cg_t, crosshairVehNum) == 12920);
+    assert!(core::mem::offset_of!(cg_t, crosshairVehTime) == 12924);
+    assert!(core::mem::offset_of!(cg_t, powerupActive) == 12928);
+    assert!(core::mem::offset_of!(cg_t, powerupTime) == 12932);
+    assert!(core::mem::offset_of!(cg_t, attackerTime) == 12936);
+    assert!(core::mem::offset_of!(cg_t, voiceTime) == 12940);
+    assert!(core::mem::offset_of!(cg_t, rewardStack) == 12944);
+    assert!(core::mem::offset_of!(cg_t, rewardTime) == 12948);
+    assert!(core::mem::offset_of!(cg_t, rewardCount) == 12952);
+    assert!(core::mem::offset_of!(cg_t, rewardShader) == 12992);
+    assert!(core::mem::offset_of!(cg_t, rewardSound) == 13032);
+    assert!(core::mem::offset_of!(cg_t, soundBufferIn) == 13072);
+    assert!(core::mem::offset_of!(cg_t, soundBufferOut) == 13076);
+    assert!(core::mem::offset_of!(cg_t, soundTime) == 13080);
+    assert!(core::mem::offset_of!(cg_t, soundBuffer) == 13084);
+    assert!(core::mem::offset_of!(cg_t, voiceChatTime) == 13164);
+    assert!(core::mem::offset_of!(cg_t, voiceChatBufferIn) == 13168);
+    assert!(core::mem::offset_of!(cg_t, voiceChatBufferOut) == 13172);
+    assert!(core::mem::offset_of!(cg_t, warmup) == 13176);
+    assert!(core::mem::offset_of!(cg_t, warmupCount) == 13180);
+    assert!(core::mem::offset_of!(cg_t, itemPickup) == 13184);
+    assert!(core::mem::offset_of!(cg_t, itemPickupTime) == 13188);
+    assert!(core::mem::offset_of!(cg_t, itemPickupBlendTime) == 13192);
+    assert!(core::mem::offset_of!(cg_t, weaponSelectTime) == 13196);
+    assert!(core::mem::offset_of!(cg_t, weaponAnimation) == 13200);
+    assert!(core::mem::offset_of!(cg_t, weaponAnimationTime) == 13204);
+    assert!(core::mem::offset_of!(cg_t, damageTime) == 13208);
+    assert!(core::mem::offset_of!(cg_t, damageX) == 13212);
+    assert!(core::mem::offset_of!(cg_t, damageY) == 13216);
+    assert!(core::mem::offset_of!(cg_t, damageValue) == 13220);
+    assert!(core::mem::offset_of!(cg_t, headYaw) == 13224);
+    assert!(core::mem::offset_of!(cg_t, headEndPitch) == 13228);
+    assert!(core::mem::offset_of!(cg_t, headEndYaw) == 13232);
+    assert!(core::mem::offset_of!(cg_t, headEndTime) == 13236);
+    assert!(core::mem::offset_of!(cg_t, headStartPitch) == 13240);
+    assert!(core::mem::offset_of!(cg_t, headStartYaw) == 13244);
+    assert!(core::mem::offset_of!(cg_t, headStartTime) == 13248);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_time) == 13252);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_pitch) == 13256);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_roll) == 13260);
+    assert!(core::mem::offset_of!(cg_t, kick_angles) == 13264);
+    assert!(core::mem::offset_of!(cg_t, kick_time) == 13276);
+    assert!(core::mem::offset_of!(cg_t, kick_origin) == 13280);
+    assert!(core::mem::offset_of!(cg_t, bobfracsin) == 13292);
+    assert!(core::mem::offset_of!(cg_t, bobcycle) == 13296);
+    assert!(core::mem::offset_of!(cg_t, xyspeed) == 13300);
+    assert!(core::mem::offset_of!(cg_t, nextOrbitTime) == 13304);
+    assert!(core::mem::offset_of!(cg_t, loadLCARSStage) == 13308);
+    assert!(core::mem::offset_of!(cg_t, forceHUDTotalFlashTime) == 13312);
+    assert!(core::mem::offset_of!(cg_t, forceHUDNextFlashTime) == 13316);
+    assert!(core::mem::offset_of!(cg_t, forceHUDActive) == 13320);
+    assert!(core::mem::offset_of!(cg_t, testModelEntity) == 13328);
+    assert!(core::mem::offset_of!(cg_t, testModelName) == 13544);
+    assert!(core::mem::offset_of!(cg_t, testGun) == 13608);
+    assert!(core::mem::offset_of!(cg_t, VHUDFlashTime) == 13612);
+    assert!(core::mem::offset_of!(cg_t, VHUDTurboFlag) == 13616);
+    assert!(core::mem::offset_of!(cg_t, HUDTickFlashTime) == 13620);
+    assert!(core::mem::offset_of!(cg_t, HUDArmorFlag) == 13624);
+    assert!(core::mem::offset_of!(cg_t, HUDHealthFlag) == 13628);
+    assert!(core::mem::offset_of!(cg_t, iconHUDActive) == 13632);
+    assert!(core::mem::offset_of!(cg_t, iconHUDPercent) == 13636);
+    assert!(core::mem::offset_of!(cg_t, iconSelectTime) == 13640);
+    assert!(core::mem::offset_of!(cg_t, invenSelectTime) == 13644);
+    assert!(core::mem::offset_of!(cg_t, forceSelectTime) == 13648);
+    assert!(core::mem::offset_of!(cg_t, lastFPFlashPoint) == 13652);
+    assert!(core::mem::offset_of!(cg_t, testModel) == 13664);
+    assert!(core::mem::offset_of!(cg_t, activeSnapshots) == 13668);
+};
+// ILP32 twin: clang i386 ground truth, where msvc and linux-gnu agree.
+// These numbers are the retail 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::offset_of!(cg_t, snap) == 36);
+    assert!(core::mem::offset_of!(cg_t, nextSnap) == 40);
+    assert!(core::mem::offset_of!(cg_t, frameInterpolation) == 44);
+    assert!(core::mem::offset_of!(cg_t, mMapChange) == 48);
+    assert!(core::mem::offset_of!(cg_t, thisFrameTeleport) == 52);
+    assert!(core::mem::offset_of!(cg_t, nextFrameTeleport) == 56);
+    assert!(core::mem::offset_of!(cg_t, frametime) == 60);
+    assert!(core::mem::offset_of!(cg_t, time) == 64);
+    assert!(core::mem::offset_of!(cg_t, oldTime) == 68);
+    assert!(core::mem::offset_of!(cg_t, physicsTime) == 72);
+    assert!(core::mem::offset_of!(cg_t, timelimitWarnings) == 76);
+    assert!(core::mem::offset_of!(cg_t, fraglimitWarnings) == 80);
+    assert!(core::mem::offset_of!(cg_t, mapRestart) == 84);
+    assert!(core::mem::offset_of!(cg_t, mInRMG) == 88);
+    assert!(core::mem::offset_of!(cg_t, mRMGWeather) == 92);
+    assert!(core::mem::offset_of!(cg_t, renderingThirdPerson) == 96);
+    assert!(core::mem::offset_of!(cg_t, hyperspace) == 100);
+    assert!(core::mem::offset_of!(cg_t, predictedPlayerState) == 104);
+    assert!(core::mem::offset_of!(cg_t, predictedVehicleState) == 1656);
+    assert!(core::mem::offset_of!(cg_t, validPPS) == 3208);
+    assert!(core::mem::offset_of!(cg_t, predictedErrorTime) == 3212);
+    assert!(core::mem::offset_of!(cg_t, predictedError) == 3216);
+    assert!(core::mem::offset_of!(cg_t, eventSequence) == 3228);
+    assert!(core::mem::offset_of!(cg_t, predictableEvents) == 3232);
+    assert!(core::mem::offset_of!(cg_t, stepChange) == 3296);
+    assert!(core::mem::offset_of!(cg_t, stepTime) == 3300);
+    assert!(core::mem::offset_of!(cg_t, duckChange) == 3304);
+    assert!(core::mem::offset_of!(cg_t, duckTime) == 3308);
+    assert!(core::mem::offset_of!(cg_t, landChange) == 3312);
+    assert!(core::mem::offset_of!(cg_t, landTime) == 3316);
+    assert!(core::mem::offset_of!(cg_t, weaponSelect) == 3320);
+    assert!(core::mem::offset_of!(cg_t, forceSelect) == 3324);
+    assert!(core::mem::offset_of!(cg_t, itemSelect) == 3328);
+    assert!(core::mem::offset_of!(cg_t, autoAngles) == 3332);
+    assert!(core::mem::offset_of!(cg_t, autoAxis) == 3344);
+    assert!(core::mem::offset_of!(cg_t, autoAnglesFast) == 3380);
+    assert!(core::mem::offset_of!(cg_t, autoAxisFast) == 3392);
+    assert!(core::mem::offset_of!(cg_t, refdef) == 3428);
+    assert!(core::mem::offset_of!(cg_t, zoomed) == 3812);
+    assert!(core::mem::offset_of!(cg_t, zoomTime) == 3816);
+    assert!(core::mem::offset_of!(cg_t, zoomSensitivity) == 3820);
+    assert!(core::mem::offset_of!(cg_t, infoScreenText) == 3824);
+    assert!(core::mem::offset_of!(cg_t, scoresRequestTime) == 4848);
+    assert!(core::mem::offset_of!(cg_t, numScores) == 4852);
+    assert!(core::mem::offset_of!(cg_t, selectedScore) == 4856);
+    assert!(core::mem::offset_of!(cg_t, teamScores) == 4860);
+    assert!(core::mem::offset_of!(cg_t, scores) == 4868);
+    assert!(core::mem::offset_of!(cg_t, showScores) == 6788);
+    assert!(core::mem::offset_of!(cg_t, scoreBoardShowing) == 6792);
+    assert!(core::mem::offset_of!(cg_t, scoreFadeTime) == 6796);
+    assert!(core::mem::offset_of!(cg_t, killerName) == 6800);
+    assert!(core::mem::offset_of!(cg_t, spectatorList) == 6832);
+    assert!(core::mem::offset_of!(cg_t, spectatorLen) == 7856);
+    assert!(core::mem::offset_of!(cg_t, spectatorWidth) == 7860);
+    assert!(core::mem::offset_of!(cg_t, spectatorTime) == 7864);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintX) == 7868);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintX2) == 7872);
+    assert!(core::mem::offset_of!(cg_t, spectatorOffset) == 7876);
+    assert!(core::mem::offset_of!(cg_t, spectatorPaintLen) == 7880);
+    assert!(core::mem::offset_of!(cg_t, skulltrails) == 7884);
+    assert!(core::mem::offset_of!(cg_t, centerPrintTime) == 11852);
+    assert!(core::mem::offset_of!(cg_t, centerPrintCharWidth) == 11856);
+    assert!(core::mem::offset_of!(cg_t, centerPrintY) == 11860);
+    assert!(core::mem::offset_of!(cg_t, centerPrint) == 11864);
+    assert!(core::mem::offset_of!(cg_t, centerPrintLines) == 12888);
+    assert!(core::mem::offset_of!(cg_t, lowAmmoWarning) == 12892);
+    assert!(core::mem::offset_of!(cg_t, lastKillTime) == 12896);
+    assert!(core::mem::offset_of!(cg_t, crosshairClientNum) == 12900);
+    assert!(core::mem::offset_of!(cg_t, crosshairClientTime) == 12904);
+    assert!(core::mem::offset_of!(cg_t, crosshairVehNum) == 12908);
+    assert!(core::mem::offset_of!(cg_t, crosshairVehTime) == 12912);
+    assert!(core::mem::offset_of!(cg_t, powerupActive) == 12916);
+    assert!(core::mem::offset_of!(cg_t, powerupTime) == 12920);
+    assert!(core::mem::offset_of!(cg_t, attackerTime) == 12924);
+    assert!(core::mem::offset_of!(cg_t, voiceTime) == 12928);
+    assert!(core::mem::offset_of!(cg_t, rewardStack) == 12932);
+    assert!(core::mem::offset_of!(cg_t, rewardTime) == 12936);
+    assert!(core::mem::offset_of!(cg_t, rewardCount) == 12940);
+    assert!(core::mem::offset_of!(cg_t, rewardShader) == 12980);
+    assert!(core::mem::offset_of!(cg_t, rewardSound) == 13020);
+    assert!(core::mem::offset_of!(cg_t, soundBufferIn) == 13060);
+    assert!(core::mem::offset_of!(cg_t, soundBufferOut) == 13064);
+    assert!(core::mem::offset_of!(cg_t, soundTime) == 13068);
+    assert!(core::mem::offset_of!(cg_t, soundBuffer) == 13072);
+    assert!(core::mem::offset_of!(cg_t, voiceChatTime) == 13152);
+    assert!(core::mem::offset_of!(cg_t, voiceChatBufferIn) == 13156);
+    assert!(core::mem::offset_of!(cg_t, voiceChatBufferOut) == 13160);
+    assert!(core::mem::offset_of!(cg_t, warmup) == 13164);
+    assert!(core::mem::offset_of!(cg_t, warmupCount) == 13168);
+    assert!(core::mem::offset_of!(cg_t, itemPickup) == 13172);
+    assert!(core::mem::offset_of!(cg_t, itemPickupTime) == 13176);
+    assert!(core::mem::offset_of!(cg_t, itemPickupBlendTime) == 13180);
+    assert!(core::mem::offset_of!(cg_t, weaponSelectTime) == 13184);
+    assert!(core::mem::offset_of!(cg_t, weaponAnimation) == 13188);
+    assert!(core::mem::offset_of!(cg_t, weaponAnimationTime) == 13192);
+    assert!(core::mem::offset_of!(cg_t, damageTime) == 13196);
+    assert!(core::mem::offset_of!(cg_t, damageX) == 13200);
+    assert!(core::mem::offset_of!(cg_t, damageY) == 13204);
+    assert!(core::mem::offset_of!(cg_t, damageValue) == 13208);
+    assert!(core::mem::offset_of!(cg_t, headYaw) == 13212);
+    assert!(core::mem::offset_of!(cg_t, headEndPitch) == 13216);
+    assert!(core::mem::offset_of!(cg_t, headEndYaw) == 13220);
+    assert!(core::mem::offset_of!(cg_t, headEndTime) == 13224);
+    assert!(core::mem::offset_of!(cg_t, headStartPitch) == 13228);
+    assert!(core::mem::offset_of!(cg_t, headStartYaw) == 13232);
+    assert!(core::mem::offset_of!(cg_t, headStartTime) == 13236);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_time) == 13240);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_pitch) == 13244);
+    assert!(core::mem::offset_of!(cg_t, v_dmg_roll) == 13248);
+    assert!(core::mem::offset_of!(cg_t, kick_angles) == 13252);
+    assert!(core::mem::offset_of!(cg_t, kick_time) == 13264);
+    assert!(core::mem::offset_of!(cg_t, kick_origin) == 13268);
+    assert!(core::mem::offset_of!(cg_t, bobfracsin) == 13280);
+    assert!(core::mem::offset_of!(cg_t, bobcycle) == 13284);
+    assert!(core::mem::offset_of!(cg_t, xyspeed) == 13288);
+    assert!(core::mem::offset_of!(cg_t, nextOrbitTime) == 13292);
+    assert!(core::mem::offset_of!(cg_t, loadLCARSStage) == 13296);
+    assert!(core::mem::offset_of!(cg_t, forceHUDTotalFlashTime) == 13300);
+    assert!(core::mem::offset_of!(cg_t, forceHUDNextFlashTime) == 13304);
+    assert!(core::mem::offset_of!(cg_t, forceHUDActive) == 13308);
+    assert!(core::mem::offset_of!(cg_t, testModelEntity) == 13312);
+    assert!(core::mem::offset_of!(cg_t, testModelName) == 13524);
+    assert!(core::mem::offset_of!(cg_t, testGun) == 13588);
+    assert!(core::mem::offset_of!(cg_t, VHUDFlashTime) == 13592);
+    assert!(core::mem::offset_of!(cg_t, VHUDTurboFlag) == 13596);
+    assert!(core::mem::offset_of!(cg_t, HUDTickFlashTime) == 13600);
+    assert!(core::mem::offset_of!(cg_t, HUDArmorFlag) == 13604);
+    assert!(core::mem::offset_of!(cg_t, HUDHealthFlag) == 13608);
+    assert!(core::mem::offset_of!(cg_t, iconHUDActive) == 13612);
+    assert!(core::mem::offset_of!(cg_t, iconHUDPercent) == 13616);
+    assert!(core::mem::offset_of!(cg_t, iconSelectTime) == 13620);
+    assert!(core::mem::offset_of!(cg_t, invenSelectTime) == 13624);
+    assert!(core::mem::offset_of!(cg_t, forceSelectTime) == 13628);
+    assert!(core::mem::offset_of!(cg_t, lastFPFlashPoint) == 13632);
+    assert!(core::mem::offset_of!(cg_t, testModel) == 13644);
+    assert!(core::mem::offset_of!(cg_t, activeSnapshots) == 13648);
+};
 // Asserts from `sharedBuffer` onward (and the total-size assert) retired:
 // DEC-46.6 hoisted the engine-registered buffer to `CgWorld::shared_buffer`
 // (pinned Box, copy-out decode), so the field left `cg_t` and every later
