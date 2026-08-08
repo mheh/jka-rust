@@ -147,141 +147,150 @@ impl cgs_t {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<cgs_t>() == 229576);
-#[cfg(target_pointer_width = "64")]
+// `gameState` sits at the front of the struct, so its offset holds on both pointer widths.
 const _: () = assert!(core::mem::offset_of!(cgs_t, gameState) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, glconfig) == 22808);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, screenXScale) == 22904);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, screenYScale) == 22908);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, screenXBias) == 22912);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, serverCommandSequence) == 22916);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, processedSnapshotNum) == 22920);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, localServer) == 22924);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, siegeTeamSwitch) == 22928);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, showDuelHealths) == 22932);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, gametype) == 22936);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, debugMelee) == 22940);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, stepSlideFix) == 22944);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, noSpecMove) == 22948);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, dmflags) == 22952);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamflags) == 22956);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, fraglimit) == 22960);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duel_fraglimit) == 22964);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, capturelimit) == 22968);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, timelimit) == 22972);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, maxclients) == 22976);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, needpass) == 22980);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, jediVmerc) == 22984);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, wDisable) == 22988);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, fDisable) == 22992);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, mapname) == 22996);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, voteTime) == 23060);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, voteYes) == 23064);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, voteNo) == 23068);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, voteModified) == 23072);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, voteString) == 23076);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamVoteTime) == 24100);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamVoteYes) == 24108);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamVoteNo) == 24116);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamVoteModified) == 24124);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, teamVoteString) == 24132);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, levelStartTime) == 26180);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, scores1) == 26184);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, scores2) == 26188);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, jediMaster) == 26192);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelWinner) == 26196);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist1) == 26200);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist2) == 26204);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist3) == 26208);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist1health) == 26212);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist2health) == 26216);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, duelist3health) == 26220);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, redflag) == 26224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, blueflag) == 26228);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, flagStatus) == 26232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, newHud) == 26236);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, gameModels) == 26240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, gameSounds) == 28288);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, gameEffects) == 29312);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, gameIcons) == 29568);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, numInlineModels) == 29824);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, inlineDrawModel) == 29828);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, inlineModelMidpoints) == 31876);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, clientinfo) == 38024);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, cursorX) == 227464);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, cursorY) == 227468);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, eventHandling) == 227472);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, mouseCaptured) == 227476);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, sizingHud) == 227480);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, capturedItem) == 227488);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, activeCursor) == 227496);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, media) == 227500);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cgs_t, effects) == 229216);
+// `glconfig` holds four `const char *`, so its alignment and every offset from `glconfig` onward change with the pointer width.
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<cgs_t>() == 229576);
+    assert!(core::mem::offset_of!(cgs_t, glconfig) == 22808);
+    assert!(core::mem::offset_of!(cgs_t, screenXScale) == 22904);
+    assert!(core::mem::offset_of!(cgs_t, screenYScale) == 22908);
+    assert!(core::mem::offset_of!(cgs_t, screenXBias) == 22912);
+    assert!(core::mem::offset_of!(cgs_t, serverCommandSequence) == 22916);
+    assert!(core::mem::offset_of!(cgs_t, processedSnapshotNum) == 22920);
+    assert!(core::mem::offset_of!(cgs_t, localServer) == 22924);
+    assert!(core::mem::offset_of!(cgs_t, siegeTeamSwitch) == 22928);
+    assert!(core::mem::offset_of!(cgs_t, showDuelHealths) == 22932);
+    assert!(core::mem::offset_of!(cgs_t, gametype) == 22936);
+    assert!(core::mem::offset_of!(cgs_t, debugMelee) == 22940);
+    assert!(core::mem::offset_of!(cgs_t, stepSlideFix) == 22944);
+    assert!(core::mem::offset_of!(cgs_t, noSpecMove) == 22948);
+    assert!(core::mem::offset_of!(cgs_t, dmflags) == 22952);
+    assert!(core::mem::offset_of!(cgs_t, teamflags) == 22956);
+    assert!(core::mem::offset_of!(cgs_t, fraglimit) == 22960);
+    assert!(core::mem::offset_of!(cgs_t, duel_fraglimit) == 22964);
+    assert!(core::mem::offset_of!(cgs_t, capturelimit) == 22968);
+    assert!(core::mem::offset_of!(cgs_t, timelimit) == 22972);
+    assert!(core::mem::offset_of!(cgs_t, maxclients) == 22976);
+    assert!(core::mem::offset_of!(cgs_t, needpass) == 22980);
+    assert!(core::mem::offset_of!(cgs_t, jediVmerc) == 22984);
+    assert!(core::mem::offset_of!(cgs_t, wDisable) == 22988);
+    assert!(core::mem::offset_of!(cgs_t, fDisable) == 22992);
+    assert!(core::mem::offset_of!(cgs_t, mapname) == 22996);
+    assert!(core::mem::offset_of!(cgs_t, voteTime) == 23060);
+    assert!(core::mem::offset_of!(cgs_t, voteYes) == 23064);
+    assert!(core::mem::offset_of!(cgs_t, voteNo) == 23068);
+    assert!(core::mem::offset_of!(cgs_t, voteModified) == 23072);
+    assert!(core::mem::offset_of!(cgs_t, voteString) == 23076);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteTime) == 24100);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteYes) == 24108);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteNo) == 24116);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteModified) == 24124);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteString) == 24132);
+    assert!(core::mem::offset_of!(cgs_t, levelStartTime) == 26180);
+    assert!(core::mem::offset_of!(cgs_t, scores1) == 26184);
+    assert!(core::mem::offset_of!(cgs_t, scores2) == 26188);
+    assert!(core::mem::offset_of!(cgs_t, jediMaster) == 26192);
+    assert!(core::mem::offset_of!(cgs_t, duelWinner) == 26196);
+    assert!(core::mem::offset_of!(cgs_t, duelist1) == 26200);
+    assert!(core::mem::offset_of!(cgs_t, duelist2) == 26204);
+    assert!(core::mem::offset_of!(cgs_t, duelist3) == 26208);
+    assert!(core::mem::offset_of!(cgs_t, duelist1health) == 26212);
+    assert!(core::mem::offset_of!(cgs_t, duelist2health) == 26216);
+    assert!(core::mem::offset_of!(cgs_t, duelist3health) == 26220);
+    assert!(core::mem::offset_of!(cgs_t, redflag) == 26224);
+    assert!(core::mem::offset_of!(cgs_t, blueflag) == 26228);
+    assert!(core::mem::offset_of!(cgs_t, flagStatus) == 26232);
+    assert!(core::mem::offset_of!(cgs_t, newHud) == 26236);
+    assert!(core::mem::offset_of!(cgs_t, gameModels) == 26240);
+    assert!(core::mem::offset_of!(cgs_t, gameSounds) == 28288);
+    assert!(core::mem::offset_of!(cgs_t, gameEffects) == 29312);
+    assert!(core::mem::offset_of!(cgs_t, gameIcons) == 29568);
+    assert!(core::mem::offset_of!(cgs_t, numInlineModels) == 29824);
+    assert!(core::mem::offset_of!(cgs_t, inlineDrawModel) == 29828);
+    assert!(core::mem::offset_of!(cgs_t, inlineModelMidpoints) == 31876);
+    assert!(core::mem::offset_of!(cgs_t, clientinfo) == 38024);
+    assert!(core::mem::offset_of!(cgs_t, cursorX) == 227464);
+    assert!(core::mem::offset_of!(cgs_t, cursorY) == 227468);
+    assert!(core::mem::offset_of!(cgs_t, eventHandling) == 227472);
+    assert!(core::mem::offset_of!(cgs_t, mouseCaptured) == 227476);
+    assert!(core::mem::offset_of!(cgs_t, sizingHud) == 227480);
+    assert!(core::mem::offset_of!(cgs_t, capturedItem) == 227488);
+    assert!(core::mem::offset_of!(cgs_t, activeCursor) == 227496);
+    assert!(core::mem::offset_of!(cgs_t, media) == 227500);
+    assert!(core::mem::offset_of!(cgs_t, effects) == 229216);
+};
+// ILP32 twin: clang i386 ground truth, where msvc and linux-gnu agree.
+// These numbers are the retail 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<cgs_t>() == 229024);
+    assert!(core::mem::offset_of!(cgs_t, glconfig) == 22804);
+    assert!(core::mem::offset_of!(cgs_t, screenXScale) == 22880);
+    assert!(core::mem::offset_of!(cgs_t, screenYScale) == 22884);
+    assert!(core::mem::offset_of!(cgs_t, screenXBias) == 22888);
+    assert!(core::mem::offset_of!(cgs_t, serverCommandSequence) == 22892);
+    assert!(core::mem::offset_of!(cgs_t, processedSnapshotNum) == 22896);
+    assert!(core::mem::offset_of!(cgs_t, localServer) == 22900);
+    assert!(core::mem::offset_of!(cgs_t, siegeTeamSwitch) == 22904);
+    assert!(core::mem::offset_of!(cgs_t, showDuelHealths) == 22908);
+    assert!(core::mem::offset_of!(cgs_t, gametype) == 22912);
+    assert!(core::mem::offset_of!(cgs_t, debugMelee) == 22916);
+    assert!(core::mem::offset_of!(cgs_t, stepSlideFix) == 22920);
+    assert!(core::mem::offset_of!(cgs_t, noSpecMove) == 22924);
+    assert!(core::mem::offset_of!(cgs_t, dmflags) == 22928);
+    assert!(core::mem::offset_of!(cgs_t, teamflags) == 22932);
+    assert!(core::mem::offset_of!(cgs_t, fraglimit) == 22936);
+    assert!(core::mem::offset_of!(cgs_t, duel_fraglimit) == 22940);
+    assert!(core::mem::offset_of!(cgs_t, capturelimit) == 22944);
+    assert!(core::mem::offset_of!(cgs_t, timelimit) == 22948);
+    assert!(core::mem::offset_of!(cgs_t, maxclients) == 22952);
+    assert!(core::mem::offset_of!(cgs_t, needpass) == 22956);
+    assert!(core::mem::offset_of!(cgs_t, jediVmerc) == 22960);
+    assert!(core::mem::offset_of!(cgs_t, wDisable) == 22964);
+    assert!(core::mem::offset_of!(cgs_t, fDisable) == 22968);
+    assert!(core::mem::offset_of!(cgs_t, mapname) == 22972);
+    assert!(core::mem::offset_of!(cgs_t, voteTime) == 23036);
+    assert!(core::mem::offset_of!(cgs_t, voteYes) == 23040);
+    assert!(core::mem::offset_of!(cgs_t, voteNo) == 23044);
+    assert!(core::mem::offset_of!(cgs_t, voteModified) == 23048);
+    assert!(core::mem::offset_of!(cgs_t, voteString) == 23052);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteTime) == 24076);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteYes) == 24084);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteNo) == 24092);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteModified) == 24100);
+    assert!(core::mem::offset_of!(cgs_t, teamVoteString) == 24108);
+    assert!(core::mem::offset_of!(cgs_t, levelStartTime) == 26156);
+    assert!(core::mem::offset_of!(cgs_t, scores1) == 26160);
+    assert!(core::mem::offset_of!(cgs_t, scores2) == 26164);
+    assert!(core::mem::offset_of!(cgs_t, jediMaster) == 26168);
+    assert!(core::mem::offset_of!(cgs_t, duelWinner) == 26172);
+    assert!(core::mem::offset_of!(cgs_t, duelist1) == 26176);
+    assert!(core::mem::offset_of!(cgs_t, duelist2) == 26180);
+    assert!(core::mem::offset_of!(cgs_t, duelist3) == 26184);
+    assert!(core::mem::offset_of!(cgs_t, duelist1health) == 26188);
+    assert!(core::mem::offset_of!(cgs_t, duelist2health) == 26192);
+    assert!(core::mem::offset_of!(cgs_t, duelist3health) == 26196);
+    assert!(core::mem::offset_of!(cgs_t, redflag) == 26200);
+    assert!(core::mem::offset_of!(cgs_t, blueflag) == 26204);
+    assert!(core::mem::offset_of!(cgs_t, flagStatus) == 26208);
+    assert!(core::mem::offset_of!(cgs_t, newHud) == 26212);
+    assert!(core::mem::offset_of!(cgs_t, gameModels) == 26216);
+    assert!(core::mem::offset_of!(cgs_t, gameSounds) == 28264);
+    assert!(core::mem::offset_of!(cgs_t, gameEffects) == 29288);
+    assert!(core::mem::offset_of!(cgs_t, gameIcons) == 29544);
+    assert!(core::mem::offset_of!(cgs_t, numInlineModels) == 29800);
+    assert!(core::mem::offset_of!(cgs_t, inlineDrawModel) == 29804);
+    assert!(core::mem::offset_of!(cgs_t, inlineModelMidpoints) == 31852);
+    assert!(core::mem::offset_of!(cgs_t, clientinfo) == 37996);
+    assert!(core::mem::offset_of!(cgs_t, cursorX) == 226924);
+    assert!(core::mem::offset_of!(cgs_t, cursorY) == 226928);
+    assert!(core::mem::offset_of!(cgs_t, eventHandling) == 226932);
+    assert!(core::mem::offset_of!(cgs_t, mouseCaptured) == 226936);
+    assert!(core::mem::offset_of!(cgs_t, sizingHud) == 226940);
+    assert!(core::mem::offset_of!(cgs_t, capturedItem) == 226944);
+    assert!(core::mem::offset_of!(cgs_t, activeCursor) == 226948);
+    assert!(core::mem::offset_of!(cgs_t, media) == 226952);
+    assert!(core::mem::offset_of!(cgs_t, effects) == 228668);
+};
