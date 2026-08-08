@@ -66,6 +66,8 @@ Finding 6, the rule-19 note. Both `animMap` site notes now carry the ratified se
 
 Findings 1, 5 and 7 need no code. Finding 1 authorizes the `ccea53c9` README rider after the fact. Finding 5 exempts "seam" from the pet-vocabulary ban. Finding 7 corrects the packet's row-4 bless criterion in place and rules out a code change and a re-bless.
 
+The walk then ratified the two residuals the fix round had left open, and `22059f28 fix(gh#31 s008): the residual wording and column breaks` closes both. The `ROTATE_SHADER` doc in `hud_golden.rs` now names `tr.defaultImage` a white-bordered box, which agrees with the module doc above it. The four comment lines in `frame_exec.rs` at the interleave divergence note, the `draw_rotate_pic` doc and the blend note each break at a clause boundary now, with the wording unchanged. That commit changes comments only, so `cargo build --workspace` warning-free and `cargo test --workspace -- --test-threads=1` green were the whole gate, and no golden suite needed a separate serial run.
+
 The full battery ran on the fix commit. `cargo build --workspace` reported zero warnings, `cargo test --workspace -- --test-threads=1` reported no failures, and all fifteen committed fixtures stayed byte-identical: four world goldens, seven scene goldens, `entity_duel1`, `ghoul2_verts_stormtrooper`, `hud_2d` and `hud_font_ocr_a`. Both `hud_golden` lanes ran green. No behavior changed, since every edit is a comment or an assert message.
 
 ## Open gaps
@@ -78,4 +80,4 @@ The 2D color register stays in floats. `RB_SetColor` truncates to bytes, and thi
 
 Neither rotate arm evaluates a `stage2d` pass. The oracle runs no `tcMod`, no `rgbGen` and no animation frame here, so a shader that needs one to look right would mean the reading is wrong, not that the code is missing a call.
 
-Two residuals fall outside the four ratified corrections, and both need a one-line ruling rather than a guess from this lane. First, the `ROTATE_SHADER` doc in `hud_golden.rs` still calls `tr.defaultImage` a "procedural checkerboard", which finding 7 established is wrong, and the module doc six screens above already says "bordered box". Finding 7 ruled no code change, so the word stands. Second, four added comment lines in `frame_exec.rs` sit over the 150-column limit at lines 1130, 1131, 1605 and 1632. The vet flagged the wrapping in `hud_golden.rs` only, so finding 4 does not reach them.
+The two residuals this lane raised are both closed. The walk ratified them on 2026-08-07 and `22059f28` landed the corrections, so no wording or column question stays open.
