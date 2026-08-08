@@ -19,6 +19,7 @@
 //! **Determinism.** Both tests fix the viewport and the shader clock ([`FROZEN_TIME_MS`], the fixed-dt seam DEC-58.1 names).
 //! Two runs therefore submit identical geometry.
 //!
+// The British spelling "Rasterisation" below is a carried defect, kept by the user ruling of 2026-08-07.
 //! **Backend caveat.** Rasterisation is the GPU's.
 //! A golden blessed on one adapter can differ by a channel step on another, so [`CHANNEL_TOLERANCE`] exists as the knob to widen.
 //! It is zero today.
