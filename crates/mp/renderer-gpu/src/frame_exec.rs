@@ -522,8 +522,10 @@ impl FrameExecutor {
                     stats.quads += 1;
                 }
 
-                // Accepted divergence: the oracle draws a rotate pic immediately, ahead of the stretch pics still pending in `tess`, and this backend appends it in command order.
-                // The disruptor zoom shows the face of it: the oracle flushes the mask over the insert, and we layer the insert over the mask (`oracle/codemp/cgame/cg_draw.c:349-350,365`).
+                // Accepted divergence: the oracle draws a rotate pic immediately, ahead of the stretch pics still pending in `tess`,
+                // and this backend appends it in command order.
+                // The disruptor zoom shows the face of it: the oracle flushes the mask over the insert,
+                // and we layer the insert over the mask (`oracle/codemp/cgame/cg_draw.c:349-350,365`).
                 FrameEvent::DrawRotatePic {
                     x,
                     y,
@@ -997,7 +999,8 @@ impl FrameExecutor {
         drawn
     }
 
-    /// `RB_RotatePic`: one quad rotated `angle` degrees about its own top-right corner, textured from stage 0's bundle image and colored by the `RE_SetColor` register.
+    /// `RB_RotatePic`: one quad rotated `angle` degrees about its own top-right corner,
+    /// textured from stage 0's bundle image and colored by the `RE_SetColor` register.
     /// Returns the quads batched: one, or zero when stage 0 binds no image.
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:1498-1541`
@@ -1024,7 +1027,8 @@ impl FrameExecutor {
         let xy = rotated_corners(pivot, local, angle);
 
         // The oracle issues no `GL_State` for this arm, so it draws in whatever state the last flush left.
-        // We draw at `GLS_2D_DEFAULT`, the state `RB_SetGL2D` installs (`tr_backend.cpp:1282-1284`), because this backend has no flush point to inherit from.
+        // We draw at `GLS_2D_DEFAULT`, the state `RB_SetGL2D` installs (`tr_backend.cpp:1282-1284`),
+        // because this backend has no flush point to inherit from.
         let blend = blend_state_from_gls(GLS_2D_DEFAULT);
 
         let Some(asset) = assets.shaders.get(shader) else {

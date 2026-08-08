@@ -94,7 +94,7 @@ const REFERENCE_SHADER: &str = "gfx/hud/reference";
 
 /// The name both rotate pics register.
 /// The script does not define it and no image file exists, so it resolves to `tr.defaultShader`.
-/// Stage 0 of that shader binds the procedural checkerboard `tr.defaultImage`.
+/// Stage 0 of that shader binds `tr.defaultImage`, the white-bordered box `R_CreateDefaultImage` builds.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:3705-3717` (`CreateInternalShaders`)
 const ROTATE_SHADER: &str = "gfx/hud/rotate";
