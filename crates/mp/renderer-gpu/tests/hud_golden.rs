@@ -1,10 +1,12 @@
 //! The image-golden gate for the census 2D group (DEC-54).
 //!
 //! Every other golden in this crate draws 3D content. This file draws the 2D
-//! screen alone, so the `SetColor`, `DrawStretchPic`, `DrawRotatePic` and
-//! `DrawRotatePic2` rows all reach a committed image. No test calls
-//! `RE_RenderScene`, so nothing here depends on a world, a camera, or the 3D
-//! pipeline.
+//! screen alone, so the `SetColor`, `DrawStretchPic`, `DrawRotatePic`,
+//! `DrawRotatePic2` and `Font_DrawString` rows all reach a committed image.
+//! Neither test calls `RE_RenderScene`, so nothing here depends on a world, a
+//! camera, or the 3D pipeline.
+//!
+//! Two tests run.
 //!
 //! [`golden_hud_2d`] is synthetic and asset-free. It boots against a temp game
 //! tree this file writes, the same recipe `scene_golden.rs` uses, and draws
@@ -13,7 +15,12 @@
 //! two rotate pics resolve to the default shader, whose bordered box makes the
 //! rotation visible; a flat square would not.
 //!
-//! **Determinism.** The test fixes the viewport and the shader clock
+//! [`golden_hud_font`] needs the retail assets and stays `#[ignore]`d, the
+//! idiom every retail golden in this crate follows. It registers `ocr_a`, the
+//! cgame small font, and draws one color-coded string through
+//! `RE_Font_DrawString`.
+//!
+//! **Determinism.** Both tests fix the viewport and the shader clock
 //! ([`FROZEN_TIME_MS`], the fixed-dt seam DEC-58.1 names), so two runs submit
 //! identical geometry.
 //!
@@ -43,6 +50,7 @@ use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_font::{Language_e, RE_Font_DrawString, RE_RegisterFont};
 use mp_renderer::tr_model::render_models::RenderModels;
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
@@ -61,6 +69,14 @@ const FROZEN_TIME_MS: i32 = 12345;
 /// The per-channel match tolerance. Zero means an exact match. Widen this if
 /// the same frame ever renders a step apart on a second adapter.
 const CHANNEL_TOLERANCE: u8 = 0;
+
+/// The language package the font path runs under. The retail western package
+/// is the only one this gate reads.
+const GOLDEN_LANGUAGE: Language_e = Language_e::eWestern;
+
+/// `se_language->modificationCount`. Nothing changes the language here, so the
+/// count stays at its start value.
+const GOLDEN_LANGUAGE_MODCOUNT: i32 = 0;
 
 /// The shader the synthetic reference quad draws through. `$whiteimage` binds
 /// `tr.whiteImage`, which `R_CreateBuiltinImages` generates, so no texture file
@@ -157,6 +173,20 @@ fn boot_synthetic() -> UiHost {
     host
 }
 
+/// Boots a full host against the retail tree. `JKA_BASEPATH` overrides the
+/// default path, so another machine can re-bless the golden without an edit.
+fn boot_retail() -> UiHost {
+    let mut cfg = BootConfig::default();
+    if let Ok(basepath) = std::env::var("JKA_BASEPATH") {
+        cfg.basepath = basepath;
+    }
+    report_com_error();
+
+    let mut host = boot::boot(&cfg);
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
+    host
+}
+
 /// Registers `name` and returns its handle.
 fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
     let re_ptr: *mut RendererFrontend = &mut host.re;
@@ -190,6 +220,106 @@ fn register_shader(host: &mut UiHost, name: &str) -> qhandle_t {
         img_state,
         sky_view,
     )
+}
+
+/// Registers `name` through `RE_RegisterFont`, which loads the `.fontdat` and
+/// its glyph pages off the retail pk3s.
+///
+/// Source: `crates/mp/renderer/src/tr_font.rs:1936-1949`
+fn register_font(host: &mut UiHost, name: &str) -> i32 {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
+    let UiHost {
+        engine,
+        models,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                qs,
+                sky_view,
+                font,
+                ..
+            },
+        ..
+    } = host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+    RE_RegisterFont(
+        qs,
+        world_load,
+        Arc::make_mut(&mut sim.published),
+        &mut view,
+        cvars,
+        models,
+        img_state,
+        sky_view,
+        font,
+        GOLDEN_LANGUAGE,
+        GOLDEN_LANGUAGE_MODCOUNT,
+        name,
+    )
+}
+
+/// Lays `text` out at `(ox, oy)` and records its glyphs into `frame_data`. The
+/// layout runs at trap time, so the stream carries one `SetColor` and one
+/// `DrawStretchPic` per glyph.
+///
+/// Source: `crates/mp/renderer/src/tr_font.rs:3051-3072`
+fn draw_font_string(
+    host: &mut UiHost,
+    frame_data: &mut FrameData,
+    handle: i32,
+    ox: i32,
+    oy: i32,
+    text: &[u8],
+) {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
+    let UiHost {
+        engine,
+        models,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                world_load,
+                qs,
+                sky_view,
+                font,
+                ..
+            },
+        ..
+    } = host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+    RE_Font_DrawString(
+        qs,
+        world_load,
+        Arc::make_mut(&mut sim.published),
+        &mut view,
+        cvars,
+        models,
+        img_state,
+        sky_view,
+        font,
+        GOLDEN_LANGUAGE,
+        GOLDEN_LANGUAGE_MODCOUNT,
+        frame_data,
+        ox,
+        oy,
+        text,
+        Some([1.0, 1.0, 1.0, 1.0]),
+        handle,
+        -1,
+        1.0,
+        FROZEN_TIME_MS,
+    );
 }
 
 /// The absolute path of the committed golden for `stem`.
@@ -252,8 +382,8 @@ fn compare(golden: &[u8], actual: &[u8]) -> (usize, u8) {
     (differing_pixels, max_delta)
 }
 
-/// How many pixels differ from the image's top-left one. The frame here leaves
-/// its corners at the clear color, so a zero means a blank render. That is
+/// How many pixels differ from the image's top-left one. Both frames here leave
+/// their corners at the clear color, so a zero means a blank render. That is
 /// the trap a golden must clear before it may bless: without it an inert draw
 /// path blesses an empty frame and the gate passes forever.
 fn coverage(rgba: &[u8]) -> usize {
@@ -264,8 +394,8 @@ fn coverage(rgba: &[u8]) -> usize {
 }
 
 /// Executes `frame_data` into an offscreen target at the frozen clock and reads
-/// the pixels back. No `RenderScene` event reaches the executor, so this runs
-/// the 2D path alone.
+/// the pixels back. No `RenderScene` event reaches the executor from either
+/// test, so this runs the 2D path alone.
 fn execute_2d_frame(
     gpu: &mut Gpu,
     host: &mut UiHost,
@@ -456,4 +586,41 @@ fn golden_hud_2d() {
     assert!(covered > 0, "nothing drawn - stats = {stats:?}");
 
     bless_or_compare("hud_2d", width, height, &actual, covered);
+}
+
+/// Census row `2d/Font_DrawString`: one color-coded string through the cgame
+/// small font. The `^1` and `^7` runs make the color-code branch of the layout
+/// visible in the image.
+///
+/// Source: `oracle/codemp/renderer/tr_font.cpp:1430-1614`;
+/// `oracle/codemp/cgame/cg_main.c:3748` (`ocr_a` is the cgame small font)
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_hud_font() {
+    let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
+
+    let mut host = boot_retail();
+    let font = register_font(&mut host, "ocr_a");
+    assert!(font != 0, "RE_RegisterFont(\"ocr_a\") returned zero");
+
+    let mut frame_data = FrameData { events: Vec::new() };
+    draw_font_string(
+        &mut host,
+        &mut frame_data,
+        font,
+        32,
+        64,
+        b"jka-rust ^1font ^7golden",
+    );
+
+    let (stats, width, height, actual) = execute_2d_frame(&mut gpu, &mut host, &frame_data);
+    assert_eq!(width, GOLDEN_WIDTH);
+    assert_eq!(height, GOLDEN_HEIGHT);
+
+    assert!(stats.quads > 0, "no glyph quad - stats = {stats:?}");
+    assert!(stats.draw_calls > 0, "no draw call - stats = {stats:?}");
+    let covered = coverage(&actual);
+    assert!(covered > 0, "nothing drawn - stats = {stats:?}");
+
+    bless_or_compare("hud_font_ocr_a", width, height, &actual, covered);
 }
