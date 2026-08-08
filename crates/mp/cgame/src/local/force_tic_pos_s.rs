@@ -16,17 +16,23 @@ pub struct forceTicPos_t {
     pub tic: qhandle_t,
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<forceTicPos_t>() == 32);
-#[cfg(target_pointer_width = "64")]
+// The head of the struct holds only 4-byte members, so these offsets hold on both pointer widths.
 const _: () = assert!(core::mem::offset_of!(forceTicPos_t, x) == 0);
-#[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(forceTicPos_t, y) == 4);
-#[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(forceTicPos_t, width) == 8);
-#[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(forceTicPos_t, height) == 12);
+// `file` is a pointer, so the size and the tail from `file` onward go in the width-gated blocks.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(forceTicPos_t, file) == 16);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(forceTicPos_t, tic) == 24);
+const _: () = {
+    assert!(core::mem::size_of::<forceTicPos_t>() == 32);
+    assert!(core::mem::offset_of!(forceTicPos_t, file) == 16);
+    assert!(core::mem::offset_of!(forceTicPos_t, tic) == 24);
+};
+// ILP32 twin: clang i386 ground truth, where msvc and linux-gnu agree.
+// These numbers are the retail 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<forceTicPos_t>() == 24);
+    assert!(core::mem::offset_of!(forceTicPos_t, file) == 16);
+    assert!(core::mem::offset_of!(forceTicPos_t, tic) == 20);
+};
