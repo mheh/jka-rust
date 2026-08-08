@@ -21,12 +21,22 @@ pub struct itemInfo_t {
     // Ghoul2 Insert End
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<itemInfo_t>() == 72);
+// The head of the struct holds only 4-byte members, so these offsets hold on both pointer widths.
 const _: () = assert!(core::mem::offset_of!(itemInfo_t, registered) == 0);
 const _: () = assert!(core::mem::offset_of!(itemInfo_t, models) == 4);
 const _: () = assert!(core::mem::offset_of!(itemInfo_t, icon) == 20);
+// `g2Models` is an array of pointers, so the size and the tail from `g2Models` onward go in the width-gated blocks.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemInfo_t, g2Models) == 24);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(itemInfo_t, radius) == 56);
+const _: () = {
+    assert!(core::mem::size_of::<itemInfo_t>() == 72);
+    assert!(core::mem::offset_of!(itemInfo_t, g2Models) == 24);
+    assert!(core::mem::offset_of!(itemInfo_t, radius) == 56);
+};
+// ILP32 twin: clang i386 ground truth, where msvc and linux-gnu agree.
+// These numbers are the retail 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<itemInfo_t>() == 56);
+    assert!(core::mem::offset_of!(itemInfo_t, g2Models) == 24);
+    assert!(core::mem::offset_of!(itemInfo_t, radius) == 40);
+};
