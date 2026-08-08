@@ -236,3 +236,10 @@ Mechanical folds from the audit: the gate battery counts four world goldens, not
 7. Row 4's bless criterion misnamed the default image. `R_CreateDefaultImage` builds a white-bordered box with a dark alpha-32 interior, not a checkerboard. The row-4 text is corrected in place. The blessed `hud_2d.png` meets the rotation-visibility intent, so no code change and no re-bless.
 
 The fix round covers findings 2, 3, 4 and 6 in one commit on the lane branch. The vet walks the fix commit, and a clean walk proceeds to the packet's disposition.
+
+**2026-08-07 - the fix-round vet walk.** The vet walked the four fix-round commits and returned two findings, both ruled.
+
+1. The `Rasterisation` spelling in `hud_golden.rs` stays as a carried defect. It landed in commit `9154cf58`, before the fix round. A one-line inline comment at the site records the ruling (landed at `08b818d4`).
+2. The lowercase openings of the two rewritten assert messages stand as the repo's panic-and-assert-message idiom, exempt from the sentence-capital rule, consistent with the sibling golden files.
+
+Everything else in the fix-round walk held: both code commits verified comments-and-strings-only, the bordered-box wording oracle-true, zero comment lines over 150 columns, and the gates green. The closing vet walk of `08b818d4` and `405c50a5` returned zero findings.
