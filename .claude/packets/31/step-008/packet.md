@@ -4,7 +4,7 @@
 
 This step closes the census 2D group (DEC-54). Three of the group's four rows already run end to end: `2d/SetColor`, `2d/DrawStretchPic` and `2d/Font_DrawString` all reach the batch, because a font string is laid out at trap time and recorded as one `SetColor`/`DrawStretchPic` pair per glyph (`RE_Font_DrawString_body`, `crates/mp/renderer/src/tr_font.rs:2772-2779`). The one dark row is `2d/DrawRotatePic` (547 submissions in trace-swoop1, `docs/plans/2026-07-24-client-port/scene-trap-census.md:11`), which the census recorder counts for `R_DRAWROTATEPIC` and `R_DRAWROTATEPIC2` alike (`crates/cgame/tests/scene_census.rs:279-287`).
 
-The chain above the gap is already live. The cgame traps enter at `CG_R_DRAWROTATEPIC` and `CG_R_DRAWROTATEPIC2` (`crates/mp/engine/client/src/cl_cgame.rs:2300-2337`), the frontends record the events (`RE_RotatePic`, `crates/mp/renderer/src/tr_cmds.rs:180-208`; `RE_RotatePic2`, `:214-242`), and both `FrameEvent` variants carry every field (`crates/mp/renderer/src/render_state/frame_event.rs:152-178`). The executor is where the chain stops: one arm skips both events with a warn-once (`crates/mp/renderer-gpu/src/frame_exec.rs:527-530`). On the live client this leaves the vehicle HUD dials and the wedge blank (`CG_DrawRotatePic2` at `crates/mp/cgame/src/cg_draw.rs:2455,2584,3182,3241`, `CG_DrawRotatePic` at `:4448`).
+The chain above the gap is already live. The cgame traps enter at `CG_R_DRAWROTATEPIC` and `CG_R_DRAWROTATEPIC2` (`crates/mp/engine/client/src/cl_cgame.rs:2300-2337`), the frontends record the events (`RE_RotatePic`, `crates/mp/renderer/src/tr_cmds.rs:180-208`; `RE_RotatePic2`, `:214-242`), and both `FrameEvent` variants carry every field (`crates/mp/renderer/src/render_state/frame_event.rs:152-178`). The executor is where the chain stops: one arm skips both events with a warn-once (`crates/mp/renderer-gpu/src/frame_exec.rs:527-530`). On the live client this leaves three HUD elements blank: the radar icons (`CG_DrawRadar`, `CG_DrawRotatePic2` at `crates/mp/cgame/src/cg_draw.rs:2455,2584`), the disruptor zoom insert and its ticks (`:3182,3241`), and the rocket-lock wedge (`CG_DrawRocketLocking`, `CG_DrawRotatePic` at `:4448`).
 
 The step also gives the 2D group its first goldens. No committed fixture draws a single 2D quad today: `world_golden.rs`, `scene_golden.rs`, `entity_golden.rs` and `ghoul2_vertex_golden.rs` all exercise 3D paths only, and nothing under `crates/mp/renderer-gpu/tests/` references `pipeline2d` or `stage2d`. This step adds one new test file with two tests: a synthetic asset-free 2D scene, and a retail-dependent font string.
 
@@ -18,9 +18,9 @@ The step does not touch the frontend (`tr_cmds.rs` records both events correctly
 
 **`RB_RotatePic`** (`oracle/codemp/renderer/tr_backend.cpp:1498-1541`):
 
-- `image = &shader->stages[0].bundle[0].image[0]`. In this tree `textureBundle_t::image` is a single `image_t *` (`oracle/codemp/renderer/tr_local.h:372-389`), so `&image[0]` is the bundle's own image pointer, and `if (image)` is a real null gate. No animation index, no `R_BindAnimatedImage`, no video-map handling.
-- No `numUnfoggedPasses` gate. Stage 0 is read whatever the shader is.
-- No `GL_State` call. The pass draws in the state the last `GL_State` left, which is `GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA` right after `RB_SetGL2D` (`:1284-1286`).
+- `image = &shader->stages[0].bundle[0].image[0]`. In this tree `textureBundle_t::image` is a single `image_t *` (`oracle/codemp/renderer/tr_local.h:372-389`), so `&image[0]` is the bundle's own image pointer, and `if (image)` is a real null gate. No animation index, no `R_BindAnimatedImage`, no video-map handling. For an `animMap` stage that same field holds the base of an `image_t *` array (`oracle/codemp/renderer/tr_shader.cpp:1441-1442`), so the oracle binds a type-confused pointer there.
+- No `numUnfoggedPasses` gate. Stage 0 is read whatever the shader is, and `GeneratePermanentShader` always allocates at least one zero-filled stage (`oracle/codemp/renderer/tr_shader.cpp:2782-2783`), so a zero-pass shader reads a NULL image and the `if (image)` gate skips the draw.
+- No `GL_State` call. The pass draws in the state the last `GL_State` left, which is `GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA` right after `RB_SetGL2D` (`:1282-1284`).
 - `qglColor4ubv(backEnd.color2D)` - the `RE_SetColor` register, byte-quantized at `RB_SetColor` (`:1409-1412`).
 - Geometry: `qglTranslatef(x + w, y, 0)`, `qglRotatef(a, 0, 0, 1)`, then the four corners `(-w, 0)`, `(0, 0)`, `(0, h)`, `(-w, h)` with texture coordinates `(s1,t1)`, `(s2,t1)`, `(s2,t2)`, `(s1,t2)`. The pivot is the quad's top-right corner, and the unrotated quad is the same rectangle a stretch pic would draw.
 
@@ -29,7 +29,7 @@ The step does not touch the frontend (`tr_cmds.rs` records both events correctly
 - Gates on `shader->numUnfoggedPasses` first, then on the same stage-0 image pointer.
 - `GL_State(shader->stages[0].stateBits)` - this arm does install its own blend.
 - Same color register. Geometry: `qglTranslatef(x, y, 0)` then the rotation, with corners `(-w/2, -h/2)`, `(w/2, -h/2)`, `(w/2, h/2)`, `(-w/2, h/2)`. The `x`/`y` pair is the quad's center here, not its top-left corner.
-- The tail resets state to `GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA` (`:1597-1600`), which is `GLS_2D_DEFAULT`.
+- The tail resets state to `GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA` (`:1600-1602`), which is `GLS_2D_DEFAULT`.
 
 Both arms run from `RB_ExecuteRenderCommands` at `RC_ROTATE_PIC` and `RC_ROTATE_PIC2` (`oracle/codemp/renderer/tr_backend.cpp:1929-1934`).
 
@@ -103,8 +103,8 @@ Both bodies:
 
 1. `assets.shaders.get(shader)`. On `None`, warn `Warned::UnknownShader` and push the white quad at the rotated corners with `blend_state_from_gls(GLS_2D_DEFAULT)` and no image, returning 1. This mirrors `draw_stretch_pic`'s fallback (`:891-895`) and the oracle's `R_GetShaderByHandle` default-shader return.
 2. `draw_rotate_pic2` only: return 0 when `asset.num_unfogged_passes == 0`.
-3. `asset.stages.first()`. On `None`, return 0. See the divergence note below.
-4. The image is the stage's `bundle[0].image` field read directly, filtered by `gpu_images.contains`, never through `stage_image`. The oracle indexes `image[0]` on a single pointer, so no animation frame and no video map is resolved here. `None` returns 0.
+3. `asset.stages.first()`. On `None`, return 0. This matches the oracle: its zero-pass shader carries one zero-filled stage whose NULL image skips the draw, so both trees draw nothing.
+4. The image is the stage's `bundle[0].image` field read directly, filtered by `gpu_images.contains`, never through `stage_image`. The oracle indexes `image[0]` on a single pointer, so no animation frame and no video map is resolved here. `None` returns 0. A `≤2`-line rule-19 note at the site names the `animMap` case: the oracle binds the animation array's base as if it were an image, and this read draws nothing instead.
 5. The corners come from `rotated_corners`, the texture coordinates from `uv.corners()`, the color from the `SetColor` register unchanged, and the image from step 4. `draw_rotate_pic` blends per open row 1; `draw_rotate_pic2` blends with `blend_state_from_gls(stage.state_bits)`.
 
 **One free fn in `frame_exec.rs`:**
@@ -139,27 +139,30 @@ Anything not on this list is out of scope, and the agent must not add it. No new
 
 ## Divergence notes, each ≤2 lines at its site
 
-- **The zero-stage shader.** The oracle reads `stages[0]` with no bounds check; for a shader with `numUnfoggedPasses == 0` that array is a zero-byte `Hunk_Alloc`, so the read is out of bounds. Rust uses `stages.first()` and draws nothing, which is the one defined behavior (porting rule 19).
 - **The 2D color register stays float.** `RB_SetColor` truncates to bytes (`tr_backend.cpp:1409-1412`); this backend keeps the `SetColor` register in floats, as the stretch-pic arm already does. The step introduces no new quantization and no new divergence here.
-- **The rotate-pic interleave.** The oracle draws a rotate pic immediately, ahead of any pending `tess` batch; this backend appends it in command order. One line at the site records that, tied to the standing tess-batching architecture note.
+- **The rotate-pic interleave, the one accepted divergence.** The oracle draws a rotate pic immediately, ahead of any pending `tess` batch; this backend appends it in command order. The site note names the concrete face: the disruptor zoom draws its mask as a stretch pic and its insert as a rotate pic (`oracle/codemp/cgame/cg_draw.c:349-350,365`), so the oracle flushes the mask over the insert and this backend layers the insert over the mask.
+
+**Parity, not a divergence: the zero-stage shader.** `GeneratePermanentShader` allocates one zero-filled stage even at zero passes (`oracle/codemp/renderer/tr_shader.cpp:2782-2783`), and its NULL image makes the oracle skip the draw. The Rust `stages.first()` read draws nothing for the same input, so the two trees agree and the code plan is unchanged.
 
 ## Open rows
 
-**Row 1 - `RB_RotatePic`'s blend state (user ruling).** The oracle issues no `GL_State` for this arm, so it inherits the last one issued: `GLS_2D_DEFAULT` right after `RB_SetGL2D`, or the last flushed stretch-pic stage's bits otherwise. Two options. **Proposed default: draw every `DrawRotatePic` with `blend_state_from_gls(GLS_2D_DEFAULT)` and record the inheritance in a two-line note at the site.** That is the state `RB_SetGL2D` installs, it is defined, and it needs no new machinery. The alternative is a frame-local `state_2d` register beside `color` in `execute_frame`, updated by each stretch-pic stage push and reset to `GLS_2D_DEFAULT` after each `RenderScene`. The register would be closer but still not exact, because the oracle's state comes from the last *flushed* shader run and this backend has no flush point, so it would trade a named divergence for an unnamed approximation. `DrawRotatePic2` is unaffected either way: it installs stage 0's bits explicitly.
+The 2026-08-07 ratification walk closed every row. Rows 1, 3, 4 and 7 are ratified as proposed, row 8 is ratified as amended, and the mechanical rows stand. Each row below keeps its text as the lane's instruction.
+
+**Row 1 - `RB_RotatePic`'s blend state (user ruling, ratified as proposed).** The oracle issues no `GL_State` for this arm, so it inherits the last one issued: `GLS_2D_DEFAULT` right after `RB_SetGL2D`, or the last flushed stretch-pic stage's bits otherwise. Two options. **Proposed default: draw every `DrawRotatePic` with `blend_state_from_gls(GLS_2D_DEFAULT)` and record the inheritance in a two-line note at the site.** That is the state `RB_SetGL2D` installs, it is defined, and it needs no new machinery. The alternative is a frame-local `state_2d` register beside `color` in `execute_frame`, updated by each stretch-pic stage push and reset to `GLS_2D_DEFAULT` after each `RenderScene`. The register would be closer but still not exact, because the oracle's state comes from the last *flushed* shader run and this backend has no flush point, so it would trade a named divergence for an unnamed approximation. `DrawRotatePic2` is unaffected either way: it installs stage 0's bits explicitly.
 
 **Row 2 - the golden file and its name (mechanical).** Proposed default: one new file `crates/mp/renderer-gpu/tests/hud_golden.rs` holding both tests, with goldens `hud_2d.png` and `hud_font_ocr_a.png`. Both tests share the boot and compare helpers, and their different asset gates live on the tests, not on separate files.
 
-**Row 3 - the retail font golden's asset gate (user ruling).** The workspace has two idioms. The renderer-gpu golden family uses `#[ignore]` plus a hard assert on load failure (`world_golden.rs:243,420`), and the cgame/jampgame tests self-skip with an `eprintln!("SKIP: ...")` and an early return (`crates/jampgame/tests/referee.rs:905-912`, `crates/cgame/tests/replay_referee.rs:181-191`). **Proposed default: idiom A, `#[ignore = "needs retail assets and a GPU; run locally with --ignored"]` plus a hard assert if the font fails to register**, matching every other retail golden in this crate. A self-skip inside an already-ignored test hides a real font-path break behind a green run.
+**Row 3 - the retail font golden's asset gate (user ruling, ratified as proposed).** The workspace has two idioms. The renderer-gpu golden family uses `#[ignore]` plus a hard assert on load failure (`world_golden.rs:243,420`), and the cgame/jampgame tests self-skip with an `eprintln!("SKIP: ...")` and an early return (`crates/jampgame/tests/referee.rs:905-912`, `crates/cgame/tests/replay_referee.rs:181-191`). **Proposed default: idiom A, `#[ignore = "needs retail assets and a GPU; run locally with --ignored"]` plus a hard assert if the font fails to register**, matching every other retail golden in this crate. A self-skip inside an already-ignored test hides a real font-path break behind a green run.
 
-**Row 4 - the bless flow for the two new PNGs (user ruling).** **Proposed default: the step-007 procedure, once per golden.** Run the test with `JKA_GOLDEN_BLESS=1` to write the PNG, re-run without it to confirm the byte-identical pass, then STOP before the commit that adds the PNG so the user looks at the image. `hud_2d.png` must show one axis-aligned checkerboard-free reference quad plus two visibly rotated checkerboard quads at different angles; a picture with three axis-aligned quads is a defect, not a blessable golden. `hud_font_ocr_a.png` must show legible glyphs with the `^1` run in red; a blank or single-color image is a defect.
+**Row 4 - the bless flow for the two new PNGs (user ruling, ratified as proposed).** **Proposed default: the step-007 procedure, once per golden.** Run the test with `JKA_GOLDEN_BLESS=1` to write the PNG, re-run without it to confirm the byte-identical pass, then STOP before the commit that adds the PNG so the user looks at the image. `hud_2d.png` must show one axis-aligned checkerboard-free reference quad plus two visibly rotated checkerboard quads at different angles; a picture with three axis-aligned quads is a defect, not a blessable golden. `hud_font_ocr_a.png` must show legible glyphs with the `^1` run in red; a blank or single-color image is a defect.
 
 **Row 5 - the font, the string and the placement (mechanical).** Proposed default: `ocr_a`, the string `"jka-rust ^1font ^7golden"` at `(32, 64)`, scale `1.0`, `iMaxPixelWidth` `-1`, color white, at the frozen clock the other goldens use.
 
 **Row 6 - the stat counter (mechanical).** Proposed default: `skipped_rotate_pics` is replaced by `rotate_pics`, counting quads batched, and `Warned::RotatePic` is deleted. The field has no reader outside `frame_exec.rs`.
 
-**Row 7 - the unknown-shader fallback (mechanical).** Proposed default: both rotate arms mirror `draw_stretch_pic` - warn `Warned::UnknownShader` once and push a white rotated quad at `GLS_2D_DEFAULT`.
+**Row 7 - the unknown-shader fallback (mechanical, ratified as proposed).** Both rotate arms mirror `draw_stretch_pic` - warn `Warned::UnknownShader` once and push a white rotated quad at `GLS_2D_DEFAULT`. The oracle's `R_GetShaderByHandle` would return the checkerboard default shader instead; the white quad is this backend's accepted stretch-pic idiom, and this step keeps it rather than opening a second shape.
 
-**Row 8 - the stage-0 image read (mechanical).** Proposed default: read `bundle[0].image` directly, never `stage_image`. The oracle indexes `image[0]` on a single pointer, so it resolves no animation frame and no video map, and a video-map stage carries no image here anyway.
+**Row 8 - the stage-0 image read (mechanical, ratified as amended).** Read `bundle[0].image` directly, never `stage_image`. The oracle indexes `image[0]` on a single pointer, so it resolves no animation frame and no video map. The amended rationale: for an `animMap` shader that pointer is the base of an `image_t *` array (`oracle/codemp/renderer/tr_shader.cpp:1441-1442`), so the oracle binds type-confused garbage there, and this read draws nothing instead. A `≤2`-line rule-19 note at the site names the `animMap` case.
 
 ## Pause triggers, named for this step
 
@@ -176,7 +179,7 @@ The full gate battery, named once and referenced per commit:
 
 - `cargo build --workspace`, zero warnings.
 - `cargo test --workspace -- --test-threads=1`.
-- `cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1`, all three world goldens byte-identical.
+- `cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1`, all four world goldens byte-identical (`world_duel1`, `world_ffa2`, `world_marks_duel1`, `world_dlights_duel1`).
 - `cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`, all seven scene goldens byte-identical.
 - `cargo test -p mp_renderer_gpu --test entity_golden -- --ignored --test-threads=1`, byte-identical.
 - `cargo test -p mp_renderer_gpu --test ghoul2_vertex_golden -- --ignored --test-threads=1`, byte-identical.
@@ -210,3 +213,14 @@ After a clean lane-review: merge to master locally. No push, and no pull request
 ## Amendments
 
 **2026-08-07 - the draft awaits the ratification walk.** Rows 1, 3 and 4 need user rulings; rows 2, 5, 6, 7 and 8 are mechanical with the defaults above.
+
+**2026-08-07 - the ratification walk closed all six open rows.** The rulings are folded into the body above.
+
+- Row 1, the `RB_RotatePic` blend state: ratified as proposed. Draw at `GLS_2D_DEFAULT` with the two-line note.
+- Row 3, the retail font asset gate: ratified as proposed. `#[ignore]` plus a hard assert.
+- Row 4, the bless flow: ratified as proposed. The step-007 procedure per golden, a STOP before each PNG commit, and named defect conditions for both images.
+- Row 8, the stage-0 image read: ratified as amended. The direct `bundle[0].image` read stands. The corrected rationale is the `animMap` case: the oracle reads type-confused garbage (`tr_shader.cpp:1441-1442`), and this read maps that to draw-nothing under a `≤2`-line rule-19 note at the site.
+- Divergence note 1, the zero-stage shader: ratified as amended. It leaves the divergence list. The oracle allocates at least one zero-filled stage (`tr_shader.cpp:2782-2783`) whose NULL image skips the draw, so draw-nothing is parity in both trees. The code plan is unchanged.
+- Divergence note 3, the command-order interleave: ratified with the auditor's naming. Command-order append stands as the one accepted divergence, and the site note names the disruptor zoom layering flip (`cg_draw.c:349-350,365`) as its concrete face.
+
+Mechanical folds from the audit: the gate battery counts four world goldens, not three. Two cosmetic cite drifts are fixed: `RB_SetGL2D` at `:1282-1284` and the `RB_RotatePic2` tail at `:1600-1602`. The cgame-site description now names the radar icons, the disruptor zoom insert and its ticks, and the rocket-lock wedge. Row 7 keeps the white-quad fallback, with the checkerboard difference recorded as this backend's accepted stretch-pic idiom.
