@@ -109,7 +109,8 @@ pub struct FrameStats {
     pub draw_calls: u32,
     /// Images uploaded this frame (`pending_uploads` drained at frame start).
     pub images_uploaded: u32,
-    /// Quads batched from `DrawRotatePic` and `DrawRotatePic2` events. A rotate pic whose stage 0 binds no image draws nothing and is not counted.
+    /// Quads batched from `DrawRotatePic` and `DrawRotatePic2` events.
+    /// A rotate pic whose stage 0 binds no image draws nothing and is not counted.
     pub rotate_pics: u32,
     /// Scene-composition events skipped (lights, polys, decals, …) — later
     /// waves of backend #1's world path. `RenderScene`, `ClearScene`, and
@@ -1039,7 +1040,8 @@ impl FrameExecutor {
             return 0;
         };
 
-        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so for an `animMap` stage it binds the animation array's base as if that pointer were an image.
+        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so an `animMap` stage binds the animation array's base as if it were an image.
+        // This read draws nothing instead.
         // Source: `oracle/codemp/renderer/tr_shader.cpp:1441-1442`
         self.batch
             .push_quad_xy(xy, uv.corners(), color, blend, Some(image));
@@ -1094,7 +1096,8 @@ impl FrameExecutor {
             return 0;
         };
 
-        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so for an `animMap` stage it binds the animation array's base as if that pointer were an image.
+        // Rule 19: the oracle reads `&stages[0].bundle[0].image[0]`, so an `animMap` stage binds the animation array's base as if it were an image.
+        // This read draws nothing instead.
         // Source: `oracle/codemp/renderer/tr_shader.cpp:1441-1442`
         self.batch.push_quad_xy(
             xy,
