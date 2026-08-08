@@ -180,136 +180,146 @@ pub struct clientInfo_t {
     pub superSmoothTime: i32,
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<clientInfo_t>() == 5920);
+// The head of the struct carries no pointer, so these offsets hold on both pointer widths.
 const _: () = assert!(core::mem::offset_of!(clientInfo_t, infoValid) == 0);
 const _: () = assert!(core::mem::offset_of!(clientInfo_t, colorOverride) == 4);
 const _: () = assert!(core::mem::offset_of!(clientInfo_t, saber) == 16);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, ghoul2Weapons) == 4328);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, saberName) == 4344);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, saber2Name) == 4408);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, name) == 4472);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, team) == 4536);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, duelTeam) == 4540);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, botSkill) == 4544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, frame) == 4548);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, color1) == 4552);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, color2) == 4564);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, icolor1) == 4576);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, icolor2) == 4580);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, score) == 4584);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, location) == 4588);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, health) == 4592);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, armor) == 4596);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, curWeapon) == 4600);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, handicap) == 4604);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, wins) == 4608);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, losses) == 4612);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, teamTask) == 4616);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, teamLeader) == 4620);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, powerups) == 4624);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, medkitUsageTime) == 4628);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, breathPuffTime) == 4632);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, modelName) == 4636);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, skinName) == 4700);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, forcePowers) == 4764);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, teamName) == 4828);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, corrTime) == 4860);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, lastHeadAngles) == 4864);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, lookTime) == 4876);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, brokenLimbs) == 4880);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, deferred) == 4884);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, newAnims) == 4888);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, fixedlegs) == 4892);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, fixedtorso) == 4896);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, headOffset) == 4900);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, gender) == 4912);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, legsModel) == 4916);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, legsSkin) == 4920);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, torsoModel) == 4924);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, torsoSkin) == 4928);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, ghoul2Model) == 4936);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, modelIcon) == 4944);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, bolt_rhand) == 4948);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, bolt_lhand) == 4952);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, bolt_head) == 4956);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, bolt_motion) == 4960);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, bolt_llumbar) == 4964);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, siegeIndex) == 4968);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, siegeDesiredTeam) == 4972);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, sounds) == 4976);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, combatSounds) == 5136);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, extraSounds) == 5296);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, jediSounds) == 5456);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, siegeSounds) == 5616);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, duelSounds) == 5736);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, legsAnim) == 5896);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, torsoAnim) == 5900);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, facial_blink) == 5904);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, facial_frown) == 5908);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, facial_aux) == 5912);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientInfo_t, superSmoothTime) == 5916);
+// `ghoul2Weapons` is an array of pointers, so the size and the tail from `ghoul2Weapons` onward go in the width-gated blocks.
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(core::mem::size_of::<clientInfo_t>() == 5920);
+    assert!(core::mem::offset_of!(clientInfo_t, ghoul2Weapons) == 4328);
+    assert!(core::mem::offset_of!(clientInfo_t, saberName) == 4344);
+    assert!(core::mem::offset_of!(clientInfo_t, saber2Name) == 4408);
+    assert!(core::mem::offset_of!(clientInfo_t, name) == 4472);
+    assert!(core::mem::offset_of!(clientInfo_t, team) == 4536);
+    assert!(core::mem::offset_of!(clientInfo_t, duelTeam) == 4540);
+    assert!(core::mem::offset_of!(clientInfo_t, botSkill) == 4544);
+    assert!(core::mem::offset_of!(clientInfo_t, frame) == 4548);
+    assert!(core::mem::offset_of!(clientInfo_t, color1) == 4552);
+    assert!(core::mem::offset_of!(clientInfo_t, color2) == 4564);
+    assert!(core::mem::offset_of!(clientInfo_t, icolor1) == 4576);
+    assert!(core::mem::offset_of!(clientInfo_t, icolor2) == 4580);
+    assert!(core::mem::offset_of!(clientInfo_t, score) == 4584);
+    assert!(core::mem::offset_of!(clientInfo_t, location) == 4588);
+    assert!(core::mem::offset_of!(clientInfo_t, health) == 4592);
+    assert!(core::mem::offset_of!(clientInfo_t, armor) == 4596);
+    assert!(core::mem::offset_of!(clientInfo_t, curWeapon) == 4600);
+    assert!(core::mem::offset_of!(clientInfo_t, handicap) == 4604);
+    assert!(core::mem::offset_of!(clientInfo_t, wins) == 4608);
+    assert!(core::mem::offset_of!(clientInfo_t, losses) == 4612);
+    assert!(core::mem::offset_of!(clientInfo_t, teamTask) == 4616);
+    assert!(core::mem::offset_of!(clientInfo_t, teamLeader) == 4620);
+    assert!(core::mem::offset_of!(clientInfo_t, powerups) == 4624);
+    assert!(core::mem::offset_of!(clientInfo_t, medkitUsageTime) == 4628);
+    assert!(core::mem::offset_of!(clientInfo_t, breathPuffTime) == 4632);
+    assert!(core::mem::offset_of!(clientInfo_t, modelName) == 4636);
+    assert!(core::mem::offset_of!(clientInfo_t, skinName) == 4700);
+    assert!(core::mem::offset_of!(clientInfo_t, forcePowers) == 4764);
+    assert!(core::mem::offset_of!(clientInfo_t, teamName) == 4828);
+    assert!(core::mem::offset_of!(clientInfo_t, corrTime) == 4860);
+    assert!(core::mem::offset_of!(clientInfo_t, lastHeadAngles) == 4864);
+    assert!(core::mem::offset_of!(clientInfo_t, lookTime) == 4876);
+    assert!(core::mem::offset_of!(clientInfo_t, brokenLimbs) == 4880);
+    assert!(core::mem::offset_of!(clientInfo_t, deferred) == 4884);
+    assert!(core::mem::offset_of!(clientInfo_t, newAnims) == 4888);
+    assert!(core::mem::offset_of!(clientInfo_t, fixedlegs) == 4892);
+    assert!(core::mem::offset_of!(clientInfo_t, fixedtorso) == 4896);
+    assert!(core::mem::offset_of!(clientInfo_t, headOffset) == 4900);
+    assert!(core::mem::offset_of!(clientInfo_t, gender) == 4912);
+    assert!(core::mem::offset_of!(clientInfo_t, legsModel) == 4916);
+    assert!(core::mem::offset_of!(clientInfo_t, legsSkin) == 4920);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoModel) == 4924);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoSkin) == 4928);
+    assert!(core::mem::offset_of!(clientInfo_t, ghoul2Model) == 4936);
+    assert!(core::mem::offset_of!(clientInfo_t, modelIcon) == 4944);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_rhand) == 4948);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_lhand) == 4952);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_head) == 4956);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_motion) == 4960);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_llumbar) == 4964);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeIndex) == 4968);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeDesiredTeam) == 4972);
+    assert!(core::mem::offset_of!(clientInfo_t, sounds) == 4976);
+    assert!(core::mem::offset_of!(clientInfo_t, combatSounds) == 5136);
+    assert!(core::mem::offset_of!(clientInfo_t, extraSounds) == 5296);
+    assert!(core::mem::offset_of!(clientInfo_t, jediSounds) == 5456);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeSounds) == 5616);
+    assert!(core::mem::offset_of!(clientInfo_t, duelSounds) == 5736);
+    assert!(core::mem::offset_of!(clientInfo_t, legsAnim) == 5896);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoAnim) == 5900);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_blink) == 5904);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_frown) == 5908);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_aux) == 5912);
+    assert!(core::mem::offset_of!(clientInfo_t, superSmoothTime) == 5916);
+};
+// ILP32 twin: clang i386 ground truth, where msvc and linux-gnu agree.
+// These numbers are the retail 32-bit module ABI.
+#[cfg(target_pointer_width = "32")]
+const _: () = {
+    assert!(core::mem::size_of::<clientInfo_t>() == 5904);
+    assert!(core::mem::offset_of!(clientInfo_t, ghoul2Weapons) == 4328);
+    assert!(core::mem::offset_of!(clientInfo_t, saberName) == 4336);
+    assert!(core::mem::offset_of!(clientInfo_t, saber2Name) == 4400);
+    assert!(core::mem::offset_of!(clientInfo_t, name) == 4464);
+    assert!(core::mem::offset_of!(clientInfo_t, team) == 4528);
+    assert!(core::mem::offset_of!(clientInfo_t, duelTeam) == 4532);
+    assert!(core::mem::offset_of!(clientInfo_t, botSkill) == 4536);
+    assert!(core::mem::offset_of!(clientInfo_t, frame) == 4540);
+    assert!(core::mem::offset_of!(clientInfo_t, color1) == 4544);
+    assert!(core::mem::offset_of!(clientInfo_t, color2) == 4556);
+    assert!(core::mem::offset_of!(clientInfo_t, icolor1) == 4568);
+    assert!(core::mem::offset_of!(clientInfo_t, icolor2) == 4572);
+    assert!(core::mem::offset_of!(clientInfo_t, score) == 4576);
+    assert!(core::mem::offset_of!(clientInfo_t, location) == 4580);
+    assert!(core::mem::offset_of!(clientInfo_t, health) == 4584);
+    assert!(core::mem::offset_of!(clientInfo_t, armor) == 4588);
+    assert!(core::mem::offset_of!(clientInfo_t, curWeapon) == 4592);
+    assert!(core::mem::offset_of!(clientInfo_t, handicap) == 4596);
+    assert!(core::mem::offset_of!(clientInfo_t, wins) == 4600);
+    assert!(core::mem::offset_of!(clientInfo_t, losses) == 4604);
+    assert!(core::mem::offset_of!(clientInfo_t, teamTask) == 4608);
+    assert!(core::mem::offset_of!(clientInfo_t, teamLeader) == 4612);
+    assert!(core::mem::offset_of!(clientInfo_t, powerups) == 4616);
+    assert!(core::mem::offset_of!(clientInfo_t, medkitUsageTime) == 4620);
+    assert!(core::mem::offset_of!(clientInfo_t, breathPuffTime) == 4624);
+    assert!(core::mem::offset_of!(clientInfo_t, modelName) == 4628);
+    assert!(core::mem::offset_of!(clientInfo_t, skinName) == 4692);
+    assert!(core::mem::offset_of!(clientInfo_t, forcePowers) == 4756);
+    assert!(core::mem::offset_of!(clientInfo_t, teamName) == 4820);
+    assert!(core::mem::offset_of!(clientInfo_t, corrTime) == 4852);
+    assert!(core::mem::offset_of!(clientInfo_t, lastHeadAngles) == 4856);
+    assert!(core::mem::offset_of!(clientInfo_t, lookTime) == 4868);
+    assert!(core::mem::offset_of!(clientInfo_t, brokenLimbs) == 4872);
+    assert!(core::mem::offset_of!(clientInfo_t, deferred) == 4876);
+    assert!(core::mem::offset_of!(clientInfo_t, newAnims) == 4880);
+    assert!(core::mem::offset_of!(clientInfo_t, fixedlegs) == 4884);
+    assert!(core::mem::offset_of!(clientInfo_t, fixedtorso) == 4888);
+    assert!(core::mem::offset_of!(clientInfo_t, headOffset) == 4892);
+    assert!(core::mem::offset_of!(clientInfo_t, gender) == 4904);
+    assert!(core::mem::offset_of!(clientInfo_t, legsModel) == 4908);
+    assert!(core::mem::offset_of!(clientInfo_t, legsSkin) == 4912);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoModel) == 4916);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoSkin) == 4920);
+    assert!(core::mem::offset_of!(clientInfo_t, ghoul2Model) == 4924);
+    assert!(core::mem::offset_of!(clientInfo_t, modelIcon) == 4928);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_rhand) == 4932);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_lhand) == 4936);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_head) == 4940);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_motion) == 4944);
+    assert!(core::mem::offset_of!(clientInfo_t, bolt_llumbar) == 4948);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeIndex) == 4952);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeDesiredTeam) == 4956);
+    assert!(core::mem::offset_of!(clientInfo_t, sounds) == 4960);
+    assert!(core::mem::offset_of!(clientInfo_t, combatSounds) == 5120);
+    assert!(core::mem::offset_of!(clientInfo_t, extraSounds) == 5280);
+    assert!(core::mem::offset_of!(clientInfo_t, jediSounds) == 5440);
+    assert!(core::mem::offset_of!(clientInfo_t, siegeSounds) == 5600);
+    assert!(core::mem::offset_of!(clientInfo_t, duelSounds) == 5720);
+    assert!(core::mem::offset_of!(clientInfo_t, legsAnim) == 5880);
+    assert!(core::mem::offset_of!(clientInfo_t, torsoAnim) == 5884);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_blink) == 5888);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_frown) == 5892);
+    assert!(core::mem::offset_of!(clientInfo_t, facial_aux) == 5896);
+    assert!(core::mem::offset_of!(clientInfo_t, superSmoothTime) == 5900);
+};
