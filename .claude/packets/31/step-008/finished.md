@@ -52,6 +52,22 @@ Every commit ran the packet's full battery. `cargo build --workspace` reported z
 
 The lockstep referee was not required. No commit touches `mp_game`, the server, or any `jampded` link-set crate.
 
+## The fix round
+
+The lane-review vet returned seven findings and the disposition walk ratified all seven. Four of them need code, and `98a55693 fix(gh#31 s008): the vet-round corrections` lands those four in one commit.
+
+Finding 2, the semicolons in the two added assert strings. The missing-golden message and the mismatch message are both rewritten as plain sentences. The sibling golden files stay untouched.
+
+Finding 3, the semicolons in added prose. The module-doc sentence about the default shader and the boot comment about the registered flag are both split into two sentences. The semicolon that separates two cites on a `Source:` line stays, per the ratified disposition.
+
+Finding 4, the column-wrapped comments. Every added comment in `hud_golden.rs` now carries one sentence per line under the 150-column limit, and the `rotate_pics` doc in `frame_exec.rs` is split onto two lines. Four sentences that would pass 150 whole are broken at a clause boundary instead.
+
+Finding 6, the rule-19 note. Both `animMap` site notes now carry the ratified second half, "and this read draws nothing instead", written as its own sentence so the line stays under the limit.
+
+Findings 1, 5 and 7 need no code. Finding 1 authorizes the `ccea53c9` README rider after the fact. Finding 5 exempts "seam" from the pet-vocabulary ban. Finding 7 corrects the packet's row-4 bless criterion in place and rules out a code change and a re-bless.
+
+The full battery ran on the fix commit. `cargo build --workspace` reported zero warnings, `cargo test --workspace -- --test-threads=1` reported no failures, and all fifteen committed fixtures stayed byte-identical: four world goldens, seven scene goldens, `entity_duel1`, `ghoul2_verts_stormtrooper`, `hud_2d` and `hud_font_ocr_a`. Both `hud_golden` lanes ran green. No behavior changed, since every edit is a comment or an assert message.
+
 ## Open gaps
 
 The font golden is low resolution, as the user noted. The mechanical cause is the render target: `GOLDEN_WIDTH` and `GOLDEN_HEIGHT` are 320 by 240, and the 640x480 virtual 2D screen maps to that whole target, so every glyph draws at half its authored size. The string's glyph band is 9 pixels tall. Raising the target to 640x480 would restore the authored size at the cost of a re-bless, and that is a later decision, not this lane's.
@@ -61,3 +77,5 @@ The command-order interleave stays as the one accepted divergence. The oracle dr
 The 2D color register stays in floats. `RB_SetColor` truncates to bytes, and this backend does not. That is the pre-existing stretch-pic behavior, and this step introduced no new quantization.
 
 Neither rotate arm evaluates a `stage2d` pass. The oracle runs no `tcMod`, no `rgbGen` and no animation frame here, so a shader that needs one to look right would mean the reading is wrong, not that the code is missing a call.
+
+Two residuals fall outside the four ratified corrections, and both need a one-line ruling rather than a guess from this lane. First, the `ROTATE_SHADER` doc in `hud_golden.rs` still calls `tr.defaultImage` a "procedural checkerboard", which finding 7 established is wrong, and the module doc six screens above already says "bordered box". Finding 7 ruled no code change, so the word stands. Second, four added comment lines in `frame_exec.rs` sit over the 150-column limit at lines 1130, 1131, 1605 and 1632. The vet flagged the wrapping in `hud_golden.rs` only, so finding 4 does not reach them.
