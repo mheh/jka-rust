@@ -294,6 +294,23 @@ jobs:
       - name: List collected zips
         run: ls -lR dist
 
+      # The publish step replaces assets by name and never removes one.
+      # This step deletes every asset of the rolling release that the current build did not produce, so a dropped lane leaves no stale download.
+      - name: Delete stale release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "no rolling release yet, nothing to delete"
+            exit 0
+          fi
+          for asset in $(gh release view latest --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+            if [ ! -f "dist/${asset}" ]; then
+              echo "deleting stale asset: ${asset}"
+              gh release delete-asset latest "${asset}" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done
+
       - name: Publish rolling `latest` release
         uses: softprops/action-gh-release@v3
         with:
