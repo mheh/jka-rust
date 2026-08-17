@@ -45,10 +45,27 @@ The established fleet pattern: packets, blind workers, mechanical referee.
 
 Everything lands on this branch (`chore/dec-67-gate-mechanics`), so the PR becomes the whole docs pass: the DEC-67 amendment, this plan, the gate tool, and the comment waves. The deployment gate re-arms on every push, so the one approval and the one CI run come at the end, when the branch is complete.
 
-## Open rows
+## Rulings (walked and closed 2026-08-16)
 
-1. **Scope** - `mp_game` only (default), or the full jampgame link set (`game` + `bg` + `qshared`).
-2. **DEC-39 composition** - this pass becomes DEC-68 and supersedes the two-pass shape for jampgame: no later deletion pass, the information stays (default). Alternative: this is DEC-39 pass 2 pulled forward, and pass 1's strip still happens later.
-3. **Worker tier** - sonnet medium for all lanes (default), or opus-4-8 for the dense AI/combat files.
-4. **Campaign anchor** - a new plain GitHub issue (default), or hang the packets off an existing issue.
-5. **Landing** - all waves on this one PR branch (default), or the plan merges first and the waves take their own PR.
+1. **Scope** - ratified: the `mp_game` crate only.
+2. **DEC-39 composition** - ratified as amended: DEC-68, one combined triage-and-restyle pass (delete residue, restyle load-bearing notes into STE, Raven-documented blocks verbatim). DEC-39 stands for the other modules.
+3. **Worker tier** - ratified: sonnet medium for all lanes.
+4. **Campaign anchor** - ratified: a new plain GitHub issue, packets under it.
+5. **Landing** - dictated: all on the one docs-pass PR branch.
+
+The behavior rules live in `docs/comment-behavior.md` (CB-0 through CB-5 seeded from the design walk and the pilot review). Every wave brief carries that ledger verbatim, and post-wave walks append to it.
+
+## The pilot (10 files, reviewed 2026-08-16)
+
+Ten sonnet workers ran one file each: `g_misc`, `g_mover`, `g_utils`, `trap`, `game_globals`, `npc_c`, `w_saber`, `entity/gentity`, `world/game_context`, `ai_main_consts`. Net -292 lines, workspace build green, and the code-content heuristic matched exactly on every changed line. The review walk produced CB-1 through CB-5.
+
+Lessons for the waves:
+
+- `replace_all` on a comment substring corrupted code whitespace five times in `w_saber` (deeper-indented copies). The worker caught it in its own diff audit. Every wave brief mandates the diff self-audit, and the `tools/comment-gate` build is a precondition for wave 1.
+- Prior passes silently reworded Raven comments in at least three files. CB-2 makes restoration part of every lane, so briefs tell workers to compare suspect Raven text against the oracle, not judge by tone.
+- Three workers ignored the no-cargo instruction without harm. The waves keep the instruction and add why: parallel cargo runs contend on the target lock.
+- `w_saber` cost 4-5x a normal file. Files over ~5,000 lines get a lane of their own, and the wave sharding balances by comment-line count, not file count.
+
+## Parked follow-up
+
+Untranscribed Raven comment content found by the pilot (CB-5): the `ai_main_consts.rs` header glosses, the 13 `g_mover.c` QUAKED blocks, the `w_saber.rs:8506` trailing clause, the commented-out `VectorCopy` under the `g_utils` WTF block. A candidate transcription wave after this campaign, verified against the oracle side, not by token identity.
