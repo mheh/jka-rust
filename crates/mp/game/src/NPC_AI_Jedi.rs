@@ -1,18 +1,18 @@
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Jedi.c`.
 //!
-//! Pass-3 transcription: `ctx: GameContext` threads the ai_main globals
-//! (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `ctx.world`, RNG
-//! routes to the one `BgState.rng`, and stored `enemy`/`goalEntity`/
-//! `activator`/`lastEnemy` fields are `Option<EntityId>`.
+//! This is a pass-3 transcription.
+//! `ctx: GameContext` threads the ai_main globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `ctx.world`.
+//! RNG routes to the one `BgState.rng`.
+//! The stored `enemy`, `goalEntity`, `activator`, and `lastEnemy` fields are `Option<EntityId>`.
 //!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())` raw-deref
-//! regime (and its `let world = ctx.world_raw();` aliases) is retired. Per-body
-//! entity/`gNPC_t`/`gclient_t` re-derives stay raw by design (`// STAGE-1:`
-//! markers and their `unsafe` blocks hold the genuine raw ops); ctx-borrowing
-//! call args are hoisted into role-named locals in source order so RNG/trap
-//! ordering is unchanged. This file is referee-blind — parity rests on the
-//! compile + golden suite.
+//! This is the safe-state migration body sweep.
+//! Every world reach is a checked `ctx.world.…` borrow.
+//! The transitional `(*ctx.world_raw())` raw-deref regime, and its `let world = ctx.world_raw();` aliases, are retired.
+//! Per-body entity, `gNPC_t`, and `gclient_t` re-derives stay raw by design.
+//! `// STAGE-1:` markers and their `unsafe` blocks hold the genuine raw ops.
+//! ctx-borrowing call args are hoisted into role-named locals in source order, so RNG and trap ordering stay unchanged.
+//! This file is referee-blind.
+//! Parity rests on the compile and golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 
@@ -22,37 +22,36 @@ use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::g_utils::G_SoundOnEnt;
 use native_string::atof;
-// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
-// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+// This shadows the prelude's `crate::q_shared::Q_stricmp` glob export, the pointer version.
+// Genuine pointer-vs-pointer survivors stay re-qualified as `crate::q_shared::Q_stricmp`.
 use native_string::Q_stricmp;
 
-// Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
-// (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
-// used as `<Type>::<VARIANT> as c_int` at the `c_int`-typed call sites. `FL_NOTARGET`
-// is a `g_local.h` entity flag.
+// These are pass-2 constants that this file needs and the prelude does not glob.
+// `entity_event_t` (voice and entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s.
+// The `c_int`-typed call sites use them as `<Type>::<VARIANT> as c_int`.
+// `FL_NOTARGET` is a `g_local.h` entity flag.
 use crate::entity::flags::FL_NOTARGET;
 use crate::saber::evasion_type_t::evasionType_t;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
-// Consts defined in sibling modules but not re-exported through the prelude glob;
-// imported here so call sites keep the bare Raven spelling. `SOLID_BMODEL`
-// (`q_shared.h:2642`) reaches this file via the prelude's
-// `mp_qshared::shared::surface_flags::*` glob.
+// These consts are defined in sibling modules, but the prelude glob does not re-export them.
+// This file imports them directly, so call sites keep the bare Raven spelling.
+// `SOLID_BMODEL` (`q_shared.h:2642`) reaches this file through the prelude's `mp_qshared::shared::surface_flags::*` glob.
 use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
 use mp_bg::bg_slidemove::STEPSIZE;
-// Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
-// canonical path per crate::saber::saber_flags.
+// This explicit import dedupes an E0659 glob ambiguity, a known SFL_*/SVF_* debt.
+// The canonical path is `crate::saber::saber_flags`.
 use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
-// Dedupe MASK_SHOT glob ambiguity (surface_flags::* / mp_qshared::shared::* both
-// re-export it): canonical home is surface_flags per house convention.
+// This dedupes the `MASK_SHOT` glob ambiguity, since both `surface_flags::*` and `mp_qshared::shared::*` re-export it.
+// The canonical home is `surface_flags`, per house convention.
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 use crate::q_shared;
 
-// Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-// `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-// take `&gentity_t`. Non-leaf bodies re-derive the raw pointers verbatim at the
-// top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary via
-// `ctx.entity_id_of(ptr)`.
+// This is the safe-state migration.
+// Entity-pointer params are `EntityId` or `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+// ctx-free leaf helpers take `&gentity_t`.
+// Non-leaf bodies re-derive the raw pointers verbatim at the top (`// STAGE-1:` markers), which stays as known debt for a later pass.
+// Callers bridge at the boundary through `ctx.entity_id_of(ptr)`.
 
 /// Raven `G_StartMatrixEffect`.
 ///
@@ -107,7 +106,8 @@ pub fn Jedi_PlayBlockedPushSound(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.entity(self_).s.number == 0 {
         crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, entity_event_t::EV_PUSHFAIL as c_int, 3000);
     } else {
-        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor.
+        // The deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if ctx.world.entity(self_).health > 0
             && !npc.is_null()
@@ -130,8 +130,8 @@ pub fn Jedi_PlayBlockedPushSound(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:150-161`
 pub fn Jedi_PlayDeflectSound(ctx: &mut GameContext, self_: EntityId) {
-    // Q_irand is drawn inside each emitting branch (as in Raven) so the LCG
-    // sequence matches: no draw occurs when nothing is emitted.
+    // Q_irand is drawn inside each emitting branch (as in Raven), so the LCG sequence matches.
+    // No draw occurs when nothing is emitted.
     let level_time = ctx.world.level.time;
     if ctx.world.entity(self_).s.number == 0 {
         let ev = ctx.world.bg_state.rng.Q_irand(
@@ -140,7 +140,8 @@ pub fn Jedi_PlayDeflectSound(ctx: &mut GameContext, self_: EntityId) {
         );
         crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
     } else {
-        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor.
+        // The deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if ctx.world.entity(self_).health > 0
             && !npc.is_null()
@@ -163,8 +164,8 @@ pub fn Jedi_PlayDeflectSound(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:163-180`
 pub fn NPC_Jedi_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.entity(self_).health > 0 {
-        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
-        // raw via the safe entity borrow, per trap 2b.
+        // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+        // The deref stays raw via the safe entity borrow.
         let client = ctx.world.entity(self_).client;
         let class = if client.is_null() {
             None
@@ -237,8 +238,8 @@ pub fn WP_ResistForcePush(
     let Some(self_id) = self_ else {
         return;
     };
-    // FLAG: client may be a real player (s.number==0) or an NPC pool client;
-    // deref raw via the safe entity borrow, per trap 2b.
+    // FLAG: the client may be a real player (s.number==0) or an NPC pool client.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_id).client;
     if ctx.world.entity(self_id).health <= 0 || client.is_null() {
         return;
@@ -329,8 +330,8 @@ pub fn Boba_StopKnockdown(
     pushDir: vec3_t,
     forceKnockdown: qboolean,
 ) -> qboolean {
-    // FLAG: NPC (Boba) carries a BG_Alloc'd pool client (not level.clients);
-    // deref raw via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC (Boba) carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     unsafe {
         if (*client).NPC_class != CLASS_BOBAFETT {
@@ -355,8 +356,8 @@ pub fn Boba_StopKnockdown(
 
         if ctx.world.bg_state.rng.Q_irand(0, 2) != 0 {
             //flip or roll with it
-            // C leaves tempCmd's other fields uninitialized (UB read in ForceJump);
-            // zero-initialize as the one defined behavior (porting-rules §19).
+            // C leaves tempCmd's other fields uninitialized, a UB read in ForceJump.
+            // This zero-initializes as the one defined behavior (porting-rules §19).
             let mut tempCmd: usercmd_t = core::mem::zeroed();
             if fDot >= 0.4 {
                 tempCmd.forwardmove = 127;
@@ -405,13 +406,14 @@ pub fn Boba_StopKnockdown(
 pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
     //switch to seeker AI for a while
     if crate::g_timer::TIMER_Done(ctx, Some(self_), c"jetRecharge".as_ptr()) != qfalse {
-        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
-        // raw via the safe entity borrow, per trap 2b.
+        // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+        // The deref stays raw via the safe entity borrow.
         let client = ctx.world.entity(self_).client;
         unsafe {
             (*client).ps.gravity = 0;
         }
-        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor.
+        // The deref stays raw.
         let snpc = ctx.world.entity(self_).NPC;
         if !snpc.is_null() {
             unsafe {
@@ -442,14 +444,15 @@ pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:367-384`
 pub fn Boba_FlyStop(ctx: &mut GameContext, self_: EntityId) {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     let gravity = ctx.world.cvars.g_gravity.value as c_int;
     unsafe {
         (*client).ps.gravity = gravity;
     }
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     if !snpc.is_null() {
         unsafe {
@@ -480,8 +483,8 @@ pub fn Boba_FlyStop(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:386-389`
 pub fn Boba_Flying(self_: &gentity_t) -> qboolean {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the entity's client field, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the entity's client field.
     let client = self_.client;
     if (unsafe { (*client).ps.eFlags2 } & EF2_FLYING) != 0 {
         qtrue
@@ -494,8 +497,8 @@ pub fn Boba_Flying(self_: &gentity_t) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:391-416`
 pub fn Boba_FireFlameThrower(ctx: &mut GameContext, self_: EntityId) {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     let damage = ctx.world.bg_state.rng.Q_irand(20, 30);
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
@@ -571,8 +574,8 @@ pub fn Boba_FireFlameThrower(ctx: &mut GameContext, self_: EntityId) {
 pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     let flameTime = 4000; //Q_irand( 1000, 3000 );
     let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
@@ -593,8 +596,8 @@ pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
         CHAN_WEAPON as c_int,
         "sound/effects/combustfire.mp3");
 
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
     let hand_r_bolt = unsafe { (*npc_client).renderInfo.handRBolt };
@@ -1020,8 +1023,8 @@ pub fn Boba_FireDecide(ctx: &mut GameContext) {
 pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
     if let Some(self_) = self_ {
         ctx.world.entity_mut(self_).flags |= FL_NOTARGET;
-        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
-        // raw via the safe entity borrow, per trap 2b.
+        // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+        // The deref stays raw via the safe entity borrow.
         let client = ctx.world.entity(self_).client;
         if !client.is_null() {
             if unsafe { (*client).ps.powerups[PW_CLOAKED as usize] } == 0 {
@@ -1044,8 +1047,8 @@ pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
 pub fn Jedi_Decloak(ctx: &mut GameContext, self_: Option<EntityId>) {
     if let Some(self_) = self_ {
         ctx.world.entity_mut(self_).flags &= !FL_NOTARGET;
-        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
-        // raw via the safe entity borrow, per trap 2b.
+        // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+        // The deref stays raw via the safe entity borrow.
         let client = ctx.world.entity(self_).client;
         if !client.is_null() {
             if unsafe { (*client).ps.powerups[PW_CLOAKED as usize] } != 0 {
@@ -1070,8 +1073,8 @@ pub fn Jedi_CheckCloak(ctx: &mut GameContext) {
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return;
     };
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if !client.is_null() && unsafe { (*client).NPC_class } == CLASS_SHADOWTROOPER {
         if unsafe { (*client).ps.saberHolstered } == 0
@@ -1097,10 +1100,11 @@ pub fn Jedi_CheckCloak(ctx: &mut GameContext) {
 pub fn Jedi_Aggression(self_: &gentity_t, change: c_int) {
     let upper_threshold: c_int;
     let lower_threshold: c_int;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = self_.NPC;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the entity's client field, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the entity's client field.
     let client = self_.client;
 
     unsafe {
@@ -1136,10 +1140,11 @@ pub fn Jedi_Aggression(self_: &gentity_t, change: c_int) {
 pub fn Jedi_AggressionErosion(ctx: &mut GameContext, amt: c_int) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"roamTime".as_ptr()) != qfalse {
         //the longer we're not alerted and have no enemy, the more our aggression goes down
@@ -1194,7 +1199,8 @@ pub fn NPC_Jedi_RateNewEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Opti
         }
     }
     //Average these with current aggression
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     let aggression = unsafe { (*snpc).stats.aggression };
     newAggression =
@@ -1212,7 +1218,8 @@ pub fn NPC_Jedi_RateNewEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Opti
 pub fn Jedi_Rage(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let agg = 10 - unsafe { (*npc_info).stats.aggression } + ctx.world.bg_state.rng.Q_irand(-2, 2);
     Jedi_Aggression(ctx.world.entity(npc_id), agg);
@@ -1245,10 +1252,11 @@ pub fn Jedi_RageStop(ctx: &mut GameContext, self_: EntityId) {
 pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"chatter".as_ptr()) != qfalse
         && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
@@ -1262,7 +1270,8 @@ pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
     {
         let mut event: c_int = -1;
         let enemy_id = ctx.world.entity(npc_id).enemy;
-        // FLAG: enemy may be an NPC pool client; deref raw, per trap 2b.
+        // FLAG: the enemy may be an NPC pool client.
+        // The deref stays raw.
         let enemy_client = match enemy_id {
             Some(eid) => ctx.world.entity(eid).client,
             None => core::ptr::null_mut(),
@@ -1410,10 +1419,11 @@ pub fn NPC_MoveDirClear(
 ) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     let npc_mins = ctx.world.entity(npc_id).r.mins;
@@ -1553,7 +1563,8 @@ pub fn NPC_MoveDirClear(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1200-1211`
 pub fn Jedi_HoldPosition(ctx: &mut GameContext) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         (*npc_info).goalEntity = None;
@@ -1566,10 +1577,11 @@ pub fn Jedi_HoldPosition(ctx: &mut GameContext) {
 pub fn Jedi_Move(ctx: &mut GameContext, goal: Option<EntityId>, retreat: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     let moved: qboolean;
     let mut info: navInfo_t = unsafe { core::mem::zeroed() };
@@ -1614,7 +1626,8 @@ pub fn Jedi_Move(ctx: &mut GameContext, goal: Option<EntityId>, retreat: qboolea
 pub fn Jedi_Hunt(ctx: &mut GameContext) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     //if we're at all interested in fighting, go after him
     if unsafe { (*npc_info).stats.aggression } > 1 {
@@ -1662,8 +1675,8 @@ pub fn Jedi_Retreat(ctx: &mut GameContext) {
 pub fn Jedi_Advance(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if unsafe { (*client).ps.saberInFlight } == qfalse {
         crate::w_saber::WP_ActivateSaber(ctx, Some(npc_id));
@@ -1679,13 +1692,14 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
     let Some(self_) = self_ else {
         return;
     };
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
     }
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     unsafe {
         if (*client).NPC_class == CLASS_TAVION {
@@ -1750,8 +1764,8 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
 pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if unsafe { (*client).ps.weaponTime } == 0
         && (ctx.world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) == 0
@@ -2014,7 +2028,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
             //we're way out of range
             let mut usedForce: qboolean = qfalse;
             if (*npc_info).stats.aggression < ctx.world.bg_state.rng.Q_irand(0, 20)
-                // C compares in float: health widens to float, `*0.75f` RHS stays float.
+                // C compares in float. `health` widens to float, and the `*0.75f` RHS stays float.
                 && ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.75f32
                 && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
             {
@@ -2368,7 +2382,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
         }
         //if really really mad, rage!
         if (*npc_info).stats.aggression > ctx.world.bg_state.rng.Q_irand(5, 15)
-            // C compares in float: health widens to float, `*0.75f` RHS stays float.
+            // C compares in float. `health` widens to float, and the `*0.75f` RHS stays float.
             && ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.75f32
             && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
         {
@@ -2514,10 +2528,11 @@ pub fn Jedi_CheckFlipEvasions(
     rightdot: f32,
     zdiff: f32,
 ) -> evasionType_t {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     unsafe {
         if !ctx.world.entity(self_).NPC.is_null() && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) != 0
@@ -2735,9 +2750,8 @@ pub fn Jedi_CheckFlipEvasions(
                     &mut idealNormal,
                 );
                 crate::q_math::VectorNormalize(&mut idealNormal);
-                // Raven's `!traceEnt.is_null()` is always true (`ge.add` never
-                // yields NULL); dropped. The `< ENTITYNUM_WORLD` guard keeps the
-                // index in range before the entity borrow.
+                // Raven's `!traceEnt.is_null()` is always true, since `ge.add` never yields NULL, so this is dropped.
+                // The `< ENTITYNUM_WORLD` guard keeps the index in range before the entity borrow.
                 let trace_ent_id = EntityId(trace.entityNum as u32);
                 if (trace.entityNum < (ENTITYNUM_WORLD) as i16
                     && ctx.world.entity(trace_ent_id).s.solid != SOLID_BMODEL)
@@ -2938,10 +2952,11 @@ pub fn Jedi_ReCalcParryTime(
     self_: EntityId,
     evasionType: evasionType_t,
 ) -> c_int {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     unsafe {
         if client.is_null() {
@@ -3039,10 +3054,11 @@ pub fn Jedi_ReCalcParryTime(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2443-2453`
 pub fn Jedi_QuickReactions(ctx: &mut GameContext, self_: EntityId) -> qboolean {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     if (unsafe { (*client).NPC_class } == CLASS_JEDI
         && unsafe { (*npc_info).rank } as c_int == RANK_COMMANDER as c_int)
@@ -3061,8 +3077,8 @@ pub fn Jedi_QuickReactions(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2455-2470`
 pub fn Jedi_SaberBusy(self_: &gentity_t) -> qboolean {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the entity's client field, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the entity's client field.
     let client = self_.client;
     unsafe {
         if (*client).ps.torsoTimer > 300
@@ -3095,8 +3111,8 @@ pub fn Jedi_SaberBlockGo(
 ) -> evasionType_t {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc);
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     unsafe {
         // `cmd: *mut usercmd_t` is not an entity pointer and stays raw.
@@ -3913,8 +3929,8 @@ pub fn Jedi_SaberBlock(ctx: &mut GameContext, saberNum: c_int, bladeNum: c_int) 
             crate::ai_wpnav::G_TestLine(ctx, saberPoint, hitloc, 0x0000ff, FRAMETIME as c_int);
         }
 
-        // STAGE-2b: irreducible — raw `ucmd` alias passed alongside `ctx`
-        // to the raw-ABI callee.
+        // The raw `ucmd` alias passes alongside `ctx` to the raw-ABI callee.
+        // This stays irreducible.
         let cmd = &raw mut ctx.world.globals.ucmd;
         evasionType = Jedi_SaberBlockGo(
             ctx,
@@ -4357,8 +4373,8 @@ pub fn Jedi_FindEnemyInCone(
     fallback: Option<EntityId>,
     minDot: f32,
 ) -> *mut gentity_t {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let self_client = ctx.world.entity(self_).client;
 
     let mut forward: vec3_t = [0.0; 3];
@@ -4399,8 +4415,9 @@ pub fn Jedi_FindEnemyInCone(
         e = 0;
         while e < numListedEntities {
             let check_id = EntityId(entityList[e as usize] as u32);
-            // FLAG: arbitrary in-box entity — client may be a real player or NPC
-            // pool client; deref raw via the safe entity borrow, per trap 2b.
+            // FLAG: this is an arbitrary in-box entity.
+            // Its client may be a real player or an NPC pool client.
+            // The deref stays raw via the safe entity borrow.
             let check_client = ctx.world.entity(check_id).client;
             if check_id == self_ {
                 e += 1;
@@ -4488,8 +4505,8 @@ pub fn Jedi_SetEnemyInfo(
     enemy_movespeed: *mut f32,
     prediction: c_int,
 ) {
-    // enemy_dest/enemy_dir/enemy_movedir are written out-params (`&mut`); the
-    // staged skeleton carried the stale by-value shape — updated to match.
+    // `enemy_dest`, `enemy_dir`, and `enemy_movedir` are written out-params (`&mut`).
+    // The staged skeleton carried a stale by-value shape, now updated to match.
     unsafe {
         let npc = ctx.world.globals.NPC;
         let ge = ctx.world.g_entities.as_mut_ptr();
@@ -4514,8 +4531,7 @@ pub fn Jedi_SetEnemyInfo(
             *enemy_movespeed = crate::q_math::VectorNormalize(enemy_movedir);
             //figure out where he'll be, say, 3 frames from now
             let mvd = *enemy_movedir;
-            // C's `0.001` is a double literal, so `movespeed * 0.001 * prediction`
-            // runs in f64 and narrows to the float VectorMA scale.
+            // C's `0.001` is a double literal, so `movespeed * 0.001 * prediction` runs in f64 and narrows to the float VectorMA scale.
             crate::q_math::_VectorMA(
                 (*enemy).r.currentOrigin,
                 (*enemy_movespeed as f64 * 0.001 * prediction as f64) as f32,
@@ -4524,9 +4540,8 @@ pub fn Jedi_SetEnemyInfo(
             );
             let dest = *enemy_dest;
             crate::q_math::_VectorSubtract(dest, (*npc).r.currentOrigin, enemy_dir);
-            // C's `1.5` is a double literal, so the `lengthMax + maxs*1.5 + 16`
-            // offset and the `VectorNormalize() - ...` subtraction run in f64 and
-            // narrow at the store to the float enemy_dist.
+            // C's `1.5` is a double literal, so the `lengthMax + maxs*1.5 + 16` offset and the `VectorNormalize() - ...` subtraction run in f64.
+            // This narrows at the store to the float `enemy_dist`.
             *enemy_dist = (crate::q_math::VectorNormalize(enemy_dir) as f64
                 - ((*npc_client).saber[0].blade[0].lengthMax as f64
                     + (*npc).r.maxs[0] as f64 * 1.5
@@ -4582,7 +4597,7 @@ pub fn Jedi_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) {
             && (*npc).s.weapon != WP_STUN_BATON as c_int
         {
             //boba leads his enemy
-            // C compares in float: health widens to float, `*0.5f` RHS stays float.
+            // C compares in float. `health` widens to float, and the `*0.5f` RHS stays float.
             if ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.5f32 {
                 //lead
                 let missileSpeed = crate::g_weapon::WP_SpeedOfMissileForWeapon(
@@ -4592,8 +4607,8 @@ pub fn Jedi_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) {
                 if missileSpeed != 0.0 {
                     let mut eDist = crate::q_math::Distance(eyes, enemy_eyes);
                     eDist /= missileSpeed; //How many seconds it will take to get to the enemy
-                                           // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
-                                           // flrand-bearing scale substitutes per component — three draws.
+                                           // VectorMA is the live `#if 1` macro (`q_shared.h:1365`).
+                                           // The flrand-bearing scale substitutes per component, so this draws three times.
                                            // Source: `oracle/codemp/game/NPC_AI_Jedi.c:3838`
                     for i in 0..3 {
                         enemy_eyes[i] += (*enemy_client).ps.velocity[i]
@@ -5362,8 +5377,7 @@ pub fn Jedi_Jump(ctx: &mut GameContext, dest: vec3_t, goalEntNum: c_int) -> qboo
 
                 crate::q_math::_VectorScale(targetDir, shotSpeed, &mut shotVel);
                 travelTime = targetDist / shotSpeed;
-                // C's `0.5` is a double literal, so the `travelTime * 0.5 *
-                // gravity` product runs in f64 and narrows at the `+=`.
+                // C's `0.5` is a double literal, so the `travelTime * 0.5 * gravity` product runs in f64 and narrows at the `+=`.
                 shotVel[2] += (travelTime as f64 * 0.5 * (*client).ps.gravity as f64) as f32;
 
                 if hitCount == 0 {
@@ -5517,15 +5531,17 @@ pub fn Jedi_Jump(ctx: &mut GameContext, dest: vec3_t, goalEntNum: c_int) -> qboo
 pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
-    // Raven derefs `goal->client` unconditionally at the top; `goal` is always
-    // a live entity here.
+    // Raven derefs `goal->client` unconditionally at the top.
+    // `goal` is always a live entity here.
     let goal_id = goal.unwrap();
-    // FLAG: goal's client may be a real player or NPC pool client; deref raw, trap 2b.
+    // FLAG: the goal's client may be a real player or an NPC pool client.
+    // The deref stays raw.
     let goal_client = ctx.world.entity(goal_id).client;
     let enemy = ctx.world.entity(npc_id).enemy;
     unsafe {
@@ -5704,8 +5720,8 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
 pub fn Jedi_Jumping(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"forceJumpChasing".as_ptr()) == qfalse
         && goal.is_some()
@@ -5867,8 +5883,8 @@ pub fn Jedi_CheckEnemyMovement(ctx: &mut GameContext, enemy_dist: f32) {
                                     &mut dir,
                                 );
                                 if crate::q_math::VectorNormalize(&mut dir) > 32.0 {
-                                    // STAGE-2b: irreducible — raw `ucmd` alias passed alongside `ctx`
-                                    // to the raw-ABI callee.
+                                    // The raw `ucmd` alias passes alongside `ctx` to the raw-ABI callee.
+                                    // This stays irreducible.
                                     let cmd = &raw mut ctx.world.globals.ucmd;
                                     crate::NPC_move::G_UcmdMoveForDir(
                                         ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
@@ -5953,8 +5969,8 @@ pub fn Jedi_CheckEnemyMovement(ctx: &mut GameContext, enemy_dist: f32) {
                                     &mut dir,
                                 );
                                 if crate::q_math::VectorNormalize(&mut dir) > 64.0 {
-                                    // STAGE-2b: irreducible — raw `ucmd` alias passed alongside `ctx`
-                                    // to the raw-ABI callee.
+                                    // The raw `ucmd` alias passes alongside `ctx` to the raw-ABI callee.
+                                    // This stays irreducible.
                                     let cmd = &raw mut ctx.world.globals.ucmd;
                                     crate::NPC_move::G_UcmdMoveForDir(
                                         ctx.entity_mut(ctx.entity_id_of(npc).unwrap()),
@@ -6012,8 +6028,8 @@ pub fn Jedi_CheckJumps(ctx: &mut GameContext) {
         jumpVel = [0.0, 0.0, 0.0];
 
         if (*client).ps.fd.forceJumpCharge != 0.0 {
-            // STAGE-2b: irreducible — raw `ucmd` alias passed alongside `ctx`
-            // to the raw-ABI callee.
+            // The raw `ucmd` alias passes alongside `ctx` to the raw-ABI callee.
+            // This stays irreducible.
             let cmd = &raw mut ctx.world.globals.ucmd;
             crate::w_force::WP_GetVelocityForForceJump(
                 ctx,
@@ -6358,10 +6374,11 @@ pub fn NPC_Jedi_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let snpc = ctx.world.entity(self_).NPC;
     let d_jedi = ctx.world.cvars.d_JediAI.integer != 0;
     let other_id = attacker.unwrap();
@@ -6492,15 +6509,16 @@ pub fn NPC_Jedi_Pain(
 pub fn Jedi_CheckDanger(ctx: &mut GameContext) -> qboolean {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     let alertEvent =
         crate::NPC_senses::NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, AEL_MINOR as c_int);
-    // §19: oracle indexes level.alertEvents[-1] (UB, near-always qfalse) when
-    // NPC_CheckAlertEvents returns -1; guard the panic on `as usize`.
+    // Per porting-rules §19, the oracle indexes `level.alertEvents[-1]`, UB and near-always qfalse, when `NPC_CheckAlertEvents` returns -1.
+    // This guards the panic on `as usize`.
     // Source: oracle/codemp/game/NPC_AI_Jedi.c:5449
     if alertEvent == -1 {
         return qfalse;
@@ -6510,7 +6528,8 @@ pub fn Jedi_CheckDanger(ctx: &mut GameContext) -> qboolean {
     if ae_level as c_int >= AEL_DANGER as c_int {
         //run away!
         let owner_id = ctx.entity_id_of(owner);
-        // FLAG: alert owner may be an NPC pool client; deref raw, per trap 2b.
+        // FLAG: the alert owner may be an NPC pool client.
+        // The deref stays raw.
         let owner_client = match owner_id {
             Some(oid) => ctx.world.entity(oid).client,
             None => core::ptr::null_mut(),
@@ -6669,8 +6688,8 @@ pub fn Jedi_CheckAmbushPlayer(ctx: &mut GameContext) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5547-5559`
 pub fn Jedi_Ambush(ctx: &mut GameContext, self_: EntityId) {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     unsafe {
         (*client).noclip = qfalse;
@@ -6700,8 +6719,8 @@ pub fn Jedi_Ambush(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5561-5568`
 pub fn Jedi_WaitingAmbush(self_: &gentity_t) -> qboolean {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the entity's client field, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the entity's client field.
     let client = self_.client;
     if (self_.spawnflags & JSF_AMBUSH) != 0 && unsafe { (*client).noclip } != qfalse {
         return qtrue;
@@ -6968,8 +6987,8 @@ pub fn Jedi_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5730-5752`
 pub fn Jedi_CanPullBackSaber(ctx: &mut GameContext, self_: EntityId) -> qboolean {
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: the NPC carries a BG_Alloc'd pool client, not level.clients.
+    // The deref stays raw via the safe entity borrow.
     let client = ctx.world.entity(self_).client;
     if unsafe { (*client).ps.saberBlocked } == BLOCKED_PARRY_BROKEN as c_int
         && crate::g_timer::TIMER_Done(ctx, Some(self_), c"parryTime".as_ptr()) == qfalse
@@ -7512,8 +7531,7 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
                     && ((*enemy_client).ps.fd.forcePowersActive & (1 << FP_SPEED)) != 0
                     && ((*client).ps.fd.forcePowersActive & (1 << FP_SPEED)) == 0
                 {
-                    // Raven's switch has case fall-through (no breaks on 0/1),
-                    // so chance ends at 1 for skill 0, 1, and 2 (§20 quirk).
+                    // Raven's switch has case fall-through (no breaks on 0/1), so chance ends at 1 for skill 0, 1, and 2 (§20 quirk).
                     let mut chance = 0;
                     match ctx.world.cvars.g_spskill.integer {
                         0 => {

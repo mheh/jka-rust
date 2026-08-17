@@ -1,18 +1,11 @@
-// PORT-COMPLETE: g_ICARUScb.c
 //! FAITHFUL port of `oracle/codemp/game/g_ICARUScb.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 2c** (deref sweep): every entity reach is a
-//! checked `ctx.world.entity[_mut](id)` borrow — the per-body raw
-//! `*mut gentity_t` re-derives are gone, seam trap handles are re-derived fresh
-//! at each `trap::*` call. The remaining `unsafe` blocks hold only sanctioned
-//! raw ops: pool-client (`gclient_t`) and `gNPC_t` derefs through copied
-//! pointer values, `parms_t` pool derefs, the `*mut *mut c_char` out-param, the
-//! `bState_t` transmutes and `cstr_to_str` string reads. Behavior is
-//! byte-identical, referee-verified.
+//! Every entity reach is a checked `ctx.world.entity[_mut](id)` borrow.
+//! The per-body raw `*mut gentity_t` re-derives are gone, and seam trap handles are re-derived fresh at each `trap::*` call.
+//! The remaining `unsafe` blocks hold only sanctioned raw ops: pool-client (`gclient_t`) and `gNPC_t` derefs through copied pointer values, `parms_t` pool derefs, the `*mut *mut c_char` out-param, the `bState_t` transmutes, and `cstr_to_str` string reads.
+//! Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::CStr;
@@ -24,15 +17,15 @@ use native_string::latin1_to_string;
 use native_string::{atof, atof_bytes};
 use native_string::{Q_stricmp, Q_strncmp};
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`. Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-// `FRAMETIME` resolves via the crate prelude glob (`crate::g_items`); the
-// shadowing local copy was removed by the placeholder-const sweep.
+// `FRAMETIME` resolves through the crate prelude glob (`crate::g_items`).
+// This file carries no local shadow copy.
 
-// Raven ICARUS `Q3_Registers.h` anonymous variable-type enum. Ported locally
-// (small, self-contained, independent of the `interpreter.h` ID/Type enum
-// chain) since only `VTYPE_FLOAT` is referenced here.
+// Raven ICARUS `Q3_Registers.h` anonymous variable-type enum, ported locally.
+// It is small and self-contained, independent of the `interpreter.h` ID/Type enum chain.
+// Only `VTYPE_FLOAT` is used here.
 // Source: `oracle/codemp/icarus/Q3_Registers.h:5-10`
 const VTYPE_NONE: c_int = 0;
 const VTYPE_FLOAT: c_int = 1;
@@ -70,7 +63,7 @@ pub fn G_DebugPrint(
     ctx: &mut GameContext,
     level: c_int,
     text: &str,
-    // variadic `...` — C varargs, seam decision pending
+    // The variadic `...` C varargs argument has a pending seam decision.
 ) {
     if ctx.world.cvars.g_developer.integer != 2 {
         return;
@@ -134,8 +127,8 @@ pub fn Q3_GetAnimLower(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         return std::ptr::null_mut();
     }
 
-    // Pool client: NPCs carry a `BG_Alloc`'d gclient_t (g_utils.c:430), so the
-    // deref stays raw through the copied pointer — never index level.clients.
+    // Pool client: NPCs carry a `BG_Alloc`'d `gclient_t` (g_utils.c:430).
+    // The deref stays raw through the copied pointer, so the code never indexes `level.clients`.
     let anim: c_int = unsafe { (*client).ps.legsAnim };
 
     animTable[anim as usize].name
@@ -155,8 +148,8 @@ pub fn Q3_GetAnimUpper(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         return std::ptr::null_mut();
     }
 
-    // Pool client: NPCs carry a `BG_Alloc`'d gclient_t (g_utils.c:430), so the
-    // deref stays raw through the copied pointer — never index level.clients.
+    // Pool client: NPCs carry a `BG_Alloc`'d `gclient_t` (g_utils.c:430).
+    // The deref stays raw through the copied pointer, so the code never indexes `level.clients`.
     let anim: c_int = unsafe { (*client).ps.torsoAnim };
 
     animTable[anim as usize].name
@@ -169,8 +162,8 @@ pub fn Q3_GetAnimBoth(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
     let lower_name = Q3_GetAnimLower(ctx, ent);
     let upper_name = Q3_GetAnimUpper(ctx, ent);
 
-    // `lower_name`/`upper_name` are `animTable` entry strings (or NULL); the
-    // empty-string test derefs the raw C string, so it stays a tight unsafe.
+    // `lower_name`/`upper_name` are `animTable` entry strings (or NULL).
+    // The empty-string test derefs the raw C string, so it stays a tight unsafe block.
     if lower_name.is_null() || unsafe { *lower_name } == 0 {
         G_DebugPrint(
             ctx,
@@ -189,8 +182,8 @@ pub fn Q3_GetAnimBoth(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         return std::ptr::null_mut();
     }
 
-    // Raven: `#ifdef _DEBUG` mismatch warning is dev-build noise only; behavior
-    // (return legs anim regardless) is unconditional and preserved here.
+    // Raven's `#ifdef _DEBUG` mismatch warning is dev-build noise only.
+    // The behavior (return legs anim regardless) is unconditional, and this port keeps it.
     lower_name
 }
 
@@ -198,7 +191,7 @@ pub fn Q3_GetAnimBoth(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:400-520`
 // The `#if 0`-style subtitle/broadcast-text block (g_ICARUScb.c:441-479) is
-// commented out in Raven itself; not transcribed (dead source).
+// commented out in Raven itself, so this port does not transcribe it. It is dead source.
 pub fn Q3_PlaySound(
     ctx: &mut GameContext,
     taskID: c_int,
@@ -285,9 +278,8 @@ pub fn Q3_Play(
         let roffid = trap::ROFF_Cache(ctx.engine, &unsafe { cstr_to_str(name) });
         ctx.world.entity_mut(id).roffid = roffid;
         if roffid != 0 {
-            // Raven stored `roffname = G_NewString(name)` here; the field was
-            // deleted (zero readers — only the resolved `roffid` is consumed), so
-            // the store drops.
+            // Raven stored `roffname = G_NewString(name)` here.
+            // The field is deleted because it has zero readers, only the resolved `roffid` is consumed, so the store drops.
 
             // Save this off for later
             trap::ICARUS_TaskIDSet(
@@ -347,12 +339,9 @@ pub fn anglerCallback(ctx: &mut GameContext, ent: EntityId) {
 
         // Stop thinking.
         e.reached = FnId::NONE;
-        // Raven compares `ent->think == anglerCallback` by address (fn-ID
-        // enums replace address compares) before clearing it; the
-        // `gentity_t.think` field is not yet retrofitted from a raw fn-ptr to
-        // `Option<EntThink>` so the compare itself can't be reproduced here.
-        // This callback is only ever assigned as its own think, so
-        // unconditionally clearing is behaviorally equivalent.
+        // Raven compares `ent->think == anglerCallback` by address before it clears the field.
+        // Fn-ID enums replace address compares, and the `gentity_t.think` field is not yet retrofitted from a raw fn pointer to `Option<EntThink>`, so this port cannot reproduce the compare itself.
+        // This callback is only ever assigned as its own think, so an unconditional clear is behaviorally equivalent.
         e.think = FnId::NONE;
     }
 
@@ -380,7 +369,7 @@ pub fn moverCallback(ctx: &mut GameContext, ent: EntityId) {
         e.s.loopSound = 0;
         e.s.loopIsSoundset = qfalse;
     }
-    // BMS_END: unported sound-slot const (missing_symbols).
+    // `BMS_END` is an unported sound-slot const.
     G_PlayDoorSound(ctx, ent, BMS_END);
 
     let mover_state = ctx.world.entity(ent).moverState;
@@ -401,8 +390,8 @@ pub fn moverCallback(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:635-658`
 pub fn Blocked_Mover(ctx: &mut GameContext, ent: EntityId, other: Option<EntityId>) {
-    // Raven derefs `other` unconditionally (the blocking entity is always real);
-    // resolve the handle up front to keep that behavior.
+    // Raven derefs `other` unconditionally, the blocking entity is always real.
+    // Resolve the handle up front to keep that behavior.
     let other = other.unwrap();
 
     // remove anything other than a client -- no longer the case
@@ -426,10 +415,9 @@ pub fn Blocked_Mover(ctx: &mut GameContext, ent: EntityId, other: Option<EntityI
 
     let damage = ctx.world.entity(ent).damage;
     if damage != 0 {
-        // Raven passes `NULL` for both `dir` and `point`; `dir` is now
-        // `Option<&mut vec3_t>` so `None` is faithful, but
-        // `point` is still a by-value `vec3_t` (no null representation),
-        // so the zero vector (`vec3_origin`) remains the stand-in there.
+        // Raven passes `NULL` for both `dir` and `point`.
+        // `dir` is now `Option<&mut vec3_t>`, so `None` is faithful.
+        // `point` is still a by-value `vec3_t` with no null representation, so the zero vector (`vec3_origin`) remains the stand-in there.
         G_Damage(
             ctx,
             Some(other),
@@ -683,9 +671,8 @@ pub fn Q3_Lerp2Pos(
 
 /// Raven `Q3_Lerp2Angles`.
 ///
-/// `angles` is written through (`ang[i] = AngleSubtract(...)`, but the
-/// output is `ent->s.apos.trDelta`, not `angles` itself) — re-checking the
-/// oracle: `angles` is only ever read here, so it stays by-value.
+/// `angles` looks written through (`ang[i] = AngleSubtract(...)`), but the output is `ent->s.apos.trDelta`, not `angles` itself.
+/// A re-check of the oracle shows `angles` is only ever read here, so it stays by-value.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:892-939`
 pub fn Q3_Lerp2Angles(
     ctx: &mut GameContext,
@@ -1253,8 +1240,8 @@ pub fn Q3_GetVector(
                 || toGet == SET_PARM16 as i32 =>
             {
                 // Raven: sscanf(parm, "%f %f %f", &value[0], &value[1], &value[2])
-                // — oracle g_ICARUScb.c:1604 has no count check; unmatched
-                // components are left untouched (porting-rules §19).
+                // Oracle g_ICARUScb.c:1604 has no count check.
+                // Unmatched components stay untouched, per porting-rules §19.
                 // Parms pool struct: deref raw through the copied pointer.
                 let parms = ctx.world.entity(id).parms;
                 let parm_str =
@@ -1339,10 +1326,9 @@ pub fn Q3_GetString(
                 }
             }
             _ if toGet == SET_TARGET as i32 => {
-                // Raven returned `ent->target` (a pool pointer) directly; the
-                // owned `Option<String>` is staged NUL-terminated into scratch
-                // and returned by pointer (`None` → NULL, dispatch skips the
-                // copy). The dispatch `strcpy`s it out immediately.
+                // Raven returned `ent->target`, a pool pointer, directly.
+                // The owned `Option<String>` is staged NUL-terminated into scratch and returned by pointer.
+                // `None` maps to NULL, and dispatch skips the copy. Dispatch `strcpy`s it out immediately.
                 match ctx.world.entity(id).target.clone() {
                     Some(target) => {
                         let buf = &mut ctx.world.scratch.icarus_get_string;
@@ -1353,11 +1339,8 @@ pub fn Q3_GetString(
                 }
             }
             _ if toGet == SET_LOCATION as i32 => return 0,
-            // The `behaviorSet`/`targetname`/`fullName` returns below hand the
-            // LIVE prefix slot pointer straight to the ICARUS dispatch (which
-            // `strcpy`s it out immediately) — the ABI-seam use the prefix stays
-            // `*mut c_char` for; an owned `String` has no stable NUL-terminated
-            // pointer, so these stay raw slot reads (not `_str()` decodes).
+            // The `behaviorSet`/`targetname`/`fullName` returns below hand the live prefix slot pointer straight to the ICARUS dispatch, which `strcpy`s it out immediately.
+            // The ABI seam needs the prefix as `*mut c_char`, and an owned `String` has no stable NUL-terminated pointer, so these stay raw slot reads, not `_str()` decodes.
             _ if toGet == SET_SPAWNSCRIPT as i32 => {
                 *value = ctx.world.entity(id).behaviorSet[BSET_SPAWN as usize]
             }
@@ -1554,7 +1537,7 @@ pub fn Q3_GetString(
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1865-1886`
 pub fn MoveOwner(ctx: &mut GameContext, self_: EntityId) {
-    // `owner` is `&g_entities[ownerNum]` — an array element, never NULL, so
+    // `owner` is `&g_entities[ownerNum]`, an array element, never NULL.
     // Raven's dead `owner->` null guard collapses to the `inuse` check.
     let owner_id = EntityId(ctx.world.entity(self_).r.ownerNum as u32);
 
@@ -1911,9 +1894,8 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2255-2320`
 pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -> qboolean {
-    // `npc` (gNPC_t) has no accessor; its derefs stay raw through the copied
-    // pointer inside this unsafe block (recipe 2c), as do the `cstr_to_str`
-    // string reads. Entity access goes through `ctx.world.entity[_mut](id)`.
+    // `npc` (gNPC_t) has no accessor, so its derefs stay raw through the copied pointer inside this unsafe block, as do the `cstr_to_str` string reads.
+    // Entity access goes through `ctx.world.entity[_mut](id)`.
     unsafe {
         let id = EntityId(entID as u32);
         let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
@@ -2038,8 +2020,8 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             let goal_id = (*npc).goalEntity.unwrap();
             ctx.world.entity_mut(goal_id).lastWaypoint = WAYPOINT_NONE;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
-            // Raven's `#ifdef _DEBUG` block (tempGoal->target = G_NewString(name))
-            // is dev-build-only diagnostic noise; not transcribed.
+            // Raven's `#ifdef _DEBUG` block (tempGoal->target = G_NewString(name)) is dev-build-only diagnostic noise.
+            // This port does not transcribe it.
             qtrue
         }
     }
@@ -2155,8 +2137,8 @@ pub fn Q3_SetAnimLower(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
 
 /// Raven `Q3_SetAnimHoldTime`.
 ///
-/// Raven: the real body (`PM_SetLegsAnimTimer`/`PM_SetTorsoAnimTimer`) is
-/// `#if 0`'d out in the oracle itself; only the "not supported" print remains live.
+/// Raven: the real body (`PM_SetLegsAnimTimer`/`PM_SetTorsoAnimTimer`) is `#if 0`'d out in the oracle itself.
+/// Only the "not supported" print remains live.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2449-2476`
 pub fn Q3_SetAnimHoldTime(ctx: &mut GameContext, entID: c_int, int_data: c_int, lower: qboolean) {
     G_DebugPrint(
@@ -2233,9 +2215,9 @@ pub fn Q3_SetArmor(ctx: &mut GameContext, entID: c_int, data: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2573-2687`
 pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) -> qboolean {
-    // `npc` (gNPC_t) has no accessor; its derefs, the pool-client `noclip`
-    // write, the `bState_t` transmutes and `cstr_to_str` all stay raw inside
-    // this unsafe block (recipe 2c). Entity access uses `ctx.world.entity[_mut]`.
+    // `npc` (gNPC_t) has no accessor.
+    // Its derefs, the pool-client `noclip` write, the `bState_t` transmutes, and `cstr_to_str` all stay raw inside this unsafe block.
+    // Entity access uses `ctx.world.entity[_mut]`.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2321,7 +2303,7 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2699-2737`
 pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) -> qboolean {
-    // gNPC_t deref + transmute + cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` deref, the transmute, and `cstr_to_str` stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2352,7 +2334,7 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2749-2771`
 pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) {
-    // gNPC_t deref + transmute + cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` deref, the transmute, and `cstr_to_str` stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2672,7 +2654,7 @@ pub fn Q3_SetItem(ctx: &mut GameContext, entID: c_int, item_name: *const c_char)
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3139-3161`
 pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
-    // gNPC_t + pool-client derefs and cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` and pool-client derefs, and `cstr_to_str`, stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2702,7 +2684,7 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3173-3195`
 pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
-    // gNPC_t + pool-client derefs and cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` and pool-client derefs, and `cstr_to_str`, stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2784,7 +2766,7 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3285-3307`
 pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
-    // gNPC_t + pool-client derefs and cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` and pool-client derefs, and `cstr_to_str`, stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -2918,8 +2900,8 @@ pub fn Q3_SetTargetName(ctx: &mut GameContext, entID: c_int, targetname: *const 
 pub fn Q3_SetTarget(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
     let id = EntityId(entID as u32);
 
-    // ICARUS `"NULL"` sentinel maps to `None`; any other value is an owned copy
-    // (`target` is a tail `Option<String>`, so no pool allocation).
+    // ICARUS `"NULL"` sentinel maps to `None`. Any other value is an owned copy.
+    // `target` is a tail `Option<String>`, so this needs no pool allocation.
     let target = unsafe { cstr_to_str(target) };
     if Q_stricmp("NULL", &target) == 0 {
         ctx.world.entity_mut(id).target = None;
@@ -3008,9 +2990,9 @@ pub fn Q3_SetForcePowerLevel(
 // Raven's `G_DebugPrint` warnings (parmNum range, truncation) are dropped
 // here, matching the file's other `Q3_Set*` stubs.
 pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
-    // `parms` (parms_t pool alloc) has no accessor; its alloc/zero and field
-    // writes stay raw through the copied pointer (recipe 2c). Entity access
-    // goes through `ctx.world.entity[_mut](id)`.
+    // `parms` (parms_t pool alloc) has no accessor.
+    // Its alloc/zero and field writes stay raw through the copied pointer.
+    // Entity access goes through `ctx.world.entity[_mut](id)`.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -3021,17 +3003,16 @@ pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue
         if ctx.world.entity(id).parms.is_null() {
             let p = G_Alloc(ctx, core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
             ctx.world.entity_mut(id).parms = p;
-            // G_Alloc is a bump allocator whose pool is not re-zeroed on map
-            // restart; C memsets the fresh parms_t so reused regions read empty.
+            // `G_Alloc` is a bump allocator whose pool is not re-zeroed on map restart.
+            // C memsets the fresh `parms_t` so reused regions read empty.
             core::ptr::write_bytes(p as *mut u8, 0, core::mem::size_of::<parms_t>());
         }
 
         let parms = ctx.world.entity(id).parms;
         let val = Q3_GameSideCheckStringCounterIncrement(parmValue);
         if val != 0.0 {
-            // Raven: `val += atof(...)` — atof returns double; the f32 `val`
-            // promotes, adds in f64, narrows once. `%f` promotes the float back
-            // to double for its 6-decimal print, so format via f64.
+            // Raven: `val += atof(...)`. `atof` returns double.
+            // The f32 `val` promotes, adds in f64, and narrows once. `%f` promotes the float back to double for its 6-decimal print, so this port formats through f64.
             // Source: `oracle/codemp/game/g_ICARUScb.c:3676-3677`
             let total = (val as f64
                 + atof_bytes(CStr::from_ptr((*parms).parm[parmNum as usize].as_ptr()).to_bytes()))
@@ -3041,8 +3022,8 @@ pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue
                 &format!("{:.6}", total as f64),
             );
         } else {
-            // Raven: strncpy + explicit truncation-NUL; write_cstr_field is the
-            // Q_strncpyz/Com_sprintf byte-copy dual.
+            // Raven uses strncpy plus an explicit truncation NUL.
+            // `write_cstr_field` is the `Q_strncpyz`/`Com_sprintf` byte-copy dual.
             write_cstr_field(
                 &mut (*parms).parm[parmNum as usize],
                 &cstr_to_str(parmValue),
@@ -3230,7 +3211,7 @@ pub fn Q3_SetCrouched(ctx: &mut GameContext, entID: c_int, add: qboolean) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3942-3967`
 pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
-    // gNPC_t deref + cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` deref and `cstr_to_str` stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -3479,7 +3460,7 @@ pub fn Q3_SetForceInvincible(ctx: &mut GameContext, entID: c_int, forceInv: qboo
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4237-4261`
 pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
-    // gNPC_t deref + cstr_to_str stay raw (recipe 2c).
+    // `gNPC_t` deref and `cstr_to_str` stay raw.
     unsafe {
         let id = EntityId(entID as u32);
 
@@ -3506,7 +3487,7 @@ pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4271-4295`
 pub fn SolidifyOwner(ctx: &mut GameContext, self_: EntityId) {
-    // `owner` is `&g_entities[ownerNum]` — an array element, never NULL, so
+    // `owner` is `&g_entities[ownerNum]`, an array element, never NULL.
     // Raven's dead `owner->` null guard collapses to the `inuse` check.
     let owner_id = EntityId(ctx.world.entity(self_).r.ownerNum as u32);
 
@@ -3544,7 +3525,7 @@ pub fn SolidifyOwner(ctx: &mut GameContext, self_: EntityId) {
 pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboolean {
     let id = EntityId(entID as u32);
 
-    // `ent` is `&g_entities[entID]` — never NULL, so the guard is the `inuse` half.
+    // `ent` is `&g_entities[entID]`, never NULL, so the guard is the `inuse` half.
     if ctx.world.entity(id).inuse == 0 {
         G_DebugPrint(
             ctx,
@@ -3591,7 +3572,7 @@ pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboo
 pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
     let id = EntityId(entID as u32);
 
-    // `ent` is `&g_entities[entID]` — never NULL, so Raven's `!ent` guard is dead.
+    // `ent` is `&g_entities[entID]`, never NULL, so Raven's `!ent` guard is dead.
     if ctx.world.entity(id).client.is_null() {
         let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
         G_DebugPrint(
@@ -3612,9 +3593,9 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
 
 /// Raven `Q3_SetRightMove`.
 ///
-/// Raven: entID/gentity_t is never null (address-of array element); the
-/// `!ent`/`!ent->client` guards are dead/live-checked here as client-null
-/// only. Body is a debug-print stub — behavior is commented out in Raven.
+/// Raven: entID/gentity_t is never null, it is the address of an array element.
+/// The `!ent`/`!ent->client` guards are dead or live-checked here as client-null only.
+/// The body is a debug-print stub. The real behavior is commented out in Raven.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4381-4399`
 pub fn Q3_SetRightMove(ctx: &mut GameContext, entID: c_int, rmoveVal: c_int) {
     let id = EntityId(entID as u32);
@@ -3635,8 +3616,8 @@ pub fn Q3_SetRightMove(ctx: &mut GameContext, entID: c_int, rmoveVal: c_int) {
 
 /// Raven `Q3_SetLockAngle`.
 ///
-/// Raven: the renderInfo.lockYaw/RF_LOCKEDANGLE assignment is fully
-/// commented out in Raven; body is a debug-print stub only.
+/// Raven: the renderInfo.lockYaw/RF_LOCKEDANGLE assignment is fully commented out in Raven.
+/// The body is a debug-print stub only.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4408-4445`
 pub fn Q3_SetLockAngle(ctx: &mut GameContext, entID: c_int, lockAngle: *const c_char) {
     let id = EntityId(entID as u32);
@@ -3808,7 +3789,7 @@ pub fn Q3_SetBehaviorSet(
         let id = EntityId(entID as u32);
         let mut bSet = bSet_t::BSET_INVALID;
 
-        // `ent` is `&g_entities[entID]` — never NULL, so Raven's null guard is dead.
+        // `ent` is `&g_entities[entID]`, never NULL, so Raven's null guard is dead.
 
         bSet = match toSet {
             _ if toSet == SET_SPAWNSCRIPT as i32 => bSet_t::BSET_SPAWN,
@@ -3829,8 +3810,7 @@ pub fn Q3_SetBehaviorSet(
             _ => bSet,
         };
 
-        // `bSet_t` is not `Copy`; use its discriminant from here on (Raven
-        // indexes `behaviorSet[]` with it as an int anyway).
+        // `bSet_t` is not `Copy`. Use its discriminant from here on, Raven indexes `behaviorSet[]` with it as an int anyway.
         let bSet = bSet as c_int;
         if bSet < (bSet_t::BSET_SPAWN as c_int) || bSet >= (bSet_t::NUM_BSETS as c_int) {
             return qfalse;
@@ -3880,7 +3860,7 @@ pub fn Q3_SetDelayScriptTime(ctx: &mut GameContext, entID: c_int, delayTime: c_i
 pub fn Q3_SetPlayerUsable(ctx: &mut GameContext, entID: c_int, usable: qboolean) {
     let id = EntityId(entID as u32);
 
-    // `ent` is `&g_entities[entID]` — never NULL, so Raven's null guard is dead.
+    // `ent` is `&g_entities[entID]`, never NULL, so Raven's null guard is dead.
     if usable != 0 {
         ctx.world.entity_mut(id).r.svFlags |= SVF_PLAYER_USABLE;
     } else {
@@ -3971,7 +3951,7 @@ pub fn Q3_SetShields(ctx: &mut GameContext, entID: c_int, shields: qboolean) {
 pub fn Q3_SetSaberActive(ctx: &mut GameContext, entID: c_int, active: qboolean) {
     let id = EntityId(entID as u32);
 
-    // `ent` is `&g_entities[entID]` — never NULL; the guard is the `inuse` half.
+    // `ent` is `&g_entities[entID]`, never NULL. The guard is the `inuse` half.
     if ctx.world.entity(id).inuse == 0 {
         return;
     }
@@ -4021,20 +4001,19 @@ pub fn Q3_SetCleanDamagingEnts(ctx: &mut GameContext) {
 
 /// Raven `SetTextColor`.
 ///
-/// Raven: `textcolor` is only ever read (never written) in this NOT-SUPPORTED
-/// stub body, so it stays by-value `vec4_t` ("keep by-value only
-/// if never written").
-/// Raven `textcolor_caption` — file-scope static for caption text color.
+/// Raven: `textcolor` is only ever read, never written, in this NOT-SUPPORTED stub body.
+/// It stays by-value `vec4_t` ("keep by-value only if never written").
+/// Raven `textcolor_caption`, a file-scope static for caption text color.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4933`
 static textcolor_caption: vec4_t = [0.0, 0.0, 0.0, 0.0];
 
-/// Raven `textcolor_center` — file-scope static for center text color.
+/// Raven `textcolor_center`, a file-scope static for center text color.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4934`
 static textcolor_center: vec4_t = [0.0, 0.0, 0.0, 0.0];
 
-/// Raven `textcolor_scroll` — file-scope static for scroll text color.
+/// Raven `textcolor_scroll`, a file-scope static for scroll text color.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4935`
 static textcolor_scroll: vec4_t = [0.0, 0.0, 0.0, 0.0];
@@ -4071,8 +4050,8 @@ pub fn Q3_SetScrollTextColor(ctx: &mut GameContext, color: *const c_char) {
 
 /// Raven `Q3_ScrollText`.
 ///
-/// Raven: the `trap_SendServerCommand` call is commented out; body is a
-/// debug-print stub only.
+/// Raven: the `trap_SendServerCommand` call is commented out.
+/// The body is a debug-print stub only.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4991-4997`
 pub fn Q3_ScrollText(ctx: &mut GameContext, id: *const c_char) {
     G_DebugPrint(
@@ -4084,9 +4063,9 @@ pub fn Q3_ScrollText(ctx: &mut GameContext, id: *const c_char) {
 
 /// Raven `Q3_LCARSText`.
 ///
-/// Raven: the `trap_SendServerCommand` call is commented out; body is a
-/// debug-print stub only (Raven's message string says "Q3_ScrollText" too —
-/// preserved verbatim, not a transcription error).
+/// Raven: the `trap_SendServerCommand` call is commented out.
+/// The body is a debug-print stub only.
+/// Raven's message string says "Q3_ScrollText" too, preserved verbatim, not a transcription error.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:5006-5012`
 pub fn Q3_LCARSText(ctx: &mut GameContext, id: *const c_char) {
     G_DebugPrint(
@@ -4112,11 +4091,10 @@ pub fn Q3_Set(
         let mut int_data: c_int;
         let mut vector_data: vec3_t = [0.0, 0.0, 0.0];
 
-        // Convert the shared-memory value once; every scalar `atof` arm below
-        // parses these bytes (libc strtod semantics via `native_string`).
+        // Convert the shared-memory value once. Every scalar `atof` arm below parses these bytes, through `native_string`'s libc `strtod` semantics.
         let data_b = CStr::from_ptr(data).to_bytes();
-        // ICARUS passes a non-null token here (proven by the `CStr::from_ptr`
-        // above); borrow it once as a `&str` for the string-compare arms below.
+        // ICARUS passes a non-null token here, proven by the `CStr::from_ptr` call above.
+        // Borrow it once as a `&str` for the string-compare arms below.
         let data_s = cstr_to_str(data);
 
         // Set this for callbacks
@@ -4125,13 +4103,10 @@ pub fn Q3_Set(
             &cstr_to_str(type_name),
         );
 
-        // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms
-        // below now routes through the shared libc-`%f` scanner
-        // `native_string::sscanf::sscanf_f32s` (stop-at-first-failure, longest-prefix
-        // parse — matching libc, not a naive whitespace-split).
-        // §19: C leaves any component sscanf fails to parse UNINITIALIZED
-        // (garbage-float UB on `vector_data`); we pick "leave the 0.0 seed
-        // above unmodified" as the one defined behavior.
+        // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms below now routes through the shared libc `%f` scanner `native_string::sscanf::sscanf_f32s`.
+        // It stops at the first failure and takes the longest-prefix parse, matching libc, not a naive whitespace split.
+        // Per porting-rules §19: C leaves any component `sscanf` fails to parse UNINITIALIZED, garbage-float UB on `vector_data`.
+        // We pick leaving the 0.0 seed above unmodified as the one defined behavior.
         match toSet {
             _ if toSet == SET_ORIGIN as i32 => {
                 {

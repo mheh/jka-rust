@@ -1,38 +1,17 @@
 //! Port of `oracle/codemp/game/w_force.c` (jampgame force-power logic).
 //!
-//! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
-//! jampgame mega-pass (settled fork rulings,
-//! `docs/handoffs/jampgame-fork-discovery.md`).
+//! Logic functions that reach `level`, cvars, `g_entities`, or traps thread the `GameContext<'_>` receiver
+//! (`.world: &mut GameWorld`, `.engine`), per the engine seam (`docs/architecture/engine-seam.md`).
+//! Globals map to `GameWorld` fields: `level` becomes `ctx.world.level`, cvars become `ctx.world.cvars`,
+//! and `g_entities[i]` becomes `ctx.world.g_entities[i]`.
+//! Traps go through `trap::X(ctx.engine, ...)`.
+//! Cross-file callees keep their own resolved raw-pointer signatures, because each file threads its own state.
 //!
-//! SPINE (`docs/architecture/engine-seam.md`): logic fns that
-//! reach `level`/cvars/`g_entities`/traps thread the `GameContext<'_>` receiver
-//! (`.world: &mut GameWorld`, `.engine`) — the only ported-logic precedent
-//! (`g_init_game`). Globals are `GameWorld` fields: `level` →
-//! `ctx.world.level`, cvars → `ctx.world.cvars`, `g_entities[i]` →
-//! `ctx.world.g_entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
-//! Cross-file callees are invoked with the packet's resolved raw-pointer
-//! signatures verbatim (their own porters thread the spine).
-//!
-//! Raw `gentity_t*`/`gclient_t*`/`playerState_t*` chains are transcribed as
-//! `unsafe` raw-pointer field access mirroring the C exactly (the fnskel
-//! skeletons operate in raw-pointer space; `GameContext.world` is itself a raw
-//! pointer). EntityId reshaping lands in the later integration pass.
-//!
-//! NOTE (integration-deferred): the packet does not enumerate the Raven
-//! constant spellings (`EV_*`, `FP_*`, `FORCE_LEVEL_*`, `PDSOUND_*`, `CHAN_*`,
-//! …) nor their owning enums; they are transcribed by their faithful Raven
-//! names (the port preserves them) and their exact enum-qualification / module
-//! path is resolved at integration (the mega-pass tree is not compiled per
-//! porter — "Do NOT run cargo"). `forcePowerNeeded` is the bg-shared const
-//! table (const tables stay const), referenced by its Raven name.
-//!
-//! Safe-state migration **Stage 1 → 2c**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5) instead of raw `gentity_t*`; ctx-free leaf
-//! helpers borrow `&gentity_t`/`&mut gentity_t`. Entity fields are read/written
-//! through `ctx.world.entity(id)`/`entity_mut(id)` at the point of use.
-//! `gclient_t`/vehicle-vtable derefs stay raw in tight `unsafe` blocks through a
-//! copied pointer value (recipe 2b; NPC targets carry pool clients). Behavior is
-//! byte-identical, referee-verified.
+//! Entity-pointer parameters are `EntityId`/`Option<EntityId>` handles (porting rule §B5) instead of raw `gentity_t*`.
+//! Ctx-free leaf helpers borrow `&gentity_t`/`&mut gentity_t`.
+//! Entity fields are read and written through `ctx.world.entity(id)`/`entity_mut(id)` at the point of use.
+//! `gclient_t`/vehicle-vtable derefs stay raw in tight `unsafe` blocks through a copied pointer value, because NPC targets can carry pool clients.
+//! Behavior is byte-identical and referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::npc::g_npc_t::gNPC_t;
@@ -44,7 +23,7 @@ use native_string::atoi_bytes;
 use native_string::strncpyz_string;
 use native_string::MAX_INFO_STRING;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`. This file keeps the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 /// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
@@ -89,7 +68,7 @@ use mp_bg::bg_saber::BG_ForcePowerDrain;
 // vec3 origin (`{0,0,0}`), the all-zero trace mins/maxs sentinel.
 use crate::q_math::vec3_origin;
 
-// Const/enum families transcribed by faithful Raven name (file header note).
+// These const and enum families keep their faithful Raven names.
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::*;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
@@ -104,9 +83,9 @@ use mp_qshared::common::mp::qcommon::usercmd_button::*;
 const M_PI: f64 = std::f64::consts::PI;
 
 // `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`/`PMF_STUCK_TO_WALL`
-// (`mp_qshared::…::pm_flags`) and `SFL_TWO_HANDED` (`crate::saber::saber_flags`,
-// the canonical `SFL_*` home) all resolve via the crate prelude glob; the
-// shadowing local copies were removed by the placeholder-const sweep.
+// (`mp_qshared::…::pm_flags`), and `SFL_TWO_HANDED` (`crate::saber::saber_flags`,
+// the canonical `SFL_*` home) all resolve through the crate prelude glob.
+// This file carries no local shadowing copies of these constants.
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_bg::public::entity_event::entity_event_t::{
@@ -118,7 +97,7 @@ use mp_bg::public::entity_event::entity_event_t::{
 /// Source: `oracle/codemp/game/w_force.c:139-145`
 pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 
-/// Raven `G_PreDefSound` — spawn a predefined-sound temp entity at `org`.
+/// Raven `G_PreDefSound`: spawn a predefined-sound temp entity at `org`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:40-49`
 pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> EntityId {
@@ -150,15 +129,15 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             trap::Cvar_Set(ctx.engine, "g_maxForceRank", &val);
         }
 
-        // FLAG: gclient_t deref stays raw (`ent` can be an NPC carrying a pool
-        // client, recipe 2b); read the pointer value via the safe entity borrow.
+        // FLAG: gclient_t deref stays raw. `ent` can be an NPC carrying a pool client.
+        // We read the pointer value through the safe entity borrow.
         let ent = match ent {
             Some(e) if !ctx.entity(e).client.is_null() => e,
             _ => return,
         };
         let cl = ctx.entity(ent).client;
-        // `ent`'s eType/number/svFlags are invariant across this fn (only `cl`,
-        // temp entities, and cvars/traps are mutated) — hoist once as Copy locals.
+        // `ent`'s eType/number/svFlags are invariant across this function.
+        // Only `cl`, temp entities, and cvars/traps are mutated, so we hoist them once as Copy locals.
         let ent_etype = ctx.entity(ent).s.eType;
         let ent_number = ctx.entity(ent).s.number;
         let ent_svflags = ctx.entity(ent).r.svFlags;
@@ -227,15 +206,14 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             return;
         }
 
-        // Raven `char forcePowers[256]` — an IN/OUT C buffer: `BG_LegalizedForcePowers`
-        // legalizes it in place below, and the parse loop that follows reads the
-        // legalized contents back out of this same buffer, not a stale copy.
+        // Raven's `char forcePowers[256]` is an IN/OUT C buffer, and `BG_LegalizedForcePowers` legalizes it in place below.
+        // The parse loop below reads the legalized contents back out of this same buffer, not a stale copy.
         // Source: `oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
         let mut forcePowers = String::new();
 
-        // Raven `char userinfo[MAX_INFO_STRING]` — scratch for the userinfo
-        // query; its only consumer is `Info_ValueForKey`, so it is an owned
-        // `String` (the engine bounds the query to the buffer size).
+        // Raven's `char userinfo[MAX_INFO_STRING]` is scratch space for the userinfo query.
+        // Its only consumer is `Info_ValueForKey`, so this file uses an owned `String` instead.
+        // The engine bounds the query to the buffer size.
         let userinfo = if ent_etype == ET_NPC as c_int && ent_number >= MAX_CLIENTS as c_int {
             //rwwFIXMEFIXME: Temp
             "forcepowers\\7-1-333003000313003120".to_string()
@@ -309,9 +287,9 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             ) == 0) as qboolean;
         }
 
-        // Read the buffer back out post-legalize (Raven re-reads `forcePowers[i]`
-        // in the parse loop below — the same array `BG_LegalizedForcePowers` just
-        // wrote into), not the pre-call string.
+        // We read the buffer back out after the legalize step.
+        // Raven re-reads `forcePowers[i]` in the parse loop below.
+        // This is the same array `BG_LegalizedForcePowers` just wrote into, not the pre-call string.
         let fp_bytes = forcePowers.into_bytes();
 
         let mut i_r: usize;
@@ -325,7 +303,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         }
         readBuf[i_r] = 0;
         //THE RANK
-        // Source: oracle/codemp/game/w_force.c:316 — plain `atoi(readBuf)`.
+        // Source: `oracle/codemp/game/w_force.c:316` (a plain `atoi(readBuf)` call).
         (*cl).ps.fd.forceRank = atoi_bytes(&readBuf[..i_r]);
         i += 1;
 
@@ -337,7 +315,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         }
         readBuf[i_r] = 0;
         //THE SIDE
-        // Source: oracle/codemp/game/w_force.c:328 — plain `atoi(readBuf)`.
+        // Source: `oracle/codemp/game/w_force.c:328` (a plain `atoi(readBuf)` call).
         (*cl).ps.fd.forceSide = atoi_bytes(&readBuf[..i_r]);
         i += 1;
 
@@ -406,10 +384,9 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         {
             let ch = fp_bytes[i];
             // Oracle builds a 1-char `readBuf` (`readBuf[0]=forcePowers[i];
-            // readBuf[1]=0;`) and calls `atoi(readBuf)` on it
-            // (w_force.c:398-402) — over a single-char domain,
-            // `to_digit(10).unwrap_or(0)` is exactly libc `atoi`, so this is
-            // not re-flagged to `cstr_util::atoi`.
+            // readBuf[1]=0;`) and calls `atoi(readBuf)` on it (`w_force.c:398-402`).
+            // Over a single-char domain, `to_digit(10).unwrap_or(0)` is exactly libc `atoi`,
+            // so this is not re-flagged to `cstr_util::atoi`.
             let digit = (ch as char).to_digit(10).unwrap_or(0) as c_int;
             (*cl).ps.fd.forcePowerLevel[i_r] = digit;
             if (*cl).ps.fd.forcePowerLevel[i_r] != 0 {
@@ -490,7 +467,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
             if warnClientLimit != 0 {
                 //the server has one or more force powers disabled and the client is using them in his config
-                //(kept commented in the oracle — no-op here too)
+                // Raven keeps this block commented out. It stays a no-op here too.
             }
         }
 
@@ -515,9 +492,10 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             (*cl).ps.fd.forcePowerSelected = (*cl).sess.selectedFP;
         }
 
-        // Raven shifts by forcePowerSelected while it can still be -1 (fresh client,
-        // set to -1 above) — shift-by-negative UB; x86/ARM both mask the count (= 1<<31,
-        // never a known power), so the masked shift is the one defined behavior (§19).
+        // Raven shifts by forcePowerSelected while it can still be -1 (a fresh client is set to -1 above).
+        // This is shift-by-negative UB.
+        // x86/ARM both mask the count (equivalent to `1<<31`, never a known power).
+        // The masked shift is the one defined behavior we pick here (porting rule 19).
         if (*cl).ps.fd.forcePowersKnown & 1i32.wrapping_shl((*cl).ps.fd.forcePowerSelected as u32)
             == 0
         {
@@ -536,13 +514,13 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
     }
 }
 
-/// Raven `WP_SpawnInitForcePowers` — reset per-spawn force state.
+/// Raven `WP_SpawnInitForcePowers`: reset per-spawn force state.
 ///
 /// Source: `oracle/codemp/game/w_force.c:574-691`
 pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (`ent` can be an NPC pool client,
-        // recipe 2b); read the pointer value via the safe entity borrow.
+        // FLAG: gclient_t deref stays raw. `ent` can be an NPC pool client.
+        // We read the pointer value through the safe entity borrow.
         let cl = ctx.entity(ent).client;
 
         (*cl).ps.saberAttackChainCount = 0;
@@ -631,7 +609,7 @@ pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `ForcePowerUsableOn` — can `attacker` use `forcePower` on `other`?
+/// Raven `ForcePowerUsableOn`: can `attacker` use `forcePower` on `other`?
 ///
 /// Source: `oracle/codemp/game/w_force.c:697-772`
 pub fn ForcePowerUsableOn(
@@ -644,10 +622,11 @@ pub fn ForcePowerUsableOn(
         let gametype = ctx.world.cvars.g_gametype.integer;
         let level_time = ctx.world.level.time;
 
-        // FLAG: gclient_t derefs stay raw (`attacker`/`other` can be NPCs/vehicles
-        // carrying pool clients, recipe 2b). `*_cl` is null when the handle is
-        // `None` OR its `.client` is null — exactly Raven's paired guard. `other`
-        // scalar fields are invariant here, hoisted once as Copy locals.
+        // FLAG: gclient_t derefs stay raw.
+        // `attacker` and `other` can be NPCs or vehicles carrying pool clients.
+        // `*_cl` is null when the handle is `None`, or when its `.client` field is null.
+        // This matches Raven's paired guard.
+        // `other`'s scalar fields are invariant here, so we hoist them once as Copy locals.
         let other_cl: *mut gclient_t = match other {
             Some(o) => ctx.entity(o).client,
             None => core::ptr::null_mut(),
@@ -730,7 +709,7 @@ pub fn ForcePowerUsableOn(
     }
 }
 
-/// Raven `WP_ForcePowerAvailable` — is there enough force pool for `forcePower`?
+/// Raven `WP_ForcePowerAvailable`: is there enough force pool for `forcePower`?
 ///
 /// Source: `oracle/codemp/game/w_force.c:774-801`
 pub fn WP_ForcePowerAvailable(
@@ -740,7 +719,8 @@ pub fn WP_ForcePowerAvailable(
     overrideAmt: c_int,
 ) -> bool {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let drain = if overrideAmt != 0 {
             overrideAmt
@@ -774,7 +754,8 @@ pub fn WP_ForcePowerAvailable(
 ///
 /// Source: `oracle/codemp/game/w_force.c:803-811`
 pub fn WP_ForcePowerInUse(self_: &gentity_t, forcePower: forcePowers_t) -> bool {
-    // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+    // FLAG: gclient_t deref stays raw.
+    // An NPC entity can carry a pool client here.
     let cl = self_.client;
     if unsafe { (*cl).ps.fd.forcePowersActive } & (1 << forcePower) != 0 {
         //already using this power
@@ -783,7 +764,7 @@ pub fn WP_ForcePowerInUse(self_: &gentity_t, forcePower: forcePowers_t) -> bool 
     false
 }
 
-/// Raven `WP_ForcePowerUsable` — full gate on activating `forcePower`.
+/// Raven `WP_ForcePowerUsable`: full gate on activating `forcePower`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:813-938`
 pub fn WP_ForcePowerUsable(
@@ -792,7 +773,8 @@ pub fn WP_ForcePowerUsable(
     forcePower: forcePowers_t,
 ) -> bool {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let self_health = ctx.entity(self_).health;
         let gametype = ctx.world.cvars.g_gametype.integer;
@@ -896,7 +878,7 @@ pub fn WP_ForcePowerUsable(
     }
 }
 
-/// Raven `WP_AbsorbConversion` — absorb an incoming force attack, return the
+/// Raven `WP_AbsorbConversion`: absorb an incoming force attack, and return the
 /// remaining (post-absorb) power level, or `-1` when not absorbed.
 ///
 /// Source: `oracle/codemp/game/w_force.c:940-997`
@@ -930,8 +912,7 @@ pub fn WP_AbsorbConversion(
             return -1;
         }
 
-        // FLAG: gclient_t deref stays raw (`attacked` can be an NPC pool client,
-        // recipe 2b).
+        // FLAG: gclient_t deref stays raw. `attacked` can be an NPC pool client.
         let atcl = ctx.entity(attacked).client;
         if (*atcl).ps.fd.forcePowersActive & (1 << FP_ABSORB) == 0 {
             //absorb is not active
@@ -971,11 +952,12 @@ pub fn WP_AbsorbConversion(
     }
 }
 
-/// Raven `WP_ForcePowerRegenerate` — regen the force pool on a regular interval.
+/// Raven `WP_ForcePowerRegenerate`: regen the force pool on a regular interval.
 ///
 /// Source: `oracle/codemp/game/w_force.c:999-1019`
 pub fn WP_ForcePowerRegenerate(self_: &gentity_t, overrideAmt: c_int) {
-    // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+    // FLAG: gclient_t deref stays raw.
+    // An NPC entity can carry a pool client here.
     let cl = self_.client;
     unsafe {
         if cl.is_null() {
@@ -997,7 +979,7 @@ pub fn WP_ForcePowerRegenerate(self_: &gentity_t, overrideAmt: c_int) {
     }
 }
 
-/// Raven `WP_ForcePowerStart` — activate the given force power.
+/// Raven `WP_ForcePowerStart`: activate the given force power.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1021-1234`
 pub fn WP_ForcePowerStart(
@@ -1007,7 +989,8 @@ pub fn WP_ForcePowerStart(
     mut overrideAmt: c_int,
 ) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut duration: c_int = 0;
@@ -1190,7 +1173,8 @@ pub fn WP_ForcePowerStart(
 /// Source: `oracle/codemp/game/w_force.c:1236-1292`
 pub fn ForceHeal(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
 
         if ctx.entity(self_).health <= 0 {
@@ -1231,7 +1215,7 @@ pub fn ForceHeal(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-/// Raven `WP_AddToClientBitflags` — pack `entNum` into a temp-ent's tricked-index
+/// Raven `WP_AddToClientBitflags`: pack `entNum` into a temp-ent's tricked-index
 /// bitfields.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1294-1317`
@@ -1258,8 +1242,8 @@ pub fn WP_AddToClientBitflags(ent: Option<&mut gentity_t>, entNum: c_int) {
 pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
@@ -1374,8 +1358,8 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
 pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
@@ -1478,8 +1462,9 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1523-1594`
 pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); read pointer value via the
-        // safe entity borrow. `self_`'s number is invariant here — hoist as a local.
+        // FLAG: gclient_t deref stays raw.
+        // We read the pointer value through the safe entity borrow.
+        // `self_`'s number is invariant here, so we hoist it as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -1552,8 +1537,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
         //don't grip someone who's still crippled
         {
             let target_id = EntityId(tr.entityNum as u32);
-            // FLAG: gclient_t deref stays raw (grip target may be an NPC pool
-            // client, recipe 2b).
+            // FLAG: gclient_t deref stays raw. The grip target may be an NPC pool client.
             let tcl = ctx.entity(target_id).client;
 
             if ctx.entity(target_id).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0
@@ -1564,16 +1548,15 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
                     && !ctx.entity(veh_id).client.is_null()
                     && !ctx.entity(veh_id).m_pVehicle.is_null()
                 {
-                    // FLAG: Vehicle_t (`m_pVehicle`/`m_pVehicleInfo`) is a C++ seam
-                    // type with no accessor; derefs stay raw.
+                    // FLAG: Vehicle_t (`m_pVehicle`/`m_pVehicleInfo`) is a C++ seam type with no accessor.
+                    // Its derefs stay raw.
                     let pVeh = ctx.entity(veh_id).m_pVehicle;
                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                         || (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_ANIMAL
                     {
                         //push the guy off
-                        // FLAG: `veh_dispatch::eject` is a seam fn taking a raw
-                        // `bgEntity_t*` alongside `ctx`; feed a copied arena raw
-                        // pointer (can't restructure without touching that file).
+                        // FLAG: `veh_dispatch::eject` is a seam function that takes a raw `bgEntity_t*` alongside `ctx`.
+                        // We feed it a copied arena raw pointer, because restructuring it would mean touching that file too.
                         let target_raw =
                             ctx.world.entity_mut(target_id) as *mut gentity_t as *mut bgEntity_t;
                         veh_dispatch::eject(ctx, pVeh, target_raw, qfalse);
@@ -1598,7 +1581,8 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1596-1629`
 pub fn ForceSpeed(ctx: &mut GameContext, self_: EntityId, forceDuration: c_int) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1642,7 +1626,8 @@ pub fn ForceSpeed(ctx: &mut GameContext, self_: EntityId, forceDuration: c_int) 
 /// Source: `oracle/codemp/game/w_force.c:1631-1656`
 pub fn ForceSeeing(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1677,7 +1662,8 @@ pub fn ForceSeeing(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1658-1692`
 pub fn ForceProtect(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1718,7 +1704,8 @@ pub fn ForceProtect(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1694-1728`
 pub fn ForceAbsorb(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1759,7 +1746,8 @@ pub fn ForceAbsorb(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1730-1775`
 pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1810,7 +1798,8 @@ pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:1777-1810`
 pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1845,7 +1834,7 @@ pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-/// Raven `ForceLightningDamage` — apply a lightning tick to `traceEnt`.
+/// Raven `ForceLightningDamage`: apply a lightning tick to `traceEnt`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1812-1900`
 pub fn ForceLightningDamage(
@@ -1856,8 +1845,8 @@ pub fn ForceLightningDamage(
     impactPoint: vec3_t,
 ) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let scl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1865,8 +1854,8 @@ pub fn ForceLightningDamage(
         (*scl).ps.eFlags &= !EF_INVULNERABLE;
         (*scl).invulnerableTimer = 0;
 
-        // Raven: `if (traceEnt && traceEnt->takedamage)` — the rest of the body is
-        // the last statement, so a non-taking / null target returns here.
+        // Raven: `if (traceEnt && traceEnt->takedamage)`.
+        // The rest of the body is the last statement, so a non-taking or null target returns here.
         let te = match traceEnt {
             Some(t) if ctx.entity(t).takedamage != 0 => t,
             _ => return,
@@ -1972,8 +1961,8 @@ pub fn ForceLightningDamage(
 /// Source: `oracle/codemp/game/w_force.c:1902-2020`
 pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); `self_`'s number is
-        // invariant here — hoist as a local.
+        // FLAG: gclient_t deref stays raw.
+        // `self_`'s number is invariant here, so we hoist it as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
 
@@ -2013,8 +2002,8 @@ pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
                 if te_id == self_ {
                     continue;
                 }
-                // `traceEnt`'s fields are invariant until the terminal
-                // `ForceLightningDamage` call — hoist the reads as Copy locals.
+                // `traceEnt`'s fields are invariant until the terminal `ForceLightningDamage` call.
+                // We hoist the reads as Copy locals.
                 let te_ownerNum = ctx.entity(te_id).r.ownerNum;
                 let te_weapon = ctx.entity(te_id).s.weapon;
                 let te_inuse = ctx.entity(te_id).inuse;
@@ -2161,7 +2150,8 @@ pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:2022-2056`
 pub fn ForceDrain(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -2206,8 +2196,8 @@ pub fn ForceDrainDamage(
     impactPoint: vec3_t,
 ) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let scl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -2215,8 +2205,8 @@ pub fn ForceDrainDamage(
         (*scl).ps.eFlags &= !EF_INVULNERABLE;
         (*scl).invulnerableTimer = 0;
 
-        // Raven: `if (traceEnt && traceEnt->takedamage)` — the rest of the body is
-        // the last statement, so a non-taking / null target returns here.
+        // Raven: `if (traceEnt && traceEnt->takedamage)`.
+        // The rest of the body is the last statement, so a non-taking or null target returns here.
         let te = match traceEnt {
             Some(t) if ctx.entity(t).takedamage != 0 => t,
             _ => return,
@@ -2310,8 +2300,8 @@ pub fn ForceDrainDamage(
 /// Source: `oracle/codemp/game/w_force.c:2184-2315`
 pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); `self_`'s number is
-        // invariant here — hoist as a local.
+        // FLAG: gclient_t deref stays raw.
+        // `self_`'s number is invariant here, so we hoist it as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -2363,8 +2353,7 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
                     //no torturing corpses
                     continue;
                 }
-                // FLAG: gclient_t deref stays raw (target may be an NPC pool client,
-                // recipe 2b).
+                // FLAG: gclient_t deref stays raw. The target may be an NPC pool client.
                 let tcl = ctx.entity(te_id).client;
                 if tcl.is_null() {
                     continue;
@@ -2378,8 +2367,8 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
                     continue;
                 }
 
-                // `traceEnt`'s box/model fields are invariant until the terminal
-                // `ForceDrainDamage` call — hoist the reads as Copy locals.
+                // `traceEnt`'s box/model fields are invariant until the terminal `ForceDrainDamage` call.
+                // We hoist the reads as Copy locals.
                 let te_absmin = ctx.entity(te_id).r.absmin;
                 let te_absmax = ctx.entity(te_id).r.absmax;
                 let te_bmodel = ctx.entity(te_id).r.bmodel;
@@ -2506,7 +2495,8 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
 /// Source: `oracle/codemp/game/w_force.c:2317-2375`
 pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let forceJumpChargeInterval: f32 =
@@ -2588,8 +2578,8 @@ pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercm
 /// Raven `WP_GetVelocityForForceJump`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2377-2460`
-// `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`); the
-// out-param reshape turns the by-value `vec3_t` into `&mut vec3_t`.
+// `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`).
+// The out-param reshape turns the by-value `vec3_t` into `&mut vec3_t`.
 pub fn WP_GetVelocityForForceJump(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -2597,8 +2587,9 @@ pub fn WP_GetVelocityForForceJump(
     ucmd: *mut usercmd_t,
 ) -> c_int {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
-        // `ucmd` is a raw `*mut usercmd_t` seam param — derefs stay raw.
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
+        // `ucmd` is a raw `*mut usercmd_t` seam parameter. Its derefs stay raw.
         let cl = ctx.entity(self_).client;
 
         let mut pushFwd: f32 = 0.0;
@@ -2676,7 +2667,8 @@ pub fn WP_GetVelocityForForceJump(
 /// Source: `oracle/codemp/game/w_force.c:2462-2500`
 pub fn ForceJump(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -2724,7 +2716,7 @@ pub fn ForceJump(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     }
 }
 
-/// Raven `WP_AddAsMindtricked` — pack `entNum` into a forcedata mindtrick mask.
+/// Raven `WP_AddAsMindtricked`: pack `entNum` into a forcedata mindtrick mask.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2502-2525`
 pub fn WP_AddAsMindtricked(fd: *mut forcedata_t, entNum: c_int) {
@@ -2755,8 +2747,9 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
     tookPower: &mut bool,
 ) -> bool {
     unsafe {
-        // FLAG: gclient_t / gNPC_t derefs stay raw (recipe 2b/2c); read pointer
-        // values via the safe entity borrow. `tr`/`tookPower` are raw seam params.
+        // FLAG: gclient_t and gNPC_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
+        // `tr` and `tookPower` are raw seam parameters.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let self_npc = ctx.entity(self_).NPC;
@@ -2797,7 +2790,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
         }
 
         let te_id = EntityId((*tr).entityNum as u32);
-        // FLAG: gclient_t (`tcl`) / gNPC_t (`npc`) stay raw (recipe 2b/2c).
+        // FLAG: gclient_t (`tcl`) and gNPC_t (`npc`) stay raw.
         let tcl = ctx.entity(te_id).client;
         let npc = ctx.entity(te_id).NPC;
 
@@ -2960,8 +2953,8 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 /// Source: `oracle/codemp/game/w_force.c:2723-2893`
 pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -3032,7 +3025,7 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
 
         if (*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] == FORCE_LEVEL_1 {
             let ent_id2 = EntityId(tr.entityNum as u32);
-            // FLAG: gclient_t deref stays raw (recipe 2b).
+            // FLAG: gclient_t deref stays raw.
             let e_cl = ctx.entity(ent_id2).client;
             if tr.fraction != 1.0
                 && tr.entityNum != (ENTITYNUM_NONE) as i16
@@ -3071,7 +3064,7 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                 let ent_id2 = EntityId(entityList[e as usize] as u32);
 
                 {
-                    // FLAG: gclient_t deref stays raw (recipe 2b).
+                    // FLAG: gclient_t deref stays raw.
                     let e_cl = ctx.entity(ent_id2).client;
                     let mut thispush_org: vec3_t;
                     if !e_cl.is_null() {
@@ -3149,8 +3142,9 @@ pub fn CanCounterThrow(
     pull: bool,
 ) -> bool {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); `thrower_cl` is null when the
-        // handle is `None` OR its `.client` is null — exactly Raven's paired guard.
+        // FLAG: gclient_t derefs stay raw.
+        // `thrower_cl` is null when the handle is `None`, or when its `.client` field is null.
+        // This matches Raven's paired guard.
         let cl = ctx.entity(self_).client;
         let thrower_cl: *mut gclient_t = match thrower {
             Some(t) => ctx.entity(t).client,
@@ -3283,8 +3277,8 @@ pub fn G_InGetUpAnim(ps: *mut playerState_t) -> bool {
 ///
 /// Source: `oracle/codemp/game/w_force.c:3025-3042`
 pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
-    // FLAG: gclient_t deref stays raw (`ent` can be an NPC pool client, recipe 2b);
-    // read the pointer value via the safe entity borrow.
+    // FLAG: gclient_t deref stays raw. `ent` can be an NPC pool client.
+    // We read the pointer value through the safe entity borrow.
     let cl = match ent {
         Some(e) if !ctx.entity(e).client.is_null() => ctx.entity(e).client,
         _ => return,
@@ -3305,10 +3299,10 @@ pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
 /// Source: `oracle/codemp/game/w_force.c:3054-3820`
 pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b; `self_`/targets can be NPC
-        // pool clients); read the pointer value via the safe entity borrow. Entity
-        // fields are read through `ctx.world.entity(id)` at the point of use;
-        // `push_list` holds `EntityId` handles rather than raw `gentity_t*`.
+        // FLAG: gclient_t derefs stay raw. `self_` and targets can be NPC pool clients.
+        // We read the pointer value through the safe entity borrow.
+        // Entity fields are read through `ctx.world.entity(id)` at the point of use.
+        // `push_list` holds `EntityId` handles, not raw `gentity_t*` pointers.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
@@ -3559,8 +3553,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
             if ent_id == self_ {
                 continue;
             }
-            // FLAG: gclient_t deref stays raw (recipe 2b; `ent_id` can be an NPC
-            // pool client).
+            // FLAG: gclient_t deref stays raw. `ent_id` can be an NPC pool client.
             let ecl = ctx.world.entity(ent_id).client;
             if !ecl.is_null() && OnSameTeam(ctx, Some(ent_id), Some(self_)) != 0 {
                 continue;
@@ -3729,8 +3722,8 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
         if ent_count != 0 {
             //method1:
             for x in 0..ent_count {
-                // FLAG: gclient_t deref stays raw (recipe 2b; target can be an NPC
-                // pool client); read the pointer value via the safe entity borrow.
+                // FLAG: gclient_t deref stays raw. The target can be an NPC pool client.
+                // We read the pointer value through the safe entity borrow.
                 let pcl = ctx.world.entity(push_list[x]).client;
                 let mut modPowerLevel = powerLevel;
 
@@ -3909,10 +3902,9 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                                     && !ctx.world.entity(veh_id).client.is_null()
                                     && !ctx.world.entity(veh_id).m_pVehicle.is_null()
                                 {
-                                    // FLAG: vehicle-vtable seam — `m_pVehicle`/
-                                    // `m_pVehicleInfo` derefs stay raw; `eject` takes
-                                    // a raw `bgEntity_t*` (no EntityId overload,
-                                    // one-file rule), materialized tight at the call.
+                                    // FLAG: vehicle-vtable seam. `m_pVehicle`/`m_pVehicleInfo` derefs stay raw.
+                                    // `eject` takes a raw `bgEntity_t*` (no EntityId overload, one-file rule).
+                                    // We materialize the pointer tight at the call site.
                                     let pVeh = ctx.world.entity(veh_id).m_pVehicle;
                                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                                         || (*(*pVeh).m_pVehicleInfo).r#type
@@ -4147,8 +4139,8 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
 /// Source: `oracle/codemp/game/w_force.c:3822-3946`
 pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let wasActive = (*cl).ps.fd.forcePowersActive;
@@ -4194,7 +4186,7 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
             FP_GRIP => {
                 (*cl).ps.fd.forceGripUseTime = level_time + 3000;
                 let grip_id = EntityId((*cl).ps.fd.forceGripEntityNum as u32);
-                // FLAG: gclient_t deref stays raw (recipe 2b).
+                // FLAG: gclient_t deref stays raw.
                 let gcl = ctx.entity(grip_id).client;
                 if (*cl).ps.fd.forcePowerLevel[FP_GRIP as usize] > FORCE_LEVEL_1
                     && !gcl.is_null()
@@ -4286,8 +4278,9 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
 /// Source: `oracle/codemp/game/w_force.c:3948-4162`
 pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow. `self_`'s number is invariant — hoist as a local.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
+        // `self_`'s number is invariant, so we hoist it as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -4549,7 +4542,7 @@ pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePow
     }
 }
 
-/// Raven `G_IsMindTricked` — is `client` in one of `fd`'s mindtrick masks?
+/// Raven `G_IsMindTricked`: is `client` in one of `fd`'s mindtrick masks?
 ///
 /// Source: `oracle/codemp/game/w_force.c:4164-4206`
 pub fn G_IsMindTricked(fd: *mut forcedata_t, client: c_int) -> bool {
@@ -4587,7 +4580,7 @@ pub fn G_IsMindTricked(fd: *mut forcedata_t, client: c_int) -> bool {
     }
 }
 
-/// Raven `RemoveTrickedEnt` — clear `client` from `fd`'s mindtrick masks.
+/// Raven `RemoveTrickedEnt`: clear `client` from `fd`'s mindtrick masks.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4208-4231`
 fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
@@ -4613,8 +4606,8 @@ fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
 /// Source: `oracle/codemp/game/w_force.c:4236-4280`
 fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
-        // safe entity borrow.
+        // FLAG: gclient_t derefs stay raw.
+        // We read pointer values through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let g_time_since = ctx.world.globals.g_TimeSinceLastFrame;
@@ -4680,7 +4673,7 @@ fn WP_ForcePowerRun(
 ) {
     // Raven declares `extern usercmd_t ucmd;` here but never references it.
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); `cmd` is a raw seam param.
+        // FLAG: gclient_t deref stays raw. `cmd` is a raw seam parameter.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -4894,7 +4887,7 @@ pub fn WP_DoSpecificPower(
     forcepower: forcePowers_t,
 ) -> c_int {
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); `ucmd` is a raw seam param.
+        // FLAG: gclient_t deref stays raw. `ucmd` is a raw seam parameter.
         let cl = ctx.entity(self_).client;
 
         let mut powerSucceeded = 1;
@@ -5034,8 +5027,8 @@ pub fn WP_DoSpecificPower(
 pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
     //Find another client that would be considered a threat.
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); `self_`'s number is
-        // invariant — hoist as a local.
+        // FLAG: gclient_t derefs stay raw.
+        // `self_`'s number is invariant, so we hoist it as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let mut besten: Option<EntityId> = None;
@@ -5091,8 +5084,8 @@ pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/w_force.c:4711-4868`
 pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // FLAG: gclient_t derefs stay raw (recipe 2b); `self_`'s number is
-        // invariant — hoist as a local.
+        // FLAG: gclient_t derefs stay raw.
+        // `self_`'s number is invariant, so we hoist it as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -5200,7 +5193,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
             } else if OnSameTeam(ctx, Some(self_), Some(en_id)) != 0 {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
             } else {
-                // FLAG: gclient_t deref stays raw (recipe 2b).
+                // FLAG: gclient_t deref stays raw.
                 let ecl = ctx.entity(en_id).client;
                 if InFront((*ecl).ps.origin, (*cl).ps.origin, (*cl).ps.viewangles, 0.8) == 0 {
                     (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
@@ -5236,7 +5229,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
 
             //org is now where the thing should be client-side because it uses the same time-based offset
             if (*cl).ps.droneFireTime < (level_time) as f32 {
-                // FLAG: gclient_t deref stays raw (recipe 2b).
+                // FLAG: gclient_t deref stays raw.
                 let ecl = ctx.entity(en_id).client;
                 let mut tr: trace_t = core::mem::zeroed();
                 trap::Trace(
@@ -5287,7 +5280,8 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
 pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
     //keep holocron status updated in holocron mode
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
 
         let mut noHRank = 0;
@@ -5369,7 +5363,8 @@ pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
 pub fn JediMasterUpdate(ctx: &mut GameContext, self_: EntityId) {
     //keep jedi master status updated for JM gametype
     unsafe {
-        // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
+        // FLAG: gclient_t deref stays raw.
+        // An NPC entity can carry a pool client here.
         let cl = ctx.entity(self_).client;
 
         trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.g_MaxHolocronCarry);
@@ -5415,7 +5410,7 @@ pub fn JediMasterUpdate(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-/// Raven `WP_HasForcePowers` — does `ps` know any non-trivial force power?
+/// Raven `WP_HasForcePowers`: does `ps` know any non-trivial force power?
 ///
 /// Source: `oracle/codemp/game/w_force.c:5013-5034`
 pub fn WP_HasForcePowers(ps: *const playerState_t) -> bool {
@@ -5442,8 +5437,7 @@ pub fn WP_HasForcePowers(ps: *const playerState_t) -> bool {
 /// Source: `oracle/codemp/game/w_force.c:5037-5092`
 pub fn G_SpecialRollGetup(ctx: &mut GameContext, self_: EntityId) -> bool {
     unsafe {
-        // FLAG: gclient_t deref stays raw (recipe 2b); `cmd` points into the raw
-        // client's `pers.cmd`.
+        // FLAG: gclient_t deref stays raw. `cmd` points into the raw client's `pers.cmd`.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut rolled = false;
@@ -5516,7 +5510,7 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
         let mut usingForce = qfalse;
         let mut prepower: c_int = 0;
 
-        // FLAG: gclient_t deref stays raw (recipe 2b); `ucmd` is a raw seam param.
+        // FLAG: gclient_t deref stays raw. `ucmd` is a raw seam parameter.
         // `self_` null OR null-client returns, matching Raven's paired guard.
         let self_ = match self_ {
             Some(s) if !ctx.entity(s).client.is_null() => s,
@@ -5801,8 +5795,8 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                     (*cl).ps.fd.forceJumpCharge = 0.0;
                 }
             }
-            // The two `else if` charge-jump arms at w_force.c:5444-5454 are
-            // `#ifndef METROID_JUMP` — dead in retail (defined at :7), not ported.
+            // The two `else if` charge-jump arms at w_force.c:5444-5454 sit inside `#ifndef METROID_JUMP`.
+            // `METROID_JUMP` is defined at `w_force.c:7`, so the arms are dead code in retail, and this file does not port them.
 
             if (*cl).ps.pm_flags & PMF_JUMP_HELD == 0 && (*cl).ps.fd.forceJumpCharge != 0.0 {
                 if (*ucmd).buttons & BUTTON_FORCEPOWER == 0
@@ -5973,9 +5967,8 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                             && (*cl).sess.duelTeam == DUELTEAM_LONE as c_int
                         {
                             if ctx.world.cvars.g_duel_fraglimit.integer != 0 {
-                                // Raven's `0.6`/`.3` are double literals, so the whole
-                                // multiply runs in f64; `(float)wins`/`(float)fraglimit`
-                                // narrow to f32 before promoting into that f64 divide.
+                                // Raven's `0.6`/`.3` are double literals, so the whole multiply runs in f64.
+                                // `(float)wins`/`(float)fraglimit` narrow to f32 before promoting into that f64 divide.
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
                                     + (ctx.world.cvars.g_forceRegenTime.integer as f64
                                         * (0.6
@@ -6027,7 +6020,7 @@ pub fn Jedi_DodgeEvasion(
         let mut dodgeAnim: c_int = -1;
 
         // Raven: return unless `self_` non-null, has a client, and is alive.
-        // FLAG: gclient_t deref stays raw (recipe 2b).
+        // FLAG: gclient_t deref stays raw.
         let self_ = match self_ {
             Some(s) if !ctx.entity(s).client.is_null() && ctx.entity(s).health > 0 => s,
             _ => return false,

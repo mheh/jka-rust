@@ -1,19 +1,14 @@
-// PORT-COMPLETE: g_active.c
-//! Port of `oracle/codemp/game/g_active.c` (jampgame pass 2).
+//! Port of `oracle/codemp/game/g_active.c`.
 //!
-//! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
-//! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
-//! `gentity_t*`, and `gclient_t*` params become their owning entity's
-//! `EntityId` (or a `&mut gclient_t`/`&gentity_t` borrow for the ctx-free
-//! leaves); the pilot is `crate::g_object`. These bodies are saturated with
-//! still-raw seam derefs (gclient/`ps` walks, vehicle chases, `pm`/ucmd
-//! traffic), so per the landed-shard "mega-fn" precedent they convert at the
-//! **signature only**: each fn re-derives its raw pointer(s) at the top of the
-//! body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and leaves the
-//! referee-verified body verbatim. The remaining raw bodies are Stage-2 debt.
-//! Behavior is byte-identical — a mechanical reshape, referee-verified.
-//! Unconverted callers bridge their raw pointer at the boundary with
-//! `ctx.entity_id_of(ptr)`.
+//! Entity parameters that cross this file's ABI seam are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! A `gclient_t*` parameter becomes its owning entity's `EntityId`, or a `&mut gclient_t`/`&gentity_t` borrow for the ctx-free leaves.
+//! Many function bodies still hold raw seam derefs, for example gclient/`ps` walks, vehicle chases, and `pm`/ucmd traffic.
+//! These functions convert at the signature only.
+//! Each function re-derives its raw pointer(s) at the top of the body, for example `let ent: *mut gentity_t = ctx.entity_mut(id);`.
+//! The referee-verified body stays verbatim.
+//! The remaining raw bodies are unconverted work.
+//! Behavior stays byte-identical because this is a mechanical reshape, and the referee verifies it.
+//! An unconverted caller bridges its raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, non_camel_case_types, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -35,24 +30,22 @@ use mp_qshared::common::mp::qcommon::usercmd_button::*; // BUTTON_*
 use mp_qshared::shared::saber_blocked_type::saberBlockedType_t::*; // BLOCKED_*
 use mp_qshared::shared::trajectory::trType_t::*; // TR_GRAVITY
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites
-// (same convention as `g_combat.rs`).
+// Raven's `qboolean` is `c_int`.
+// This file keeps the source spelling at assignment sites, matching the convention in `g_combat.rs`.
 
-// `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW`
-// (`mp_qshared::…::pm_flags`) and `MASK_PLAYERSOLID`
-// (`mp_qshared::shared::surface_flags`) resolve via the crate prelude glob
-// (placeholder-const sweep: removed the shadowing local copies).
+// `PITCH`/`YAW`/`ROLL` (`crate::q_math`), `PMF_FOLLOW` (`mp_qshared::…::pm_flags`), and `MASK_PLAYERSOLID`
+// (`mp_qshared::shared::surface_flags`) resolve through the crate prelude glob.
+// No local copy of these constants shadows the prelude here.
 
 // Raven `#define FALL_FADE_TIME 3000` (q_shared.h).
 // Source: `oracle/codemp/game/q_shared.h:2148`
 pub const FALL_FADE_TIME: c_int = 3000;
 
-// MAT_*/SVF_*/PMF_SCOREBOARD now resolve via the crate prelude (pass-3 symbol
-// backfill: `mp_qshared::common::mp::gentity`, `crate::g_public_consts`,
-// `mp_qshared::common::mp::qcommon::pm_flags`).
+// MAT_*/SVF_*/PMF_SCOREBOARD resolve through the crate prelude, from `mp_qshared::common::mp::gentity`, `crate::g_public_consts`,
+// and `mp_qshared::common::mp::qcommon::pm_flags`.
 
 // Raven `#define MAX_SIGHT_DISTANCE`/`MAX_SIGHT_FOV`/`MAX_JEDIMASTER_DISTANCE`/
-// `MAX_JEDIMASTER_FOV` — file-scope in `g_active.c` (not referenced elsewhere).
+// `MAX_JEDIMASTER_FOV` - file-scope in `g_active.c` (not referenced elsewhere).
 // Source: `oracle/codemp/game/g_active.c:1097-1101`
 pub const MAX_SIGHT_DISTANCE: c_float = 1500.0;
 pub const MAX_SIGHT_FOV: c_float = 100.0;
@@ -70,7 +63,7 @@ pub const TAUNT_MEDITATE: c_int = 2;
 pub const TAUNT_FLOURISH: c_int = 3;
 pub const TAUNT_GLOAT: c_int = 4;
 
-// Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
+// Cross-module functions used as the call surface (signatures already match).
 use crate::ai_main::InFieldOfVision;
 use crate::g_client::{respawn, ClientBegin, SetClientViewAngle};
 use crate::g_cmds::{
@@ -123,8 +116,8 @@ use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 ///
 /// Source: `oracle/codemp/game/g_active.c:20-24`
 pub fn P_SetTwitchInfo(ctx: &mut GameContext, ent: EntityId) {
-    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
-    // raw (may be an NPC pool client — recipe 2b).
+    // The checked entity borrow reads `ent`'s `gclient_t*`.
+    // The deref stays raw because the client may be an NPC pool client.
     let client: *mut gclient_t = ctx.world.entity(ent).client;
     unsafe {
         (*client).ps.painTime = ctx.world.level.time;
@@ -132,12 +125,12 @@ pub fn P_SetTwitchInfo(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `P_DamageFeedback` — send the damage-blend/pain feedback for a frame.
+/// Raven `P_DamageFeedback`: send the damage-blend/pain feedback for a frame.
 ///
 /// Source: `oracle/codemp/game/g_active.c:36-118`
 pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
-    // `player` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `player`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let client = ctx.world.entity(player).client;
     unsafe {
         if (*client).ps.pm_type == PM_DEAD as c_int {
@@ -211,12 +204,12 @@ pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
     }
 }
 
-/// Raven `P_WorldEffects` — drowning + lava/slime sizzle damage.
+/// Raven `P_WorldEffects`: drowning + lava/slime sizzle damage.
 ///
 /// Source: `oracle/codemp/game/g_active.c:129-205`
 pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let client = ctx.world.entity(ent).client;
     unsafe {
         if (*client).noclip != 0 {
@@ -339,13 +332,13 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `DoImpact` — collision impact damage (crush/fall).
+/// Raven `DoImpact`: collision impact damage (crush/fall).
 ///
 /// Source: `oracle/codemp/game/g_active.c:213-405`
 pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageSelf: qboolean) {
-    // `self_`/`other` fields via checked entity borrows (distinct slots); the
-    // `gclient_t*` selfCl (may be an NPC pool client — recipe 2b) is dereffed
-    // raw. The one cross-entity write (splashRadius from self_ dims) copies out.
+    // The checked entity borrows read `self_`/`other` fields from distinct slots.
+    // The `gclient_t*` `selfCl` deref stays raw because the client may be an NPC pool client.
+    // The one cross-entity write, `splashRadius` from `self_` dims, copies out.
     unsafe {
         let mut velocity: vec3_t = [0.0; 3];
         let mut my_mass: f32;
@@ -513,7 +506,7 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
     }
 }
 
-/// Raven `Client_CheckImpactBBrush` — clients only do impact damage vs easy-break breakables.
+/// Raven `Client_CheckImpactBBrush`: clients only do impact damage vs easy-break breakables.
 ///
 /// Source: `oracle/codemp/game/g_active.c:407-436`
 pub fn Client_CheckImpactBBrush(
@@ -521,8 +514,8 @@ pub fn Client_CheckImpactBBrush(
     self_: Option<EntityId>,
     other: Option<EntityId>,
 ) {
-    // `self_`/`other` fields via checked entity borrow; selfCl (`gclient_t*`,
-    // may be an NPC pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `self_`/`other` fields.
+    // The `selfCl` (`gclient_t*`) deref stays raw because the client may be an NPC pool client.
     let Some(other) = other else {
         return;
     };
@@ -560,12 +553,12 @@ pub fn Client_CheckImpactBBrush(
     }
 }
 
-/// Raven `G_SetClientSound` — loop-sound selection (hack/heal/supply/lava).
+/// Raven `G_SetClientSound`: loop-sound selection (hack/heal/supply/lava).
 ///
 /// Source: `oracle/codemp/game/g_active.c:444-467`
 pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let client = ctx.world.entity(ent).client;
     unsafe {
         let level_time = ctx.world.level.time;
@@ -593,16 +586,13 @@ pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `ClientImpacts` — dispatch `touch` for pmove touch-ents.
-///
-/// Source: `oracle/codemp/game/g_active.c:478-506`
-/// Raven `ClientImpacts` — bot/other touch dispatch over `pm->touchents`.
+/// Raven `ClientImpacts`: bot/other touch dispatch over `pm->touchents`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:478-506`
 pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
-    // `ent`/`other` fields via checked entity borrows; the raw `*mut gentity_t`
-    // pairs are re-acquired at the point of use for the `dispatch_touch` seam
-    // (which threads `ctx` alongside the two entity pointers).
+    // The checked entity borrows read `ent`/`other` fields.
+    // The raw `*mut gentity_t` pairs get re-acquired at the point of use for the `dispatch_touch` seam, which threads `ctx`
+    // alongside the two entity pointers.
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
@@ -654,16 +644,13 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
     }
 }
 
-/// Raven `G_TouchTriggers` — fire trigger `touch` handlers around a client.
-///
-/// Source: `oracle/codemp/game/g_active.c:516-590`
-/// Raven `G_TouchTriggers` — check nearby trigger volumes against `ent`.
+/// Raven `G_TouchTriggers`: check nearby trigger volumes against `ent` and fire their `touch` handlers.
 ///
 /// Source: `oracle/codemp/game/g_active.c:516-590`
 pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
-    // `ent`/`hit` fields via checked entity borrows; the `gclient_t*` (may be an
-    // NPC pool client — recipe 2b) is dereffed raw. Raw `*mut gentity_t` pairs
-    // are re-acquired at the `dispatch_touch` seam calls.
+    // The checked entity borrows read `ent`/`hit` fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
+    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` seam calls.
     let client = ctx.world.entity(ent).client;
     unsafe {
         if client.is_null() {
@@ -790,15 +777,12 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `G_MoverTouchPushTriggers` — fire push-trigger `touch` along a mover's path.
-///
-/// Source: `oracle/codemp/game/g_active.c:601-671`
-/// Raven `G_MoverTouchPushTriggers` — sweep a mover's motion against push triggers.
+/// Raven `G_MoverTouchPushTriggers`: sweep a mover's motion against push triggers and fire their `touch` handlers.
 ///
 /// Source: `oracle/codemp/game/g_active.c:601-671`
 pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: vec3_t) {
-    // `ent`/`hit` fields via checked entity borrows; raw `*mut gentity_t` pairs
-    // are re-acquired at the `dispatch_touch` seam call.
+    // The checked entity borrows read `ent`/`hit` fields.
+    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` seam call.
     unsafe {
         // non-moving movers don't hit triggers!
         if VectorLengthSquared(ctx.world.entity(ent).s.pos.trDelta) == 0.0 {
@@ -913,12 +897,10 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
 /// Raven `SpectatorThink`.
 ///
 /// Source: `oracle/codemp/game/g_active.c:678-740`
-/// Raven `SpectatorThink`.
-///
-/// Source: `oracle/codemp/game/g_active.c:678-740`
 pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw. `pm`/`ucmd` stay raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
+    // `pm` and `ucmd` stay raw too.
     let client = ctx.world.entity(ent).client;
     unsafe {
         if (*client).sess.spectatorState != SPECTATOR_FOLLOW {
@@ -939,8 +921,8 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             pm.cmd = *ucmd;
             // spectators can fly through bodies
             pm.tracemask = MASK_PLAYERSOLID & !CONTENTS_BODY;
-            // pm.trace/pointcontents fields stay for layout only;
-            // bg logic reaches the engine via BgTraps, threaded into Pmove below.
+            // The `pm.trace`/`pointcontents` fields stay for layout only.
+            // Bg logic reaches the engine through `BgTraps`, threaded into `Pmove` below.
 
             pm.noSpecMove = ctx.world.cvars.g_noSpecMove.integer;
 
@@ -954,7 +936,7 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             // perform a pmove
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field, so a raw store is required here.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -1001,8 +983,9 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
 ///
 /// Source: `oracle/codemp/game/g_active.c:751-774`
 pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
-    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
-    // raw (may be an NPC pool client — recipe 2b). Body is all client-side.
+    // The checked entity borrow reads `ent`'s `gclient_t*`.
+    // The deref stays raw because the client may be an NPC pool client.
+    // The body is all client-side.
     let client: *mut gclient_t = ctx.world.entity(ent).client;
     unsafe {
         let level_time = ctx.world.level.time;
@@ -1038,12 +1021,12 @@ pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     }
 }
 
-/// Raven `ClientTimerActions` — once-a-second health/armor decay over max.
+/// Raven `ClientTimerActions`: once-a-second health/armor decay over max.
 ///
 /// Source: `oracle/codemp/game/g_active.c:783-803`
 pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
-    // `ent` accessed through its borrow; the `gclient_t*` (may be an NPC pool
-    // client — recipe 2b) is dereffed raw.
+    // `ent` is accessed through its borrow.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let client = ent.client;
     unsafe {
         (*client).timeResidual += msec;
@@ -1070,7 +1053,7 @@ pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:810-823`
 pub fn ClientIntermissionThink(client: &mut gclient_t) {
-    // ctx-free `&mut gclient_t` leaf — accessed directly through its borrow.
+    // This is a ctx-free `&mut gclient_t` leaf, accessed directly through its borrow.
     client.ps.eFlags &= !EF_TALK;
     client.ps.eFlags &= !EF_FIRING;
 
@@ -1085,13 +1068,13 @@ pub fn ClientIntermissionThink(client: &mut gclient_t) {
     }
 }
 
-/// Raven `G_VehicleAttachDroidUnit` — snap a droid unit to its vehicle bolt.
+/// Raven `G_VehicleAttachDroidUnit`: snap a droid unit to its vehicle bolt.
 ///
 /// Source: `oracle/codemp/game/g_active.c:826-854`
 pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
-    // `vehEnt`/`droidEnt` fields via checked entity borrow; the `Vehicle_t*`
-    // `veh` (no accessor — recipe 2c) and the `gclient_t*` droidCl are dereffed
-    // raw. Raven's post-deref `!vehEnt` null-check is vacuous, dropped.
+    // The checked entity borrow reads `vehEnt`/`droidEnt` fields.
+    // The `Vehicle_t*` `veh` has no accessor, and the `gclient_t*` `droidCl` is dereffed raw too.
+    // Raven's post-deref `!vehEnt` null check is vacuous, so this drops it.
     let veh = ctx.world.entity(vehEnt).m_pVehicle;
     unsafe {
         if !veh.is_null() && !(*veh).m_pDroidUnit.is_null() {
@@ -1156,13 +1139,13 @@ pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
     }
 }
 
-/// Raven `G_CheapWeaponFire` — server-driven weapon fire event (with speeder gate).
+/// Raven `G_CheapWeaponFire`: server-driven weapon fire event (with speeder gate).
 ///
 /// Source: `oracle/codemp/game/g_active.c:857-895`
 pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
-    // Entity fields via checked entity borrows; the `Vehicle_t*` veh (no
-    // accessor — recipe 2c) and the `gclient_t*`s (may be NPC pool clients —
-    // recipe 2b) are dereffed raw.
+    // The checked entity borrows read entity fields.
+    // The `Vehicle_t*` `veh` has no accessor, and the `gclient_t*` values are dereffed raw because the clients may be
+    // NPC pool clients.
     let ent = EntityId::from_num(entNum).unwrap();
     unsafe {
         if ctx.world.entity(ent).inuse == 0 || ctx.world.entity(ent).client.is_null() {
@@ -1204,12 +1187,12 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
     }
 }
 
-/// Raven `ClientEvents` — process predictable client events for the frame.
+/// Raven `ClientEvents`: process predictable client events for the frame.
 ///
 /// Source: `oracle/codemp/game/g_active.c:909-1052`
 pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_int) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let client = ctx.world.entity(ent).client;
     unsafe {
         let mut oldEventSequence = oldEventSequence;
@@ -1322,9 +1305,11 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                 //jetpack
                 ItemUse_Jetpack(ctx, ent);
             } else if event == EV_USE_ITEM8 as c_int {
-                //health disp — ItemUse_UseDisp(ent, HI_HEALTHDISP);
+                //health disp
+                //ItemUse_UseDisp(ent, HI_HEALTHDISP);
             } else if event == EV_USE_ITEM9 as c_int {
-                //ammo disp — ItemUse_UseDisp(ent, HI_AMMODISP);
+                //ammo disp
+                //ItemUse_UseDisp(ent, HI_AMMODISP);
             } else if event == EV_USE_ITEM10 as c_int {
                 //eweb
                 ItemUse_UseEWeb(ctx, ent);
@@ -1338,7 +1323,7 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
     }
 }
 
-/// Raven `SendPendingPredictableEvents` — spawn a temp-ent for a pending event.
+/// Raven `SendPendingPredictableEvents`: spawn a temp-ent for a pending event.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1059-1087`
 pub fn SendPendingPredictableEvents(ctx: &mut GameContext, ps: *mut playerState_t) {
@@ -1370,12 +1355,12 @@ pub fn SendPendingPredictableEvents(ctx: &mut GameContext, ps: *mut playerState_
     }
 }
 
-/// Raven `G_UpdateForceSightBroadcasts` — broadcast this client to force-sight viewers.
+/// Raven `G_UpdateForceSightBroadcasts`: broadcast this client to force-sight viewers.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1103-1147`
 pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
-    // `self_`/`ent` fields via checked entity borrow; the `gclient_t*`s selfCl/
-    // entCl are read through the borrow then dereffed raw (recipe 2b).
+    // The checked entity borrow reads `self_`/`ent` fields.
+    // The `gclient_t*` values `selfCl`/`entCl` come through the borrow, then get dereffed raw.
     let selfCl = ctx.world.entity(self_).client;
     unsafe {
         // Any clients with force sight on should see this client
@@ -1422,12 +1407,12 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-/// Raven `G_UpdateJediMasterBroadcasts` — broadcast the Jedi Master to nearby clients.
+/// Raven `G_UpdateJediMasterBroadcasts`: broadcast the Jedi Master to nearby clients.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1149-1197`
 pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
-    // `self_`/`ent` fields via checked entity borrow; the `gclient_t*`s selfCl/
-    // entCl are read through the borrow then dereffed raw (recipe 2b).
+    // The checked entity borrow reads `self_`/`ent` fields.
+    // The `gclient_t*` values `selfCl`/`entCl` come through the borrow, then get dereffed raw.
     let selfCl = ctx.world.entity(self_).client;
     unsafe {
         // Not jedi master mode then nothing to do
@@ -1491,13 +1476,13 @@ pub fn G_UpdateClientBroadcasts(ctx: &mut GameContext, self_: EntityId) {
     G_UpdateForceSightBroadcasts(ctx, self_);
 }
 
-/// Raven `G_AddPushVecToUcmd` — fold a client's push vector into its ucmd.
+/// Raven `G_AddPushVecToUcmd`: fold a client's push vector into its ucmd.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1211-1244`
 pub fn G_AddPushVecToUcmd(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
-    // `self_`'s `gclient_t*` read through the checked entity borrow; deref stays
-    // raw (may be an NPC pool client — recipe 2b). `ucmd` stays raw. Body is all
-    // client/ucmd-side.
+    // The checked entity borrow reads `self_`'s `gclient_t*`.
+    // The deref stays raw because the client may be an NPC pool client.
+    // `ucmd` stays raw too, and the whole body is client/ucmd-side.
     let cl = ctx.world.entity(self_).client;
     unsafe {
         let mut forward: vec3_t = [0.0; 3];
@@ -1545,7 +1530,7 @@ pub fn G_AddPushVecToUcmd(ctx: &mut GameContext, self_: EntityId, ucmd: *mut use
     }
 }
 
-/// Raven `G_StandingAnim` — is this a plain standing anim? (not idles/cinematics).
+/// Raven `G_StandingAnim`: is this a plain standing anim? (not idles/cinematics).
 ///
 /// Source: `oracle/codemp/game/g_active.c:1246-1258`
 pub fn G_StandingAnim(anim: c_int) -> qboolean {
@@ -1586,12 +1571,13 @@ pub fn G_ActionButtonPressed(buttons: c_int) -> qboolean {
     }
 }
 
-/// Raven `G_CheckClientIdle` — enter/exit idle animations after inactivity.
+/// Raven `G_CheckClientIdle`: enter/exit idle animations after inactivity.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1302-1430`
 pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut usercmd_t) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
+    // `ucmd` stays raw too.
     let cl = match ent {
         Some(e) => ctx.world.entity(e).client,
         None => core::ptr::null_mut(),
@@ -1748,8 +1734,8 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
 ///
 /// Source: `oracle/codemp/game/g_active.c:1432-1486`
 pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboolean) {
-    // `ent` accessed through its borrow; the `gNPC_t*` NPC (no accessor —
-    // recipe 2c) is dereffed raw.
+    // `ent` is accessed through its borrow.
+    // The `gNPC_t*` `NPC` has no accessor, so this dereffs it raw.
     if ent.client.is_null() || ent.NPC.is_null() {
         return;
     }
@@ -1800,8 +1786,8 @@ pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboole
 ///
 /// Source: `oracle/codemp/game/g_active.c:1494-1510`
 pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
-    // `ent` accessed through its borrow; the `gNPC_t*` NPC (no accessor —
-    // recipe 2c) is dereffed raw.
+    // `ent` is accessed through its borrow.
+    // The `gNPC_t*` `NPC` has no accessor, so this dereffs it raw.
     if ent.client.is_null() || ent.NPC.is_null() {
         return 0;
     }
@@ -1817,8 +1803,8 @@ pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1517-1573`
 pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
-    // `ent` accessed through its borrow; the `gclient_t*`/`gNPC_t*` (no
-    // accessors — recipes 2b/2c) are dereffed raw.
+    // `ent` is accessed through its borrow.
+    // The `gclient_t*`/`gNPC_t*` values have no accessors, so this dereffs them raw.
     if ent.client.is_null() || ent.NPC.is_null() {
         return 0;
     }
@@ -1838,12 +1824,13 @@ pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
     }
 }
 
-/// Raven `G_CheckMovingLoopingSounds` — NPC movement loop-sounds.
+/// Raven `G_CheckMovingLoopingSounds`: NPC movement loop-sounds.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1577-1614`
 pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
+    // `ucmd` stays raw too.
     let cl = ctx.world.entity(ent).client;
     unsafe {
         if !cl.is_null() {
@@ -1894,13 +1881,13 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
     }
 }
 
-/// Raven `G_HeldByMonster` — clamp a player being held by a monster (Rancor).
+/// Raven `G_HeldByMonster`: clamp a player being held by a monster (Rancor).
 ///
 /// Source: `oracle/codemp/game/g_active.c:1616-1651`
 pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut *mut usercmd_t) {
-    // `ent`/`monster` fields via checked entity borrow; the `gclient_t*`s cl/mcl
-    // (may be NPC pool clients — recipe 2b) are dereffed raw. The Rancor attach
-    // is a bg-seam call over raw client `ps`. `ucmd` stays raw.
+    // The checked entity borrow reads `ent`/`monster` fields.
+    // The `gclient_t*` values `cl`/`mcl` are dereffed raw because the clients may be NPC pool clients.
+    // The Rancor attach is a bg-seam call over the raw client `ps`, and `ucmd` stays raw too.
     let cl = match ent {
         Some(e) => ctx.world.entity(e).client,
         None => core::ptr::null_mut(),
@@ -1957,12 +1944,12 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
     }
 }
 
-/// Raven `G_SetTauntAnim` — play a taunt/bow/meditate/flourish/gloat animation.
+/// Raven `G_SetTauntAnim`: play a taunt/bow/meditate/flourish/gloat animation.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1662-1926`
 pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     let cl = ctx.world.entity(ent).client;
     unsafe {
         let level_time = ctx.world.level.time;
@@ -2187,15 +2174,12 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
     }
 }
 
-/// Raven `ClientThink_real` — the per-frame client/NPC think core.
-///
-/// Source: `oracle/codemp/game/g_active.c:1939-3611`
-/// Raven `ClientThink_real` — the per-client server-side think/Pmove driver.
+/// Raven `ClientThink_real`: the per-frame client/NPC think core and server-side Pmove driver.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1939-3611`
 pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::gen_cmds::genCmds_t::{self, *};
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // The parameter is an `EntityId`, and the raw body is re-derived verbatim. This is unconverted work.
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client;
@@ -2589,8 +2573,8 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     // rwwFIXMEFIXME: do this and also check for all real client
                     // Slow down on turns - don't orbit!!!
                     let mut turndelta = 0.0f32;
-                    // rwwFIXMEFIXME: locked-yaw RF_LOCKEDANGLE path is unreachable
-                    // (Raven guards it with `if (0)`) — port the always-taken branch.
+                    // The RF_LOCKEDANGLE locked-yaw path is unreachable in Raven, because Raven guards it with `if (0)`.
+                    // This port transcribes only the always-taken branch.
                     // Raven: `(180 - fabs(AngleDelta(...)))/180`. `fabs` is libm's
                     // `double fabs`, so the subtract and divide run in f64 before
                     // narrowing to the f32 `turndelta`.
@@ -2893,8 +2877,8 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                         ),
                     ) != qfalse
                 {
-                    // Raven's `#if 0` bolt-index computation is dead code (never
-                    // taken); the always-taken `#else` path below is transcribed.
+                    // Raven's `#if 0` bolt-index computation is dead code, because it is never taken.
+                    // The always-taken `#else` path below is transcribed.
                     let pDif = 40.0f32;
                     let mut boltOrg: vec3_t = [0.0; 3];
                     let mut pBoltOrg: vec3_t = [0.0; 3];
@@ -3118,8 +3102,8 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         } else {
             pm.tracemask = MASK_PLAYERSOLID;
         }
-        // pm.trace/pointcontents fields stay for layout only; bg logic
-        // reaches the engine through BgTraps threaded into Pmove below.
+        // The `pm.trace`/`pointcontents` fields stay for layout only.
+        // Bg logic reaches the engine through `BgTraps`, threaded into `Pmove` below.
         pm.debugLevel = ctx.world.cvars.g_debugMove.integer;
         pm.noFootsteps = ((ctx.world.cvars.g_dmflags.integer & DF_NO_FOOTSTEPS) > 0) as qboolean;
 
@@ -3307,7 +3291,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         {
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field, so a raw store is required here.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -3878,12 +3862,13 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `G_CheckClientTimeouts` — force idle clients to spectator.
+/// Raven `G_CheckClientTimeouts`: force idle clients to spectator.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3620-3640`
 pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
-    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
-    // raw (may be an NPC pool client — recipe 2b). Body is all client-side.
+    // The checked entity borrow reads `ent`'s `gclient_t*`.
+    // The deref stays raw because the client may be an NPC pool client.
+    // The body is all client-side.
     let cl = ctx.world.entity(ent).client;
     unsafe {
         // Only timeout supported right now is the timeout to spectator mode
@@ -3907,12 +3892,13 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `ClientThink` — vmMain client-think entry.
+/// Raven `ClientThink`: vmMain client-think entry.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3649-3720`
 pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t) {
-    // `ent`'s fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
+    // `ucmd` stays raw too.
     let ent = EntityId::from_num(clientNum).unwrap();
     let cl = ctx.world.entity(ent).client;
     unsafe {
@@ -3951,8 +3937,8 @@ pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t
 ///
 /// Source: `oracle/codemp/game/g_active.c:3723-3729`
 pub fn G_RunClient(ctx: &mut GameContext, ent: EntityId) {
-    // `ent`'s fields via checked entity borrow; the `gclient_t*` (may be an NPC
-    // pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
     if ctx.world.entity(ent).r.svFlags & SVF_BOT == 0
         && ctx.world.cvars.g_synchronousClients.integer == 0
     {
@@ -3965,13 +3951,13 @@ pub fn G_RunClient(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `SpectatorClientEndFrame` — follow-cam / scoreboard bookkeeping.
+/// Raven `SpectatorClientEndFrame`: follow-cam / scoreboard bookkeeping.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3738-3783`
 pub fn SpectatorClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
-    // `ent`'s fields via checked entity borrow; the `gclient_t*` entCl (may be
-    // an NPC pool client — recipe 2b) and the followed client `cl` (level.clients
-    // direct — a real followed slot) are dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` `entCl` is dereffed raw because the client may be an NPC pool client.
+    // The followed client `cl` is read directly from `level.clients`, a real followed slot, and is also dereffed raw.
     let entCl = ctx.world.entity(ent).client;
     unsafe {
         if ctx.world.entity(ent).s.eType == ET_NPC as c_int {
@@ -4017,12 +4003,12 @@ pub fn SpectatorClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-/// Raven `ClientEndFrame` — end-of-frame per-client fixups.
+/// Raven `ClientEndFrame`: end-of-frame per-client fixups.
 ///
 /// Source: `oracle/codemp/game/g_active.c:3794-3874`
 pub fn ClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
-    // `ent` fields via checked entity borrow; the `gclient_t*` entCl (may be an
-    // NPC pool client — recipe 2b) is dereffed raw.
+    // The checked entity borrow reads `ent`'s fields.
+    // The `gclient_t*` `entCl` is dereffed raw because the client may be an NPC pool client.
     let mut isNPC: qboolean = qfalse;
 
     if ctx.world.entity(ent).s.eType == ET_NPC as c_int {
