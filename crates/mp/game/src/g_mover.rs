@@ -1,31 +1,31 @@
-// PORT-COMPLETE: g_mover.c
-//! FAITHFUL port of `oracle/codemp/game/g_mover.c`.
+//! This is a faithful port of `oracle/codemp/game/g_mover.c`.
 //!
-//! Safe-state migration (campaign 2c). Entity params crossing this file's ABI
-//! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
-//! `gentity_t*`; the pilot is `crate::g_object`. The single-entity spawn/think
-//! setters (`SP_func_*`, `InitMover`/`InitBBrush`, `SetMoverState`,
-//! `ReturnToPos1`, the door-sound helpers, the `func_usable_*`/`func_static_use`
-//! use-paths, the `G_EntIs*` entityNum probes, …) are converted to the accessor
-//! regime: their bodies reach the entity through `ctx.entity(id)` /
-//! `ctx.entity_mut(id)` at the point of use, so the per-line `(*ent).…` raw
-//! derefs are gone; the only remaining `unsafe` is the seam (C-string reads of
-//! engine-owned name pointers, `trap::*` raw-pointer casts). Behavior is
-//! byte-identical to the pre-migration port — a mechanical reshape.
+//! The safe-state migration (campaign 2c) converts entity params that cross this file's ABI seam to
+//! `EntityId`/`Option<EntityId>` handles (§B5), instead of raw `gentity_t*`.
+//! The pilot for this conversion is `crate::g_object`.
+//! The single-entity spawn and think setters convert to the accessor regime: `SP_func_*`,
+//! `InitMover`/`InitBBrush`, `SetMoverState`, `ReturnToPos1`, the door-sound helpers, the
+//! `func_usable_*`/`func_static_use` use-paths, and the `G_EntIs*` entityNum probes.
+//! Their bodies reach the entity through `ctx.entity(id)` or `ctx.entity_mut(id)` at the point of use,
+//! so the per-line `(*ent).…` raw derefs are gone.
+//! The only remaining `unsafe` is the seam: C-string reads of engine-owned name pointers, and
+//! `trap::*` raw-pointer casts.
+//! Behavior stays byte-identical to the pre-migration port.
+//! The change is a mechanical reshape.
 //!
-//! The genuinely entangled bodies stay **Stage-1** (raw `*mut gentity_t`
-//! re-derived at the top of the body, verbatim referee-verified logic): the
-//! `G_MoverPush`/`G_TryPushingEntity`/`G_MoverTeam` push machinery (two
-//! simultaneous mutable entities + gclient walks + the `pushed[]` save-stack),
-//! the `teamchain`/`teammaster` pointer chases (`MatchTeam`,
-//! `CalcTeamDoorCenter`, `G_FindDoorTrigger`, `G_EntIsUnlockedDoor`,
-//! `Think_SpawnNewDoorTrigger`, `Think_SetupTrainTargets`, `Reached_Train`,
-//! `UnLockDoors`/`LockDoors`), the client-heavy touch/trigger paths
-//! (`Touch_Door*`, `Touch_Plat*`, `Touch_Button`, `Blocked_Door`,
-//! `Use_BinaryMover*`, `Reached_BinaryMover`), and the `G_TempEntity` scratch
-//! writers (`G_Chunks`, `G_MiscModelExplosion`, `Glass*`, `funcBBrush*`). These
-//! remain Stage-2 debt. Unconverted callers bridge their raw pointer at the
-//! boundary with `ctx.entity_id_of(ptr)`.
+//! The genuinely entangled bodies stay Stage-1: raw `*mut gentity_t` re-derived at the top of the
+//! body, with the logic verified verbatim against the referee.
+//! This covers the push machinery in `G_MoverPush`, `G_TryPushingEntity`, and `G_MoverTeam` (two
+//! simultaneous mutable entities, gclient walks, and the `pushed[]` save-stack).
+//! It also covers the `teamchain`/`teammaster` pointer chases in `MatchTeam`, `CalcTeamDoorCenter`,
+//! `G_FindDoorTrigger`, `G_EntIsUnlockedDoor`, `Think_SpawnNewDoorTrigger`, `Think_SetupTrainTargets`,
+//! `Reached_Train`, and `UnLockDoors`/`LockDoors`.
+//! It also covers the client-heavy touch and trigger paths: `Touch_Door*`, `Touch_Plat*`,
+//! `Touch_Button`, `Blocked_Door`, `Use_BinaryMover*`, and `Reached_BinaryMover`.
+//! It also covers the `G_TempEntity` scratch writers: `G_Chunks`, `G_MiscModelExplosion`, `Glass*`,
+//! and `funcBBrush*`.
+//! These stay as Stage-2 debt.
+//! Unconverted callers bridge their raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -52,12 +52,13 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use crate::entity::flags;
 
-/// Raven `pushed_t` (`g_mover.c:19-24`) — one saved position/angle/deltayaw
-/// snapshot per moved entity, so a blocked mover push can roll everything
-/// back. Owned by `GameGlobals::pushed`/`pushed_p` (the
-/// `pushed[]`/`pushed_p` save-stack is genuine cross-call scratch state,
-/// modeled as a `Vec` + cursor index rather than a raw pointer pair per
-/// porting-rules B3/B5).
+/// Raven `pushed_t`.
+///
+/// This holds one saved position, angle, and deltayaw snapshot per moved entity, so a blocked mover
+/// push can roll everything back.
+/// `GameGlobals::pushed`/`pushed_p` owns it.
+/// The `pushed[]`/`pushed_p` save-stack is genuine cross-call scratch state, so this models it as a
+/// `Vec` plus a cursor index, not a raw pointer pair, per porting-rules B3/B5.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:19-24`
 #[derive(Clone, Copy)]
@@ -68,16 +69,19 @@ pub struct PushedEntry {
     pub deltayaw: c_int,
 }
 
-// `CONTENTS_TRIGGER` (`mp_qshared::shared::surface_flags`), `SVF_NOCLIENT`/
-// `SVF_BROADCAST` (`crate::g_public_consts`), `FRAMETIME` (`crate::g_items`)
-// and `YAW` (`crate::q_math`) all resolve via the crate prelude glob; the
-// shadowing local copies were removed by the placeholder-const sweep.
+// These constants resolve through the crate prelude glob, not a local definition in this file.
+// `CONTENTS_TRIGGER` comes from `mp_qshared::shared::surface_flags`.
+// `SVF_NOCLIENT` and `SVF_BROADCAST` come from `crate::g_public_consts`.
+// `FRAMETIME` comes from `crate::g_items`.
+// `YAW` comes from `crate::q_math`.
+// The placeholder-const sweep removed the shadowing local copies that used to live here.
 pub const FUNC_WALL_OFF: c_int = 1;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven's `qboolean` is `c_int`.
+// This file keeps the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-// Raven file-scope `#define`s (this file's own bitflags on `ent->spawnflags`).
+// These are Raven's file-scope `#define`s: this file's own bitflags on `ent->spawnflags`.
 // Source: `oracle/codemp/game/g_mover.c:26-33`
 const MOVER_START_ON: c_int = 1;
 pub const MOVER_FORCE_ACTIVATE: c_int = 2;
@@ -88,8 +92,8 @@ const MOVER_GOODIE: c_int = 32;
 pub const MOVER_PLAYER_USE: c_int = 64;
 pub const MOVER_INACTIVE: c_int = 128;
 
-// Raven file-scope `int BMS_START/BMS_MID/BMS_END` (g_mover.c:35-37) — never
-// reassigned at runtime (const tables -> const).
+// Raven's file-scope `int BMS_START`, `BMS_MID`, and `BMS_END` never get reassigned at runtime, so
+// this ports them as `const`.
 // Source: `oracle/codemp/game/g_mover.c:35-37`
 pub const BMS_START: c_int = 0;
 pub const BMS_MID: c_int = 1;
@@ -136,7 +140,6 @@ pub fn G_PlayDoorSound(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:86-111`
 pub fn G_TestEntityPosition(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mask = if (*ent).clipmask != 0 {
@@ -189,10 +192,9 @@ pub fn G_TestEntityPosition(ctx: &mut GameContext, ent: EntityId) -> *mut gentit
 
 /// Raven `G_CreateRotationMatrix`.
 ///
-/// `angles` is never written through in Raven (only read by `AngleVectors`),
-/// so it stays by value; `matrix` is the `vec3_t matrix[3]` out-param, walked
-/// as a 3-row array via pointer arithmetic (same convention as
-/// `G_TransposeMatrix` in this file).
+/// `angles` is never written through in Raven, only read by `AngleVectors`, so it stays by value.
+/// `matrix` is the `vec3_t matrix[3]` out-param, walked as a 3-row array through pointer arithmetic.
+/// This is the same convention as `G_TransposeMatrix` in this file.
 /// Source: `oracle/codemp/game/g_mover.c:118-121`
 pub fn G_CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
     unsafe {
@@ -202,8 +204,8 @@ pub fn G_CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
             Some(&mut *matrix.add(1)),
             Some(&mut *matrix.add(2)),
         );
-        // Raven `VectorInverse(matrix[1])` — not itself ported anywhere in
-        // the crate graph (call surface: unresolved), inlined here.
+        // Raven's `VectorInverse(matrix[1])` is not itself ported anywhere in the crate graph (the
+        // call surface is unresolved), so this inlines it here.
         for c in (*matrix.add(1)).iter_mut() {
             *c = -*c;
         }
@@ -212,9 +214,9 @@ pub fn G_CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
 
 /// Raven `G_TransposeMatrix`.
 ///
-/// `matrix`/`transpose` are Raven `vec3_t matrix[3]` — arrays of 3 rows that
-/// decay to a `vec3_t *` at the call boundary, so the raw pointer here is
-/// walked as a 3-row array via pointer arithmetic.
+/// `matrix` and `transpose` are Raven `vec3_t matrix[3]`, arrays of 3 rows that decay to a
+/// `vec3_t *` at the call boundary.
+/// The raw pointer here is walked as a 3-row array through pointer arithmetic.
 /// Source: `oracle/codemp/game/g_mover.c:128-135`
 pub fn G_TransposeMatrix(matrix: *mut vec3_t, transpose: *mut vec3_t) {
     unsafe {
@@ -226,10 +228,10 @@ pub fn G_TransposeMatrix(matrix: *mut vec3_t, transpose: *mut vec3_t) {
     }
 }
 
-// Reshape: Raven's `point` is written through (`point[i] =
-// DotProduct(...)`, read back by the caller), so it becomes `&mut vec3_t`
-// per the ruling's non-nullable-out case. Same-file callers (below)
-// updated to pass `&mut`.
+// Reshape: Raven's `point` is written through (`point[i] = DotProduct(...)`) and read back by the
+// caller.
+// This becomes `&mut vec3_t` per the ruling's non-nullable-out case.
+// Same-file callers below pass `&mut`.
 /// Raven `G_RotatePoint`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:142-149`
@@ -250,8 +252,8 @@ pub fn G_RotatePoint(point: &mut vec3_t, matrix: *mut vec3_t) {
 
 /// Raven `G_TryPushingEntity`.
 ///
-/// `move`/`amove` are read-only in Raven (never written back through), so
-/// they stay by value ("keep by-value only if never written" clause).
+/// `move` and `amove` are read-only in Raven, never written back through, so they stay by value.
+/// This follows the "keep by-value only if never written" clause.
 /// Source: `oracle/codemp/game/g_mover.c:159-269`
 pub fn G_TryPushingEntity(
     ctx: &mut GameContext,
@@ -260,12 +262,12 @@ pub fn G_TryPushingEntity(
     r#move: vec3_t,
     amove: vec3_t,
 ) -> qboolean {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
     let check: *mut gentity_t = ctx.entity_mut(check);
     let pusher: *mut gentity_t = ctx.entity_mut(pusher);
     unsafe {
-        // This was only serverside not to mention it was never set (Raven
-        // comment — the EF_MOVER_STOP branch is `#if 0`'d out, g_mover.c:164-172).
+        // This was only serverside not to mention it was never set.
+        // Raven's `EF_MOVER_STOP` branch that follows this comment is commented out with `#if 0`.
+        // Source: `oracle/codemp/game/g_mover.c:164-172`
         if (*pusher).s.apos.trType != trType_t::TR_STATIONARY
             && ((*pusher).spawnflags & 16) != 0
             && Q_stricmp(&(*pusher).classname_str(), "func_rotating") == 0
@@ -338,8 +340,8 @@ pub fn G_TryPushingEntity(
                 (*client).ps.origin[i] += move2[i];
             }
             // make sure the client's view rotates when on a rotating mover.
-            // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`
-            // (same transcription as `bg_pmove.rs:312`).
+            // Raven's `ANGLE2SHORT(x)` macro is `((int)((x)*65536/360) & 65535)`.
+            // This is the same transcription as `bg_pmove.rs:312`.
             (*client).ps.delta_angles[YAW] += ((amove[YAW] * 65536.0 / 360.0) as c_int) & 65535;
         }
 
@@ -383,9 +385,9 @@ pub fn G_TryPushingEntity(
             return qfalse;
         }
 
-        // if it is ok to leave in the old position, do it — this is only
-        // relevant for riding entities, not pushed. Sliding trapdoors can
-        // cause this.
+        // if it is ok to leave in the old position, do it
+        // this is only relevent for riding entities, not pushed
+        // Sliding trapdoors can cause this.
         let last = ctx.world.globals.pushed[ctx.world.globals.pushed_p - 1];
         (*check).s.pos.trBase = last.origin;
         if !(*check).client.is_null() {
@@ -418,14 +420,13 @@ pub fn G_MoverPush(
     amove: vec3_t,
     obstacle: *mut *mut gentity_t,
 ) -> qboolean {
-    // STAGE-1: EntityId `pusher`, raw body re-derived verbatim (Stage-2 debt);
-    // `obstacle` is a raw out-param double-pointer (Stage-2).
+    // `obstacle` is a raw out-param double-pointer (Stage-2 debt).
     let pusher: *mut gentity_t = ctx.entity_mut(pusher);
     unsafe {
         *obstacle = core::ptr::null_mut();
 
-        // mins/maxs are the bounds at the destination; totalMins/totalMaxs
-        // are the bounds for the entire move.
+        // mins/maxs are the bounds at the destination
+        // totalMins / totalMaxs are the bounds for the entire move
         let (mut mins, mut maxs, mut total_mins, mut total_maxs) =
             ([0.0f32; 3], [0.0f32; 3], [0.0f32; 3], [0.0f32; 3]);
         if (*pusher).r.currentAngles[0] != 0.0
@@ -472,7 +473,7 @@ pub fn G_MoverPush(
             ),
         );
 
-        // move the pusher to its final position
+        // move the pusher to it's final position
         for i in 0..3 {
             (*pusher).r.currentOrigin[i] += r#move[i];
             (*pusher).r.currentAngles[i] += amove[i];
@@ -504,9 +505,8 @@ pub fn G_MoverPush(
                 {
                     continue;
                 }
-                // see if the ent's bbox is inside the pusher's final position —
-                // this does allow a fast moving object to pass through a thin
-                // entity...
+                // see if the ent's bbox is inside the pusher's final position
+                // this does allow a fast moving object to pass through a thin entity...
                 if G_TestEntityPosition(ctx, ctx.entity_id_of(check).unwrap()).is_null() {
                     continue;
                 }
@@ -583,12 +583,11 @@ pub fn G_MoverPush(
             // save off the obstacle so we can call the block function (crush, etc)
             *obstacle = check;
 
-            // move back any entities we already moved — go backwards, so if
-            // the same entity was pushed twice, it goes back to the
-            // original position.
-            // (Raven leaves `pushed_p` itself untouched here — only
-            // `G_MoverTeam`'s next call resets it — so this walks the
-            // snapshot without popping.)
+            // move back any entities we already moved
+            // go backwards, so if the same entity was pushed
+            // twice, it goes back to the original position
+            // Raven leaves `pushed_p` untouched here.
+            // Only `G_MoverTeam`'s next call resets it, so this walks the snapshot without popping it.
             for i in (0..ctx.world.globals.pushed_p).rev() {
                 let p = ctx.world.globals.pushed[i];
                 (*p.ent).s.pos.trBase = p.origin;
@@ -611,14 +610,13 @@ pub fn G_MoverPush(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:416-471`
 pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut obstacle: *mut gentity_t = core::ptr::null_mut();
 
-        // make sure all team slaves can move before commiting any moves or
-        // calling any think functions — if the move is blocked, all moved
-        // objects will be backed out.
+        // make sure all team slaves can move before commiting
+        // any moves or calling any think functions
+        // if the move is blocked, all moved objects will be backed out
         ctx.world.globals.pushed.clear();
         ctx.world.globals.pushed_p = 0;
 
@@ -718,8 +716,8 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:479-493`
 pub fn G_RunMover(ctx: &mut GameContext, ent: EntityId) {
-    // if not a team captain, don't do anything, because the captain
-    // will handle everything
+    // if not a team captain, don't do anything, because
+    // the captain will handle everything
     if ctx.entity(ent).flags & flags::FL_TEAMSLAVE != 0 {
         return;
     }
@@ -735,17 +733,17 @@ pub fn G_RunMover(ctx: &mut GameContext, ent: EntityId) {
     crate::g_main::G_RunThink(ctx, ent);
 }
 
-// Reshape: Raven's `center` is written through (built up across the
-// slave loop, read back by every caller), so it becomes `&mut vec3_t` per
-// the ruling's non-nullable-out case. Same-file callers updated below.
+// Reshape: Raven's `center` is written through, built up across the slave loop and read back by
+// every caller.
+// This becomes `&mut vec3_t` per the ruling's non-nullable-out case.
+// Same-file callers below are updated.
 /// Raven `CalcTeamDoorCenter`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:511-528`
 pub fn CalcTeamDoorCenter(ctx: &mut GameContext, ent: EntityId, center: &mut vec3_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        // start with our own center
+        // start with our center
         for i in 0..3 {
             center[i] = ((*ent).r.mins[i] + (*ent).r.maxs[i]) * 0.5;
         }
@@ -794,8 +792,8 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
             let pos2 = ctx.entity(ent).pos2;
             ctx.entity_mut(ent).s.pos.trBase = pos1;
             let delta = [pos2[0] - pos1[0], pos2[1] - pos1[1], pos2[2] - pos1[2]];
-            // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
-            // an int, computed in f64, narrowed once at the float store.
+            // Raven's `f = 1000.0 / ent->s.pos.trDuration;` divides a double literal by an int.
+            // This computes in f64 and narrows once at the float store.
             // Source: `oracle/codemp/game/g_mover.c:560`
             let f = (1000.0f64 / ctx.entity(ent).s.pos.trDuration as f64) as f32;
             ctx.entity_mut(ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
@@ -810,8 +808,8 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
             let pos2 = ctx.entity(ent).pos2;
             ctx.entity_mut(ent).s.pos.trBase = pos2;
             let delta = [pos1[0] - pos2[0], pos1[1] - pos2[1], pos1[2] - pos2[2]];
-            // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
-            // an int, computed in f64, narrowed once at the float store.
+            // Raven's `f = 1000.0 / ent->s.pos.trDuration;` divides a double literal by an int.
+            // This computes in f64 and narrows once at the float store.
             // Source: `oracle/codemp/game/g_mover.c:575`
             let f = (1000.0f64 / ctx.entity(ent).s.pos.trDuration as f64) as f32;
             ctx.entity_mut(ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
@@ -841,7 +839,6 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
 /// of time.
 /// Source: `oracle/codemp/game/g_mover.c:600-606`
 pub fn MatchTeam(ctx: &mut GameContext, teamLeader: EntityId, moverState: c_int, time: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let teamLeader: *mut gentity_t = ctx.entity_mut(teamLeader);
     unsafe {
         let mut slave = teamLeader;
@@ -877,7 +874,6 @@ pub fn ReturnToPos1(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:634-702`
 pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // stop the looping sound
@@ -907,7 +903,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
                 // return to pos1 after a delay
                 (*ent).think = Some(EntThink::ReturnToPos1).into();
                 if (*ent).spawnflags & 8 != 0 {
-                    // toggle, keep think, wait for next use
+                    // toggle, keep think, wait for next use?
                     (*ent).nextthink = -1;
                 } else {
                     (*ent).nextthink = ctx.world.level.time + (*ent).wait as c_int;
@@ -955,7 +951,6 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:710-828`
 pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let activator = (*ent).activator;
@@ -966,7 +961,7 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
 
             let ent_eid = ctx.entity_id_of(ent).unwrap();
             let level_time_plus_50 = ctx.world.level.time + 50;
-            // start moving 50 msec later, because if this was player
+            // start moving 50 msec later, becase if this was player
             // triggered, level.time hasn't been advanced yet
             MatchTeam(ctx, ent_eid, MOVER_1TO2, level_time_plus_50);
             CalcTeamDoorCenter(ctx, ctx.entity_id_of(ent).unwrap(), &mut doorcenter);
@@ -1023,9 +1018,10 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
                     (*ent).r.currentOrigin[1] - (*ent).pos1[1],
                     (*ent).r.currentOrigin[2] - (*ent).pos1[2],
                 ];
-                // Raven runs fPartial through double libm: VectorLength narrows a double
-                // sqrt to float, acos is the double call, and RAD2DEG is `(a*180.0f)/M_PI`
-                // with double M_PI. fPartial narrows back to float after each assignment.
+                // Raven runs fPartial through double libm.
+                // VectorLength narrows a double sqrt to float, acos is the double call, and RAD2DEG
+                // is `(a*180.0f)/M_PI` with double M_PI.
+                // fPartial narrows back to float after each assignment.
                 let mut f_partial = VectorLength(cur_delta) / VectorLength((*ent).s.pos.trDelta);
                 f_partial /= (*ent).s.pos.trDuration as f32;
                 f_partial /= 0.001f32;
@@ -1063,9 +1059,10 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
                     (*ent).r.currentOrigin[1] - (*ent).pos2[1],
                     (*ent).r.currentOrigin[2] - (*ent).pos2[2],
                 ];
-                // Raven runs fPartial through double libm: VectorLength narrows a double
-                // sqrt to float, acos is the double call, and RAD2DEG is `(a*180.0f)/M_PI`
-                // with double M_PI. fPartial narrows back to float after each assignment.
+                // Raven runs fPartial through double libm.
+                // VectorLength narrows a double sqrt to float, acos is the double call, and RAD2DEG
+                // is `(a*180.0f)/M_PI` with double M_PI.
+                // fPartial narrows back to float after each assignment.
                 let mut f_partial = VectorLength(cur_delta) / VectorLength((*ent).s.pos.trDelta);
                 f_partial /= (*ent).s.pos.trDuration as f32;
                 f_partial /= 0.001f32;
@@ -1096,13 +1093,13 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `UnLockDoors`.
 ///
 /// Go through and unlock the door and all the slaves.
-/// `ent` is declared `gentity_t *const` in Raven (a const *pointer*, not a
-/// const pointee) — the fields are still mutated, so the cast to `*mut` here
-/// just recovers writability, not a behavior change.
+/// `ent` is declared `gentity_t *const` in Raven, a const pointer, not a const pointee.
+/// The fields are still mutated, so the cast to `*mut` here only recovers writability.
+/// This does not change behavior.
 ///
-/// Ctx-free leaf helper (Stage-1): borrows `&mut gentity_t`; the whole-team
-/// walk stays a confined raw-pointer chase (it reconstructs the arena base
-/// from each node, so there is no ctx/world to reach through).
+/// This is a ctx-free leaf helper (Stage-1) that borrows `&mut gentity_t`.
+/// The whole-team walk stays a confined raw-pointer chase.
+/// It reconstructs the arena base from each node, so there is no ctx or world to reach through.
 /// Source: `oracle/codemp/game/g_mover.c:830-845`
 pub fn UnLockDoors(ctx: &mut GameContext, ent: EntityId) {
     let mut slave = Some(ent);
@@ -1123,8 +1120,8 @@ pub fn UnLockDoors(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Go through and lock the door and all the slaves.
 ///
-/// Ctx-free leaf helper (Stage-1): borrows `&mut gentity_t`; the whole-team
-/// walk stays a confined raw-pointer chase.
+/// This is a ctx-free leaf helper (Stage-1) that borrows `&mut gentity_t`.
+/// The whole-team walk stays a confined raw-pointer chase.
 /// Source: `oracle/codemp/game/g_mover.c:846-857`
 pub fn LockDoors(ent: &mut gentity_t) {
     unsafe {
@@ -1152,7 +1149,6 @@ pub fn Use_BinaryMover(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -1211,8 +1207,8 @@ pub fn InitMoverTrData(ent: &mut gentity_t) {
     let pos1 = ent.pos1;
     let pos2 = ent.pos2;
     let r#move = [pos2[0] - pos1[0], pos2[1] - pos1[1], pos2[2] - pos1[2]];
-    // Raven uses VectorLength, whose sqrt is the double libm call narrowed to float;
-    // an inline f32 sqrt double-rounds and diverges from the oracle.
+    // Raven uses VectorLength, whose sqrt is the double libm call narrowed to float.
+    // An inline f32 sqrt double-rounds and diverges from the oracle.
     let distance = VectorLength(r#move);
     if ent.speed == 0.0 {
         ent.speed = 100.0;
@@ -1234,7 +1230,7 @@ pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
     let model2 = ctx.entity(ent).model2.clone();
     // `""` ≡ Raven's `!ent->model2 || !ent->model2[0]` guard.
     if !model2.is_empty() {
-        // Raven `strstr(ent->model2, ".glm")` — use Rust string contains check
+        // Raven's `strstr(ent->model2, ".glm")` maps to the Rust `.contains(".glm")` check below.
         if model2.contains(".glm") {
             // for now, not supported in MP.
             ctx.entity_mut(ent).s.modelindex2 = 0;
@@ -1304,15 +1300,13 @@ pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1018-1029`
 pub fn Blocked_Door(ctx: &mut GameContext, ent: EntityId, other: Option<EntityId>) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*ent).damage != 0 {
-            // Resolved `G_Damage` takes `dir`/`point` by value (Raven passes
-            // NULL pointers here); substitute the zero vector since `G_Damage`
-            // is itself an unported stub either way.
+            // The resolved `G_Damage` takes `dir` and `point` by value.
+            // Raven passes NULL pointers here, so this substitutes the zero vector.
             G_Damage(
                 ctx,
                 ctx.entity_id_of(other),
@@ -1348,14 +1342,12 @@ pub fn Touch_DoorTriggerSpectator(
     other: Option<EntityId>,
     _trace: *mut trace_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
-        // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in
-        // `mp_bg::public::viewheight` (`c_int`, cast here to match the
-        // `vec3_t` components they seed).
+        // `DEFAULT_MINS_2` and `DEFAULT_MAXS_2` are canonical in `mp_bg::public::viewheight` as `c_int`.
+        // This casts them here to match the `vec3_t` components they seed.
         // Source: `oracle/codemp/game/bg_public.h:41-42`
         const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
         const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
@@ -1420,7 +1412,6 @@ pub fn Touch_DoorTrigger(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -1494,7 +1485,8 @@ pub fn Touch_DoorTrigger(
         }
 
         if (*parent).moverState != MOVER_1TO2 {
-            // door is not already opening — if closed, opening or open, check this
+            // door is not already opening
+            // if door is closed, opening or open, check this
             Use_BinaryMover(
                 ctx,
                 (*ent).parent.unwrap(),
@@ -1515,7 +1507,6 @@ pub fn Touch_DoorTrigger(
 /// encloses all of them.
 /// Source: `oracle/codemp/game/g_mover.c:1168-1215`
 pub fn Think_SpawnNewDoorTrigger(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // set all of the slaves as shootable
@@ -1603,7 +1594,6 @@ pub fn G_EntIsDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1239-1280`
 pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut owner: *mut gentity_t = core::ptr::null_mut();
@@ -1684,7 +1674,7 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                 }
             }
             if let Some(ent_targetname) = (*ent).targetname_str() {
-                // find out what is targeting it
+                // find out what is targetting it
                 owner = core::ptr::null_mut();
                 loop {
                     owner = G_Find(ctx, ctx.entity_id_of(owner), EntFindField::Target, &ent_targetname);
@@ -1878,7 +1868,6 @@ pub fn Touch_Plat(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -1906,7 +1895,6 @@ pub fn Touch_PlatCenterTrigger(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -1937,7 +1925,6 @@ pub fn Touch_PlatCenterTrigger(
 /// just sit on top of it.
 /// Source: `oracle/codemp/game/g_mover.c:1527-1559`
 pub fn SpawnPlatTrigger(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // the middle trigger will be a thin trigger just above the starting
@@ -2054,7 +2041,6 @@ pub fn Touch_Button(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -2143,7 +2129,6 @@ pub fn Think_BeginMoving(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1739-1793`
 pub fn Reached_Train(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // copy the appropriate values
@@ -2185,8 +2170,8 @@ pub fn Reached_Train(ctx: &mut GameContext, ent: EntityId) {
             (*ent).pos2[1] - (*ent).pos1[1],
             (*ent).pos2[2] - (*ent).pos1[2],
         ];
-        // Raven uses VectorLength (double sqrt narrowed to float); an inline f32 sqrt
-        // double-rounds and diverges from the oracle.
+        // Raven uses VectorLength, a double sqrt narrowed to float.
+        // An inline f32 sqrt double-rounds and diverges from the oracle.
         let length = VectorLength(r#move);
 
         (*ent).s.pos.trDuration = (length * 1000.0 / speed) as c_int;
@@ -2215,12 +2200,11 @@ pub fn Reached_Train(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1802-1864`
 pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        // Raven passes `ent->target` (possibly NULL) to G_Find, where a NULL match
-        // never compares equal and yields NULL; preserve that by not searching on
-        // a NULL target rather than reading it as a string.
+        // Raven passes `ent->target` (possibly NULL) to G_Find, where a NULL match never compares
+        // equal and yields NULL.
+        // This preserves that by not searching on a NULL target rather than reading it as a string.
         let train_target = (*ent).target.clone();
         let found = match train_target.as_deref() {
             Some(train_target) => G_Find(ctx, None, EntFindField::Targetname, train_target),
@@ -2253,8 +2237,9 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                 break;
             };
 
-            // find a path_corner among the targets — there may also be
-            // other targets that get fired when the corner is reached
+            // find a path_corner among the targets
+            // there may also be other targets that get fired when the corner
+            // is reached
             let mut next: *mut gentity_t;
             loop {
                 next = G_Find(ctx, None, EntFindField::Targetname, &path_target);
@@ -2262,9 +2247,9 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                     // end of path
                     break;
                 }
-                // Raven uses libc `strcmp` (case-sensitive) here, which has no
-                // ported binding in this crate; `Q_stricmp` is the closest
-                // available equivalent (case-insensitive) and is a no-op
+                // Raven uses libc `strcmp` (case-sensitive) here, which has no ported binding in
+                // this crate.
+                // `Q_stricmp` is the closest available equivalent (case-insensitive) and is a no-op
                 // difference for the literal "path_corner" classname.
                 if Q_stricmp(&(*next).classname_str(), "path_corner") == 0 {
                     break;
@@ -2311,10 +2296,10 @@ pub fn SP_path_corner(ctx: &mut GameContext, self_: EntityId) {
 pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).s.angles = [0.0; 3];
 
-    // Raven `TRAIN_BLOCK_STOPS` spawnflag (`g_mover.c:1900`); not yet a
-    // named const anywhere in the crate graph — transcribed as its
-    // literal bit here (single call site, no cross-file reuse to justify
-    // a shared const yet).
+    // Raven's `TRAIN_BLOCK_STOPS` spawnflag (`g_mover.c:1900`) is not yet a named const anywhere in
+    // the crate graph.
+    // This transcribes it as its literal bit here, since it has a single call site and no
+    // cross-file reuse to justify a shared const yet.
     pub const TRAIN_BLOCK_STOPS: c_int = 1;
     if ctx.entity(self_).spawnflags & TRAIN_BLOCK_STOPS != 0 {
         ctx.entity_mut(self_).damage = 0;
@@ -2371,9 +2356,8 @@ pub fn SP_func_static(ctx: &mut GameContext, ent: EntityId) {
     G_SetAngles(ctx.entity_mut(ent), angles);
 
     if ctx.entity(ent).spawnflags & 2048 != 0 {
-        // yes this is very very evil, but for now (pre-alpha) it's a
-        // solution — I need to rotate something that is huge and it's
-        // touching too many area portals...
+        // yes this is very very evil, but for now (pre-alpha) it's a solution
+        // I need to rotate something that is huge and it's touching too many area portals...
         ctx.entity_mut(ent).r.svFlags |= SVF_BROADCAST;
     }
 
@@ -2434,8 +2418,9 @@ pub fn func_static_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // `other` unused by Raven; `activator` threads straight to `G_UseTargets`
-    // (the resolve→entity_id_of round-trip is the identity).
+    // Raven does not use `other`.
+    // `activator` threads straight to `G_UseTargets`, since the resolve to entity_id_of round-trip
+    // is the identity.
     let _ = other;
     G_ActivateBehavior(ctx, Some(self_), bSet_t::BSET_USE as c_int);
 
@@ -2678,9 +2663,9 @@ pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
         length = 8.0;
     }
 
-    // Raven: `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`. The ratio
-    // is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double;
-    // the product narrows to float.
+    // Raven computes `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`.
+    // The ratio is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double.
+    // The product narrows to float.
     let ratio = ctx.world.cvars.g_gravity.value / (3.0 * length);
     let freq = (1.0f64 / (core::f64::consts::PI * 2.0) * (ratio as f64).sqrt()) as f32;
 
@@ -2800,7 +2785,6 @@ pub fn G_Chunks(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2398-2498`
 pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let attacker = (*self_).enemy;
@@ -2856,8 +2840,9 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
         // that it seemed to be the closest to yielding the results that I
         // wanted. Volume is length * width * height...then break that
         // volume down based on how many chunks we have.
-        // Raven: `sqrt( sqrt( org[0]*org[1]*org[2] )) * 1.75f`. Both sqrts are the double
-        // libm call and the whole product stays double until it narrows to float on assign.
+        // Raven computes `sqrt( sqrt( org[0]*org[1]*org[2] )) * 1.75f`.
+        // Both sqrts are the double libm call, and the whole product stays double until it narrows
+        // to float on assign.
         let mut scale = (((org_size[0] * org_size[1] * org_size[2]) as f64)
             .sqrt()
             .sqrt()
@@ -2875,10 +2860,10 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
 
         if (*self_).radius > 0.0 {
             // designer wants to scale number of chunks, helpful because the
-            // above scale code is far from perfect — I do this after the
-            // scale calculation because it seems that the chunk size
-            // generally seems to be very close, it's just the number of
-            // chunks is a bit weak.
+            // above scale code is far from perfect
+            // I do this after the scale calculation because it seems that
+            // the chunk size generally seems to be very close, it's just
+            // the number of chunks is a bit weak
             num_chunks = (num_chunks as f32 * (*self_).radius) as c_int;
         }
 
@@ -2909,7 +2894,7 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
         };
 
         if (*self_).spawnflags & 2048 == 0 {
-            // NO_EXPLOSION — we are allowed to explode
+            // NO_EXPLOSION - the flag is absent here, so the explosion is allowed.
             G_MiscModelExplosion(ctx, (*self_).r.absmin, (*self_).r.absmax, size, chunk_type);
         }
 
@@ -2972,8 +2957,7 @@ pub fn funcBBrushDie(
     damage: c_int,
     r#mod: c_int,
 ) {
-    // STAGE-1: EntityId/Option params (inflictor unused by Raven here); raw
-    // body re-derived verbatim (Stage-2 debt).
+    // Raven does not use `inflictor` here.
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
@@ -3001,7 +2985,6 @@ pub fn funcBBrushUse(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -3036,7 +3019,6 @@ pub fn funcBBrushPain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
@@ -3110,10 +3092,10 @@ pub fn funcBBrushPain(
             let mut numChunks = ctx.world.bg_state.rng.Q_irand(1, 3);
             if (*self_).radius > 0.0 {
                 // designer wants to scale number of chunks, helpful because
-                // the above scale code is far from perfect — I do this
-                // after the scale calculation because it seems that the
-                // chunk size generally seems to be very close, it's just
-                // the number of chunks is a bit weak.
+                // the above scale code is far from perfect
+                // I do this after the scale calculation because it seems
+                // that the chunk size generally seems to be very close,
+                // it's just the number of chunks is a bit weak
                 numChunks = (numChunks as f32 * (*self_).radius).ceil() as c_int;
             }
 
@@ -3368,8 +3350,7 @@ pub fn GlassDie(
     damage: c_int,
     r#mod: c_int,
 ) {
-    // STAGE-1: EntityId/Option params (inflictor unused by Raven here); raw
-    // body re-derived verbatim (Stage-2 debt).
+    // Raven does not use `inflictor` here.
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
@@ -3414,8 +3395,7 @@ pub fn GlassDie_Old(
     damage: c_int,
     r#mod: c_int,
 ) {
-    // STAGE-1: EntityId/Option params (inflictor unused by Raven here); raw
-    // body re-derived verbatim (Stage-2 debt).
+    // Raven does not use `inflictor` here.
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
@@ -3456,7 +3436,6 @@ pub fn GlassUse(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
@@ -3484,9 +3463,9 @@ pub fn GlassUse(
         ];
         (*self_).pos1 = temp1;
 
-        // Raven uses VectorNormalize, whose sqrt is the double libm call and which leaves
-        // the vector untouched at zero length (so the scale yields (0,0,0)); an inline f32
-        // sqrt double-rounds and turns the coincident-center case into NaN.
+        // Raven uses VectorNormalize, whose sqrt is the double libm call.
+        // At zero length it leaves the vector untouched, so the scale yields (0,0,0).
+        // An inline f32 sqrt double-rounds and turns the coincident-center case into NaN.
         VectorNormalize(&mut (*self_).pos2);
         (*self_).pos2 = [
             (*self_).pos2[0] * 390.0,
@@ -3723,8 +3702,8 @@ pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
     let model2 = ctx.entity(self_).model2.clone();
     // `""` ≡ Raven's `!self->model2 || !self->model2[0]` guard.
     if !model2.is_empty() {
-        // Raven `strstr(self->model2, ".glm")` — `str::contains` is the
-        // equivalent substring check.
+        // Raven's `strstr(self->model2, ".glm")` maps to the equivalent `str::contains` substring
+        // check.
         if model2.contains(".glm") {
             // for now, not supported in MP.
             ctx.entity_mut(self_).s.modelindex2 = 0;
