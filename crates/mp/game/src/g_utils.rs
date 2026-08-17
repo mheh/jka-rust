@@ -1,4 +1,3 @@
-// PORT-COMPLETE: g_utils.c
 //! FAITHFUL port of `oracle/codemp/game/g_utils.c`.
 //!
 //! The jampgame mega-pass filled this file.
@@ -215,7 +214,7 @@ pub fn G_BSPIndex(ctx: &mut GameContext, name: &str) -> c_int {
 /// The live function unconditionally returns `qfalse`, ported faithfully as-is.
 /// Source: `oracle/codemp/game/g_utils.c:162-188`
 pub fn G_PlayerHasCustomSkeleton(ent: &gentity_t) -> qboolean {
-    // STAGE-1: ctx-free leaf borrow &gentity_t (body ignores `ent`, the `#if 0` stub).
+    // This is a ctx-free leaf borrow &gentity_t (the body ignores `ent`, the `#if 0` stub).
     let _ = ent;
     qfalse
 }
@@ -267,7 +266,7 @@ pub fn G_Find(
     field: EntFindField,
     r#match: &str,
 ) -> *mut gentity_t {
-    // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
+    // This takes an Option param. The raw body is re-derived verbatim, deferred to the post-port refactor.
     let from: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), from) };
     unsafe {
@@ -320,7 +319,7 @@ pub fn G_RadiusList(
     takeDamage: qboolean,
     ent_list: *mut *mut gentity_t,
 ) -> c_int {
-    // Safe-state 2c: `ignore` stays an Option<EntityId> handle.
+    // `ignore` stays an Option<EntityId> handle.
     // `ent_list` is a raw out-array, kept as-is, so matched entities are stored as raw pointers taken from the accessor at the point of use.
     let radius = if radius < 1.0 { 1.0 } else { radius };
 
@@ -382,7 +381,7 @@ pub fn G_RadiusList(
 ///
 /// Source: `oracle/codemp/game/g_utils.c:315-370`
 pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32) {
-    // Safe-state 2c: EntityId param, entity fields via accessor borrow.
+    // This takes an EntityId param, and entity fields go through the accessor borrow.
     let mass = {
         let pb = ctx.world.entity(targ).physicsBounce;
         if pb > 0.0 {
@@ -413,7 +412,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
         }
     }
 
-    // FLAG (task #7): NPC pool client (gClPtrs), not a `level.clients` slot.
+    // This is an NPC pool client (gClPtrs), not a `level.clients` slot.
     // The pointer is read off the borrow and dereffed raw, as Raven does.
     let client = ctx.world.entity(targ).client;
     if !client.is_null() {
@@ -440,7 +439,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
 
     // set the timer so that the other client can't cancel
     // out the movement immediately
-    // FLAG (task #7): NPC pool client, dereffed raw.
+    // This is an NPC pool client, dereffed raw.
     let client = ctx.world.entity(targ).client;
     if !client.is_null() {
         unsafe {
@@ -536,7 +535,7 @@ pub fn G_CreateFakeClient(ctx: &mut GameContext, entNum: c_int, cl: *mut *mut gc
 ///
 /// Source: `oracle/codemp/game/g_utils.c:450-465`
 pub fn G_CleanAllFakeClients(ctx: &mut GameContext) {
-    // Safe-state 2c: index-driven accessor borrows.
+    // This uses index-driven accessor borrows.
     let mut i = MAX_CLIENTS as usize;
     while i < mp_qshared::shared::MAX_GENTITIES {
         let id = EntityId(i as u32);
@@ -568,7 +567,7 @@ pub fn G_SetAnim(
     setAnimFlags: c_int,
     blendTime: c_int,
 ) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // This takes an EntityId param. The raw body is re-derived verbatim, deferred to the post-port refactor.
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     // Oracle body is the live `#else` "new clean and shining way".
     // The old `#if 0` pmove path is dead, so `ucmd` is unused, kept only for signature parity.
@@ -644,7 +643,7 @@ pub fn GlobalUse(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // Safe-state 2c: Option handles, and `self_` fields read via the accessor.
+    // This uses Option handles, and `self_` fields read via the accessor.
     // The fn-enum dispatch still takes raw gentity pointers, taken from the accessor as values at the call (sanctioned seam, not a held reference).
     let Some(self_id) = self_ else {
         return;
@@ -683,7 +682,7 @@ pub fn G_UseTargets2(
     activator: Option<EntityId>,
     string: Option<&str>,
 ) {
-    // Safe-state 2c: Option handles, and `ent`/`t` fields via the accessor.
+    // This uses Option handles, and `ent`/`t` fields via the accessor.
     let Some(ent_id) = ent else {
         return;
     };
@@ -736,7 +735,7 @@ pub fn G_UseTargets2(
 /// Thin wrapper: null-checks `ent` then forwards to `G_UseTargets2` with `ent->target` as the search string.
 /// Source: `oracle/codemp/game/g_utils.c:609-616`
 pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Option<EntityId>) {
-    // Safe-state 2c: Option handles, and `ent->target` read via the accessor.
+    // This uses Option handles, and `ent->target` read via the accessor.
     let Some(ent_id) = ent else {
         return;
     };
@@ -749,7 +748,7 @@ pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Opt
 /// Source: `oracle/codemp/game/g_utils.c:627-642`
 pub fn tv(ctx: &mut GameContext, x: f32, y: f32, z: f32) -> *mut f32 {
     unsafe {
-        // Raven's function-local `static int index` and `static vec3_t vecs[8]` now live on `GameWorld.scratch` (safe-state Stage 3).
+        // Raven's function-local `static int index` and `static vec3_t vecs[8]` now live on `GameWorld.scratch`.
         // The 8-slot ring rotation is preserved exactly.
         let idx = ctx.world.scratch.tv_index as usize;
         ctx.world.scratch.tv_index = (ctx.world.scratch.tv_index + 1) & 7;
@@ -800,7 +799,7 @@ pub fn G_SetMovedir(angles: &mut vec3_t, movedir: &mut vec3_t) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:694-702`
 pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
-    // Safe-state 2c: EntityId param, and fields via accessor borrow.
+    // This takes an EntityId param, and fields go through the accessor borrow.
     // Raven's `ent->s.number = ent - g_entities` is the arena index (== `e.index()`).
     {
         let ent = ctx.world.entity_mut(e);
@@ -1014,9 +1013,9 @@ pub fn G_KillG2Queue(ctx: &mut GameContext, entNum: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:932-1043`
 pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
-    // Safe-state 2c: EntityId handle, and entity fields via the accessor.
+    // This takes an EntityId handle, and entity fields go through the accessor.
     // `ed_ptr` is taken fresh from the accessor for each trap or `write_bytes` call that needs a raw gentity pointer.
-    // FLAG (task #7): the NPC pool client (gClPtrs, g_utils.c:430) is dereffed raw exactly as Raven does, because it is not a `level.clients` slot.
+    // The NPC pool client (gClPtrs, g_utils.c:430) is dereffed raw, exactly as Raven does, because it is not a `level.clients` slot.
     // Raven derefs `ed` unconditionally, and NULL is undefined behavior there.
     // Callers are null-tolerant, so we treat None as a no-op (rule 19: pick the one defined behavior).
     let Some(ed_id) = ed else {
@@ -1064,7 +1063,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
     {
         // this "client" structure is one of our dynamically allocated
         // ones, so free the memory.
-        // FLAG (task #7): NPC pool client, dereffed raw.
+        // This is an NPC pool client, dereffed raw.
         let client = ctx.world.entity(ed_id).client;
         let mut saberEntNum: c_int = -1;
         unsafe {
@@ -1113,7 +1112,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
         while i < MAX_CLIENTS {
             let id = EntityId(i as u32);
             let inuse = ctx.world.entity(id).inuse != qfalse;
-            // FLAG (task #7): pool client possible, read off the borrow, deref raw.
+            // A pool client is possible here, so this reads it off the borrow and derefs it raw.
             let client = ctx.world.entity(id).client;
             if inuse && !client.is_null() {
                 unsafe {
@@ -1217,7 +1216,7 @@ pub fn G_SoundTempEntity(
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1112-1142`
 pub fn G_ScaleNetHealth(self_: &mut gentity_t) {
-    // Safe-state 2c: ctx-free leaf mutator, operating directly on the caller's `&mut gentity_t` borrow (no raw re-derive).
+    // This is a ctx-free leaf mutator, operating directly on the caller's `&mut gentity_t` borrow (no raw re-derive).
     let maxHealth = self_.maxHealth;
 
     if maxHealth < 1000 {
@@ -1253,8 +1252,8 @@ pub fn G_ScaleNetHealth(self_: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1162-1193`
 pub fn G_KillBox(ctx: &mut GameContext, ent: EntityId) {
-    // Safe-state 2c: EntityId self, and entity fields via the accessor.
-    // FLAG (task #7): `ent->client`/`hit->client` dereffed raw (pool-client-safe), as Raven does.
+    // This takes an EntityId self, and entity fields go through the accessor.
+    // `ent->client`/`hit->client` are dereffed raw (pool-client-safe), as Raven does.
     let client = ctx.world.entity(ent).client;
     let (r_mins, r_maxs) = {
         let e = ctx.world.entity(ent);
@@ -1319,11 +1318,11 @@ pub fn G_KillBox(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1206-1211`
 pub fn G_AddPredictableEvent(ent: Option<&mut gentity_t>, event: c_int, eventParm: c_int) {
-    // Safe-state 2c: nullable ctx-free leaf, and `ent` fields via the borrow.
+    // This is a nullable ctx-free leaf, and `ent` fields go through the borrow.
     let Some(ent) = ent else {
         return;
     };
-    // FLAG (task #7): `ent->client` may be a `BG_Alloc`'d NPC pool client (gClPtrs, g_utils.c:430), not a `level.clients` slot.
+    // `ent->client` may be a `BG_Alloc`'d NPC pool client (gClPtrs, g_utils.c:430), not a `level.clients` slot.
     // Read the pointer off the safe borrow and deref it raw, exactly as Raven does.
     let client = ent.client;
     if client.is_null() {
@@ -1338,7 +1337,7 @@ pub fn G_AddPredictableEvent(ent: Option<&mut gentity_t>, event: c_int, eventPar
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1221-1243`
 pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
-    // Safe-state 2c: ctx-free leaf, and `ent` fields via the borrow.
+    // This is a ctx-free leaf, and `ent` fields go through the borrow.
     // This is a ctx-less boundary fn, because Raven reads the `level` global directly.
     // World comes via the `g_strap` seam world cell, and engine (for the zero-event G_Printf) comes via the
     // strap_engine() precedent (see G_ModelIndex/G_SoundIndex).
@@ -1354,7 +1353,7 @@ pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
 
     let level_time = unsafe { (*crate::g_strap::strap_world()).level.time };
 
-    // FLAG (task #7): `ent->client` may be a `BG_Alloc`'d NPC pool client (gClPtrs), not a `level.clients` slot.
+    // `ent->client` may be a `BG_Alloc`'d NPC pool client (gClPtrs), not a `level.clients` slot.
     // Read off the borrow, deref raw.
     let client = ent.client;
     if !client.is_null() {
@@ -1380,7 +1379,7 @@ pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
 pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
     // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` seam cells (world and engine) so `G_TempEntity` can allocate.
     // This mirrors Raven reaching the `level`/`g_entities` globals directly (see G_AddEvent).
-    // Safe-state 2c: te fields via the accessor.
+    // te fields go through the accessor.
     let mut ctx = GameContext {
         world: unsafe { &mut *crate::g_strap::strap_world() },
         engine: crate::g_strap::strap_engine(),
@@ -1401,7 +1400,7 @@ pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
 pub fn G_PlayEffectID(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
     // play an effect by the G_EffectIndex'd ID instead of a predefined effect ID
     // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` seam cells (see G_PlayEffect).
-    // Safe-state 2c: te fields via the accessor.
+    // te fields go through the accessor.
     let mut ctx = GameContext {
         world: unsafe { &mut *crate::g_strap::strap_world() },
         engine: crate::g_strap::strap_engine(),
@@ -1434,7 +1433,7 @@ pub fn G_ScreenShake(
     duration: c_int,
     global: qboolean,
 ) -> *mut gentity_t {
-    // Safe-state 2c: `target` handle, and te fields via the accessor.
+    // This takes a `target` handle, and te fields go through the accessor.
     // `te` is a fresh temp entity whose raw pointer is returned to the caller as before.
     let te_id = G_TempEntity(ctx, org, EV_SCREENSHAKE as c_int);
     let te = ctx.entity_mut(te_id) as *mut gentity_t;
@@ -1462,7 +1461,7 @@ pub fn G_ScreenShake(
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1322-1338`
 pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
-    // Safe-state 2c: te + target fields via the accessor.
+    // te and target fields go through the accessor.
     let te_id = G_TempEntity(ctx, vec3_origin, EV_MUTE_SOUND as c_int);
     {
         let e = ctx.world.entity_mut(te_id);
@@ -1483,8 +1482,8 @@ pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1345-1372`
 pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, soundIndex: c_int) {
-    // Safe-state 2c: `ent` handle, and te fields via the accessor.
-    // FLAG (task #7): ent->client pool client (gClPtrs) dereffed raw.
+    // This takes an `ent` handle, and te fields go through the accessor.
+    // `ent->client` is a pool client (gClPtrs), dereffed raw.
     // Raven reads ent->r.currentOrigin unconditionally, so the later null-check is vacuous, and we treat None as a no-op.
     // No assert on soundIndex. Raven's G_Sound accepts 0 as a benign no-sound event.
     // A porter-invented debug_assert here once killed live bot spawns.
@@ -1549,7 +1548,7 @@ pub fn G_SoundAtLoc(ctx: &mut GameContext, loc: vec3_t, channel: c_int, soundInd
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1392-1399`
 pub fn G_EntitySound(ctx: &mut GameContext, ent: EntityId, channel: c_int, soundIndex: c_int) {
-    // Safe-state 2c: EntityId param, and te + ent fields via the accessor.
+    // This takes an EntityId param, and te and ent fields go through the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
     let te_id = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
     let ent_number = ctx.world.entity(ent).s.number;
@@ -1563,7 +1562,7 @@ pub fn G_EntitySound(ctx: &mut GameContext, ent: EntityId, channel: c_int, sound
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1402-1411`
 pub fn G_SoundOnEnt(ctx: &mut GameContext, ent: EntityId, channel: c_int, soundPath: &str) {
-    // Safe-state 2c: EntityId param, and te + ent fields via the accessor.
+    // This takes an EntityId param, and te and ent fields go through the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
     let te_id = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
     let ent_number = ctx.world.entity(ent).s.number;
@@ -1578,7 +1577,7 @@ pub fn G_SoundOnEnt(ctx: &mut GameContext, ent: EntityId, channel: c_int, soundP
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1453-1471`
 pub fn ValidUseTarget(ent: Option<&gentity_t>) -> qboolean {
-    // Safe-state 2c: nullable ctx-free leaf, reading fields off the borrow directly.
+    // This is a nullable ctx-free leaf, reading fields off the borrow directly.
     let Some(ent) = ent else {
         return qfalse;
     };
@@ -1601,8 +1600,8 @@ pub fn ValidUseTarget(ent: Option<&gentity_t>) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1474-1505`
 pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, target: EntityId) {
-    // Safe-state 2c: EntityId params, and entity fields via the accessor.
-    // FLAG (task #7): the `ent`/`target` clients are dereffed raw (pool-client-safe).
+    // This takes EntityId params, and entity fields go through the accessor.
+    // The `ent`/`target` clients are dereffed raw (pool-client-safe).
     // HI_HEALTHDISP (8) and HI_AMMODISP (9) come from the canonical prelude glob (mp_bg::public::holdable), so the value
     // matches the STAT_HOLDABLE_ITEMS bit and the dispType TryUse passes in.
     // STAT_HEALTH (0) and STAT_MAX_HEALTH (8) are the canonical statIndex_t slots (mp_bg::public::stat_index), cast to usize for indexing.
@@ -1653,8 +1652,8 @@ pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, t
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1508-1544`
 pub fn G_CanUseDispOn(ctx: &mut GameContext, ent: Option<EntityId>, dispType: c_int) -> c_int {
-    // Safe-state 2c: Option handle, and entity fields via the accessor.
-    // FLAG (task #7): the `ent` client is dereffed raw (pool-client-safe).
+    // This takes an Option handle, and entity fields go through the accessor.
+    // The `ent` client is dereffed raw (pool-client-safe).
     // HI_HEALTHDISP (8) and HI_AMMODISP (9) come from the canonical prelude glob (mp_bg::public::holdable), so the
     // compared dispType matches TryUse's caller.
     // STAT_HEALTH (0) and STAT_MAX_HEALTH (8) are canonical statIndex_t slots (mp_bg::public::stat_index),
@@ -1724,8 +1723,8 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
     const BOTH_BUTTON_HOLD: c_int = animNumber_t::BOTH_BUTTON_HOLD as c_int;
     const BOTH_CONSOLE1: c_int = animNumber_t::BOTH_CONSOLE1 as c_int;
 
-    // Safe-state 2c: Option handles, and entity fields via the accessor.
-    // FLAG (task #7): ent->client pool client (gClPtrs) dereffed raw, as Raven does.
+    // This takes Option handles, and entity fields go through the accessor.
+    // `ent->client` is a pool client (gClPtrs), dereffed raw, as Raven does.
     let Some(ent_id) = ent else {
         return qfalse;
     };
@@ -1842,7 +1841,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
     const CLASS_VEHICLE: c_int = class_t::CLASS_VEHICLE as c_int;
     const USE_DISTANCE: f32 = 64.0;
 
-    // STAGE-1: Option param (body null-checks ent), raw body re-derived verbatim (Stage-2 debt).
+    // This takes an Option param (the body null-checks ent). The raw body is re-derived verbatim, deferred to the post-port refactor.
     let ent: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
@@ -2076,8 +2075,8 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
 }
 
 fn goto_tryJetPack(ctx: &mut GameContext, ent: EntityId) {
-    // Safe-state 2c: EntityId param, and ent fields via the accessor.
-    // FLAG (task #7): ent->client pool client dereffed raw.
+    // This takes an EntityId param, and ent fields go through the accessor.
+    // `ent->client` is a pool client, dereffed raw.
     // HI_JETPACK (7), HI_AMMODISP (9), and ENTITYNUM_NONE (1023) resolve to the port's canonical constants via the prelude glob
     // (mp_bg::public::holdable, mp_qshared::shared::limits), so the STAT_HOLDABLE_ITEMS bit tests and the
     // ItemUse_UseDisp / EV_USE_ITEM0 dispType all use the real values.
@@ -2187,7 +2186,7 @@ pub fn G_BoxInBounds(
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1927-1932`
 pub fn G_SetAngles(ent: &mut gentity_t, angles: vec3_t) {
-    // Safe-state 2c: ctx-free leaf mutator on the caller's `&mut gentity_t`.
+    // This is a ctx-free leaf mutator on the caller's `&mut gentity_t`.
     ent.r.currentAngles = angles;
     ent.s.angles = angles;
     ent.s.apos.trBase = angles;
@@ -2232,7 +2231,7 @@ pub fn G_ClearTrace(
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1955-1963`
 pub fn G_SetOrigin(ent: &mut gentity_t, origin: vec3_t) {
-    // Safe-state 2c: ctx-free leaf mutator on the caller's `&mut gentity_t`.
+    // This is a ctx-free leaf mutator on the caller's `&mut gentity_t`.
     ent.s.pos.trBase = origin;
     ent.s.pos.trType = trType_t::TR_STATIONARY;
     ent.s.pos.trTime = 0;
@@ -2246,7 +2245,7 @@ pub fn G_SetOrigin(ent: &mut gentity_t, origin: vec3_t) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1965-2001`
 pub fn G_CheckInSolid(ctx: &mut GameContext, self_: EntityId, fix: qboolean) -> qboolean {
-    // Safe-state 2c: EntityId param, and entity fields via the accessor.
+    // This takes an EntityId param, and entity fields go through the accessor.
     // The trace reads are read-only inputs, copied into locals.
     let (currentOrigin, r_mins, r_maxs, number, clipmask) = {
         let e = ctx.world.entity(self_);
@@ -2349,7 +2348,7 @@ pub fn G_ROFF_NotetrackCallback(
     cent: Option<EntityId>,
     notetrack: *const c_char,
 ) {
-    // Safe-state 2c: Option handle, and cent fields via the accessor.
+    // This takes an Option handle, and cent fields go through the accessor.
     // `notetrack` is a raw c-string (seam), parsed under a tight unsafe block.
     let Some(cent_id) = cent else {
         return;

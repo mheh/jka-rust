@@ -13,7 +13,7 @@
 //! Behavior stays byte-identical to the pre-migration port.
 //! The change is a mechanical reshape.
 //!
-//! The genuinely entangled bodies stay Stage-1: raw `*mut gentity_t` re-derived at the top of the
+//! The genuinely entangled bodies keep raw `*mut gentity_t` re-derived at the top of the
 //! body, with the logic verified verbatim against the referee.
 //! This covers the push machinery in `G_MoverPush`, `G_TryPushingEntity`, and `G_MoverTeam` (two
 //! simultaneous mutable entities, gclient walks, and the `pushed[]` save-stack).
@@ -24,7 +24,7 @@
 //! `Touch_Button`, `Blocked_Door`, `Use_BinaryMover*`, and `Reached_BinaryMover`.
 //! It also covers the `G_TempEntity` scratch writers: `G_Chunks`, `G_MiscModelExplosion`, `Glass*`,
 //! and `funcBBrush*`.
-//! These stay as Stage-2 debt.
+//! These stay deferred to the post-port refactor.
 //! Unconverted callers bridge their raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -420,7 +420,7 @@ pub fn G_MoverPush(
     amove: vec3_t,
     obstacle: *mut *mut gentity_t,
 ) -> qboolean {
-    // `obstacle` is a raw out-param double-pointer (Stage-2 debt).
+    // `obstacle` is a raw out-param double-pointer, deferred to the post-port refactor.
     let pusher: *mut gentity_t = ctx.entity_mut(pusher);
     unsafe {
         *obstacle = core::ptr::null_mut();
@@ -1097,7 +1097,7 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
 /// The fields are still mutated, so the cast to `*mut` here only recovers writability.
 /// This does not change behavior.
 ///
-/// This is a ctx-free leaf helper (Stage-1) that borrows `&mut gentity_t`.
+/// This is a ctx-free leaf helper that borrows `&mut gentity_t`.
 /// The whole-team walk stays a confined raw-pointer chase.
 /// It reconstructs the arena base from each node, so there is no ctx or world to reach through.
 /// Source: `oracle/codemp/game/g_mover.c:830-845`
@@ -1120,7 +1120,7 @@ pub fn UnLockDoors(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Go through and lock the door and all the slaves.
 ///
-/// This is a ctx-free leaf helper (Stage-1) that borrows `&mut gentity_t`.
+/// This is a ctx-free leaf helper that borrows `&mut gentity_t`.
 /// The whole-team walk stays a confined raw-pointer chase.
 /// Source: `oracle/codemp/game/g_mover.c:846-857`
 pub fn LockDoors(ent: &mut gentity_t) {

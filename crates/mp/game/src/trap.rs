@@ -240,7 +240,7 @@ pub fn AAS_EntityInfo(
     args: <BotlibAasEntityInfo as OutboundSysCall>::Args,
 ) -> <BotlibAasEntityInfo as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAasEntityInfo>>::execute(engine, args)
 }
 
@@ -251,7 +251,7 @@ pub fn AdjustAreaPortalState(
     args: <GAdjustAreaPortalState as OutboundSysCall>::Args,
 ) -> <GAdjustAreaPortalState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GAdjustAreaPortalState>>::execute(engine, args)
 }
 
@@ -283,7 +283,7 @@ pub fn BotAllocGoalState(
     args: <BotlibAiAllocGoalState as OutboundSysCall>::Args,
 ) -> <BotlibAiAllocGoalState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiAllocGoalState>>::execute(engine, args)
 }
 
@@ -294,7 +294,7 @@ pub fn BotAllocMoveState(
     args: <BotlibAiAllocMoveState as OutboundSysCall>::Args,
 ) -> <BotlibAiAllocMoveState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiAllocMoveState>>::execute(engine, args)
 }
 
@@ -305,7 +305,7 @@ pub fn BotAllocWeaponState(
     args: <BotlibAiAllocWeaponState as OutboundSysCall>::Args,
 ) -> <BotlibAiAllocWeaponState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiAllocWeaponState>>::execute(engine, args)
 }
 
@@ -316,7 +316,7 @@ pub fn BotAllocateClient(
     args: <GBotAllocateClient as OutboundSysCall>::Args,
 ) -> <GBotAllocateClient as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GBotAllocateClient>>::execute(engine, args)
 }
 
@@ -327,7 +327,7 @@ pub fn BotFreeGoalState(
     args: <BotlibAiFreeGoalState as OutboundSysCall>::Args,
 ) -> <BotlibAiFreeGoalState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiFreeGoalState>>::execute(engine, args)
 }
 
@@ -338,7 +338,7 @@ pub fn BotFreeMoveState(
     args: <BotlibAiFreeMoveState as OutboundSysCall>::Args,
 ) -> <BotlibAiFreeMoveState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiFreeMoveState>>::execute(engine, args)
 }
 
@@ -349,7 +349,7 @@ pub fn BotFreeWeaponState(
     args: <BotlibAiFreeWeaponState as OutboundSysCall>::Args,
 ) -> <BotlibAiFreeWeaponState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiFreeWeaponState>>::execute(engine, args)
 }
 
@@ -371,7 +371,7 @@ pub fn BotGetSnapshotEntity(
     args: <BotlibGetSnapshotEntity as OutboundSysCall>::Args,
 ) -> <BotlibGetSnapshotEntity as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibGetSnapshotEntity>>::execute(engine, args)
 }
 
@@ -382,7 +382,7 @@ pub fn BotLibSetup(
     args: <BotlibSetup as OutboundSysCall>::Args,
 ) -> <BotlibSetup as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibSetup>>::execute(engine, args)
 }
 
@@ -393,7 +393,7 @@ pub fn BotLibShutdown(
     args: <BotlibShutdown as OutboundSysCall>::Args,
 ) -> <BotlibShutdown as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibShutdown>>::execute(engine, args)
 }
 
@@ -404,7 +404,7 @@ pub fn BotResetAvoidGoals(
     args: <BotlibAiResetAvoidGoals as OutboundSysCall>::Args,
 ) -> <BotlibAiResetAvoidGoals as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiResetAvoidGoals>>::execute(engine, args)
 }
 
@@ -415,7 +415,7 @@ pub fn BotResetAvoidReach(
     args: <BotlibAiResetAvoidReach as OutboundSysCall>::Args,
 ) -> <BotlibAiResetAvoidReach as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiResetAvoidReach>>::execute(engine, args)
 }
 
@@ -426,7 +426,7 @@ pub fn BotResetGoalState(
     args: <BotlibAiResetGoalState as OutboundSysCall>::Args,
 ) -> <BotlibAiResetGoalState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiResetGoalState>>::execute(engine, args)
 }
 
@@ -437,7 +437,7 @@ pub fn BotResetMoveState(
     args: <BotlibAiResetMoveState as OutboundSysCall>::Args,
 ) -> <BotlibAiResetMoveState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiResetMoveState>>::execute(engine, args)
 }
 
@@ -448,7 +448,7 @@ pub fn BotResetWeaponState(
     args: <BotlibAiResetWeaponState as OutboundSysCall>::Args,
 ) -> <BotlibAiResetWeaponState as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiResetWeaponState>>::execute(engine, args)
 }
 
@@ -459,7 +459,7 @@ pub fn BotUpdateEntityItems(
     args: <BotlibAiUpdateEntityItems as OutboundSysCall>::Args,
 ) -> <BotlibAiUpdateEntityItems as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibAiUpdateEntityItems>>::execute(engine, args)
 }
 
@@ -470,7 +470,7 @@ pub fn BotUserCommand(
     args: <BotlibUserCommand as OutboundSysCall>::Args,
 ) -> <BotlibUserCommand as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibUserCommand>>::execute(engine, args)
 }
 
@@ -481,7 +481,7 @@ pub fn Bot_CalculatePaths(
     args: <GBotCalculatepaths as OutboundSysCall>::Args,
 ) -> <GBotCalculatepaths as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GBotCalculatepaths>>::execute(engine, args)
 }
 
@@ -492,7 +492,7 @@ pub fn Bot_UpdateWaypoints(
     args: <GBotUpdatewaypoints as OutboundSysCall>::Args,
 ) -> <GBotUpdatewaypoints as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GBotUpdatewaypoints>>::execute(engine, args)
 }
 
@@ -564,7 +564,7 @@ pub fn DebugPolygonCreate(
     args: <GDebugPolygonCreate as OutboundSysCall>::Args,
 ) -> <GDebugPolygonCreate as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GDebugPolygonCreate>>::execute(engine, args)
 }
 
@@ -581,7 +581,7 @@ pub fn EA_Alt_Attack(
     args: <BotlibEaAltAttack as OutboundSysCall>::Args,
 ) -> <BotlibEaAltAttack as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaAltAttack>>::execute(engine, args)
 }
 
@@ -592,7 +592,7 @@ pub fn EA_Attack(
     args: <BotlibEaAttack as OutboundSysCall>::Args,
 ) -> <BotlibEaAttack as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaAttack>>::execute(engine, args)
 }
 
@@ -603,7 +603,7 @@ pub fn EA_Crouch(
     args: <BotlibEaCrouch as OutboundSysCall>::Args,
 ) -> <BotlibEaCrouch as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaCrouch>>::execute(engine, args)
 }
 
@@ -614,7 +614,7 @@ pub fn EA_ForcePower(
     args: <BotlibEaForcepower as OutboundSysCall>::Args,
 ) -> <BotlibEaForcepower as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaForcepower>>::execute(engine, args)
 }
 
@@ -625,7 +625,7 @@ pub fn EA_GetInput(
     args: <BotlibEaGetInput as OutboundSysCall>::Args,
 ) -> <BotlibEaGetInput as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaGetInput>>::execute(engine, args)
 }
 
@@ -636,7 +636,7 @@ pub fn EA_Jump(
     args: <BotlibEaJump as OutboundSysCall>::Args,
 ) -> <BotlibEaJump as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaJump>>::execute(engine, args)
 }
 
@@ -647,7 +647,7 @@ pub fn EA_Move(
     args: <BotlibEaMove as OutboundSysCall>::Args,
 ) -> <BotlibEaMove as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaMove>>::execute(engine, args)
 }
 
@@ -658,7 +658,7 @@ pub fn EA_MoveBack(
     args: <BotlibEaMoveBack as OutboundSysCall>::Args,
 ) -> <BotlibEaMoveBack as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaMoveBack>>::execute(engine, args)
 }
 
@@ -669,7 +669,7 @@ pub fn EA_MoveForward(
     args: <BotlibEaMoveForward as OutboundSysCall>::Args,
 ) -> <BotlibEaMoveForward as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaMoveForward>>::execute(engine, args)
 }
 
@@ -680,7 +680,7 @@ pub fn EA_MoveLeft(
     args: <BotlibEaMoveLeft as OutboundSysCall>::Args,
 ) -> <BotlibEaMoveLeft as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaMoveLeft>>::execute(engine, args)
 }
 
@@ -691,7 +691,7 @@ pub fn EA_MoveRight(
     args: <BotlibEaMoveRight as OutboundSysCall>::Args,
 ) -> <BotlibEaMoveRight as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaMoveRight>>::execute(engine, args)
 }
 
@@ -702,7 +702,7 @@ pub fn EA_ResetInput(
     args: <BotlibEaResetInput as OutboundSysCall>::Args,
 ) -> <BotlibEaResetInput as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaResetInput>>::execute(engine, args)
 }
 
@@ -728,7 +728,7 @@ pub fn EA_SelectWeapon(
     args: <BotlibEaSelectWeapon as OutboundSysCall>::Args,
 ) -> <BotlibEaSelectWeapon as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaSelectWeapon>>::execute(engine, args)
 }
 
@@ -739,7 +739,7 @@ pub fn EA_Use(
     args: <BotlibEaUse as OutboundSysCall>::Args,
 ) -> <BotlibEaUse as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaUse>>::execute(engine, args)
 }
 
@@ -750,7 +750,7 @@ pub fn EA_View(
     args: <BotlibEaView as OutboundSysCall>::Args,
 ) -> <BotlibEaView as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<BotlibEaView>>::execute(engine, args)
 }
 
@@ -761,7 +761,7 @@ pub fn EntitiesInBox(
     args: <GEntitiesInBox as OutboundSysCall>::Args,
 ) -> <GEntitiesInBox as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GEntitiesInBox>>::execute(engine, args)
 }
 
@@ -772,7 +772,7 @@ pub fn EntityContact(
     args: <GEntityContact as OutboundSysCall>::Args,
 ) -> <GEntityContact as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GEntityContact>>::execute(engine, args)
 }
 
@@ -852,7 +852,7 @@ pub fn G2API_AnimateG2Models(
     args: <GG2Animateg2Models as OutboundSysCall>::Args,
 ) -> <GG2Animateg2Models as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Animateg2Models>>::execute(engine, args)
 }
 
@@ -863,7 +863,7 @@ pub fn G2API_AttachInstanceToEntNum(
     args: <GG2Attachinstancetoentnum as OutboundSysCall>::Args,
 ) -> <GG2Attachinstancetoentnum as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Attachinstancetoentnum>>::execute(engine, args)
 }
 
@@ -874,7 +874,7 @@ pub fn G2API_CleanEntAttachments(
     args: <GG2Cleanentattachments as OutboundSysCall>::Args,
 ) -> <GG2Cleanentattachments as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Cleanentattachments>>::execute(engine, args)
 }
 
@@ -885,7 +885,7 @@ pub fn G2API_CleanGhoul2Models(
     args: <GG2Cleanmodels as OutboundSysCall>::Args,
 ) -> <GG2Cleanmodels as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Cleanmodels>>::execute(engine, args)
 }
 
@@ -896,7 +896,7 @@ pub fn G2API_CollisionDetect(
     args: <GG2Collisiondetect as OutboundSysCall>::Args,
 ) -> <GG2Collisiondetect as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Collisiondetect>>::execute(engine, args)
 }
 
@@ -907,7 +907,7 @@ pub fn G2API_CollisionDetectCache(
     args: <GG2Collisiondetectcache as OutboundSysCall>::Args,
 ) -> <GG2Collisiondetectcache as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Collisiondetectcache>>::execute(engine, args)
 }
 
@@ -918,7 +918,7 @@ pub fn G2API_CopySpecificGhoul2Model(
     args: <GG2Copyspecificghoul2Model as OutboundSysCall>::Args,
 ) -> <GG2Copyspecificghoul2Model as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Copyspecificghoul2Model>>::execute(engine, args)
 }
 
@@ -929,7 +929,7 @@ pub fn G2API_DuplicateGhoul2Instance(
     args: <GG2Duplicateghoul2Instance as OutboundSysCall>::Args,
 ) -> <GG2Duplicateghoul2Instance as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Duplicateghoul2Instance>>::execute(engine, args)
 }
 
@@ -940,7 +940,7 @@ pub fn G2API_GetBoltMatrix(
     args: <GG2Getbolt as OutboundSysCall>::Args,
 ) -> <GG2Getbolt as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Getbolt>>::execute(engine, args)
 }
 
@@ -951,7 +951,7 @@ pub fn G2API_GetBoltMatrix_NoRecNoRot(
     args: <GG2GetboltNorecNorot as OutboundSysCall>::Args,
 ) -> <GG2GetboltNorecNorot as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2GetboltNorecNorot>>::execute(engine, args)
 }
 
@@ -962,7 +962,7 @@ pub fn G2API_GetBoltMatrix_NoReconstruct(
     args: <GG2GetboltNorec as OutboundSysCall>::Args,
 ) -> <GG2GetboltNorec as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2GetboltNorec>>::execute(engine, args)
 }
 
@@ -1058,7 +1058,7 @@ pub fn G2API_IKMove(
     args: <GG2Ikmove as OutboundSysCall>::Args,
 ) -> <GG2Ikmove as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Ikmove>>::execute(engine, args)
 }
 
@@ -1096,7 +1096,7 @@ pub fn G2API_OverrideServer(
     args: <GG2Overrideserver as OutboundSysCall>::Args,
 ) -> <GG2Overrideserver as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Overrideserver>>::execute(engine, args)
 }
 
@@ -1107,7 +1107,7 @@ pub fn G2API_RemoveGhoul2Model(
     args: <GG2Removeghoul2Model as OutboundSysCall>::Args,
 ) -> <GG2Removeghoul2Model as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Removeghoul2Model>>::execute(engine, args)
 }
 
@@ -1118,7 +1118,7 @@ pub fn G2API_RemoveGhoul2Models(
     args: <GG2Removeghoul2Models as OutboundSysCall>::Args,
 ) -> <GG2Removeghoul2Models as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Removeghoul2Models>>::execute(engine, args)
 }
 
@@ -1129,7 +1129,7 @@ pub fn G2API_SetBoltInfo(
     args: <GG2Setboltinfo as OutboundSysCall>::Args,
 ) -> <GG2Setboltinfo as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Setboltinfo>>::execute(engine, args)
 }
 
@@ -1227,7 +1227,7 @@ pub fn G2API_SetRagDoll(
     args: <GG2Setragdoll as OutboundSysCall>::Args,
 ) -> <GG2Setragdoll as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Setragdoll>>::execute(engine, args)
 }
 
@@ -1238,7 +1238,7 @@ pub fn G2API_SetSkin(
     args: <GG2Setskin as OutboundSysCall>::Args,
 ) -> <GG2Setskin as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Setskin>>::execute(engine, args)
 }
 
@@ -1264,7 +1264,7 @@ pub fn G2Trace(
     args: <GG2Trace as OutboundSysCall>::Args,
 ) -> <GG2Trace as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Trace>>::execute(engine, args)
 }
 
@@ -1275,7 +1275,7 @@ pub fn G2_HaveWeGhoul2Models(
     args: <GG2Haveweghoulmodels as OutboundSysCall>::Args,
 ) -> <GG2Haveweghoulmodels as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GG2Haveweghoulmodels>>::execute(engine, args)
 }
 
@@ -1321,7 +1321,7 @@ pub fn GetUsercmd(
     args: <GGetUsercmd as OutboundSysCall>::Args,
 ) -> <GGetUsercmd as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GGetUsercmd>>::execute(engine, args)
 }
 
@@ -1343,7 +1343,7 @@ pub fn ICARUS_FreeEnt(
     args: <GIcarusFreeent as OutboundSysCall>::Args,
 ) -> <GIcarusFreeent as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusFreeent>>::execute(engine, args)
 }
 
@@ -1386,7 +1386,7 @@ pub fn ICARUS_Init(
     args: <GIcarusInit as OutboundSysCall>::Args,
 ) -> <GIcarusInit as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusInit>>::execute(engine, args)
 }
 
@@ -1397,7 +1397,7 @@ pub fn ICARUS_InitEnt(
     args: <GIcarusInitent as OutboundSysCall>::Args,
 ) -> <GIcarusInitent as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusInitent>>::execute(engine, args)
 }
 
@@ -1408,7 +1408,7 @@ pub fn ICARUS_IsInitialized(
     args: <GIcarusIsinitialized as OutboundSysCall>::Args,
 ) -> <GIcarusIsinitialized as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusIsinitialized>>::execute(engine, args)
 }
 
@@ -1419,7 +1419,7 @@ pub fn ICARUS_IsRunning(
     args: <GIcarusIsrunning as OutboundSysCall>::Args,
 ) -> <GIcarusIsrunning as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusIsrunning>>::execute(engine, args)
 }
 
@@ -1430,7 +1430,7 @@ pub fn ICARUS_MaintainTaskManager(
     args: <GIcarusMaintaintaskmanager as OutboundSysCall>::Args,
 ) -> <GIcarusMaintaintaskmanager as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusMaintaintaskmanager>>::execute(engine, args)
 }
 
@@ -1462,7 +1462,7 @@ pub fn ICARUS_Shutdown(
     args: <GIcarusShutdown as OutboundSysCall>::Args,
 ) -> <GIcarusShutdown as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusShutdown>>::execute(engine, args)
 }
 
@@ -1473,7 +1473,7 @@ pub fn ICARUS_TaskIDComplete(
     args: <GIcarusTaskidcomplete as OutboundSysCall>::Args,
 ) -> <GIcarusTaskidcomplete as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusTaskidcomplete>>::execute(engine, args)
 }
 
@@ -1484,7 +1484,7 @@ pub fn ICARUS_TaskIDPending(
     args: <GIcarusTaskidpending as OutboundSysCall>::Args,
 ) -> <GIcarusTaskidpending as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusTaskidpending>>::execute(engine, args)
 }
 
@@ -1495,7 +1495,7 @@ pub fn ICARUS_TaskIDSet(
     args: <GIcarusTaskidset as OutboundSysCall>::Args,
 ) -> <GIcarusTaskidset as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusTaskidset>>::execute(engine, args)
 }
 
@@ -1506,7 +1506,7 @@ pub fn ICARUS_ValidEnt(
     args: <GIcarusValident as OutboundSysCall>::Args,
 ) -> <GIcarusValident as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GIcarusValident>>::execute(engine, args)
 }
 
@@ -1527,7 +1527,7 @@ pub fn InPVS(
     args: <GInPvs as OutboundSysCall>::Args,
 ) -> <GInPvs as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GInPvs>>::execute(engine, args)
 }
 
@@ -1538,7 +1538,7 @@ pub fn LinkEntity(
     args: <GLinkentity as OutboundSysCall>::Args,
 ) -> <GLinkentity as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GLinkentity>>::execute(engine, args)
 }
 
@@ -1549,7 +1549,7 @@ pub fn LocateGameData(
     args: <GLocateGameData as OutboundSysCall>::Args,
 ) -> <GLocateGameData as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GLocateGameData>>::execute(engine, args)
 }
 
@@ -1560,7 +1560,7 @@ pub fn Nav_AddFailedEdge(
     args: <GNavAddfailededge as OutboundSysCall>::Args,
 ) -> <GNavAddfailededge as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavAddfailededge>>::execute(engine, args)
 }
 
@@ -1571,7 +1571,7 @@ pub fn Nav_AddFailedNode(
     args: <GNavAddfailednode as OutboundSysCall>::Args,
 ) -> <GNavAddfailednode as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavAddfailednode>>::execute(engine, args)
 }
 
@@ -1582,7 +1582,7 @@ pub fn Nav_AddRawPoint(
     args: <GNavAddrawpoint as OutboundSysCall>::Args,
 ) -> <GNavAddrawpoint as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavAddrawpoint>>::execute(engine, args)
 }
 
@@ -1593,7 +1593,7 @@ pub fn Nav_CalculatePaths(
     args: <GNavCalculatepaths as OutboundSysCall>::Args,
 ) -> <GNavCalculatepaths as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavCalculatepaths>>::execute(engine, args)
 }
 
@@ -1604,7 +1604,7 @@ pub fn Nav_CheckAllFailedEdges(
     args: <GNavCheckallfailededges as OutboundSysCall>::Args,
 ) -> <GNavCheckallfailededges as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavCheckallfailededges>>::execute(engine, args)
 }
 
@@ -1615,7 +1615,7 @@ pub fn Nav_CheckBlockedEdges(
     args: <GNavCheckblockededges as OutboundSysCall>::Args,
 ) -> <GNavCheckblockededges as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavCheckblockededges>>::execute(engine, args)
 }
 
@@ -1626,7 +1626,7 @@ pub fn Nav_CheckFailedNodes(
     args: <GNavCheckfailednodes as OutboundSysCall>::Args,
 ) -> <GNavCheckfailednodes as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavCheckfailednodes>>::execute(engine, args)
 }
 
@@ -1637,7 +1637,7 @@ pub fn Nav_ClearAllFailedEdges(
     args: <GNavClearallfailededges as OutboundSysCall>::Args,
 ) -> <GNavClearallfailededges as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavClearallfailededges>>::execute(engine, args)
 }
 
@@ -1648,7 +1648,7 @@ pub fn Nav_ClearCheckedNodes(
     args: <GNavClearcheckednodes as OutboundSysCall>::Args,
 ) -> <GNavClearcheckednodes as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavClearcheckednodes>>::execute(engine, args)
 }
 
@@ -1659,7 +1659,7 @@ pub fn Nav_Free(
     args: <GNavFree as OutboundSysCall>::Args,
 ) -> <GNavFree as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavFree>>::execute(engine, args)
 }
 
@@ -1670,7 +1670,7 @@ pub fn Nav_GetBestNode(
     args: <GNavGetbestnode as OutboundSysCall>::Args,
 ) -> <GNavGetbestnode as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetbestnode>>::execute(engine, args)
 }
 
@@ -1681,7 +1681,7 @@ pub fn Nav_GetBestNodeAltRoute2(
     args: <GNavGetbestnodealt2 as OutboundSysCall>::Args,
 ) -> <GNavGetbestnodealt2 as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetbestnodealt2>>::execute(engine, args)
 }
 
@@ -1692,7 +1692,7 @@ pub fn Nav_GetBestPathBetweenEnts(
     args: <GNavGetbestpathbetweenents as OutboundSysCall>::Args,
 ) -> <GNavGetbestpathbetweenents as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetbestpathbetweenents>>::execute(engine, args)
 }
 
@@ -1703,7 +1703,7 @@ pub fn Nav_GetNearestNode(
     args: <GNavGetnearestnode as OutboundSysCall>::Args,
 ) -> <GNavGetnearestnode as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetnearestnode>>::execute(engine, args)
 }
 
@@ -1714,7 +1714,7 @@ pub fn Nav_GetNodeEdge(
     args: <GNavGetnodeedge as OutboundSysCall>::Args,
 ) -> <GNavGetnodeedge as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetnodeedge>>::execute(engine, args)
 }
 
@@ -1725,7 +1725,7 @@ pub fn Nav_GetNodeNumEdges(
     args: <GNavGetnodenumedges as OutboundSysCall>::Args,
 ) -> <GNavGetnodenumedges as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetnodenumedges>>::execute(engine, args)
 }
 
@@ -1736,7 +1736,7 @@ pub fn Nav_GetNodePosition(
     args: <GNavGetnodeposition as OutboundSysCall>::Args,
 ) -> <GNavGetnodeposition as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetnodeposition>>::execute(engine, args)
 }
 
@@ -1747,7 +1747,7 @@ pub fn Nav_GetNumNodes(
     args: <GNavGetnumnodes as OutboundSysCall>::Args,
 ) -> <GNavGetnumnodes as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetnumnodes>>::execute(engine, args)
 }
 
@@ -1758,7 +1758,7 @@ pub fn Nav_GetPathCost(
     args: <GNavGetpathcost as OutboundSysCall>::Args,
 ) -> <GNavGetpathcost as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavGetpathcost>>::execute(engine, args)
 }
 
@@ -1769,7 +1769,7 @@ pub fn Nav_HardConnect(
     args: <GNavHardconnect as OutboundSysCall>::Args,
 ) -> <GNavHardconnect as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavHardconnect>>::execute(engine, args)
 }
 
@@ -1786,7 +1786,7 @@ pub fn Nav_NodesAreNeighbors(
     args: <GNavNodesareneighbors as OutboundSysCall>::Args,
 ) -> <GNavNodesareneighbors as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavNodesareneighbors>>::execute(engine, args)
 }
 
@@ -1803,7 +1803,7 @@ pub fn Nav_SetPathsCalculated(
     args: <GNavSetpathscalculated as OutboundSysCall>::Args,
 ) -> <GNavSetpathscalculated as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavSetpathscalculated>>::execute(engine, args)
 }
 
@@ -1814,7 +1814,7 @@ pub fn Nav_ShowEdges(
     args: <GNavShowedges as OutboundSysCall>::Args,
 ) -> <GNavShowedges as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavShowedges>>::execute(engine, args)
 }
 
@@ -1825,7 +1825,7 @@ pub fn Nav_ShowNodes(
     args: <GNavShownodes as OutboundSysCall>::Args,
 ) -> <GNavShownodes as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavShownodes>>::execute(engine, args)
 }
 
@@ -1836,7 +1836,7 @@ pub fn Nav_ShowPath(
     args: <GNavShowpath as OutboundSysCall>::Args,
 ) -> <GNavShowpath as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GNavShowpath>>::execute(engine, args)
 }
 
@@ -1847,7 +1847,7 @@ pub fn PointContents(
     args: <GPointContents as OutboundSysCall>::Args,
 ) -> <GPointContents as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GPointContents>>::execute(engine, args)
 }
 
@@ -1864,7 +1864,7 @@ pub fn RMG_Init(
     args: <GRmgInit as OutboundSysCall>::Args,
 ) -> <GRmgInit as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GRmgInit>>::execute(engine, args)
 }
 
@@ -1881,7 +1881,7 @@ pub fn ROFF_Clean(
     args: <GRoffClean as OutboundSysCall>::Args,
 ) -> <GRoffClean as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GRoffClean>>::execute(engine, args)
 }
 
@@ -1892,7 +1892,7 @@ pub fn ROFF_Play(
     args: <GRoffPlay as OutboundSysCall>::Args,
 ) -> <GRoffPlay as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GRoffPlay>>::execute(engine, args)
 }
 
@@ -1903,7 +1903,7 @@ pub fn ROFF_UpdateEntities(
     args: <GRoffUpdateEntities as OutboundSysCall>::Args,
 ) -> <GRoffUpdateEntities as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GRoffUpdateEntities>>::execute(engine, args)
 }
 
@@ -1920,7 +1920,7 @@ pub fn SV_RegisterSharedMemory(
     args: <GSetSharedBuffer as OutboundSysCall>::Args,
 ) -> <GSetSharedBuffer as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSetSharedBuffer>>::execute(engine, args)
 }
 
@@ -1954,7 +1954,7 @@ pub fn SetActiveSubBSP(
     args: <GSetActiveSubbsp as OutboundSysCall>::Args,
 ) -> <GSetActiveSubbsp as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSetActiveSubbsp>>::execute(engine, args)
 }
 
@@ -1983,7 +1983,7 @@ pub fn SetServerCull(
     args: <GSetServerCull as OutboundSysCall>::Args,
 ) -> <GSetServerCull as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSetServerCull>>::execute(engine, args)
 }
 
@@ -2000,7 +2000,7 @@ pub fn SiegePersGet(
     args: <GSiegepersget as OutboundSysCall>::Args,
 ) -> <GSiegepersget as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSiegepersget>>::execute(engine, args)
 }
 
@@ -2011,7 +2011,7 @@ pub fn SiegePersSet(
     args: <GSiegepersset as OutboundSysCall>::Args,
 ) -> <GSiegepersset as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSiegepersset>>::execute(engine, args)
 }
 
@@ -2022,7 +2022,7 @@ pub fn SnapVector(
     args: <GSnapvector as OutboundSysCall>::Args,
 ) -> <GSnapvector as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GSnapvector>>::execute(engine, args)
 }
 
@@ -2033,7 +2033,7 @@ pub fn Trace(
     args: <GTrace as OutboundSysCall>::Args,
 ) -> <GTrace as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GTrace>>::execute(engine, args)
 }
 
@@ -2044,7 +2044,7 @@ pub fn TrueFree(
     args: <GTruefree as OutboundSysCall>::Args,
 ) -> <GTruefree as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GTruefree>>::execute(engine, args)
 }
 
@@ -2055,7 +2055,7 @@ pub fn TrueMalloc(
     args: <GTruemalloc as OutboundSysCall>::Args,
 ) -> <GTruemalloc as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GTruemalloc>>::execute(engine, args)
 }
 
@@ -2066,7 +2066,7 @@ pub fn UnlinkEntity(
     args: <GUnlinkentity as OutboundSysCall>::Args,
 ) -> <GUnlinkentity as OutboundSysCall>::Output {
     // This is the UFCS spelling of the frozen `engine.execute(args)` call.
-    // The bare method call cannot infer `C` from `Args` alone (SEAM-D13).
+    // The bare method call cannot infer `C` from `Args` alone.
     <Engine as Execute<GUnlinkentity>>::execute(engine, args)
 }
 

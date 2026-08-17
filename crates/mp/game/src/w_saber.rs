@@ -3,10 +3,10 @@
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration Stage 1: entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5) instead of raw
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5) instead of raw
 //! `gentity_t*`. Ctx-free leaf helpers borrow `&gentity_t`/`&mut gentity_t`.
 //!
-//! Safe-state migration Stage 2b (body sweep): every world reach is a checked `ctx.world.…` field access.
+//! Every world reach is a checked `ctx.world.…` field access.
 //! The one exception is an irreducible `&mut vec3_t` out-param site into `G_Damage`, marked in-code.
 //! The per-body entity and client pointers stay raw by design.
 //! This file is gclient-saturated (`(*ent).client as *mut gclient_t` chains), and gclient dissolution is out of scope.
@@ -2772,7 +2772,7 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // STAGE-2b: irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
+            // This is irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
             // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
@@ -2831,7 +2831,7 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // STAGE-2b: irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
+            // This is irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
             // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
@@ -4267,7 +4267,7 @@ pub fn WP_SaberApplyDamage(ctx: &mut GameContext, self_: EntityId) {
 
         let dmg_spot = ctx.world.globals.dmgSpot[iu];
         let total_dmg = ctx.world.globals.totalDmg[iu] as c_int;
-        // STAGE-2b: irreducible. `G_Damage`'s `dir` is a `&mut vec3_t` out-param.
+        // This is irreducible. `G_Damage`'s `dir` is a `&mut vec3_t` out-param.
         // A checked `&mut ctx.world.globals.dmgDir[iu]` would alias `ctx` across the call.
         // This derives it through the raw world instead, so it holds no borrow.
         let dmg_dir = Some(unsafe { &mut (*ctx.world_raw()).globals.dmgDir[iu] });

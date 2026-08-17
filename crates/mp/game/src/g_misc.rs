@@ -237,7 +237,7 @@ pub fn SP_light(ctx: &mut GameContext, self_: EntityId) {
 pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, angles: vec3_t) {
     use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
     use mp_bg::public::team::TEAM_SPECTATOR;
-    // FLAG (task #7): `player->client` is a real or NPC-pool `gclient_t` pointer, and it has no accessor for `ps`.
+    // `player->client` is a real or NPC-pool `gclient_t` pointer, and it has no accessor for `ps`.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let client = ctx.world.entity(player).client;
     unsafe {
@@ -809,7 +809,7 @@ pub fn HolocronTouch(
         Some(o) => o,
         None => return,
     };
-    // FLAG (task #7): `other->client` is a player or NPC-pool `gclient_t` pointer, and `ps` is on it.
+    // `other->client` is a player or NPC-pool `gclient_t` pointer, and `ps` is on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let client = ctx.world.entity(other).client;
     if client.is_null() || ctx.world.entity(other).health < 1 {
@@ -919,7 +919,7 @@ pub fn HolocronTouch(
 ///
 /// Source: `oracle/codemp/game/g_misc.c:907-991`
 pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): the holocron carrier (`enemy`) is a player or NPC-pool client.
+    // The holocron carrier (`enemy`) is a player or NPC-pool client.
     // We deref its `client->ps` raw, exactly as Raven does, as a copied pointer value.
     // The holocron entity itself still rides the normal accessors.
     let justthink = |id: EntityId, ctx: &mut GameContext| {
@@ -1319,7 +1319,7 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
 
     let activator = ctx.world.entity(ent).activator;
-    // FLAG (task #7): `activator->client` is a player or NPC-pool `gclient_t` pointer, and `pers.cmd` is on it.
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and `pers.cmd` is on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let activator_cl = match activator {
         Some(a) => ctx.world.entity(a).client,
@@ -1393,7 +1393,7 @@ pub fn shield_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): `activator`/`other`'s `client` fields are player or NPC-pool `gclient_t` pointers, and `ps`/`siegeClass` are on them.
+    // `activator`/`other`'s `client` fields are player or NPC-pool `gclient_t` pointers, and `ps`/`siegeClass` are on them.
     // We deref them raw, exactly as Raven does, as copied pointer values.
     let act_cl = ctx.world.entity(activator).client;
     if act_cl.is_null() {
@@ -1510,7 +1510,7 @@ pub fn ammo_generic_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.eFlags`/`ps.ammo` are on it.
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.eFlags`/`ps.ammo` are on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
@@ -1969,7 +1969,7 @@ pub fn ammo_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.ammo` is on it.
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.ammo` is on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
@@ -2124,7 +2124,7 @@ pub fn health_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.stats` is on it.
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.stats` is on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
@@ -2646,7 +2646,7 @@ pub fn Use_Target_Escapetrig(
         ctx.world.globals.gEscaping = qfalse;
         while i < mp_qshared::shared::MAX_CLIENTS_I32 {
             let e_id = EntityId(i as u32);
-            // FLAG (task #7): this is the client-slot pool `gclient_t`.
+            // This is the client-slot pool `gclient_t`.
             // We deref it raw, exactly as Raven does, as a copied pointer value, since `i < MAX_CLIENTS` marks a real slot.
             let c = ctx.world.entity(e_id).client;
             let inuse = ctx.world.entity(e_id).inuse;
@@ -3527,7 +3527,7 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
                 &mut ctx.world.entity_mut(self_).pos1,
             );
             ctx.world.entity_mut(self_).pos1 = targ_origin;
-            // FLAG (task #7): `self_->client` is a shooter-pool `gclient_t`, and its `ps.viewangles` is on it.
+            // `self_->client` is a shooter-pool `gclient_t`, and its `ps.viewangles` is on it.
             // We deref it raw, exactly as Raven does, as a copied pointer value.
             let client = ctx.world.entity(self_).client;
             let pos1 = ctx.world.entity(self_).pos1;
@@ -3555,7 +3555,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
 
     let (_, s) = G_SpawnString(ctx, "weapon", "");
 
-    // FLAG (task #7): `self_->client` is a shooter-pool `gclient_t`, and `ps` is on it.
+    // `self_->client` is a shooter-pool `gclient_t`, and `ps` is on it.
     // We deref it raw, exactly as Raven does, as a copied pointer value.
     let client = ctx.world.entity(self_).client;
 

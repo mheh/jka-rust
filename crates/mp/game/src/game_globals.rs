@@ -1,6 +1,6 @@
 //! `GameGlobals` holds the remaining game-tier mutable file-scope globals and file-statics as one owned GameWorld sub-struct.
 //! File-scope mutable globals become GameWorld fields, grouped by owning `.c` file.
-//! Pass-2 porters read and write these fields through `ctx.world`.
+//! Porters read and write these fields through `ctx.world`.
 //! Porters never add a field.
 //! Scalar declarations carry their Rust type.
 //! Non-scalar declarations (pointers, structs, arrays) are `()` placeholders with a `//TODO: Port <type>` marker.
@@ -167,7 +167,6 @@ const MAX_WPARRAY_SIZE: usize = mp_qshared::shared::limits::MAX_WPARRAY_SIZE as 
 const MAX_NODETABLE_SIZE: usize = crate::ai_wpnav::MAX_NODETABLE_SIZE as usize;
 
 // Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` / `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`).
-// This is a pass-2 backfill of the `()` placeholders these fields carried.
 // The porting rules allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
 pub(crate) const MAX_SHADER_REMAPS: usize = 128;
 pub(crate) const MAX_G2_KILL_QUEUE: usize = 256;
@@ -223,7 +222,7 @@ impl Default for BotStates {
 impl BotStates {
     /// Raw `*mut bot_state_t` for slot `i`.
     /// This is the `Box`'s stable heap address, or null when the slot is `None`.
-    /// `ai_main.c`'s body code reads bot state across `ctx`-mutating calls (STAGE-2b irreducible aliasing).
+    /// `ai_main.c`'s body code reads bot state across `ctx`-mutating calls, which is irreducible aliasing.
     /// It takes this raw pointer rather than a checked borrow.
     /// `ptr(i).is_null()` is the faithful equivalent of Raven's `botstates[i] == NULL`.
     #[inline]
@@ -450,7 +449,7 @@ pub struct teamgame_t {
 /// Raven game-tier mutable file-scope globals, grouped into GameWorld fields.
 pub struct GameGlobals {
     // --- `NPC.c` file-scope globals ---
-    // Pass-2 backfill: `gentity_t *NPC;`/`gNPC_t *NPCInfo;`/`gclient_t *client;` are single-pointer file statics, not `**`.
+    // `gentity_t *NPC;`/`gNPC_t *NPCInfo;`/`gclient_t *client;` are single-pointer file statics, not `**`.
     // The placeholder comment mis-described the level of indirection.
     // These are null-init, like the other raw pointer fields above.
     /// `NPC`. Source: `oracle/codemp/game/NPC.c:33`
@@ -465,7 +464,6 @@ pub struct GameGlobals {
     pub _saved_client: *mut gclient_t,
     /// `client`. Source: `oracle/codemp/game/NPC.c:35`
     pub client: *mut gclient_t,
-    /// `enemyVisibility` is a pass-2 backfill of the `()` placeholder.
     /// Porting rules §E13 allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
     /// Source: `oracle/codemp/game/NPC.c:38`
     pub enemyVisibility: crate::npc::visibility_t::visibility_t,
@@ -569,7 +567,7 @@ pub struct GameGlobals {
     /// `botstates` (`bot_state_t *[MAX_CLIENTS]`, owned `Option<Box<_>>` slots).
     /// Source: `oracle/codemp/game/ai_main.c:46`
     pub botstates: BotStates,
-    /// `droppedBlueFlag` (`gentity_t *`, raw pointer, matches the raw-pointer entity signatures used throughout the pass-2 shards).
+    /// `droppedBlueFlag` (`gentity_t *`, raw pointer, matching this file's other raw-pointer entity fields).
     /// Source: `oracle/codemp/game/ai_main.c:94`
     pub droppedBlueFlag: *mut gentity_t,
     /// `droppedRedFlag` (`gentity_t *`).
@@ -715,7 +713,6 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/g_items.c:101`
     pub shieldLoopSound: qhandle_t,
     // --- `g_log.c` file-scope globals ---
-    // Pass-2 backfill of the `()` placeholders.
     // The porting rules allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
     // The shapes are exactly what the `g_log.md` packet's TODO comments spelled out.
     /// `qboolean G_WeaponLogClientTouch[MAX_CLIENTS]`.
@@ -927,7 +924,7 @@ pub struct GameGlobals {
     pub gTrigFallSound: c_int,
     // --- `g_utils.c` file-scope globals ---
     /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`).
-    /// This is restored to Raven's `gclient_t*` element typing (safe-state Stage 4). Reads no longer cast.
+    /// This is restored to Raven's `gclient_t*` element typing. Reads no longer cast.
     /// Source: `oracle/codemp/game/g_utils.c:428`
     pub gClPtrs: GClPtrs,
     /// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (see `GG2KillIndex`).

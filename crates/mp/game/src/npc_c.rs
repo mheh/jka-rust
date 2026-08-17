@@ -3,12 +3,11 @@
 //! The jampgame mega-pass filled this file, so all bodies are live.
 //! Functions that reach file-scope NPC-AI state (the `NPC`, `NPCInfo`, `client`, and `ucmd` file-scope globals,
 //! `level`, `g_entities`, cvars) read it through `ctx.world.globals`.
-//! These functions keep raw-pointer internals as Stage-2 debt, matching the g_utils.c precedent.
+//! These functions keep raw-pointer internals, deferred to the post-port refactor, matching the g_utils.c precedent.
 //!
-//! This file is at safe-state migration Stage 1.
 //! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
 //! Ctx-free leaf helpers take `&mut`/`&gentity_t`.
-//! Bodies re-derive the raw pointers verbatim at the top, marked `// STAGE-1:`, as Stage-2 debt.
+//! Bodies re-derive the raw pointers verbatim at the top, deferred to the post-port refactor.
 //! Callers bridge at the boundary through `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -58,7 +57,7 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
     const ALERT_CLEAR_TIME: c_int = 200;
 
     ctx.world.globals.ucmd = usercmd_t::default();
-    // STAGE-2b: this raw `&ucmd` alias into `ctx.world` is irreducible.
+    // This raw `&ucmd` alias into `ctx.world` is irreducible.
     // It is handed alongside `ctx` to the raw-ABI `ClientThink`.
     let ucmd_ptr = &raw mut ctx.world.globals.ucmd;
     let self_num = ctx.world.entity(self_).s.number;
@@ -1430,7 +1429,7 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:1576-1762`
 pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: `self_` is unused by the body, because it drives off the `NPC` global set by the preceding `SetNPCGlobals`.
+    // `self_` is unused by the body, because it drives off the `NPC` global set by the preceding `SetNPCGlobals`.
     // The signature is `EntityId`, with no re-derive.
     let _ = self_;
     use mp_bg::public::anim_number::animNumber_t;
