@@ -31,3 +31,23 @@ Doc templates that cite the oracle without the literal protected `Source:` prefi
 ## CB-5 - missing Raven content is never backfilled (pilot row 5, 2026-08-16)
 
 Raven comment content that was never transcribed into the Rust file (untranscribed header glosses, absent QUAKED blocks, dropped trailing clauses) stays absent in this pass. Workers flag it in their report, and the finds park in the plan doc as a candidate follow-up transcription wave with its own verification shape. Examples: the `ai_main_consts.rs` glosses, the 13 `g_mover.c` QUAKED blocks, `w_saber.rs:8506`.
+
+## CB-6 - the FLAG: prefix is a durable convention (batch-1 walk, 2026-08-17)
+
+`FLAG:` is a stable repo-wide marker (~557 sites across the crate), not campaign residue. The rule is the w_force pattern: keep the prefix and the restyled one-line fact, and drop the campaign-shorthand parenthetical. Treat the prefix like `SAFETY:`.
+
+## CB-7 - wave-recipe tags are residue (batch-1 walk, 2026-08-17)
+
+`recipe 2b`, `recipe 2c`, `trap 2b`, and bare `(2b)` delete uniformly, and the attached facts stay. Only the phrase `recipe rule 2b` is ledger-anchored (DEC-29). A site that leans on the prohibition itself cites `(DEC-29)` inline. A mixed cite keeps its real half: `(recipe §D12 / 2b)` becomes `(§D12)`.
+
+## CB-8 - DEC-anchored named invariants read as one family (batch-1 walk, 2026-08-17)
+
+A named invariant with a ledger anchor, for example `SEAM-BG-REENTRY (DEC-28, sanctioned)`, is protected and uniform: every member site carries the same named tag in the same shape, so the family greps as one. A member hiding under anonymous prose restyles into the house shape.
+
+## CB-9 - deletion beats rewording when CB-0 rule 1 fails (batch-1 walk, 2026-08-17)
+
+A restyle candidate that restates visible code or narrates completed history is residue even when true. Delete it, do not reword it.
+
+## CB-10 - the 150-column cap binds every line, Raven verbatim included (batch-1 walk, 2026-08-17)
+
+An over-cap Raven line splits at a word boundary with zero word changes. Amends CB-2: "character for character" binds the text, not the line shape, so the CB-2 comparison joins split lines before it diffs against the oracle. A cap-split is not drift, and a reworded line still is.
