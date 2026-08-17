@@ -32,6 +32,8 @@ name: Build modules
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -42,8 +44,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # DEC-67 PR flow: a pull request runs CI only after the user approves this gate.
+  # The gate binds to the `ci-approval` environment, and the environment names the repo owner as its required reviewer.
+  # GitHub lets an author approve their own environment gate, unlike a PR review, so the solo-dev flow works.
+  # A job that waits on an environment consumes no runner time.
+  approve:
+    name: CI approval gate
+    if: github.event_name == 'pull_request'
+    environment: ci-approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record the approval
+        run: echo "CI approved for PR ${{ github.event.pull_request.number }}"
+
   test:
     name: Workspace compile gate
+    needs: approve
+    # A master push skips the gate, so this condition lets that skip through.
+    # A pull request reaches this job only after the gate succeeds.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.approve.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -91,7 +110,7 @@ jobs:
   build:
     name: ${{ matrix.family.name }} ${{ matrix.target.arch }}-${{ matrix.target.platform }}
     needs: test
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'pull_request'
     runs-on: ${{ matrix.target.runner }}
     continue-on-error: ${{ matrix.target.allow_failure }}
     strategy:
@@ -192,7 +211,7 @@ jobs:
   server:
     name: jampded ${{ matrix.target.artifact_suffix }} (${{ matrix.profile }})
     needs: test
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'pull_request'
     runs-on: ${{ matrix.target.runner }}
     continue-on-error: ${{ matrix.target.allow_failure }}
     strategy:
@@ -327,3 +346,17 @@ jobs:
             across builds.
           files: dist/*.zip
           fail_on_unmatched_files: false
+
+  # The one status check the master ruleset requires (DEC-67).
+  # The single stable name spares the ruleset from chasing matrix leg names.
+  ci-green:
+    name: ci-green
+    needs: [test, build, server]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless every lane succeeded
+        run: |
+          test "${{ needs.test.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"
+          test "${{ needs.server.result }}" = "success"
