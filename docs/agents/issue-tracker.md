@@ -36,15 +36,16 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Claim**: `gh issue edit <n> --add-assignee @me`. This is the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 
-## Branch pattern (ruled 2026-08-01)
+## Branch pattern (ruled 2026-08-01, amended by DEC-67 2026-08-16)
 
 Work branches from `master` and is named by the issue that drives it:
 
 - `wf/<ticket>-<slug>` for wayfinder ticket work, for example `wf/6-renderer-surface`.
 - `issue/<n>-<slug>` for plain-issue work.
 - `research/<name>` for research-agent output branches (the agent commits, the architect reviews and merges).
+- `chore/<slug>` for work that no issue drives, for example a DEC entry or a doc touch-up.
 
-A branch merges to `master` only green (build + gates) and is deleted after the merge. Long-lived phase branches (the old `ui-port` pattern) are retired.
+Every change reaches `master` through a pull request (DEC-67). Push the branch, open the PR, and merge it on GitHub with a merge commit, only green (build + gates). Never squash, and never commit directly on master. Delete the branch after the merge. Long-lived phase branches (the old `ui-port` pattern) are retired.
 
 ## Session state and handoffs (DEC-52 process pass, 2026-08-01)
 
