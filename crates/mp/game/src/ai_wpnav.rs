@@ -1,25 +1,19 @@
-// PORT-COMPLETE: ai_wpnav.c
 //! FAITHFUL port of `oracle/codemp/game/ai_wpnav.c`.
 //!
-//! Filled by the jampgame mega-pass.
+//! The waypoint/node arena globals keep their faithful C layout in `GameGlobals`.
+//! `gWPArray` is `WpArray([*mut wpobject_t; 4096])`, a raw-pointer array into the `B_Alloc` bump arena.
+//! `nodetable` is `NodeTable(Box<[nodeobject_t; 16384]>)`.
+//! `gSpawnPoints` is `SpawnPointArray([*mut gentity_t; 64])`.
 //!
-//! The waypoint/node arena globals have their faithful C repr in
-//! `GameGlobals` — `gWPArray: WpArray([*mut wpobject_t; 4096])` (raw-pointer
-//! array into the `B_Alloc` bump arena), `nodetable: NodeTable(Box<[nodeobject_t;
-//! 16384]>)`, `gSpawnPoints: SpawnPointArray([*mut gentity_t; 64])`.
-//!
-//! Safe-state migration **Stage 2** (campaign 2c): entity-pointer params are
-//! `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`, and
-//! entity field access goes through the `GameContext` accessors
-//! (`ctx.entity()` / `ctx.entity_mut()`) at the point of use — the STAGE-1
-//! fn-top raw re-derives are gone. Entity-scan loops walk by `EntityId(i)`.
-//! Returns of `*mut gentity_t` and the raw `gentity_t*` globals (`eFlag*`,
-//! `gSpawnPoints`, `flag*`) stay raw: the pointer is produced at the boundary
-//! via `ent_id::resolve(base, id)` and consumed by callers via `ctx.entity_id_of(ptr)`.
-//! Player-client (`ent->client->ps`) derefs stay raw in tight `unsafe`
-//! blocks (§2b — pool clients have no accessor), as do the waypoint-arena
-//! (`wpobject_t`/`nodeobject_t`), `gitem_t`, and route-file byte-buffer
-//! pointers, which are not entities and have no owned home.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Entity field access goes through the `GameContext` accessors (`ctx.entity()` / `ctx.entity_mut()`) at the point of use.
+//! Function-top raw re-derives of entity pointers are gone.
+//! Entity-scan loops walk by `EntityId(i)`.
+//! Returns of `*mut gentity_t` and the raw `gentity_t*` globals (`eFlag*`, `gSpawnPoints`, `flag*`) stay raw.
+//! The pointer is produced at the boundary via `ent_id::resolve(base, id)` and consumed by callers via `ctx.entity_id_of(ptr)`.
+//! Player-client (`ent->client->ps`) derefs stay raw in tight `unsafe` blocks, because pool clients have no accessor.
+//! The waypoint-arena (`wpobject_t`/`nodeobject_t`), `gitem_t`, and route-file byte-buffer pointers stay raw too,
+//! because they are not entities and have no owned home.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ent_id;
@@ -44,10 +38,9 @@ use mp_qshared::shared::cvar::vmCvar_t;
 use native_string::atof_bytes;
 use native_string::atoi_bytes;
 
-/// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]` — per-weapon-index bot
-/// pickup weighting table used by nav item scoring. C's brace initializer is
-/// shorter than `WP_NUM_WEAPONS` (19); the remaining trailing entries are
-/// zero-initialized, matched here explicitly.
+/// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]`: a per-weapon-index bot pickup weighting table used by nav item scoring.
+/// C's brace initializer is shorter than `WP_NUM_WEAPONS` (19).
+/// The remaining trailing entries are zero-initialized, matched here explicitly.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1796-1815`
 pub const botGlobalNavWeaponWeights: [f32; WP_NUM_WEAPONS as usize] = [
@@ -67,15 +60,14 @@ pub const botGlobalNavWeaponWeights: [f32; WP_NUM_WEAPONS as usize] = [
     3.0, // WP_TRIP_MINE
     3.0, // WP_DET_PACK
     0.0, // WP_EMPLACED_GUN
-    0.0, // (trailing zero-init, brace initializer shorter than array size)
+    0.0, // (trailing zero-init)
     0.0, // (trailing zero-init)
     0.0, // (trailing zero-init)
 ];
 
-// ── ai_wpnav.c / ai_main.h / q_shared.h constants used below (verbatim, per
-// the file's own local-const precedent — cf. `GetFlagStr`/`G_TestLine`). ──
-// `MAX_WPARRAY_SIZE` (`q_shared.h:993`) resolves via the crate prelude glob
-// (`mp_qshared::shared::limits`).
+// The ai_wpnav.c / ai_main.h / q_shared.h constants below are transcribed verbatim,
+// per the file's own local-const precedent (cf. `GetFlagStr`/`G_TestLine`).
+// `MAX_WPARRAY_SIZE` (`q_shared.h:993`) resolves via the crate prelude glob (`mp_qshared::shared::limits`).
 // Source: `oracle/codemp/game/ai_wpnav.c:2505`
 pub const MAX_NODETABLE_SIZE: c_int = 16384;
 pub const MAX_SPAWNPOINT_ARRAY: usize = 64;
@@ -101,12 +93,11 @@ pub const WPFLAG_SIEGE_IMPERIALOBJ: c_int = 0x00100000;
 pub const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
 pub const WPFLAG_CALCULATED: c_int = 0x00400000;
 pub const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
-// `CONTENTS_PLAYERCLIP` / `MASK_PLAYERSOLID` come from the prelude
-// (`mp_qshared::shared::surface_flags`).
+// `CONTENTS_PLAYERCLIP` / `MASK_PLAYERSOLID` come from the prelude (`mp_qshared::shared::surface_flags`).
 
-/// `trap_Trace` helper: a point/box solid trace, faithfully passing NULL for
-/// `mins`/`maxs` when the caller wants a point trace (Raven passes literal
-/// `NULL`). Keeps every trace call site a one-liner.
+/// `trap_Trace` helper: a point/box solid trace.
+/// It faithfully passes NULL for `mins`/`maxs` when the caller wants a point trace, because Raven passes literal `NULL`.
+/// This keeps every trace call site a one-liner.
 #[inline]
 unsafe fn wp_trace(
     ctx: &mut GameContext,
@@ -126,10 +117,9 @@ unsafe fn wp_trace(
 
 /// Raven `GetFlagStr`.
 ///
-/// Builds a human-readable waypoint-flag string into a `B_TempAlloc`'d
-/// scratch buffer (128 bytes) — ports 1:1 as raw-pointer byte writes since
-/// `B_TempAlloc`/`B_TempFree` are the (parked-elsewhere) allocator seam and
-/// this function touches no file-scope globals itself.
+/// This builds a human-readable waypoint-flag string into a `B_TempAlloc`'d scratch buffer (128 bytes).
+/// It writes raw pointer bytes 1:1, because `B_TempAlloc`/`B_TempFree` are a parked-elsewhere allocator,
+/// and this function touches no file-scope globals itself.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:25-210`
 pub fn GetFlagStr(ctx: &mut GameContext, flags: c_int) -> *mut c_char {
@@ -323,7 +313,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             while i < ctx.world.globals.gWPNum {
                 let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
-                    // §2b: pool client (index 0 view client); deref raw as Raven does.
+                    // This is a pool client (index 0 view client), dereferenced raw as Raven does.
                     let vc = ctx.entity(viewent_id).client;
                     let vo = (*vc).ps.origin;
                     let a = [
@@ -347,8 +337,8 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 let flagstr = GetFlagStr(ctx, (*p).flags);
                 ctx.world.globals.gLastPrintedIndex = bestindex;
                 let flagstr_s = cstr_to_str(flagstr);
-                // C `%f` promotes the float weight to double and prints 6 decimals;
-                // format via `as f64` to mirror that promotion exactly.
+                // C `%f` promotes the float weight to double and prints 6 decimals.
+                // We format via `as f64` to mirror that promotion exactly.
                 // Source: `oracle/codemp/game/ai_wpnav.c:335`
                 let s = format!(
                     "^3Waypoint {}\nFlags - {} ({}) (w{:.6})\nOrigin - ({} {} {})\n",
@@ -408,8 +398,8 @@ pub fn TransferWPData(ctx: &mut GameContext, from: c_int, to: c_int) {
 
 /// Raven `CreateNewWP`.
 ///
-/// Appends a fresh waypoint at `gWPNum`. `origin` is only read (copied into the
-/// slot), so it stays by-value.
+/// Appends a fresh waypoint at `gWPNum`.
+/// `origin` is only read (copied into the slot), so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:371-401`
 pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
@@ -449,8 +439,7 @@ pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
 
 /// Raven `CreateNewWP_FromObject`.
 ///
-/// Appends a waypoint copied from an in-memory `wpobject_t` (the load path),
-/// carrying neighbours and re-latching the CTF flag globals.
+/// Appends a waypoint copied from an in-memory `wpobject_t` (the load path), carrying neighbours and re-latching the CTF flag globals.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:403-454`
 pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
@@ -504,10 +493,10 @@ pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
 
 /// Raven `RemoveWP`.
 ///
-/// Pops the last waypoint. Faithfully reproduces Raven's `memset(p, 0,
-/// sizeof(p))` — `sizeof` of the *pointer*, not the object, so only the first
-/// `size_of::<*mut wpobject_t>()` bytes (`origin[0..1]`) are zeroed before
-/// `inuse` is cleared; the slot memory is reused, never freed.
+/// Pops the last waypoint.
+/// This faithfully reproduces Raven's `memset(p, 0, sizeof(p))`, the `sizeof` of the *pointer*, not the object.
+/// Only the first `size_of::<*mut wpobject_t>()` bytes (`origin[0..1]`) are zeroed before `inuse` is cleared.
+/// The slot memory is reused, never freed.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:456-482`
 pub fn RemoveWP(ctx: &mut GameContext) {
@@ -524,7 +513,7 @@ pub fn RemoveWP(ctx: &mut GameContext) {
             return;
         }
 
-        // `memset( gWPArray[gWPNum], 0, sizeof(gWPArray[gWPNum]) )` — pointer size.
+        // `memset( gWPArray[gWPNum], 0, sizeof(gWPArray[gWPNum]) )`, pointer size.
         core::ptr::write_bytes(p as *mut u8, 0, size_of::<*mut wpobject_t>());
         (*p).inuse = 0;
     }
@@ -541,8 +530,8 @@ pub fn RemoveAllWP(ctx: &mut GameContext) {
 
 /// Raven `RemoveWP_InTrail`.
 ///
-/// Removes the waypoint with index `afterindex` and shuffles the rest down one
-/// slot. The pointer-sized `memset` idiom is Raven's (see `RemoveWP`).
+/// Removes the waypoint with index `afterindex` and shuffles the rest down one slot.
+/// The pointer-sized `memset` idiom is Raven's (see `RemoveWP`).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:491-557`
 pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
@@ -595,8 +584,8 @@ pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
 
 /// Raven `CreateNewWP_InTrail`.
 ///
-/// Inserts a new waypoint immediately *after* index `afterindex`, shifting the
-/// tail up one slot. `origin` is read-only, so it stays by-value.
+/// Inserts a new waypoint immediately *after* index `afterindex`, shifting the tail up one slot.
+/// `origin` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:559-635`
 pub fn CreateNewWP_InTrail(
@@ -675,9 +664,8 @@ pub fn CreateNewWP_InTrail(
 
 /// Raven `CreateNewWP_InsertUnder`.
 ///
-/// Like `CreateNewWP_InTrail`, but the new point replaces the found slot (the
-/// found point is pushed up) rather than being inserted after it. `origin` is
-/// read-only, so it stays by-value.
+/// Like `CreateNewWP_InTrail`, but the new point replaces the found slot (the found point is pushed up) rather than being inserted after it.
+/// `origin` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:637-714`
 pub fn CreateNewWP_InsertUnder(
@@ -762,7 +750,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
         let Some(pl) = pl else {
             return;
         };
-        // §2b: player pool client; deref the entity's own client pointer raw.
+        // This is a player pool client. It dereferences the entity's own client pointer raw.
         if ctx.entity(pl).client.is_null() {
             return;
         }
@@ -794,7 +782,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
             return;
         }
 
-        // §2b: player pool client; deref raw as Raven does.
+        // This is a player pool client, dereferenced raw as Raven does.
         let cl = ctx.entity(pl).client;
         let origin = (*ctx.world.globals.gWPArray.0[foundindex as usize]).origin;
         (*cl).ps.origin = origin;
@@ -826,7 +814,7 @@ pub fn WPFlagsModify(ctx: &mut GameContext, wpnum: c_int, flags: c_int) {
 
 /// Raven `NotWithinRange` (file-static).
 ///
-/// Pure integer range check — no globals, no traps.
+/// Pure integer range check. No globals, no traps.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:771-784`
 pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
@@ -841,8 +829,8 @@ pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
 
 /// Raven `NodeHere`.
 ///
-/// Whether a node already sits at (integer-truncated) `spot` X/Y with Z within
-/// ±5. `spot` is read-only, so it stays by-value.
+/// Whether a node already sits at (integer-truncated) `spot` X/Y with Z within ±5.
+/// `spot` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:787-809`
 pub fn NodeHere(ctx: &mut GameContext, spot: vec3_t) -> c_int {
@@ -869,9 +857,8 @@ pub fn NodeHere(ctx: &mut GameContext, spot: vec3_t) -> c_int {
 
 /// Raven `CanGetToVector`.
 ///
-/// Single solid box-trace between two points; no file-scope state. `org1`/
-/// `org2`/`mins`/`maxs` are read-only trace args (never written), so they
-/// stay by-value `vec3_t`.
+/// Single solid box-trace between two points. No file-scope state.
+/// `org1`/`org2`/`mins`/`maxs` are read-only trace args (never written), so they stay by-value `vec3_t`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:812-824`
 pub fn CanGetToVector(
@@ -906,10 +893,9 @@ pub fn CanGetToVector(
 
 /// Raven `CanGetToVectorTravel`.
 ///
-/// Walks a box from `org1` toward `moveTo` in `stepSize` increments, allowing a
-/// single 16-unit stair step, and reports whether any progress was made. All
-/// four `vec3_t` args are read-only, so they stay by-value. (The `#if 0` block at
-/// `ai_wpnav.c:826-882` is dead source, dropped per §20.)
+/// Walks a box from `org1` toward `moveTo` in `stepSize` increments, allowing a single 16-unit stair step, and reports whether any progress was made.
+/// All four `vec3_t` args are read-only, so they stay by-value.
+/// The `#if 0` block at `ai_wpnav.c:826-882` is dead source, dropped per §20.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:883-996`
 pub fn CanGetToVectorTravel(
@@ -1044,7 +1030,7 @@ pub fn CanGetToVectorTravel(
             let measure_length = VectorLength(final_measure);
 
             if measure_length == 0.0 {
-                break; // no progress
+                break; // no progress, break out. If last movement was a sucess didMove will equal 1.
             }
 
             step_size -= measure_length;
@@ -1061,11 +1047,10 @@ pub fn CanGetToVectorTravel(
 
 /// Raven `ConnectTrail`.
 ///
-/// Branch-searches the node grid from `startindex` to `endindex`, then walks
-/// the found chain back inserting waypoints. Falls back to a one-way flag pair
-/// when unreachable. (The `g_RMG` short-circuit at the top means the inner
-/// `g_RMG` branch-distance block is only reached when `g_RMG` is off; it is
-/// transcribed faithfully regardless.)
+/// Branch-searches the node grid from `startindex` to `endindex`, then walks the found chain back inserting waypoints.
+/// It falls back to a one-way flag pair when unreachable.
+/// The `g_RMG` short-circuit at the top means the inner `g_RMG` branch-distance block is only reached when `g_RMG` is off.
+/// It is transcribed faithfully regardless.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1000-1399`
 pub fn ConnectTrail(
@@ -1074,9 +1059,9 @@ pub fn ConnectTrail(
     endindex: c_int,
     behindTheScenes: qboolean,
 ) -> c_int {
-    // Try to drop one branch node offset by (dx,dy) from node `i`; returns true
-    // when a node was appended (sets `cancontinue`). Mirrors the four repeated
-    // X±/Y± blocks in the oracle.
+    // This tries to drop one branch node offset by (dx,dy) from node `i`.
+    // It returns true when a node was appended (sets `cancontinue`).
+    // It mirrors the four repeated X±/Y± blocks in the oracle.
     unsafe fn branch_dir(
         ctx: &mut GameContext,
         i: c_int,
@@ -1123,7 +1108,7 @@ pub fn ConnectTrail(
                 - ctx.world.globals.nodetable.0[nn].origin[2]
                 > 50.0
             {
-                // big drop — can't magically fly back up
+                // if there's a big drop, make sure we know we can't just magically fly back up
                 ctx.world.globals.nodetable.0[nn].flags = WPFLAG_ONEWAY_FWD;
             }
             ctx.world.globals.nodenum += 1;
@@ -1162,7 +1147,7 @@ pub fn ConnectTrail(
         if ctx.world.cvars.g_RMG.integer == 0 {
             branch_distance = TABLE_BRANCH_DISTANCE;
         } else {
-            branch_distance = 512.0; // be less precise on broad terrain
+            branch_distance = 512.0; // be less precise here, terrain is fairly broad, and we don't want to take an hour precalculating
         }
 
         if ctx.world.cvars.g_RMG.integer != 0 {
@@ -1224,7 +1209,7 @@ pub fn ConnectTrail(
 
         while ctx.world.globals.nodenum < MAX_NODETABLE_SIZE && foundit == 0 && cancontinue != 0 {
             if ctx.world.cvars.g_RMG.integer != 0 {
-                // adjust branch distance by distance from start/end (RMG only)
+                // adjust the branch distance dynamically depending on the distance from the start and end points.
                 let last = (ctx.world.globals.nodenum - 1) as usize;
                 let so = (*ctx.world.globals.gWPArray.0[startindex as usize]).origin;
                 let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
@@ -1322,10 +1307,10 @@ pub fn ConnectTrail(
                 let mut test_dist: f32;
 
                 if ctx.world.globals.nodenum <= 10 {
-                    return 0; // not enough to bother
+                    return 0; // not enough to even really bother.
                 }
 
-                // find whichever node is closest to the desired end
+                // Since it failed, find whichever node is closest to the desired end.
                 while n_count < ctx.world.globals.nodenum {
                     let no = ctx.world.globals.nodetable.0[n_count as usize].origin;
                     let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
@@ -1426,8 +1411,7 @@ pub fn OpposingEnds(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
 
 /// Raven `DoorBlockingSection`.
 ///
-/// If a `func_` brush blocks both directions of the segment, treat it as an
-/// (openable) door and let the two endpoints stay linked.
+/// If a `func_` brush blocks both directions of the segment, treat it as an (openable) door and let the two endpoints stay linked.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1418-1463`
 pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
@@ -1457,9 +1441,9 @@ pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c
         }
 
         let cn = ctx.world.g_entities[tr.entityNum as usize].classname_str();
-        // Raven derefs `testdoor->classname` unconditionally; a NULL classname
-        // (now `""`) would crash there — the one defined behavior here is
-        // "no `func_` match" (returns 0). (§19)
+        // Raven derefs `testdoor->classname` unconditionally.
+        // A NULL classname (now `""`) would crash there.
+        // The one defined behavior here is "no `func_` match" (returns 0). (§19)
         if cn.is_empty() {
             return 0;
         }
@@ -1553,9 +1537,8 @@ pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
 
 /// Raven `OrgVisibleCurve`.
 ///
-/// Double solid box-trace along a levelled path segment; no file-scope state.
-/// All `vec3_t` args are read-only trace args (`org1`/`org2`/`mins`/`maxs`),
-/// so they stay by-value.
+/// Double solid box-trace along a levelled path segment. No file-scope state.
+/// All `vec3_t` args are read-only trace args (`org1`/`org2`/`mins`/`maxs`), so they stay by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1526-1547`
 pub fn OrgVisibleCurve(
@@ -1592,8 +1575,7 @@ pub fn OrgVisibleCurve(
 
 /// Raven `CanForceJumpTo`.
 ///
-/// Returns a nonzero force-jump "level" (1/2/3) when `testingindex` is a
-/// reachable force-jump-up target from `baseindex`, else 0.
+/// Returns a nonzero force-jump "level" (1/2/3) when `testingindex` is a reachable force-jump-up target from `baseindex`, else 0.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1549-1621`
 pub fn CanForceJumpTo(
@@ -1638,7 +1620,7 @@ pub fn CanForceJumpTo(
         }
 
         if heightdif < 128.0 {
-            return 0; // don't bother
+            return 0; // don't bother..
         }
 
         if heightdif > 512.0 {
@@ -1684,7 +1666,7 @@ pub fn CalculatePaths(ctx: &mut GameContext) {
         let mins: vec3_t = [-15.0, -15.0, -15.0];
         let maxs: vec3_t = [15.0, 15.0, 15.0];
 
-        // clear out all the neighbor data before we recalculate
+        // now clear out all the neighbor data before we recalculate
         let mut i: c_int = 0;
         while i < ctx.world.globals.gWPNum {
             let p = ctx.world.globals.gWPArray.0[i as usize];
@@ -1966,12 +1948,11 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
 
 /// Raven `CalculateJumpRoutes`.
 ///
-/// Marks jump waypoints that need force-jumping (999 = "FJSR" sentinel) by the
-/// height drop to their trail neighbours.
+/// Marks jump waypoints that need force-jumping (999 = "FJSR" sentinel) by the height drop to their trail neighbours.
 ///
-/// The oracle reads `gWPArray[i-1]`/`gWPArray[i+1]` unguarded; at `i==0` that
-/// is an out-of-bounds `gWPArray[-1]`, and `i+1` can reach one past the array —
-/// the one defined behavior here treats those as null (skip the branch). (§19)
+/// The oracle reads `gWPArray[i-1]`/`gWPArray[i+1]` unguarded.
+/// At `i==0` that is an out-of-bounds `gWPArray[-1]`, and `i+1` can reach one past the array.
+/// The one defined behavior here treats those as null and skips the branch. (§19)
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1953-2005`
 pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
@@ -2036,9 +2017,8 @@ pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
 
 /// Raven `LoadPathData`.
 ///
-/// Hand-rolled route-file parser (`ai_wpnav.c:2007-2250`), transcribed as
-/// direct byte-pointer indexing over the `B_TempAlloc`'d scratch buffers to
-/// stay 1:1 with the oracle's char-array walk.
+/// Hand-rolled route-file parser (`ai_wpnav.c:2007-2250`), transcribed as direct byte-pointer indexing over the `B_TempAlloc`'d scratch buffers,
+/// to stay 1:1 with the oracle's char-array walk.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2007-2250`
 pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
@@ -2046,10 +2026,8 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         let mut i: isize = 0;
         let mut i_cv: isize;
 
-        // Raven `B_TempAlloc`s `routePath` (1024 bytes), `Com_sprintf`s the
-        // path into it, opens the file, then `B_TempFree`s it — we build the
-        // path as an owned `String` directly but keep the alloc/free pair for
-        // bump-allocator stack parity.
+        // Raven `B_TempAlloc`s `routePath` (1024 bytes), `Com_sprintf`s the path into it, opens the file, then `B_TempFree`s it.
+        // We build the path as an owned `String` directly, but we keep the alloc/free pair for bump-allocator stack parity.
         let _route_path = B_TempAlloc(ctx, 1024);
         let filename_s = cstr_to_str(filename);
         let route_path_s = format!("botroutes/{}.wnt", filename_s);
@@ -2256,8 +2234,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
 /// Raven `FlagObjects`.
 ///
-/// Finds the waypoint nearest each CTF flag (with a clear box trace) and marks
-/// it, latching the `flag*`/`oFlag*`/`eFlag*` globals.
+/// Finds the waypoint nearest each CTF flag (with a clear box trace) and marks it, latching the `flag*`/`oFlag*`/`eFlag*` globals.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2252-2369`
 pub fn FlagObjects(ctx: &mut GameContext) {
@@ -2378,9 +2355,8 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             return 0;
         }
 
-        // See `LoadPathData`'s note: `routePath` is a `B_TempAlloc`'d scratch
-        // buffer in Raven; kept as an alloc/free pair for bump-allocator
-        // stack parity even though we build the path as an owned `String`.
+        // See `LoadPathData`'s note. `routePath` is a `B_TempAlloc`'d scratch buffer in Raven.
+        // We keep the alloc/free pair for bump-allocator stack parity, even though we build the path as an owned `String`.
         let _route_path = B_TempAlloc(ctx, 1024);
         let filename_s = cstr_to_str(filename);
         let route_path_s = format!("botroutes/{}.wnt", filename_s);
@@ -2407,8 +2383,8 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         FlagObjects(ctx); // currently only used for flagging waypoints nearest CTF flags
 
-        // C `%f` promotes each float arg to double and prints 6 decimals; format
-        // the weight/origin/flLen fields via `as f64` to mirror that promotion.
+        // C `%f` promotes each float arg to double and prints 6 decimals.
+        // We format the weight/origin/flLen fields via `as f64` to mirror that promotion.
         // Source: `oracle/codemp/game/ai_wpnav.c:2418,2447`
         let p0 = ctx.world.globals.gWPArray.0[i as usize];
         let mut file_string = format!(
@@ -2421,8 +2397,8 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             (*p0).origin[2] as f64,
         );
 
-        // Raven builds `storeString` for waypoint 0's neighbor list but never
-        // concatenates it into `fileString` — a genuine Raven bug, preserved per §19.
+        // Raven builds `storeString` for waypoint 0's neighbor list but never concatenates it into `fileString`.
+        // This is a genuine Raven bug, preserved per §19.
         let mut n: c_int = 0;
         let mut store_string = String::new();
         while n < (*p0).neighbornum {
@@ -2594,8 +2570,7 @@ pub fn G_NodeMatchingXY(ctx: &mut GameContext, x: f32, y: f32) -> c_int {
 
 /// Raven `G_NodeMatchingXY_BA`.
 ///
-/// Lowest-weight unflagged node with matching (int-truncated) X/Y, short-circuit
-/// returning `final` if reached.
+/// Lowest-weight unflagged node with matching (int-truncated) X/Y, short-circuit returning `final` if reached.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2589-2614`
 pub fn G_NodeMatchingXY_BA(ctx: &mut GameContext, x: c_int, y: c_int, r#final: c_int) -> c_int {
@@ -2624,8 +2599,8 @@ pub fn G_NodeMatchingXY_BA(ctx: &mut GameContext, x: c_int, y: c_int, r#final: c
 
 /// Raven `G_RecursiveConnection`.
 ///
-/// Flood-fills weights out from `start` across the 4-connected grid until it
-/// reaches `end`, optionally requiring a clear trace between adjacent nodes.
+/// Flood-fills weights out from `start` across the 4-connected grid until it reaches `end`,
+/// optionally requiring a clear trace between adjacent nodes.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2616-2689`
 pub fn G_RecursiveConnection(
@@ -2664,15 +2639,15 @@ pub fn G_RecursiveConnection(
         while i < 4 {
             let d = index_directions[i as usize];
             if d == end {
-                // connected all the way to the destination
+                // we've connected all the way to the destination.
                 return d;
             }
 
             if d != -1 && ctx.world.globals.nodetable.0[d as usize].flags != 0 {
-                // already used — not valid
+                // this point is already used, so it's not valid.
                 index_directions[i as usize] = -1;
             } else if d != -1 {
-                // otherwise mark it as used
+                // otherwise mark it as used.
                 ctx.world.globals.nodetable.0[d as usize].flags = 1;
             }
 
@@ -2698,7 +2673,7 @@ pub fn G_RecursiveConnection(
 
             let d = index_directions[i as usize];
             if d != -1 {
-                // still valid — keep connecting via this point
+                // it's still valid, so keep connecting via this point.
                 recursive_index =
                     G_RecursiveConnection(ctx, d, end, pass_weight, traceCheck, baseHeight);
             }
@@ -2716,8 +2691,7 @@ pub fn G_RecursiveConnection(
 
 /// Raven `G_BackwardAttachment`.
 ///
-/// After a node path exists, walks it back toward `finalDestination` (lowest
-/// weight per step), materialising waypoints via `CreateNewWP_InsertUnder`.
+/// After a node path exists, walks it back toward `finalDestination` (lowest weight per step), materialising waypoints via `CreateNewWP_InsertUnder`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2981-3048`
 pub fn G_BackwardAttachment(
@@ -2769,7 +2743,7 @@ pub fn G_BackwardAttachment(
         let d = index_directions[i as usize];
         if d != -1 {
             if d == finalDestination {
-                // found the original point and linked all the way back
+                // hooray, we've found the original point and linked all the way back to it.
                 let a = ctx.world.globals.nodetable.0[start as usize].origin;
                 CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
                 let b = ctx.world.globals.nodetable.0[d as usize].origin;
@@ -2787,7 +2761,7 @@ pub fn G_BackwardAttachment(
     }
 
     if desired_index != -1 {
-        // create a waypoint here, then recurse for the lowest-weight neighbor
+        // Create a waypoint here, and then recursively call this function for the next neighbor with the lowest weight.
         if ctx.world.globals.gWPNum < 3900 {
             let a = ctx.world.globals.nodetable.0[start as usize].origin;
             CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
@@ -2806,14 +2780,12 @@ pub fn G_BackwardAttachment(
 ///
 /// Generate waypoint information on-the-fly for the random mission.
 ///
-/// The `PATH_TIME_DEBUG`/`ASCII_ART_DEBUG`/`PAINFULLY_DEBUGGING_THROUGH_VM`
-/// `#ifdef` blocks are not defined in this build (dead debug source); dropped
-/// per §20, including their `trap_Milliseconds`/`Com_Printf` calls.
+/// The `PATH_TIME_DEBUG`/`ASCII_ART_DEBUG`/`PAINFULLY_DEBUGGING_THROUGH_VM` `#ifdef` blocks are not defined in this build (dead debug source).
+/// They are dropped per §20, including their `trap_Milliseconds`/`Com_Printf` calls.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3055-3250`
 pub fn G_RMGPathing(ctx: &mut GameContext) {
-    // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
-    // (`c_int`, cast here to match the `vec3_t` components they seed).
+    // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` live in `mp_bg::public::viewheight` (`c_int`, cast here to match the `vec3_t` components they seed).
     // Source: `oracle/codemp/game/bg_public.h:41-42`
     const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
     const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
@@ -2837,8 +2809,8 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
             return;
         }
         let terrain_id = terrain_id.unwrap();
-        // terrain bounds are loop-invariant (this fn never mutates the terrain
-        // entity); hoist to value copies so the loops below hold no entity borrow.
+        // Terrain bounds are loop-invariant, because this fn never mutates the terrain entity.
+        // We hoist them to value copies, so the loops below hold no entity borrow.
         let t_absmin = ctx.entity(terrain_id).r.absmin;
         let t_absmax = ctx.entity(terrain_id).r.absmax;
 
@@ -3021,9 +2993,9 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
 
 /// Raven `BeginAutoPathRoutine`.
 ///
-/// Called for RMG levels. The `PAINFULLY_DEBUGGING_THROUGH_VM` `#ifdef`
-/// `Com_Printf` blocks are dead source in this build (not defined); dropped
-/// per §20.
+/// Called for RMG levels.
+/// The `PAINFULLY_DEBUGGING_THROUGH_VM` `#ifdef` `Com_Printf` blocks are dead source in this build (not defined).
+/// They are dropped per §20.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3254-3342`
 pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
@@ -3186,8 +3158,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
 
 /// Raven `GetClosestSpawn`.
 ///
-/// Nearest spawn entity to `ent`'s player origin (walks only the non-client
-/// entity range).
+/// Nearest spawn entity to `ent`'s player origin (walks only the non-client entity range).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3425-3457`
 pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
@@ -3204,7 +3175,7 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 && (Q_stricmp(&classname, "info_player_start") == 0
                     || Q_stricmp(&classname, "info_player_deathmatch") == 0)
             {
-                // §2b: player pool client; deref raw as Raven does.
+                // This is a player pool client, dereferenced raw as Raven does.
                 let cl = ctx.entity(ent).client;
                 let eo = (*cl).ps.origin;
                 let so = ctx.entity(spawn_id).r.currentOrigin;
@@ -3225,8 +3196,7 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
 /// Raven `GetNextSpawnInIndex`.
 ///
-/// Next spawn entity after `currentSpawn` in index order, wrapping back to
-/// `MAX_CLIENTS` if none follows.
+/// Next spawn entity after `currentSpawn` in index order, wrapping back to `MAX_CLIENTS` if none follows.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3459-3499`
 pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mut gentity_t {
@@ -3249,7 +3219,7 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
         }
 
         if next_index.is_none() {
-            // loop back around to 0 (client range end)
+            // loop back around to 0
             i = MAX_CLIENTS as c_int;
             while i < ctx.world.level.num_entities {
                 let spawn_id = EntityId(i as u32);
@@ -3292,7 +3262,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         let Some(pl) = pl else {
             return 0;
         };
-        // §2b: player pool client; deref the entity's own client pointer raw.
+        // This is a player pool client. It dereferences the entity's own client pointer raw.
         if ctx.entity(pl).client.is_null() {
             return 0;
         }
@@ -3320,11 +3290,11 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            // Raven's `if (optional_sargument)` is always true (ConcatArgs
-            // never returns NULL) — empty assigns atoi("") == 0.
+            // Raven's `if (optional_sargument)` is always true, because ConcatArgs never returns NULL.
+            // An empty argument assigns atoi("") == 0.
             optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
-            // §2b: player pool client; deref raw as Raven does.
+            // This is a player pool client, dereferenced raw as Raven does.
             let cl = ctx.entity(pl).client;
             let origin = (*cl).ps.origin;
             if !optional_s_argument.is_empty() {
@@ -3340,8 +3310,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            // Raven's `if (optional_sargument)` is always true (ConcatArgs
-            // never returns NULL) — empty assigns atoi("") == 0.
+            // Raven's `if (optional_sargument)` is always true, because ConcatArgs never returns NULL.
+            // An empty argument assigns atoi("") == 0.
             optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
             if !optional_s_argument.is_empty() {
@@ -3357,8 +3327,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            // Raven's `if (optional_sargument)` is always true (ConcatArgs
-            // never returns NULL) — empty assigns atoi("") == 0.
+            // Raven's `if (optional_sargument)` is always true, because ConcatArgs never returns NULL.
+            // An empty argument assigns atoi("") == 0.
             optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
             if !optional_s_argument.is_empty() {
@@ -3386,7 +3356,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             if !closest_spawn.is_null() {
                 let cs_id = ctx.entity_id_of(closest_spawn).unwrap();
                 let currentOrigin = ctx.entity(cs_id).r.currentOrigin;
-                // §2b: player pool client; deref raw as Raven does.
+                // This is a player pool client, dereferenced raw as Raven does.
                 let cl = ctx.entity(pl).client;
                 (*cl).ps.origin = currentOrigin;
             }
@@ -3433,11 +3403,11 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 2);
 
-            // Raven's `if (optional_sargument)` is always true (ConcatArgs
-            // never returns NULL) — empty assigns atoi("") == 0.
+            // Raven's `if (optional_sargument)` is always true, because ConcatArgs never returns NULL.
+            // An empty argument assigns atoi("") == 0.
             optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
-            // §2b: player pool client; deref raw as Raven does.
+            // This is a player pool client, dereferenced raw as Raven does.
             let cl = ctx.entity(pl).client;
             let origin = (*cl).ps.origin;
             if !optional_s_argument.is_empty() {
@@ -3488,8 +3458,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 2);
 
-            // Raven's `if (optional_sargument)` is always true (ConcatArgs
-            // never returns NULL) — empty assigns atoi("") == 0.
+            // Raven's `if (optional_sargument)` is always true, because ConcatArgs never returns NULL.
+            // An empty argument assigns atoi("") == 0.
             optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
             if !optional_s_argument.is_empty() {

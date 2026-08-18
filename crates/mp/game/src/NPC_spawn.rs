@@ -1,34 +1,26 @@
-// PORT-COMPLETE: NPC_spawn.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_spawn.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
+//! Entity-pointer parameters are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Ctx-free leaf helpers take `&mut gentity_t` or `&gentity_t` directly.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`.
+//! Every world reach is a checked `ctx.world.…` borrow.
+//! One `world_raw()` use survives as irreducible: the raw `*mut GameWorld` field of `GameCallbacksImpl` fed to
+//! `BG_ParseAnimationFile`.
 //!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())` raw-deref
-//! regime is retired. One `world_raw()` use survives (irreducible): the raw
-//! `*mut GameWorld` field of `GameCallbacksImpl` fed to `BG_ParseAnimationFile`.
-//!
-//! Safe-state campaign **2c** (deref regime): per-body `gentity_t` derefs go
-//! through `ctx.world.entity()`/`entity_mut()` accessors at point of use; the
-//! fn-top `ctx.entity_mut()` re-derives are gone. Pool clients (`ent.client`)
-//! and `gNPC_t` (`ent.NPC` / `globals.NPCInfo`) have no accessor, so those
-//! derefs stay raw in tight `unsafe` blocks through a copied pointer value
-//! (recipe 2b/2c). `NPC_Spawn_Do`/`NPC_SpawnType` keep the Stage-1 re-derive:
-//! each cross-copies a fresh `G_Spawn` entity with the spawner (two live
-//! entities, rule 4) — left as Stage-2 debt. This file is referee-blind —
-//! parity rests on the compile + golden suite.
+//! Per-body `gentity_t` derefs go through `ctx.world.entity()`/`entity_mut()` accessors at point of use.
+//! Pool clients (`ent.client`) and `gNPC_t` (`ent.NPC` / `globals.NPCInfo`) have no accessor, so those derefs
+//! stay raw in tight `unsafe` blocks through a copied pointer value.
+//! `NPC_Spawn_Do` and `NPC_SpawnType` still re-derive a raw pointer at the top of the function body: each
+//! cross-copies a fresh `G_Spawn` entity with the spawner, so two live entities exist at once.
+//! This file is referee-blind. Parity rests on the compile and the golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_utils::G_ModelIndex;
 use crate::prelude::*;
-// Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
-// define it): the canonical home is g_public_consts, per house convention.
+// Dedupe the `SVF_NOCLIENT` glob ambiguity: both `g_items::*` and `g_public_consts::*` define it.
+// The canonical home is `g_public_consts`, per house convention.
 use crate::ent_fn_enums::dispatch_die;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
@@ -41,9 +33,6 @@ use native_string::latin1_to_string;
 use native_string::strncpyz_string;
 use native_string::Q_stricmp;
 use native_string::Q_strncmp;
-
-// Unported types referenced in this file (need porting before this compiles):
-// PAIN_FUNC, TOUCH_FUNC
 
 /// Raven `NPC_spawn.c` NPC spawnflag bit.
 /// Source: `oracle/codemp/game/NPC_spawn.c:57`
@@ -78,7 +67,8 @@ pub const SFB_STARTINSOLID: c_int = 128;
 /// Raven: rwwFIXMEFIXME: Do something here, need to let the client know.
 /// Source: `oracle/codemp/game/NPC_spawn.c:90-94`
 pub fn WP_SetSaberModel(client: Option<&mut gclient_t>, npcClass: class_t) -> c_int {
-    // Ctx-free leaf; body ignores `client` (all callers pass `None`).
+    // This is a ctx-free leaf function.
+    // The body ignores `client`, because every caller passes `None`.
     let _ = client;
     1
 }
@@ -87,8 +77,8 @@ pub fn WP_SetSaberModel(client: Option<&mut gclient_t>, npcClass: class_t) -> c_
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:103-189`
 pub fn NPC_PainFunc(ent: &gentity_t) -> Option<crate::ent_fn_enums::EntPain> {
-    // Raven returns the selected pain fn-ptr; fn-ptr fields are the
-    // `Option<EntPain>` fn-ID enum directly (no *mut c_void encoding).
+    // Raven returns the selected pain function pointer.
+    // Here, fn-pointer fields are the `Option<EntPain>` fn-ID enum directly, with no `*mut c_void` encoding.
     let pain = unsafe {
         if (*((*ent).client)).ps.weapon == WP_SABER {
             crate::ent_fn_enums::EntPain::NPC_Jedi_Pain
@@ -122,7 +112,7 @@ pub fn NPC_PainFunc(ent: &gentity_t) -> Option<crate::ent_fn_enums::EntPain> {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:199-206`
 pub fn NPC_TouchFunc(_ent: &gentity_t) -> Option<crate::ent_fn_enums::EntTouch> {
-    // Raven always returns `NPC_Touch`, returned here as `Option<EntTouch>` directly.
+    // Raven always returns `NPC_Touch`. Here it returns `Option<EntTouch>` directly.
     Some(crate::ent_fn_enums::EntTouch::NPC_Touch)
 }
 
@@ -130,8 +120,8 @@ pub fn NPC_TouchFunc(_ent: &gentity_t) -> Option<crate::ent_fn_enums::EntTouch> 
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:215-501`
 pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
-    // Pool client + gNPC_t + vehicle derefs stay raw (recipe 2b/2c): copied
-    // pointer values, tight unsafe. Entity fields go through the world accessor.
+    // Pool client, gNPC_t, and vehicle derefs stay raw, through copied pointer values in tight `unsafe` blocks.
+    // Entity fields go through the world accessor.
     let client = ctx.world.entity(ent).client;
     let npc = ctx.world.entity(ent).NPC;
     unsafe {
@@ -220,7 +210,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                         WP_THERMAL | WP_BLASTER => {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
                             if (*npc).rank >= RANK_LT || (*client).ps.weapon == WP_THERMAL {
-                                // officers/thermal alt-fire: commented out in oracle
+                                // officers, grenade-throwers use alt-fire
                             }
                         }
                         _ => {}
@@ -266,9 +256,9 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                     (*npc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
                     (*client).ps.eFlags2 |= EF2_FLYING;
                 } else {
-                    // Oracle switch: `default:` falls into `case WP_BLASTER:`, so
-                    // ST_ClearTimers runs for WP_BLASTER and any weapon not in the
-                    // explicit no-op case set. Source: oracle/codemp/game/NPC_spawn.c:412-458
+                    // Raven's `default:` case falls into `case WP_BLASTER:`, so `ST_ClearTimers` runs for
+                    // `WP_BLASTER` and for any weapon outside the explicit no-op set.
+                    // Source: oracle/codemp/game/NPC_spawn.c:412-458
                     match (*client).ps.weapon {
                         WP_BRYAR_PISTOL | WP_DISRUPTOR | WP_BOWCASTER | WP_REPEATER | WP_DEMP2
                         | WP_FLECHETTE | WP_ROCKET_LAUNCHER | WP_THERMAL | WP_STUN_BATON => {}
@@ -288,7 +278,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if (*client).NPC_class == CLASS_SEEKER && ctx.world.entity(ent).activator.is_some() {
-            // teams already set correctly
+            // assume my teams are already set correctly
         } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && ctx.world.entity(ent).s.NPC_class != CLASS_VEHICLE as c_int
         {
@@ -313,12 +303,13 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
 /// and go from there? - dmv
 /// Source: `oracle/codemp/game/NPC_spawn.c:509-749`
 pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: &str) -> c_int {
-    // Faithful transcription of the C string-compare cascade. `NPC_type` is the
-    // NPC species name; the caller maps Raven's NULL pointer to `""`.
+    // This is a faithful transcription of the C string-compare cascade.
+    // `NPC_type` is the NPC species name.
+    // The caller maps Raven's NULL pointer to an empty string.
     let name = NPC_type;
 
     let stricmp = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
-    // Q_strncmp is case-SENSITIVE (unlike Q_stricmp); compare prefixes exactly.
+    // `Q_strncmp` is case-sensitive, unlike `Q_stricmp`. It compares prefixes exactly.
     let strncmp = |a: &str, b: &str, n: usize| {
         let a_pre: String = a.chars().take(n).collect();
         let b_pre: String = b.chars().take(n).collect();
@@ -475,7 +466,7 @@ pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: &str) -> c_
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:759-797`
 pub fn NPC_SetWeapons(ctx: &mut GameContext, ent: EntityId) {
-    // Pool client + gNPC_t derefs stay raw (recipe 2b/2c): copied pointer values.
+    // Pool client and gNPC_t derefs stay raw, through copied pointer values.
     let client = ctx.world.entity(ent).client;
     let npc = ctx.world.entity(ent).NPC;
     let mut bestWeap: c_int = WP_NONE;
@@ -520,7 +511,7 @@ pub fn NPC_SetWeapons(ctx: &mut GameContext, ent: EntityId) {
 /// and sounds precached in CG_RegisterNPCEffects in cg_player.cpp.
 /// Source: `oracle/codemp/game/NPC_spawn.c:808-810`
 pub fn NPC_SpawnEffect(ent: &gentity_t) {
-    // Empty body in the oracle (effect hook, never filled in).
+    // The body is empty in the oracle. This is an effect hook that Raven never filled in.
     let _ = ent;
 }
 
@@ -528,7 +519,7 @@ pub fn NPC_SpawnEffect(ent: &gentity_t) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:817-823`
 pub fn NPC_SetFX_SpawnStates(ctx: &mut GameContext, ent: EntityId) {
-    // Pool client + gNPC_t derefs stay raw (recipe 2b/2c): copied pointer values.
+    // Pool client and gNPC_t derefs stay raw, through copied pointer values.
     let npc = ctx.world.entity(ent).NPC;
     let client = ctx.world.entity(ent).client;
     unsafe {
@@ -584,7 +575,7 @@ pub fn NPC_SpotWouldTelefrag(ctx: &mut GameContext, npc: EntityId) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:862-1274`
 pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
-    // Pool client + gNPC_t derefs stay raw (recipe 2b/2c): copied pointer values.
+    // Pool client and gNPC_t derefs stay raw, through copied pointer values.
     // Entity fields go through the world accessor.
     let client = ctx.world.entity(ent).client;
     let npc = ctx.world.entity(ent).NPC;
@@ -607,8 +598,8 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             tn, t3
                         ),
                     );
-                    // `target3` is an owned `String` (`""` ≡ absent), so an empty
-                    // value fires nothing — matching Raven's NULL-pointer skip.
+                    // `target3` is an owned `String`, where an empty value stands for absent.
+                    // An empty value fires nothing, matching Raven's NULL-pointer skip.
                     let t3s = (!t3.is_empty()).then_some(t3);
                     G_UseTargets2(ctx, Some(ent), Some(ent), t3s.as_deref());
                     ctx.world.entity_mut(ent).think = Some(EntThink::G_FreeEntity).into();
@@ -777,7 +768,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.level.time + (ctx.world.cvars.g_inactivity.value as c_int) * 1000;
         (*client).latched_buttons = 0;
         if ctx.world.entity(ent).s.m_iVehicleNum != 0 {
-            // already have owner set
+            // I'm an NPC in a vehicle (or a vehicle), I already have owner set
         } else if (*client).NPC_class == CLASS_SEEKER && ctx.world.entity(ent).activator.is_some() {
             let act = ctx.world.entity(ent).activator.unwrap();
             let num = ctx.world.entity(act).s.number;
@@ -810,7 +801,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         SetNPCGlobals(ctx, ent);
 
         ctx.world.entity_mut(ent).enemy = None;
-        // gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        // `gNPC_t` (`NPCInfo`) has no accessor. The deref stays raw.
         let npc_info = ctx.world.globals.NPCInfo;
         (*npc_info).timeOfDeath = 0;
         (*npc_info).shotTime = 0;
@@ -818,7 +809,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         NPC_ChangeWeapon((*client).ps.weapon);
 
         ctx.world.entity_mut(ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Pain).into();
-        // pain/touch fn-ID enums assigned straight from the selector fns.
+        // The pain and touch fn-ID enums come straight from the selector functions.
         let pain_opt = NPC_PainFunc(ctx.world.entity(ent));
         ctx.world.entity_mut(ent).pain = pain_opt.into();
         let touch_opt = NPC_TouchFunc(ctx.world.entity(ent));
@@ -869,12 +860,13 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         );
 
         ucmd = core::mem::zeroed();
-        // Raven `VectorCopy` is a macro; here it copies the `int angles[3]`.
+        // Raven's `VectorCopy` is a macro. Here it copies the `int angles[3]`.
         ucmd.angles = (*client).pers.cmd.angles;
 
         (*client).ps.groundEntityNum = ENTITYNUM_NONE;
 
-        // NPCAI_MATCHPLAYERWEAPON: G_MatchPlayerWeapon commented out in oracle.
+        // Raven gates a commented-out `G_MatchPlayerWeapon` call behind `NPCAI_MATCHPLAYERWEAPON`.
+        // The guard has no effect, so it is dropped here.
 
         let num = ctx.world.entity(ent).s.number;
         ClientThink(ctx, num, &mut ucmd as *mut usercmd_t);
@@ -889,25 +881,28 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             if ctx.world.entity(ent).spawnflags & SFB_CINEMATIC == 0
                 && (*npc).behaviorState != BS_CINEMATIC
             {
-                // g_entities[0].client stats bump: commented out / no-op in oracle
+                // Raven's `g_entities[0].client` stats bump here is commented out in the oracle, so this block
+                // stays a no-op.
             }
         }
         ctx.world.entity_mut(ent).waypoint = WAYPOINT_NONE;
         (*npc).homeWp = WAYPOINT_NONE;
 
-        // FLAG (rule 4): two-entity copy — a fresh droid NPC (`droid_ent`, raw
-        // `*mut gentity_t` from NPC_SpawnType) is cross-copied with the parent
-        // `ent`. Parent fields are read into locals (ctx borrow ends before each
-        // raw droid write); `droid_ent`/`veh`/pool-clients stay raw. Left as
-        // Stage-2 debt — the copy-out/copy-in pilot shape does not apply here.
+        // FLAG: this is a two-entity copy.
+        // A fresh droid NPC (`droid_ent`, a raw `*mut gentity_t` from `NPC_SpawnType`) is cross-copied with the
+        // parent `ent`.
+        // Parent fields are read into locals first, so the `ctx` borrow ends before each raw droid write.
+        // `droid_ent`, `veh`, and the pool clients stay raw.
+        // The copy-out/copy-in pilot shape does not apply here, so this stays open work.
         let veh = ctx.world.entity(ent).m_pVehicle;
         if !veh.is_null() {
             if (*veh).m_iDroidUnitTag != -1 {
                 let model2 = ctx.world.entity(ent).model2.clone();
-                // Raven prefers `ent->model2`, else the vehicle's `droidNPC`;
-                // `None` ≡ the C null pointer that skips the spawn (empty
-                // `model2` is absent, but a non-null empty `droidNPC` still
-                // enters the block, exactly as Raven).
+                // Raven prefers `ent->model2`, and falls back to the vehicle's `droidNPC`.
+                // `None` stands for the C null pointer that skips the spawn.
+                // Raven's guard (`NPC_spawn.c:1213-1214`) is `droidNPC && droidNPC[0]`, non-null and non-empty.
+                // This site checks only null, so a non-null empty `droidNPC` string enters this block that Raven skips.
+                // This divergence is tracked as issue #47.
                 let droid_npc_type = if !model2.is_empty() {
                     Some(model2)
                 } else if !(*(*veh).m_pVehicleInfo).droidNPC.is_null() {
@@ -942,9 +937,9 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             (*droid_ent).s.m_iVehicleNum = ent_number;
                             (*droid_ent).s.owner = ent_number;
                             (*droid_ent).r.ownerNum = ent_number;
-                            // `Vehicle_t.m_pDroidUnit` is `mp_bg`'s own `bgEntity_t`; this crate's
-                            // `bgEntity_t` name is the `gentity_t` alias (prelude), so the overlay
-                            // cast targets the bg type fully qualified.
+                            // `Vehicle_t.m_pDroidUnit` is `mp_bg`'s own `bgEntity_t`.
+                            // This crate's own `bgEntity_t` name is the prelude's `gentity_t` alias, so the
+                            // overlay cast targets the bg type fully qualified.
                             (*veh).m_pDroidUnit =
                                 droid_ent as *mut mp_bg::public::bg_entity::bgEntity_t;
                             (*droid_ent).alliedTeam = ent_allied;
@@ -991,9 +986,9 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
 pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
     unsafe {
         if (&ctx.world.globals.gNPCPtrs)[entNum as usize].is_null() {
-            // `gNPC_t` holds a `*mut AIGroupInfo_t` field (align 8); pad to an
-            // 8-byte boundary first (see `BG_AllocPad8`) so every `(*ptr).field`
-            // access downstream is safely dereferenceable.
+            // `gNPC_t` holds a `*mut AIGroupInfo_t` field with 8-byte alignment.
+            // Pad to an 8-byte boundary first, with `BG_AllocPad8`, so every `(*ptr).field` access downstream
+            // is safely dereferenceable.
             mp_bg::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
             (&mut ctx.world.globals.gNPCPtrs)[entNum as usize] = BG_Alloc(
                 core::mem::size_of::<gNPC_t>() as c_int,
@@ -1004,8 +999,9 @@ pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
         let ptr = (&ctx.world.globals.gNPCPtrs)[entNum as usize];
 
         if !ptr.is_null() {
-            // Byte-wise, like C's memset: `ptr` is BG_Alloc pool storage (4-byte
-            // aligned only), not guaranteed 8-aligned for gNPC_t's pointer field.
+            // This zeroes byte-wise, like C's `memset`.
+            // `ptr` is `BG_Alloc` pool storage, aligned to only 4 bytes, so it is not guaranteed 8-aligned for
+            // `gNPC_t`'s pointer field.
             core::ptr::write_bytes(ptr as *mut u8, 0, core::mem::size_of::<gNPC_t>());
         }
 
@@ -1017,13 +1013,14 @@ pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1356-1364`
 pub fn NPC_DefaultScriptFlags(ent: &gentity_t) {
-    // Ctx-free leaf takes `&gentity_t`; the caller's `ent.is_null()` guard is
-    // vacuous behind a reference (dropped), the `NPC` guard is preserved.
+    // This ctx-free leaf takes `&gentity_t`.
+    // The caller's `ent.is_null()` guard is vacuous behind a reference, so it is dropped, and the `NPC` guard
+    // stays.
     let npc = ent.NPC;
     if npc.is_null() {
         return;
     }
-    // gNPC_t deref stays raw (recipe 2c): copied pointer value, tight unsafe.
+    // The `gNPC_t` deref stays raw: a copied pointer value in a tight `unsafe` block.
     unsafe {
         (*npc).scriptFlags = SCF_CHASE_ENEMIES | SCF_LOOK_FOR_ENEMIES;
     }
@@ -1034,8 +1031,9 @@ pub fn NPC_DefaultScriptFlags(ent: &gentity_t) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:1377-1763`
 pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        // Return stays raw `*mut gentity_t` (return conversion is a later pass).
+        // The `EntityId` parameter re-derives to a raw pointer, and the body stays verbatim raw-pointer code,
+        // as open work.
+        // The return stays a raw `*mut gentity_t`, because return-type conversion is a later pass.
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut newent: *mut gentity_t = core::ptr::null_mut();
         let mut save_org: vec3_t = [0.0; 3];
@@ -1091,8 +1089,9 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 "{}ERROR: NPC G_Alloc NPC failed\n",
                 latin1_to_string(S_COLOR_RED.to_bytes())
             ));
-            // Raven: goto finish; (unreachable `return NULL;` right after — the
-            // goto always wins). Preserve control-flow, not shape (§C10).
+            // Raven: `goto finish;`.
+            // The `return NULL;` right after is unreachable, because the goto always wins.
+            // This preserves control flow, not shape (§C10).
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
@@ -1104,8 +1103,9 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         (*((*newent).NPC)).tempGoal = Some(crate::g_utils::G_Spawn(ctx));
 
         if (*((*newent).NPC)).tempGoal.is_none() {
-            // Oracle nulls NPC and `goto finish` — the finish path returns the
-            // (non-null) newent; the `return NULL` after the goto is unreachable.
+            // The oracle nulls `NPC` and does `goto finish`.
+            // The finish path returns the non-null `newent`, and the `return NULL` after the goto is
+            // unreachable.
             // Source: oracle/codemp/game/NPC_spawn.c:1442-1447,1756-1762
             (*newent).NPC = core::ptr::null_mut();
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
@@ -1135,11 +1135,12 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             return newent;
         }
 
-        // Byte-wise over sizeof(gclient_t): `client` is `*mut c_void` here, so a
-        // typed write_bytes would zero only 1 byte (size_of::<c_void>()), not the
-        // whole struct C's `memset(newent->client, 0, sizeof(*newent->client))`
-        // zeroes; the backing storage (G_CreateFakeClient -> BG_Alloc) is also
-        // only 4-byte aligned, below gclient_t's pointer-field alignment.
+        // This zeroes byte-wise, over `sizeof(gclient_t)`.
+        // `client` is `*mut c_void` here, so a typed `write_bytes` would zero only one byte
+        // (`size_of::<c_void>()`), not the whole struct that C's `memset(newent->client, 0,
+        // sizeof(*newent->client))` zeroes.
+        // The backing storage, from `G_CreateFakeClient` through `BG_Alloc`, is also aligned to only 4 bytes,
+        // below `gclient_t`'s pointer-field alignment.
         core::ptr::write_bytes(
             (*newent).client as *mut u8,
             0,
@@ -1151,8 +1152,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         if (*ent).NPC_type.is_none() {
             (*ent).NPC_type = Some("random".to_owned());
         } else {
-            // Raven `Q_strlwr(G_NewString(NPC_type))` — lowercase the owned name in
-            // place (ASCII, matching Q_strlwr).
+            // Raven does `Q_strlwr(G_NewString(NPC_type))`.
+            // This lowercases the owned name in place, ASCII only, matching `Q_strlwr`.
             let lowered = (*ent).NPC_type.as_deref().unwrap().to_ascii_lowercase();
             (*ent).NPC_type = Some(lowered);
         }
@@ -1168,22 +1169,22 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
 
         if (*ent).message.is_some() {
-            // Raven aliased the one `message` allocation; the owned `String`
-            // clone is content-identical (no pointer-identity compares exist).
+            // Raven aliased the one `message` allocation.
+            // The owned `String` clone is content-identical, because no pointer-identity compares exist.
             (*newent).message = (*ent).message.clone();
             (*newent).flags |= FL_NO_KNOCKBACK;
         }
 
         if Q_stricmp(&(*ent).classname_str(), "NPC_Vehicle") == 0 {
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
+                // A raw store is required here, because this is bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
-            // `NPC_type` is `Some` here (normalized above); materialize a
-            // `CString` for the vehicle-loader consumers that still take
-            // `*const c_char` (bg tier / `G_Create*NPC`).
+            // `NPC_type` is `Some` here, already normalized above.
+            // This materializes a `CString` for the vehicle-loader consumers that still take `*const c_char`,
+            // in the bg tier and `G_Create*NPC`.
             let npc_type_c = cstr((*ent).NPC_type.as_deref().unwrap());
             let i_veh_index = BG_VehicleGetIndex(
                 npc_type_c.as_ptr(),
@@ -1242,8 +1243,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             (*((*newent).m_pVehicle)).m_vOrientation =
                 &mut (*((*newent).client)).ps.vehOrientation[0] as *mut f32;
 
-            // Overlay cast to `mp_bg`'s `bgEntity_t` (this crate's `bgEntity_t` is the
-            // prelude `gentity_t` alias).
+            // This overlay-casts to `mp_bg`'s `bgEntity_t`.
+            // This crate's own `bgEntity_t` name is the prelude's `gentity_t` alias.
             (*((*newent).m_pVehicle)).m_pParentEntity =
                 newent as *mut mp_bg::public::bg_entity::bgEntity_t;
             crate::veh_dispatch::initialize(ctx, (*newent).m_pVehicle);
@@ -1317,11 +1318,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         if (*newent).health == 0 {
             (*newent).health = (*ent).health;
         }
-        // `NPC_targetname` is an owned `String` (`""` ≡ absent); `targetname` and
-        // `script_targetname` are PREFIX slots the engine reads. Raven aliased one
-        // pool allocation into both; the two `set` writes are content-identical
-        // (no pointer-identity compare exists — verified). Empty → NULL, matching
-        // Raven's NULL-pointer alias when unset.
+        // `NPC_targetname` is an owned `String`, where an empty string stands for absent.
+        // `targetname` and `script_targetname` are PREFIX slots the engine reads.
+        // Raven aliased one pool allocation into both, so the two `set` writes are content-identical, because
+        // no pointer-identity compare exists.
+        // An empty string maps to NULL, matching Raven's NULL-pointer alias when the field is unset.
         {
             let npc_targetname = (*ent).NPC_targetname.clone();
             if npc_targetname.is_empty() {
@@ -1332,9 +1333,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 ctx.ent_set(__teid16, PrefixSet::Targetname(Some(&npc_targetname)));
             }
         }
-        // `NPC_target` and `target` are both owned `String`/`Option<String>` now
-        // (`""`/`None` ≡ absent); the copy is a plain owned move (ruling C: only
-        // `message` translates `\n` — NPC target names carry no escapes).
+        // `NPC_target` and `target` are now both owned, as `String`/`Option<String>`, where an empty string
+        // or `None` stands for absent.
+        // The copy is a plain owned move, per the string migration's ruling C: only `message` translates
+        // `\n`, because NPC target names carry no escapes.
         (*newent).target = {
             let npc_target = (*ent).NPC_target.clone();
             if npc_target.is_empty() {
@@ -1385,8 +1387,9 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         if !(*ent).parms.is_null() {
             for parm_num in 0..MAX_PARMS {
-                // Raven's `parm[parmNum]` null arm is constant-true (char array,
-                // never NULL); only the `[0]` emptiness check survives.
+                // Raven's `parm[parmNum]` null check is always true, because it is a char array and never
+                // NULL.
+                // Only the `[0]` emptiness check survives.
                 let p = &(*(*ent).parms).parm[parm_num as usize];
                 if p[0] != 0 {
                     Q3_SetParm(
@@ -1447,8 +1450,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent));
             }
             if let Some(ct) = (*ent).closetarget.clone() {
-                // `closetarget` is an owned `Option<String>` (G4); when set, it
-                // bridges into the owned `target` (both `\n`-translated at spawn).
+                // `closetarget` is an owned `Option<String>` (G4).
+                // When set, it bridges into the owned `target`, and both get `\n`-translated at spawn.
                 (*newent).target = Some(ct);
             }
             ctx.ent_set(ctx.entity_id_of(ent).unwrap(), PrefixSet::Targetname(None));
@@ -1467,7 +1470,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1765-1768`
 pub fn NPC_Spawn_Go(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: thin pass-through — `EntityId` forwarded directly (no re-derive).
+    // This is a thin pass-through. The `EntityId` forwards directly, with no re-derive.
     NPC_Spawn_Do(ctx, ent);
 }
 
@@ -1479,7 +1482,7 @@ pub fn NPC_ShySpawn(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).nextthink = nt;
     ctx.world.entity_mut(ent).think = Some(EntThink::NPC_ShySpawn).into();
 
-    // g_entities[0] is player 0, a real client slot (recipe 2b).
+    // `g_entities[0]` is player 0, a real client slot.
     let player0 = EntityId(0);
     let p0_origin = ctx.world.entity(player0).r.currentOrigin;
     let ent_origin = ctx.world.entity(ent).r.currentOrigin;
@@ -1509,7 +1512,7 @@ pub fn NPC_Spawn(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // `other`/`activator` are unused by the body (Raven use-handler signature).
+    // `other` and `activator` go unused in the body. This matches Raven's use-handler signature.
     if ctx.world.entity(ent).delay != 0 {
         if ctx.world.entity(ent).spawnflags & 2048 != 0 {
             ctx.world.entity_mut(ent).think = Some(EntThink::NPC_ShySpawn).into();
@@ -1615,16 +1618,16 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2103-2173`
 pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean {
     unsafe {
-        // `NPC_type` is `Option<String>` (`None` ≡ Raven NULL); pass a NULL
-        // pointer through to the bg-tier loader when unset, else a `CString`.
+        // `NPC_type` is `Option<String>`, where `None` stands for Raven's NULL.
+        // This passes a NULL pointer through to the bg-tier loader when unset, and a `CString` otherwise.
         let sp_npc_type = ctx.world.entity(spawner).NPC_type.clone();
         let sp_npc_type_c = sp_npc_type.as_deref().map(cstr);
         let sp_npc_type_ptr = sp_npc_type_c
             .as_ref()
             .map_or(core::ptr::null(), |c| c.as_ptr());
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
+            // A raw store is required here, because this is bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -1674,8 +1677,8 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
                         let anim_path = cstr(&format!("{}/animation.cfg", &gla_name[..slash_pos]));
 
                         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
-                        // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a raw
-                        // `*mut GameWorld` field fed by the `world_raw()` accessor.
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
+                        // A raw store is required here, because this is bg-seam re-entry, fed by the `world_raw()` accessor.
                         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                             world: ctx.world_raw(),
                             engine: ctx.engine,
@@ -1699,9 +1702,9 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             }
         }
 
-        // Raven prefers the spawner's `model2`, else the vehicle's `droidNPC`;
-        // `""` ≡ absent for both (`model2` owned, `droidNPC` non-null-and-non-
-        // empty per Raven's explicit guard).
+        // Raven prefers the spawner's `model2`, and falls back to the vehicle's `droidNPC`.
+        // An empty string stands for absent in both: `model2` is owned, and `droidNPC` must be non-null and
+        // non-empty, per Raven's explicit guard.
         let sp_model2 = ctx.world.entity(spawner).model2.clone();
         let droid_npc_type = if !sp_model2.is_empty() {
             sp_model2
@@ -1740,7 +1743,7 @@ pub fn NPC_VehicleSpawnUse(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // `other`/`activator` are unused by the body (Raven use-handler signature).
+    // `other` and `activator` go unused in the body. This matches Raven's use-handler signature.
     if ctx.world.entity(self_).delay != 0 {
         ctx.world.entity_mut(self_).think = Some(EntThink::G_VehicleSpawn).into();
         let nt = ctx.world.level.time + ctx.world.entity(self_).delay;
@@ -2654,11 +2657,12 @@ pub fn NPC_SpawnType(
     targetname: Option<&str>,
     isVehicle: qboolean,
 ) -> *mut gentity_t {
-    // STAGE-1: `ent` is `Option<EntityId>` (the body null-checks it); re-derived
-    // to a raw pointer, verbatim body preserved (Stage-2 debt). `npc_type` is a
-    // name string (`&str`); Raven's nullable `targetname` becomes `Option<&str>`
-    // so the "only set NPC_targetname when non-NULL" distinction is preserved.
-    // The return stays raw `*mut gentity_t` (return conversion is a later pass).
+    // `ent` is `Option<EntityId>`, and the body null-checks it, then re-derives it to a raw pointer, with the
+    // body preserved verbatim, as open work.
+    // `npc_type` is a name string (`&str`).
+    // Raven's nullable `targetname` becomes `Option<&str>`, so the "only set NPC_targetname when non-NULL"
+    // distinction is preserved.
+    // The return stays a raw `*mut gentity_t`, because return-type conversion is a later pass.
     let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |i| ctx.entity_mut(i));
     let npc_spawner_eid = G_Spawn(ctx);
     let npc_spawner = ctx.entity_mut(npc_spawner_eid) as *mut gentity_t;
@@ -2763,7 +2767,7 @@ pub fn NPC_SpawnType(
         }
     }
 
-    // Call precache funcs
+    //call precache funcs for James' builds
     let npc_type_str = npc_type;
 
     if Q_stricmp("gonk", npc_type_str) == 0 {
@@ -2842,8 +2846,8 @@ pub fn NPC_Spawn_f(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4045-4170`
 pub fn NPC_Kill_f(ctx: &mut GameContext) {
-    // Raven `TeamNames[TEAM_NUM_TEAMS]` (NPC_stats.c:133), the NPC team_t names
-    // (the many commented-out Trek-era entries collapse to these three).
+    // Raven's `TeamNames[TEAM_NUM_TEAMS]` (`NPC_stats.c:133`) holds the NPC `team_t` names.
+    // The many commented-out Trek-era entries collapse to these three.
     const TEAM_NAMES: [&str; TEAM_NUM_TEAMS as usize] = ["", "player", "enemy", "neutral"];
     let mut kill_team: team_t = TEAM_FREE;
     let mut kill_non_sf = 0u32;
@@ -2869,7 +2873,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             Com_Printf("NPC_Kill Error: 'npc kill team' requires a team name!\n");
             Com_Printf("Valid team names are:\n");
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
+                // Raven's `TeamNames[]` (`NPC_stats.c:133`) holds the NPC `team_t` names.
                 Com_Printf(&format!("{}\n", TEAM_NAMES[n as usize]));
             }
             Com_Printf("nonally - kills all but your teammates\n");
@@ -2886,7 +2890,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                 Com_Printf(&format!("NPC_Kill Error: team '{}' not recognized\n", name));
                 Com_Printf("Valid team names are:\n");
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                    // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
+                    // Raven's `TeamNames[]` (`NPC_stats.c:133`) holds the NPC `team_t` names.
                     Com_Printf(&format!("{}\n", TEAM_NAMES[n as usize]));
                 }
                 Com_Printf("nonally - kills all but your teammates\n");
@@ -2941,8 +2945,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                     player.NPC_type.as_deref().unwrap_or(""),
                     player.NPC_targetname.clone()
                 ));
-                // STAGE-1: raw pointer cast ends the `player` borrow before
-                // re-entering `ctx` (Stage-2 debt).
+                // This raw pointer cast ends the `player` borrow before re-entering `ctx`.
                 let player_ptr = player as *mut gentity_t;
                 G_FreeEntity(ctx, ctx.entity_id_of(player_ptr));
             }
@@ -2998,7 +3001,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:4172-4175`
 pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
     let targetname = ctx.world.entity(ent).targetname_str().unwrap_or_default();
-    // Pool client deref stays raw (recipe 2b): copied pointer value, tight unsafe.
+    // The pool client deref stays raw: a copied pointer value in a tight `unsafe` block.
     let client = ctx.world.entity(ent).client;
     let score = unsafe { (*client).ps.persistant[PERS_SCORE as usize] };
     Com_Printf(&format!("{targetname}: {score}\n"));
@@ -3041,7 +3044,6 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
                 NPC_PrintScore(ctx, ctx.entity_id_of(player.unwrap()).unwrap());
             }
         } else {
-            // Find specific NPC
             let found_ent = G_Find(
                 ctx,
                 ctx.entity_id_of(std::ptr::null_mut()),
