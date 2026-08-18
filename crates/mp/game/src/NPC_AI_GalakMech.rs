@@ -1,19 +1,12 @@
-// PORT-COMPLETE: NPC_AI_GalakMech.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_GalakMech.c`.
+//! Raven `NPC_AI_GalakMech.c`.
 //!
-//! All functions are ported: `GM_Move` reads the canonical `NIF_COLLISION`
-//! bit, `GM_CheckFireState`/`NPC_BSGM_Attack`/`NPC_BSGM_Default` place their
-//! `*4` state in `ctx.world.globals`, and `impactPos4` lives in
-//! `ctx.world.scratch.impact_pos_4` (safe-state Stage 3).
+//! `GM_CheckFireState`, `NPC_BSGM_Attack`, and `NPC_BSGM_Default` place their `*4` state in `ctx.world.globals`.
+//! The Raven file-static `vec3_t impactPos4` lives in `ctx.world.scratch.impact_pos_4`.
 //!
-//! Safe-state **2c** (deref regime): the gentity half is converted to
-//! `ctx.world.entity(id)` / `entity_mut(id)` accessor borrows — the laundered
-//! `g_entities`-base raw pointers (`npc_ent`/`enemy_ent`/`cover_ent`/…) are
-//! gone. Two irreducible raw-deref regimes remain, each FLAGged in-source and
-//! confined to tight `unsafe` blocks through a copied pointer value: the
-//! `gNPC_t` (`NPCInfo`) fields (no safe accessor) and the NPC's BG_Alloc'd pool
-//! `gclient_t` (`gClPtrs`, not `level.clients`). Behavior is byte-identical,
-//! referee-verified.
+//! The gentity half of the deref regime uses `ctx.world.entity(id)` / `entity_mut(id)` accessor borrows.
+//! Two raw-deref regimes remain, each flagged in source and confined to tight `unsafe` blocks through a copied pointer value.
+//! The `gNPC_t` (`NPCInfo`) fields have no safe accessor.
+//! The NPC's BG_Alloc'd pool `gclient_t` (`gClPtrs`) is not `level.clients`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::flags::{FL_NO_KNOCKBACK, FL_SHIELDED};
@@ -22,8 +15,8 @@ use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::g_utils::G_SoundOnEnt;
 use crate::trap;
-// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
-// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+// This shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version).
+// Genuine pointer-vs-pointer survivors keep the qualified path `crate::q_shared::Q_stricmp`.
 use native_string::Q_stricmp;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
@@ -31,45 +24,43 @@ use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
-// Raven's file-scope `#define`s (`NPC_AI_GalakMech.c:24-26`) — not central
-// constants, ported as file-local consts matching the C values.
+// Raven's file-scope `#define`s (`NPC_AI_GalakMech.c:24-26`) are not central constants.
+// They port as file-local consts that match the C values.
 pub const TURN_ON: c_int = 0x00000000;
 const TURN_OFF: c_int = 0x00000100;
 pub const GALAK_SHIELD_HEALTH: c_int = 500;
 
-// Raven `bState_t::BS_CINEMATIC` bare spelling (not glob-imported by the
-// prelude, unlike the other Raven enums it re-exports).
+// Raven `bState_t::BS_CINEMATIC` uses the bare spelling.
+// The prelude does not glob-import it, unlike the other Raven enums it re-exports.
 // Source: `oracle/codemp/game/b_public.h`
 const BS_CINEMATIC: bState_t = bState_t::BS_CINEMATIC;
 
-// Raven `HL_GENERIC1` (`NPC_AI_GalakMech.c` uses the bare hit-location
-// spelling; not glob-imported by the prelude).
+// Raven `HL_GENERIC1` uses the bare hit-location spelling in `NPC_AI_GalakMech.c`.
+// The prelude does not glob-import it.
 // Source: `oracle/codemp/game/g_local.h`
 use crate::entity::hit_location::HL_GENERIC1;
 use crate::q_shared;
 
-// Raven `gNPC_t::scriptFlags` bits (`SCF_*`, b_public.h:26-52) resolve to the
-// canonical `crate::npc::script_flags` consts through the prelude glob. The
-// former local placeholders here had guessed values (SCF_CHASE_ENEMIES 0x80,
-// SCF_DONT_FIRE 0x800, SCF_FIRE_WEAPON 0x1000 vs the real 0x400/0x4000/0x40000),
-// which masked the wrong scriptFlags bits — a live bug — so they were removed.
+// Raven `gNPC_t::scriptFlags` bits (`SCF_*`, `b_public.h:26-52`) resolve to the canonical
+// `crate::npc::script_flags` consts through the prelude glob.
+// The former local placeholders here had guessed values: `SCF_CHASE_ENEMIES 0x80`, `SCF_DONT_FIRE 0x800`, `SCF_FIRE_WEAPON 0x1000`,
+// instead of the real `0x400`/`0x4000`/`0x40000`.
+// Those guessed values masked the wrong scriptFlags bits, a live bug, so we removed them.
 
-// Raven `FRAMETIME` (`g_local.h:37`) = 100. Kept local (single-owner header,
-// deliberately not consolidated; see consolidation note) — value matches the oracle.
+// Raven `FRAMETIME` (`g_local.h:37`) equals 100.
+// This stays local to a single-owner header, deliberately not consolidated (see consolidation note).
+// The value matches the oracle.
 const FRAMETIME: c_int = 100;
 
-// Raven `NIF_COLLISION` (`navInfo_t::flags` bit) resolves to the canonical
-// `crate::npc::nav_info_s::NIF_COLLISION` through the prelude glob.
+// Raven `NIF_COLLISION` (`navInfo_t::flags` bit) resolves to the canonical `crate::npc::nav_info_s::NIF_COLLISION` through the prelude glob.
 
-// Raven file-static `vec3_t impactPos4` — shared across GM_CheckFireState,
-// NPC_BSGM_Attack, and others for caching impact positions. Now owned by
-// `GameWorld.scratch` (safe-state Stage 3, §B3), reached as
-// `ctx.world.scratch.impact_pos_4`.
+// Raven's file-static `vec3_t impactPos4` is shared across `GM_CheckFireState`, `NPC_BSGM_Attack`, and others for caching impact positions.
+// `GameWorld.scratch` now owns it (§B3), reached as `ctx.world.scratch.impact_pos_4`.
 // Source: `oracle/codemp/game/NPC_AI_GalakMech.c`
 
-// Vector helpers are the canonical `crate::q_math` forms reached via the
-// prelude glob: `_VectorCopy`/`_VectorSubtract`/`_VectorMA` (out-param) and
-// `VectorClear`. Source: `oracle/codemp/game/q_shared.h`
+// Vector helpers are the canonical `crate::q_math` forms reached via the prelude glob:
+// `_VectorCopy`/`_VectorSubtract`/`_VectorMA` (out-param) and `VectorClear`.
+// Source: `oracle/codemp/game/q_shared.h`
 
 // Distance constants for combat logic (derived from oracle source comments).
 // Source: `oracle/codemp/game/NPC_AI_GalakMech.c` (various lines with distance checks)
@@ -80,7 +71,7 @@ const REPEATER_ALT_SIZE: f32 = 3.0; // half of bbox size
                                     // Raven `#define GENERATOR_HEALTH 25`.
                                     // Source: `oracle/codemp/game/NPC_AI_GalakMech.c:23`
 const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
-                                    // Raven `#define ARMOR_EFFECT_TIME 500` (was a guessed 3000 — corrected).
+                                    // Raven `#define ARMOR_EFFECT_TIME 500` (this was a guessed 3000, now corrected).
                                     // Source: `oracle/codemp/game/w_saber.h:1`
 const ARMOR_EFFECT_TIME: c_int = 500;
 
@@ -107,11 +98,11 @@ pub fn NPC_GalakMech_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:59-98`
 pub fn NPC_GalakMech_Init(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; deref stays raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so the deref stays raw.
     let npc = ctx.world.entity(ent).NPC;
     let behavior_state = unsafe { *((&(*npc).behaviorState) as *const bState_t as *const c_int) };
     if behavior_state != BS_CINEMATIC as c_int {
-        // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+        // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
         let client = ctx.world.entity(ent).client;
         unsafe {
             (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] = GALAK_SHIELD_HEALTH;
@@ -213,13 +204,12 @@ pub fn GM_CreateExplosion(
 pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let level_time = ctx.world.level.time;
-        // Raven `vec3_origin` — resolved via the crate prelude (pass-3 symbol
-        // backfill).
+        // Raven's `vec3_origin` resolves via the crate prelude.
         if level_time - ctx.world.entity(self_).s.time < 4000 {
             // FIXME: need a real effect
             // self->s.powerups |= ( 1 << PW_SHOCKED );
             // self->client->ps.powerups[PW_SHOCKED] = level.time + 1000;
-            // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+            // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
             let client = ctx.world.entity(self_).client;
             (*client).ps.electrifyTime = level_time + 1000;
             if crate::g_timer::TIMER_Done(ctx, Some(self_), c"dyingExplosion".as_ptr()) != 0 {
@@ -325,11 +315,9 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
 /// Raven `NPC_GM_Pain`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:238-354`
-// The disabled `if (0)`/PW_GALAK_SHIELD-shield-down branch and the dead
-// `gPainPoint`/`point` store (both fully commented out in the oracle, and the
-// `if ( point )` array-as-pointer check is always true) have zero observable
-// effect; the `Q_irand`/`G_AddVoiceEvent`/timer paths below are the only
-// live behavior, ported faithfully.
+// The disabled `if (0)`/PW_GALAK_SHIELD-shield-down branch and the dead `gPainPoint`/`point` store are both fully commented out in the oracle.
+// The `if ( point )` array-as-pointer check is always true, so this branch has zero observable effect.
+// The `Q_irand`/`G_AddVoiceEvent`/timer paths below are the only live behavior.
 pub fn NPC_GM_Pain(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -337,13 +325,13 @@ pub fn NPC_GM_Pain(
     damage: c_int,
 ) {
     let inflictor = attacker;
-    let hitLoc: c_int = 1; // Raven: `int hitLoc = 1;` — never reassigned in this fn
+    let hitLoc: c_int = 1; // Raven's `int hitLoc = 1;` is never reassigned in this fn.
     let r#mod = ctx.world.globals.gPainMOD;
     let level_time = ctx.world.level.time;
 
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; deref stays raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so the deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
-    // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+    // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
 
     if ctx.world.entity(self_).lockCount == 0 && unsafe { (*client).ps.torsoTimer } <= 0 {
@@ -362,8 +350,8 @@ pub fn NPC_GM_Pain(
                 ctx.world.entity_mut(self_).count += 1;
                 let self_id = self_;
                 let delay = ctx.world.bg_state.rng.Q_irand(3000, 5000);
-                // §19: oracle derefs `self->NPC->blockedSpeechDebounceTime`
-                // unconditionally; the null guard is defensive.
+                // §19: Raven derefs `self->NPC->blockedSpeechDebounceTime` unconditionally.
+                // The null guard here is defensive.
                 // Source: oracle/codemp/game/NPC_AI_GalakMech.c:307
                 if !npc.is_null() {
                     unsafe {
@@ -389,7 +377,7 @@ pub fn NPC_GM_Pain(
 
     if inflictor.is_some() && ctx.world.entity(inflictor.unwrap()).lastEnemy == Some(self_) {
         // He force-pushed my own lobfires back at me
-        // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; deref stays raw.
+        // FLAG: gNPC_t (NPCInfo) has no safe accessor, so the deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int
             && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
@@ -437,10 +425,10 @@ pub fn NPC_GM_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:362-369`
 pub fn GM_HoldPosition(ctx: &mut GameContext) {
-    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall
-    // `.cast()`; no gentity field is dereffed here.
+    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall `.cast()`.
+    // No gentity field is dereffed here.
     let npc_ent = ctx.world.globals.NPC;
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; derefs stay raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         crate::NPC_combat::NPC_FreeCombatPoint(ctx, (*npc_info).combatPoint, 1);
@@ -462,11 +450,10 @@ pub fn GM_HoldPosition(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:376-408`
 pub fn GM_Move(ctx: &mut GameContext) -> qboolean {
-    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall
-    // `.cast()`.
+    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall `.cast()`.
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; deref stays raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so the deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         (*npc_info).combatMove = qtrue; // always move straight toward our goal
@@ -530,11 +517,10 @@ pub fn NPC_BSGM_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:440-460`
 pub fn GM_CheckMoveState(ctx: &mut GameContext) {
-    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall
-    // `.cast()`.
+    // `npc_ent` (globals.NPC) stays a raw pointer only for the ICARUS syscall `.cast()`.
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; derefs stay raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if trap::ICARUS_TaskIDPending(
@@ -598,7 +584,7 @@ pub fn GM_CheckMoveState(ctx: &mut GameContext) {
 pub fn GM_CheckFireState(ctx: &mut GameContext) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; derefs stay raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         let level_time = ctx.world.level.time;
@@ -612,7 +598,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
             return;
         }
 
-        // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+        // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
         let client = ctx.world.entity(npc_id).client;
         if !VectorCompare((*client).ps.velocity, vec3_origin) {
             // if moving at all, don't do this
@@ -689,7 +675,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                     }
 
                     if tooClose == qfalse && tooFar == qfalse {
-                        // okay to shoot at last pos
+                        // okay too shoot at last pos
                         _VectorSubtract((*npc_info).enemyLastSeenLocation, muzzle, &mut dir);
                         VectorNormalize(&mut dir);
                         vectoangles(dir, &mut angles);
@@ -726,7 +712,7 @@ pub fn NPC_GM_StartLaser(ctx: &mut GameContext) {
         {
             // NPC_SetAnim( NPC, SETANIM_TORSO, TORSO_RAISEWEAP2, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD );
         }
-        // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+        // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
         let client = ctx.world.entity(npc_id).client;
         let torso_timer = unsafe { (*client).ps.torsoTimer };
         crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"beamDelay".as_ptr(), torso_timer);
@@ -737,8 +723,8 @@ pub fn NPC_GM_StartLaser(ctx: &mut GameContext) {
             torso_timer + 3000,
         );
         ctx.world.entity_mut(npc_id).lockCount = 1;
-        // turn on warmup effect (Raven `vec3_origin` — resolved via the
-        // crate prelude, pass-3 symbol backfill).
+        // turn on warmup effect
+        // Raven's `vec3_origin` resolves via the crate prelude.
         let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
         crate::g_utils::G_PlayEffectID(
             G_EffectIndex(ctx, "galak/beam_warmup"),
@@ -773,7 +759,7 @@ pub fn GM_StartGloat(ctx: &mut GameContext) {
         animNumber_t::BOTH_STAND2TO1 as c_int,
         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
     );
-    // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+    // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     unsafe {
         (*client).ps.legsTimer += 500;
@@ -787,10 +773,10 @@ pub fn GM_StartGloat(ctx: &mut GameContext) {
 pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; derefs stay raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let level_time = ctx.world.level.time;
-    // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+    // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     unsafe {
         // Don't do anything if we're hurt
@@ -799,7 +785,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             return;
         }
 
-        // Victory animation section disabled with #if 0 in oracle
+        // The victory-animation section is disabled with `#if 0` in the oracle.
 
         // If we don't have an enemy, just idle
         if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse
@@ -956,12 +942,11 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             }
         } else {
             // Okay, we're not in a special attack, see if we should switch weapons or start a special attack
-            // (Raven's WP_REPEATER "he's deflecting my shots" branch is inside a
-            // `/* ... */` block comment in the oracle — dead code, not transcribed;
-            // its `Q_irand(0,50)`/`Q_irand(2000,6000)`/`Q_irand(0,1)` draws never run.)
+            // Raven's WP_REPEATER "he's deflecting my shots" branch sits inside a `/* ... */` block comment in the oracle.
+            // It is dead code, not transcribed, and its `Q_irand(0,50)`/`Q_irand(2000,6000)`/`Q_irand(0,1)` draws never run.
             // Source: `oracle/codemp/game/NPC_AI_GalakMech.c:813-828`
-            // Hoisted immutable entity reads (unchanged through this branch;
-            // `npc_origin`/`enemy_origin` reused from combat-state init above).
+            // These are hoisted immutable entity reads, unchanged through this branch.
+            // `npc_origin`/`enemy_origin` are reused from the combat-state init above.
             let enemy_anim_index = ctx.world.entity(enemy_id).localAnimIndex;
             let npc_lock_count = ctx.world.entity(npc_id).lockCount;
             let npc_loc_dmg = ctx.world.entity(npc_id).locationDamage[HL_GENERIC1 as usize];
@@ -1056,9 +1041,9 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     ctx.world.globals.enemyCS4 = qfalse; // not true, but should stop us from firing
                     ctx.world.globals.hitAlly4 = qtrue; // us!
                 } else {
-                    // `impactPos4` is a file static shared with GM_CheckFireState; copy it
-                    // out, let NPC_ShotEntity write through the local, then store back so the
-                    // later reads see the same value C's file-static vec3_t would hold.
+                    // `impactPos4` is a file static shared with `GM_CheckFireState`.
+                    // This copies it out, lets `NPC_ShotEntity` write through the local, then stores it back.
+                    // Later reads then see the same value that C's file-static `vec3_t` would hold.
                     let mut impactPos4 = ctx.world.scratch.impact_pos_4;
                     let hit = crate::NPC_combat::NPC_ShotEntity(
                         ctx,
@@ -1066,9 +1051,9 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                         Some(&mut impactPos4),
                     );
                     ctx.world.scratch.impact_pos_4 = impactPos4;
-                    // `hit_ent` is never NULL (base+index); the guards below survive as
-                    // `client != null` pointer checks. FLAG (task #7): the hit entity's
-                    // gclient_t is dereffed raw via the safe entity borrow (trap 2b).
+                    // `hit_ent` is never NULL (base+index).
+                    // The guards below survive as `client != null` pointer checks.
+                    // FLAG: the hit entity's gclient_t is dereffed raw via the safe entity borrow.
                     let hit_id = EntityId(hit as u32);
                     let hit_client = ctx.world.entity(hit_id).client;
                     let enemy_number = ctx.world.entity(enemy_id).s.number;
@@ -1102,8 +1087,8 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             ),
         ) != 0
         {
-            // C only declares hit/hitEnt here; the single NPC_ShotEntity call is below,
-            // after enemyLastSeenTime is set.
+            // C only declares hit/hitEnt here.
+            // The single `NPC_ShotEntity` call is below, after `enemyLastSeenTime` is set.
             if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"talkDebounce".as_ptr()) != 0
                 && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
             {
@@ -1139,13 +1124,13 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 
             (*npc_info).enemyLastSeenTime = level_time;
 
-            // `impactPos4` is a file static shared with GM_CheckFireState; copy it out, let
-            // NPC_ShotEntity write through the local, then store back (matches C's file-static).
+            // `impactPos4` is a file static shared with `GM_CheckFireState`.
+            // This copies it out, lets `NPC_ShotEntity` write through the local, then stores it back, matching C's file-static.
             let mut impactPos4 = ctx.world.scratch.impact_pos_4;
             let hit = crate::NPC_combat::NPC_ShotEntity(ctx, Some(enemy_id), Some(&mut impactPos4));
             ctx.world.scratch.impact_pos_4 = impactPos4;
-            // `hit_ent` is never NULL (base+index). FLAG (task #7): the hit entity's
-            // gclient_t is dereffed raw via the safe entity borrow (trap 2b).
+            // `hit_ent` is never NULL (base+index).
+            // FLAG: the hit entity's gclient_t is dereffed raw via the safe entity borrow.
             let hit_id = EntityId(hit as u32);
             let hit_client = ctx.world.entity(hit_id).client;
             let enemy_number = ctx.world.entity(enemy_id).s.number;
@@ -1208,8 +1193,9 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
             _VectorCopy(enemy_origin, &mut target);
 
-            // C: `flrand(-5,5) + (crandom()*(6-currentAim)*2)` runs in `double`
-            // (`crandom()` is `double`, `flrand`'s `float` widens); narrows to float.
+            // C evaluates `flrand(-5,5) + (crandom()*(6-currentAim)*2)` in `double`.
+            // `crandom()` returns `double`, and `flrand`'s `float` result widens to match.
+            // This narrows the result back to `float`.
             target[0] = (target[0] as f64
                 + (ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
                     + ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f64 * 2.0))
@@ -1323,13 +1309,14 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
         }
 
         if ctx.world.entity(npc_id).enemy.is_some() && ctx.world.entity(enemy_id).enemy.is_some() {
-            // The enemy's own enemy — a second EntityId hop off `enemy_id`, resolved
-            // only inside this guard (guaranteed `Some` by the check above).
+            // This is the enemy's own enemy, a second EntityId hop off `enemy_id`.
+            // It resolves only inside this guard, guaranteed `Some` by the check above.
             let eoe_id = ctx.world.entity(enemy_id).enemy.unwrap();
             if ctx.world.entity(enemy_id).s.weapon == WP_SABER as c_int
                 && ctx.world.entity(eoe_id).s.weapon == WP_SABER as c_int
             {
-                // don't shoot at an enemy jedi who is fighting another jedi, for fear of injuring one or causing rogue blaster deflections (a la Obi Wan/Vader duel at end of ANH)
+                // don't shoot at an enemy jedi who is fighting another jedi,
+                // for fear of injuring one or causing rogue blaster deflections (a la Obi Wan/Vader duel at end of ANH)
                 ctx.world.globals.shoot4 = qfalse;
             }
         }
@@ -1420,8 +1407,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     meansOfDeath_t::MOD_UNKNOWN as c_int,
                 );
                 crate::g_utils::G_Throw(ctx, enemy_id, smackDir, 100.0);
-                // FLAG (task #7): enemy entity's gclient_t dereffed raw via safe
-                // entity borrow (trap 2b).
+                // FLAG: the enemy entity's gclient_t is dereffed raw via the safe entity borrow.
                 let enemy_client = ctx.world.entity(enemy_id).client;
                 if enemy_client != core::ptr::null_mut() {
                     (*enemy_client).ps.electrifyTime = level_time + 1000;
@@ -1476,9 +1462,9 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 pub fn NPC_BSGM_Default(ctx: &mut GameContext) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG (task #7): gNPC_t (NPCInfo) has no safe accessor; derefs stay raw.
+    // FLAG: gNPC_t (NPCInfo) has no safe accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
+    // FLAG: the NPC pool gclient_t (gClPtrs) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     unsafe {
         if ((*npc_info).scriptFlags & SCF_FIRE_WEAPON) != 0 {
@@ -1514,7 +1500,7 @@ pub fn NPC_BSGM_Default(ctx: &mut GameContext) {
                 // armor regenerated, turn shield back on
                 // do a trace and make sure we can turn this back on?
                 let mut tr: trace_t = core::mem::zeroed();
-                // file-static shieldMins/shieldMaxs, not the dead if(0) block's -20/20/64 box.
+                // These are Raven's file-static `shieldMins`/`shieldMaxs`, not the dead `if(0)` block's -20/20/64 box.
                 let shield_mins = [-60.0, -60.0, -24.0];
                 let shield_maxs = [60.0, 60.0, 80.0];
                 let current_origin = ctx.world.entity(npc_id).r.currentOrigin;

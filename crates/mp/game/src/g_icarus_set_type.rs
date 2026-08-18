@@ -1,12 +1,11 @@
-//! MP game-tier `setType_t` + `setTable` — ICARUS SET_* property enum and its
-//! name/id lookup table.
+//! MP game-tier `setType_t` and `setTable`: the ICARUS SET_* property enum and its name/id lookup table.
 //!
-//! `setType_t` is duplicated from `mp_engine_icarus::q3_interface::set_type_t`
-//! (Q3_Interface.h) rather than imported: `mp/game` cannot depend on the
-//! engine tier (`docs/workspace-architecture.md` — only `ghoul2` is shared
-//! between `engine/*` and `cgame`; `icarus` is not), but `g_ICARUScb.c`
-//! (game-tier ICARUS callbacks) needs this enum and its `setTable` string
-//! lookup at the game layer. Kept byte-identical to the icarus-crate port.
+//! `setType_t` is duplicated from `mp_engine_icarus::q3_interface::set_type_t` (Q3_Interface.h) rather than imported.
+//! `mp/game` cannot depend on the engine tier (`docs/workspace-architecture.md`).
+//! Only `ghoul2` is shared between `engine/*` and `cgame`.
+//! `icarus` is not shared.
+//! `g_ICARUScb.c` (game-tier ICARUS callbacks) needs this enum and its `setTable` string lookup at the game layer.
+//! Kept byte-identical to the icarus-crate port.
 //!
 //! Type definition source: `oracle/codemp/icarus/Q3_Interface.h:6-255`
 //! `setTable` source: `oracle/codemp/game/g_ICARUScb.c:52-268`
@@ -56,7 +55,7 @@ pub enum setType_t {
     SET_PARM16,
 
     // Scripts and other file paths
-    /// Script to run when spawned
+    /// Script to run when spawned //0 - do not change these, these are equal to BSET_SPAWN, etc
     SET_SPAWNSCRIPT,
     /// Script to run when used
     SET_USESCRIPT,
@@ -96,31 +95,31 @@ pub enum setType_t {
     SET_ENEMY,
     /// Set for BS_FOLLOW_LEADER
     SET_LEADER,
-    /// Move to this navgoal then continue script
+    /// *Move to this navgoal then continue script
     SET_NAVGOAL,
     /// Set captureGoal by targetname
     SET_CAPTURE,
     /// Set angles toward ent by targetname
     SET_VIEWTARGET,
-    /// Set angles toward ent by targetname, will continue to face them (only in BS_CINEMATIC)
+    /// Set angles toward ent by targetname, will *continue* to face them... only in BS_CINEMATIC
     SET_WATCHTARGET,
     /// Set/change your targetname
     SET_TARGETNAME,
     /// Set/change what to use when hit
     SET_PAINTARGET,
-    /// All ents with this cameraGroup will be focused on
+    /// all ents with this cameraGroup will be focused on
     SET_CAMERA_GROUP,
-    /// What tag on all clients to try and track
+    /// What tag on all clients to try to track
     SET_CAMERA_GROUP_TAG,
-    /// Object for NPC to look at
+    /// object for NPC to look at
     SET_LOOK_TARGET,
-    /// Object to place on NPC right hand bolt
+    /// object to place on NPC right hand bolt
     SET_ADDRHANDBOLT_MODEL,
-    /// Object to remove from NPC right hand bolt
+    /// object to remove from NPC right hand bolt
     SET_REMOVERHANDBOLT_MODEL,
-    /// Object to place on NPC left hand bolt
+    /// object to place on NPC left hand bolt
     SET_ADDLHANDBOLT_MODEL,
-    /// Object to remove from NPC left hand bolt
+    /// object to remove from NPC left hand bolt
     SET_REMOVELHANDBOLT_MODEL,
     /// Color of text RED,WHITE,BLUE, YELLOW
     SET_CAPTIONTEXTCOLOR,
@@ -150,14 +149,16 @@ pub enum setType_t {
     SET_VIEWENTITY,
     /// Looping sound to play on entity
     SET_LOOPSOUND,
-    /// Specify name of entity to freeze
+    /// Specify name of entity to freeze - !!!NOTE!!! since the ent is frozen, it cannot unfreeze itself,
+    /// you must have some other entity unfreeze a frozen ent!!!
     SET_ICARUS_FREEZE,
-    /// Specify name of entity to unfreeze
+    /// Specify name of entity to unfreeze - !!!NOTE!!! since the ent is frozen, it cannot unfreeze itself,
+    /// you must have some other entity unfreeze a frozen ent!!!
     SET_ICARUS_UNFREEZE,
 
-    /// Key of text string to print
+    /// key of text string to print
     SET_SCROLLTEXT,
-    /// Key of text string to print in LCARS frame
+    /// key of text string to print in LCARS frame
     SET_LCARSTEXT,
 
     // Vectors
@@ -175,7 +176,7 @@ pub enum setType_t {
     SET_YVELOCITY,
     /// Velocity along Z axis
     SET_ZVELOCITY,
-    /// Vertical offset from original origin (offset/ent's speed * 1000ms is duration)
+    /// Vertical offset from original origin... offset/ent's speed * 1000ms is duration
     SET_Z_OFFSET,
     /// Pitch for NPC to turn to
     SET_DPITCH,
@@ -183,7 +184,7 @@ pub enum setType_t {
     SET_DYAW,
     /// Speed-up slow down game (0 - 1.0)
     SET_TIMESCALE,
-    /// When following an ent with the camera, apply this z ofs
+    /// when following an ent with the camera, apply this z ofs
     SET_CAMERA_GROUP_Z_OFS,
     /// How far away NPC can see
     SET_VISRANGE,
@@ -249,11 +250,11 @@ pub enum setType_t {
     SET_FORWARDMOVE,
     /// NPC move right -127(left) to 127
     SET_RIGHTMOVE,
-    /// Frame to start animation sequence on
+    /// frame to start animation sequence on
     SET_STARTFRAME,
-    /// Frame to end animation sequence on
+    /// frame to end animation sequence on
     SET_ENDFRAME,
-    /// Frame to set animation sequence to
+    /// frame to set animation sequence to
     SET_ANIMFRAME,
     /// Change an entity's count field
     SET_COUNT,
@@ -261,7 +262,7 @@ pub enum setType_t {
     SET_SHOT_SPACING,
     /// Amount of time until Mission Status should be shown after death
     SET_MISSIONSTATUSTIME,
-    /// Width of NPC bounding box
+    /// Width of NPC bounding box.
     SET_WIDTH,
 
     // Booleans
@@ -269,7 +270,7 @@ pub enum setType_t {
     SET_IGNOREPAIN,
     /// Do not acquire enemies
     SET_IGNOREENEMIES,
-    /// Do not get enemy set by allies in area (ambush)
+    /// Do not get enemy set by allies in area(ambush)
     SET_IGNOREALERTS,
     /// Others won't shoot you
     SET_DONTSHOOT,
@@ -301,7 +302,7 @@ pub enum setType_t {
     SET_NOAVOID,
     /// Make yourself notsolid or solid
     SET_SOLID,
-    /// Can be activated by the player's "use" button
+    /// Can be activateby the player's "use" button
     SET_PLAYER_USABLE,
     /// For non-NPCs, loop your animation sequence
     SET_LOOP_ANIM,
@@ -341,7 +342,7 @@ pub enum setType_t {
     SET_NO_COMBAT_TALK,
     /// NPCs will not do their combat talking noises when this is on
     SET_NO_ALERT_TALK,
-    /// Player has turned on his own - scripts will stop, NPCs will turn on him and level changes load the brig
+    /// Player has turned on his own- scripts will stop, NPCs will turn on him and level changes load the brig
     SET_TREASONED,
     /// Allows turning off an animating shader in a script
     SET_DISABLE_SHADER_ANIM,
@@ -349,11 +350,11 @@ pub enum setType_t {
     SET_SHADER_ANIM,
     /// Turns saber on/off
     SET_SABERACTIVE,
-    /// Only set this on things you move with script commands that you want to open/close area portals (Default is off)
+    /// Only set this on things you move with script commands that you *want* to open/close area portals.  Default is off.
     SET_ADJUST_AREA_PORTALS,
-    /// When true, only a heavy weapon class missile/laser can damage this ent
+    /// When true, only a heavy weapon class missile/laser can damage this ent.
     SET_DMG_BY_HEAVY_WEAP_ONLY,
-    /// When true, ion_cannon is shielded from any kind of damage
+    /// When true, ion_cannon is shielded from any kind of damage.
     SET_SHIELDED,
     /// This NPC cannot alert groups or be part of a group
     SET_NO_GROUPS,
@@ -361,9 +362,9 @@ pub enum setType_t {
     SET_FIRE_WEAPON,
     /// Makes NPC immune to jedi mind-trick
     SET_NO_MINDTRICK,
-    /// In lieu of using a target_activate or target_deactivate
+    /// in lieu of using a target_activate or target_deactivate
     SET_INACTIVE,
-    /// Provides an alternate way of changing func_usable to be visible or not, DOES NOT AFFECT SOLID
+    /// provides an alternate way of changing func_usable to be visible or not, DOES NOT AFFECT SOLID
     SET_FUNC_USABLE_VISIBLE,
     /// Increment secret areas found counter
     SET_SECRET_AREA_FOUND,
@@ -385,7 +386,7 @@ pub enum setType_t {
     SET_NO_ACROBATICS,
     /// When true NPC will always display subtitle regardless of subtitle setting
     SET_USE_SUBTITLES,
-    /// Removes entities that could muck up cinematics, explosives, turrets, seekers
+    /// Removes entities that could muck up cinematics, explosives, turrets, seekers.
     SET_CLEAN_DAMAGING_ENTS,
     /// Turns on/off HUD
     SET_HUD,
@@ -409,7 +410,7 @@ pub enum setType_t {
     SET_BEHAVIOR_STATE,
     /// Change fallback bState
     SET_DEFAULT_BSTATE,
-    /// Set/Change a temp bState
+    /// Set/Chang a temp bState
     SET_TEMP_BSTATE,
     /// Events you can initiate
     SET_EVENT,
