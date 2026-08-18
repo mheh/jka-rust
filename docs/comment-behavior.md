@@ -36,9 +36,13 @@ Raven comment content that was never transcribed into the Rust file (untranscrib
 
 `FLAG:` is a stable repo-wide marker (~557 sites across the crate), not campaign residue. The rule is the w_force pattern: keep the prefix and the restyled one-line fact, and drop the campaign-shorthand parenthetical. Treat the prefix like `SAFETY:`.
 
+Batch-2 addendum: "one-line fact" means one fact, not one line. A second sentence at a `FLAG:` site goes on its own line, per the one-sentence-per-line law.
+
 ## CB-7 - wave-recipe tags are residue (batch-1 walk, 2026-08-17)
 
 `recipe 2b`, `recipe 2c`, `trap 2b`, and bare `(2b)` delete uniformly, and the attached facts stay. Only the phrase `recipe rule 2b` is ledger-anchored (DEC-29). A site that leans on the prohibition itself cites `(DEC-29)` inline. A mixed cite keeps its real half: `(recipe §D12 / 2b)` becomes `(§D12)`.
+
+Batch-2 addendum: a frozen campaign gets no carve-out. DEC-31 froze the work, not the naming, so `Stage N` labels from frozen campaigns delete the same way. A citation a worker cannot anchor in `docs/` is residue too, and an invented anchor is worse than none (the fabricated `§B4` case).
 
 ## CB-8 - DEC-anchored named invariants read as one family (batch-1 walk, 2026-08-17)
 
