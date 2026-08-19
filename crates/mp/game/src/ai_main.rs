@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/ai_main.c`.
+//! Port of `oracle/codemp/game/ai_main.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
@@ -6,7 +6,7 @@
 //! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
 //! `bot_state_t*` / `gclient_t*` non-entity params stay raw.
 //! Some bodies re-derive the raw pointers verbatim at the top, inside `unsafe` blocks that hold genuine raw ops.
-//! This raw-pointer pattern is known debt for a future cleanup pass.
+//! This raw-pointer pattern remains, not yet replaced by typed entity views.
 //! Returns of `*mut gentity_t` stay raw.
 //! Callers bridge via `ctx.entity_id_of(ptr)`.
 //!
@@ -14,7 +14,6 @@
 //! The per-body entity/`bot_state_t`/`gclient_t` re-derives stay raw by design.
 //! `BotOrder`'s botstates table keeps one irreducible `&raw const` field pointer for live reads across
 //! `ctx`-mutating calls, marked in code.
-//! Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -321,7 +320,6 @@ pub fn BotMindTricked(ctx: &mut GameContext, botClient: c_int, enemyClient: c_in
 pub fn BotAI_Print(
     r#type: c_int,
     fmt: *mut c_char,
-    // The `...` C varargs tail has no seam decision yet.
 ) {
     // Raven: `void QDECL BotAI_Print(int type, char *fmt, ...) { return; }`.
     // This is a no-op stub in MP.
@@ -527,16 +525,16 @@ pub fn BotInputToUserCommand(
         let bi = &mut *bi;
         let ucmd = &mut *ucmd;
 
-        // clear the whole structure
+        //clear the whole structure
         core::ptr::write_bytes(ucmd as *mut usercmd_t, 0, 1);
-        // the duration for the user command in milli seconds
+        //the duration for the user command in milli seconds
         ucmd.serverTime = time;
 
         if bi.actionflags & ACTION_DELAYEDJUMP != 0 {
             bi.actionflags |= ACTION_JUMP;
             bi.actionflags &= !ACTION_DELAYEDJUMP;
         }
-        // set the buttons
+        //set the buttons
         if bi.actionflags & ACTION_RESPAWN != 0 {
             ucmd.buttons = BUTTON_ATTACK;
         }
@@ -560,7 +558,7 @@ pub fn BotInputToUserCommand(
         }
 
         if useTime < ctx.world.level.time && ctx.world.bg_state.rng.Q_irand(1, 10) < 5 {
-            // for now just hit use randomly in case there's something useable around
+            //for now just hit use randomly in case there's something useable around
             ucmd.buttons |= BUTTON_USE;
         }
 
@@ -569,12 +567,12 @@ pub fn BotInputToUserCommand(
         }
 
         ucmd.weapon = bi.weapon as u8;
-        // set the view angles
+        //set the view angles
         // NOTE: the ucmd->angles are the angles WITHOUT the delta angles
         ucmd.angles[PITCH] = ANGLE2SHORT(bi.viewangles[PITCH]);
         ucmd.angles[YAW] = ANGLE2SHORT(bi.viewangles[YAW]);
         ucmd.angles[ROLL] = ANGLE2SHORT(bi.viewangles[ROLL]);
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             let temp: c_short = (ucmd.angles[j] - *delta_angles.add(j)) as c_short;
             ucmd.angles[j] = temp as c_int;
@@ -668,7 +666,7 @@ pub fn BotUpdateInput(
             time,
             (*bs).noUseTime,
         );
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
@@ -702,7 +700,7 @@ pub fn BotAIRegularUpdate(ctx: &mut GameContext) {
 pub fn RemoveColorEscapeSequences(text: *mut c_char) {
     // Raven: strip Quake3 colour-escape pairs and drop bytes above 0x7E, in place.
     // `text[i]` is signed `char`, so `> 0x7E` catches only 0x7F (bytes >=0x80 are negative).
-    // This is faithful to the signed-char oracle behavior.
+    // This matches the signed-char oracle behavior.
     unsafe {
         let mut i: isize = 0;
         let mut l: isize = 0;
@@ -775,7 +773,7 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
 
         StandardBotAI(ctx, bs, thinktime);
 
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
@@ -853,7 +851,7 @@ pub fn BotAISetupClient(
 
         let bs = ctx.world.globals.botstates.ptr(client as usize);
 
-        // The reset above zeroed `inuse`, so this faithfully-preserved Raven guard
+        // The reset above zeroed `inuse`, so this Raven guard
         // (`if (bs && bs->inuse)`) never fires.
         // `bs` is a live `Box` address here, never null.
         if (*bs).inuse != qfalse {
@@ -955,8 +953,8 @@ pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboole
 /// Raven `BotResetState`.
 ///
 /// `cur_ps` is `Copy` and `settings` is moved out and back with `ptr::read`/
-/// `ptr::write` (its owned `String`s are preserved, never dropped), so the
-/// save/zero/restore mirrors Raven's memcpy+memset+memcpy exactly.
+/// `ptr::write` (its owned `String`s survive, never dropped), so the
+/// save/zero/restore mirrors Raven's memcpy+memset+memcpy.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:924-959`
 pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -975,7 +973,7 @@ pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
         // Byte-wise: `bs` is B_Alloc/BG_Alloc pool storage (4-byte aligned only),
         // not guaranteed 8-aligned for bot_state_t's pointer fields.
         core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
-        // Copy back the preserved state.
+        // Copy back the saved state.
         (*bs).ms = movestate;
         (*bs).gs = goalstate;
         (*bs).ws = weaponstate;
@@ -7497,7 +7495,6 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     {
                         // Raven stores a bool compare into the float `mLen`, making the guard
                         // below unreachable.
-                        // This port preserves it.
                         mLen = (VectorLength(a) > 128.0) as c_int as f32;
                         if mLen > 128.0 && mLen < 1024.0 {
                             _VectorSubtract(

@@ -1,7 +1,7 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Stormtrooper.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Stormtrooper.c`.
 //!
 //! The `fnskel.py` signature skeleton landed this file.
-//! The pass-3 mega-pass filled every remaining body against the settled fork rulings: ctx threading, `Option<EntityId>` stored fields, and the bg/game state split.
+//! Pass 3 filled every remaining body against the settled fork rulings: ctx threading, `Option<EntityId>` stored fields, and the bg/game state split.
 //! File-scope AI globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) and this file's own file-statics (`enemyLOS`, `enemyCS`, `enemyInFOV`, `faceEnemy`, `hitAlly`, `move`, `shoot`, `enemyDist`, genuine cross-frame state) reach through `ctx.world` and `ctx.world.globals`.
 //!
 //! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5).
@@ -10,7 +10,6 @@
 //! The ambient `NPC` global stays a raw `*mut gentity_t` value only where a syscall needs `.cast()` or a pointer compare (`NPC == group->commander`) demands it.
 //! Its `npc_id` handle feeds every other field reach.
 //! Genuinely accessorless graphs stay raw in tight `unsafe` blocks with `// FLAG:` notes: `gNPC_t` (`NPCInfo`, no accessor), the `AIGroupInfo` group graph (`group`, `group.enemy`, `group.commander`, `member[]`, reached only through `gNPC_t.group`), and BG_Alloc'd pool clients (`ent.client`, read through the safe entity borrow, then deref'd raw).
-//! Behavior is byte-identical and referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::{
@@ -121,10 +120,10 @@ pub fn ST_AggressionAdjust(self_: &gentity_t, change: c_int) {
         let client = (*self_).client;
         // FIXME: base this on initial NPC stats (Raven comment).
         let (upper_threshold, lower_threshold) = if (*client).playerTeam == NPCTEAM_PLAYER {
-            // good guys are less aggressive
+            //good guys are less aggressive
             (7, 1)
         } else {
-            // bad guys are more aggressive
+            //bad guys are more aggressive
             (10, 3)
         };
 
@@ -185,9 +184,9 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
         let client = ctx.world.entity(self_).client;
 
         if failChance >= 0.0 {
-            // a negative failChance makes it always talk
+            //a negative failChance makes it always talk
             if !(*npc).group.is_null() {
-                // group AI speech debounce timer
+                //group AI speech debounce timer
                 if (*(*npc).group).speechDebounceTime > ctx.world.level.time {
                     return;
                 }
@@ -201,11 +200,11 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 }
                 */
             } else if TIMER_Done(ctx, Some(self_), c"chatter".as_ptr()) == 0 {
-                // personal timer
+                //personal timer
                 return;
             } else if ctx.world.globals.groupSpeechDebounceTime.get((*client).playerTeam as usize).is_some_and(|&t| t > ctx.world.level.time)
             {
-                // for those not in group AI
+                //for those not in group AI
                 // FIXME: let certain speech types interrupt others? Let closer NPCs
                 // interrupt farther away ones? (Raven comment).
                 return;
@@ -1808,8 +1807,8 @@ pub fn ST_ResolveBlockedShot(ctx: &mut GameContext, hit: c_int) {
         TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
         let npc_id_4 = ctx.entity_id_of(NPC);
         let delay = ctx.world.bg_state.rng.Q_irand(1000, 3000);
-        // Raven typo `"attakDelay"` preserved verbatim (parity: a distinct timer
-        // key from "attackDelay", never read elsewhere).
+        // Raven's typo `"attakDelay"` is a distinct timer key from `"attackDelay"`.
+        // No code reads `"attakDelay"` elsewhere.
         TIMER_Set(ctx, npc_id_4, c"attakDelay".as_ptr(), delay);
     }
 }
@@ -1856,9 +1855,9 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
                 || (*group).numState[SQUAD_SCOUT as usize] > 0)
         // laying down covering fire
         {
-            if ctx.world.level.time - (*NPCInfo).enemyLastSeenTime < 10000 // we have seen the enemy in the last 10 seconds
+            if ctx.world.level.time - (*NPCInfo).enemyLastSeenTime < 10000 //we have seem the enemy in the last 10 seconds
                 && (group.is_null() || ctx.world.level.time - (*group).lastSeenEnemyTime < 10000)
-            // we are not in a group or the group has seen the enemy in the last 10 seconds
+            //we are not in a group or the group has seen the enemy in the last 10 seconds
             {
                 if ctx.world.bg_state.rng.Q_irand(0, 10) == 0 {
                     // Fire on the last known position
@@ -2074,7 +2073,8 @@ pub fn ST_TransferTimers(ctx: &mut GameContext, self_: EntityId, other: EntityId
     let other_id_4 = Some(other);
     let self_id_4 = Some(self_);
     let scout_left = TIMER_Get(ctx, self_id_4, c"scout".as_ptr()) - ctx.world.level.time;
-    // Raven reads timer key `"scout"`, not `"scoutTime"`. This looks like a bug, and the port keeps it faithful for parity (§S19).
+    // Raven reads timer key `"scout"`, not `"scoutTime"`.
+    // This looks like a bug, and the port keeps it as-is.
     TIMER_Set(ctx, other_id_4, c"scoutTime".as_ptr(), scout_left);
     let other_id_5 = Some(other);
     let self_id_5 = Some(self_);

@@ -1,11 +1,10 @@
-//! FAITHFUL port of `oracle/codemp/game/g_ICARUScb.c`.
+//! Port of `oracle/codemp/game/g_ICARUScb.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
 //! Every entity reach is a checked `ctx.world.entity[_mut](id)` borrow.
 //! The per-body raw `*mut gentity_t` re-derives are gone, and seam trap handles are re-derived fresh at each `trap::*` call.
 //! The remaining `unsafe` blocks hold only sanctioned raw ops: pool-client (`gclient_t`) and `gNPC_t` derefs through copied pointer values, `parms_t` pool derefs, the `*mut *mut c_char` out-param, the `bState_t` transmutes, and `cstr_to_str` string reads.
-//! Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::CStr;
@@ -63,7 +62,7 @@ pub fn G_DebugPrint(
     ctx: &mut GameContext,
     level: c_int,
     text: &str,
-    // The variadic `...` C varargs argument has a pending seam decision.
+    // The variadic `...` C varargs argument still needs a design decision.
 ) {
     if ctx.world.cvars.g_developer.integer != 2 {
         return;
@@ -416,7 +415,7 @@ pub fn Blocked_Mover(ctx: &mut GameContext, ent: EntityId, other: Option<EntityI
     let damage = ctx.world.entity(ent).damage;
     if damage != 0 {
         // Raven passes `NULL` for both `dir` and `point`.
-        // `dir` is now `Option<&mut vec3_t>`, so `None` is faithful.
+        // `dir` is now `Option<&mut vec3_t>`, so `None` matches Raven's `NULL`.
         // `point` is still a by-value `vec3_t` with no null representation, so the zero vector (`vec3_origin`) remains the stand-in there.
         G_Damage(
             ctx,
@@ -818,7 +817,7 @@ pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     }
 
     if let Some(die_fn) = ctx.world.entity(vid).die.get() {
-        // `dispatch_die` is the fn-ptr-dispatch seam: it takes the raw
+        // `dispatch_die` is the fn-ptr dispatch point: it takes the raw
         // `gentity_t*` Raven passed (victim thrice) and re-derives ids inside.
         let vp = ctx.world.entity_mut(vid) as *mut gentity_t;
         crate::ent_fn_enums::dispatch_die(ctx, die_fn, vp, vp, vp, o_health, MOD_UNKNOWN as c_int);
@@ -3434,7 +3433,7 @@ pub fn Q3_SetUndying(ctx: &mut GameContext, entID: c_int, undying: qboolean) {
 
 /// Raven `Q3_SetInvincible`.
 ///
-/// Raven: the debug message says "Invicible" (typo preserved verbatim).
+/// Raven: the debug message says "Invicible" (a typo).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4210-4214`
 pub fn Q3_SetInvincible(ctx: &mut GameContext, entID: c_int, invincible: qboolean) {
     G_DebugPrint(
@@ -3446,7 +3445,7 @@ pub fn Q3_SetInvincible(ctx: &mut GameContext, entID: c_int, invincible: qboolea
 
 /// Raven `Q3_SetForceInvincible`.
 ///
-/// Raven: the debug message says "Invicible" (typo preserved verbatim).
+/// Raven: the debug message says "Invicible" (a typo).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4224-4228`
 pub fn Q3_SetForceInvincible(ctx: &mut GameContext, entID: c_int, forceInv: qboolean) {
     G_DebugPrint(
@@ -4065,7 +4064,7 @@ pub fn Q3_ScrollText(ctx: &mut GameContext, id: *const c_char) {
 ///
 /// Raven: the `trap_SendServerCommand` call is commented out.
 /// The body is a debug-print stub only.
-/// Raven's message string says "Q3_ScrollText" too, preserved verbatim, not a transcription error.
+/// Raven's message string says "Q3_ScrollText" too, and that is not a transcription error.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:5006-5012`
 pub fn Q3_LCARSText(ctx: &mut GameContext, id: *const c_char) {
     G_DebugPrint(
@@ -4106,7 +4105,7 @@ pub fn Q3_Set(
         // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms below now routes through the shared libc `%f` scanner `native_string::sscanf::sscanf_f32s`.
         // It stops at the first failure and takes the longest-prefix parse, matching libc, not a naive whitespace split.
         // Per porting-rules §19: C leaves any component `sscanf` fails to parse UNINITIALIZED, garbage-float UB on `vector_data`.
-        // We pick leaving the 0.0 seed above unmodified as the one defined behavior.
+        // Leaving the 0.0 seed above unmodified is the one defined behavior chosen here.
         match toSet {
             _ if toSet == SET_ORIGIN as i32 => {
                 {

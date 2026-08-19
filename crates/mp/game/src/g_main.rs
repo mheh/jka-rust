@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_main.c`.
+//! Port of `oracle/codemp/game/g_main.c`.
 //!
 //! The `GAME_CVAR_TABLE` per-row register and update loops (`G_RegisterCvars`/`G_UpdateCvars`) use a mechanical
 //! `field_mut` dispatch plus `resolve_cvar_flags` string-to-int folding.
@@ -77,7 +77,7 @@ pub fn G_Error(ctx: &mut GameContext, msg: &str) {
 /// Source: `oracle/codemp/game/g_main.c:736-781`
 pub fn G_FindTeams(ctx: &mut GameContext) {
     // This is a raw-pointer walk.
-    // It is an audited unsafe seam helper for the disjoint-but-aliasing-shaped `e`/`e2` double loop over the same
+    // It is an audited unsafe helper for the disjoint-but-aliasing-shaped `e`/`e2` double loop over the same
     // array.
     unsafe {
         let num_entities = ctx.world.level.num_entities;
@@ -128,7 +128,7 @@ pub fn G_FindTeams(ctx: &mut GameContext) {
 ///
 /// Raven's whole body is `#if 0`-guarded dead code (team-shader remap via `AddRemap`/`BuildShaderStateConfig`,
 /// neither ported).
-/// The live function faithfully does nothing.
+/// The live function does nothing.
 ///
 /// Source: `oracle/codemp/game/g_main.c:783-795`
 pub fn G_RemapTeamShaders() {}
@@ -434,7 +434,7 @@ pub fn G_UpdateCvars(ctx: &mut GameContext) {
 pub fn Com_Error(
     level: c_int,
     error: *const c_char,
-    // variadic `...`: C varargs. The seam decision is pending.
+    // Raven's variadic `...` is dropped. Callers format the message before calling.
 ) {
     // `level` is dropped on the sink path, matching Raven's `G_Error("%s", text)`
     // call site, which never passes it on.
@@ -483,7 +483,7 @@ pub fn AddTournamentPlayer(ctx: &mut GameContext) {
         if ctx.world.cvars.g_allowHighPingDuelist.integer == 0
             && ctx.world.clients[i as usize].ps.ping >= 999
         {
-            // don't add people who are lagging out if cvar is not set to allow it.
+            //don't add people who are lagging out if cvar is not set to allow it.
             i += 1;
             continue;
         }
@@ -590,7 +590,7 @@ pub fn AddPowerDuelPlayers(ctx: &mut GameContext) {
     let mut nonspec_doubles: c_int = 0;
     G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, qfalse);
     if nonspec_loners >= 1 && nonspec_doubles >= 2 {
-        // we have enough people, stop
+        //we have enough people, stop
         return;
     }
 
@@ -600,8 +600,8 @@ pub fn AddPowerDuelPlayers(ctx: &mut GameContext) {
     G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
 
     if loners < 1 || doubles < 2 {
-        // don't bother trying to spawn anyone yet if the balance is not
-        // even set up between spectators
+        //don't bother trying to spawn anyone yet if the balance is not
+        //even set up between spectators
         return;
     }
 
@@ -682,7 +682,7 @@ pub fn RemovePowerDuelLosers(ctx: &mut GameContext) {
             && (cl.ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 || cl.iAmALoser != qfalse)
             && (cl.sess.sessionTeam != TEAM_SPECTATOR || cl.iAmALoser != qfalse)
         {
-            // he was dead or he was spectating as a loser
+            //he was dead or he was spectating as a loser
             remClients[remNum] = cl.ps.clientNum;
             remNum += 1;
         }
@@ -698,14 +698,14 @@ pub fn RemovePowerDuelLosers(ctx: &mut GameContext) {
 
     let mut j = 0;
     while j < remNum {
-        // set them all to spectator
+        //set them all to spectator
                 SetTeam(ctx, EntityId(remClients[j] as u32), "s");
         j += 1;
     }
 
     ctx.world.globals.g_dontFrickinCheck = qfalse;
 
-    // recalculate stuff now that we have reset teams.
+    //recalculate stuff now that we have reset teams.
     CalculateRanks(ctx);
 }
 
@@ -831,13 +831,13 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
     }
 }
 
-// DESIGN NOTE (reviewed 2026-07-06): why `bg_lib::qsort` over `slice::sort_by` or libc `qsort_r`, and why widening
+// DESIGN NOTE: why `bg_lib::qsort` over `slice::sort_by` or libc `qsort_r`, and why widening
 // the element is permutation-safe.
 //
 // 1. The oracle sorts with Raven's own qsort, not libc's qsort.
 //    `bg_lib.c:105` holds the Bentley-McIlroy "Engineering a Sort Function" qsort, outside every `Q3_VM` guard.
 //    It compiles into native builds and shadows libc inside the module.
-//    The referee oracle dylib confirms this: `_qsort` is defined `T`, with no undefined import.
+//    The oracle dylib confirms this: `_qsort` is defined `T`, with no undefined import.
 //    A "match libc qsort" strategy would match the wrong algorithm.
 //
 // 2. Element-size invariance: every position in the algorithm is an index scaled by `es`.
@@ -853,7 +853,7 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
 //    is every pair of clients at match start.
 //
 // 4. The trap the alternatives set: for `n < 7`, Bentley-McIlroy takes its insertion-sort path, which is stable.
-//    A stable `slice::sort_by` agrees for 2 to 6 clients, so every small referee scenario passes.
+//    A stable `slice::sort_by` agrees for 2 to 6 clients, so every small test scenario passes.
 //    The divergence only shows at 7 or more connected clients, when the real unstable quicksort path first runs.
 //    This is a latent, scenario-dependent parity bug that could surface in an 8-player replay long after the sort
 //    call stopped looking suspect.
@@ -2891,7 +2891,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
         // Entities where `i >= MAX_CLIENTS` are NPCs carrying `BG_Alloc`'d pool clients, not `clients[i]`.
         // It holds the raw `ent`/`client` pointers across dozens of interleaved `ctx` subsystem calls
         // (`G_RunMissile`/`G_Damage`/`G_SetAnim`/`WP_*`), and mutates entity and pool-client state in lockstep.
-        // This stays on the raw-pointer body for a dedicated referee-gated conversion.
+        // This stays on the raw-pointer body. Converting it needs a dedicated pass.
         // The surrounding `G_RunFrame` sub-loops are converted above and below.
         let mut i: c_int = 0;
         while i < ctx.world.level.num_entities {

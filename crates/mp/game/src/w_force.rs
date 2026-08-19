@@ -11,7 +11,6 @@
 //! Ctx-free leaf helpers borrow `&gentity_t`/`&mut gentity_t`.
 //! Entity fields are read and written through `ctx.world.entity(id)`/`entity_mut(id)` at the point of use.
 //! `gclient_t`/vehicle-vtable derefs stay raw in tight `unsafe` blocks through a copied pointer value, because NPC targets can carry pool clients.
-//! Behavior is byte-identical and referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::npc::g_npc_t::gNPC_t;
@@ -68,7 +67,7 @@ use mp_bg::bg_saber::BG_ForcePowerDrain;
 // vec3 origin (`{0,0,0}`), the all-zero trace mins/maxs sentinel.
 use crate::q_math::vec3_origin;
 
-// These const and enum families keep their faithful Raven names.
+// These const and enum families keep their Raven names.
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::*;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
@@ -130,14 +129,14 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         }
 
         // FLAG: gclient_t deref stays raw. `ent` can be an NPC carrying a pool client.
-        // We read the pointer value through the safe entity borrow.
+        // The pointer value is read through the safe entity borrow.
         let ent = match ent {
             Some(e) if !ctx.entity(e).client.is_null() => e,
             _ => return,
         };
         let cl = ctx.entity(ent).client;
         // `ent`'s eType/number/svFlags are invariant across this function.
-        // Only `cl`, temp entities, and cvars/traps are mutated, so we hoist them once as Copy locals.
+        // Only `cl`, temp entities, and cvars/traps are mutated, so they are hoisted once as Copy locals.
         let ent_etype = ctx.entity(ent).s.eType;
         let ent_number = ctx.entity(ent).s.number;
         let ent_svflags = ctx.entity(ent).r.svFlags;
@@ -287,7 +286,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             ) == 0) as qboolean;
         }
 
-        // We read the buffer back out after the legalize step.
+        // The buffer is read back out after the legalize step.
         // Raven re-reads `forcePowers[i]` in the parse loop below.
         // This is the same array `BG_LegalizedForcePowers` just wrote into, not the pre-call string.
         let fp_bytes = forcePowers.into_bytes();
@@ -495,7 +494,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         // Raven shifts by forcePowerSelected while it can still be -1 (a fresh client is set to -1 above).
         // This is shift-by-negative UB.
         // x86/ARM both mask the count (equivalent to `1<<31`, never a known power).
-        // The masked shift is the one defined behavior we pick here (porting rule 19).
+        // The masked shift is the one defined behavior chosen here (porting rule 19).
         if (*cl).ps.fd.forcePowersKnown & 1i32.wrapping_shl((*cl).ps.fd.forcePowerSelected as u32)
             == 0
         {
@@ -520,7 +519,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // FLAG: gclient_t deref stays raw. `ent` can be an NPC pool client.
-        // We read the pointer value through the safe entity borrow.
+        // The pointer value is read through the safe entity borrow.
         let cl = ctx.entity(ent).client;
 
         (*cl).ps.saberAttackChainCount = 0;
@@ -626,7 +625,7 @@ pub fn ForcePowerUsableOn(
         // `attacker` and `other` can be NPCs or vehicles carrying pool clients.
         // `*_cl` is null when the handle is `None`, or when its `.client` field is null.
         // This matches Raven's paired guard.
-        // `other`'s scalar fields are invariant here, so we hoist them once as Copy locals.
+        // `other`'s scalar fields are invariant here, so they are hoisted once as Copy locals.
         let other_cl: *mut gclient_t = match other {
             Some(o) => ctx.entity(o).client,
             None => core::ptr::null_mut(),
@@ -1243,7 +1242,7 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
@@ -1359,7 +1358,7 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
@@ -1463,8 +1462,8 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
 pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // FLAG: gclient_t deref stays raw.
-        // We read the pointer value through the safe entity borrow.
-        // `self_`'s number is invariant here, so we hoist it as a local.
+        // The pointer value is read through the safe entity borrow.
+        // `self_`'s number is invariant here, so it is hoisted as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -1548,15 +1547,15 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
                     && !ctx.entity(veh_id).client.is_null()
                     && !ctx.entity(veh_id).m_pVehicle.is_null()
                 {
-                    // FLAG: Vehicle_t (`m_pVehicle`/`m_pVehicleInfo`) is a C++ seam type with no accessor.
+                    // FLAG: Vehicle_t (`m_pVehicle`/`m_pVehicleInfo`) is a C++ type with no accessor.
                     // Its derefs stay raw.
                     let pVeh = ctx.entity(veh_id).m_pVehicle;
                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                         || (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_ANIMAL
                     {
                         //push the guy off
-                        // FLAG: `veh_dispatch::eject` is a seam function that takes a raw `bgEntity_t*` alongside `ctx`.
-                        // We feed it a copied arena raw pointer, because restructuring it would mean touching that file too.
+                        // FLAG: `veh_dispatch::eject` takes a raw `bgEntity_t*` alongside `ctx`.
+                        // This feeds it a copied arena raw pointer, because restructuring it would mean touching that file too.
                         let target_raw =
                             ctx.world.entity_mut(target_id) as *mut gentity_t as *mut bgEntity_t;
                         veh_dispatch::eject(ctx, pVeh, target_raw, qfalse);
@@ -1846,7 +1845,7 @@ pub fn ForceLightningDamage(
 ) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let scl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -1962,7 +1961,7 @@ pub fn ForceLightningDamage(
 pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // FLAG: gclient_t deref stays raw.
-        // `self_`'s number is invariant here, so we hoist it as a local.
+        // `self_`'s number is invariant here, so it is hoisted as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
 
@@ -2003,7 +2002,7 @@ pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
                     continue;
                 }
                 // `traceEnt`'s fields are invariant until the terminal `ForceLightningDamage` call.
-                // We hoist the reads as Copy locals.
+                // The reads are hoisted as Copy locals.
                 let te_ownerNum = ctx.entity(te_id).r.ownerNum;
                 let te_weapon = ctx.entity(te_id).s.weapon;
                 let te_inuse = ctx.entity(te_id).inuse;
@@ -2197,7 +2196,7 @@ pub fn ForceDrainDamage(
 ) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let scl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -2301,7 +2300,7 @@ pub fn ForceDrainDamage(
 pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
     unsafe {
         // FLAG: gclient_t deref stays raw.
-        // `self_`'s number is invariant here, so we hoist it as a local.
+        // `self_`'s number is invariant here, so it is hoisted as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -2368,7 +2367,7 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
                 }
 
                 // `traceEnt`'s box/model fields are invariant until the terminal `ForceDrainDamage` call.
-                // We hoist the reads as Copy locals.
+                // The reads are hoisted as Copy locals.
                 let te_absmin = ctx.entity(te_id).r.absmin;
                 let te_absmax = ctx.entity(te_id).r.absmax;
                 let te_bmodel = ctx.entity(te_id).r.bmodel;
@@ -2589,7 +2588,7 @@ pub fn WP_GetVelocityForForceJump(
     unsafe {
         // FLAG: gclient_t deref stays raw.
         // An NPC entity can carry a pool client here.
-        // `ucmd` is a raw `*mut usercmd_t` seam parameter. Its derefs stay raw.
+        // `ucmd` is a raw `*mut usercmd_t` parameter. Its derefs stay raw.
         let cl = ctx.entity(self_).client;
 
         let mut pushFwd: f32 = 0.0;
@@ -2748,8 +2747,8 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 ) -> bool {
     unsafe {
         // FLAG: gclient_t and gNPC_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
-        // `tr` and `tookPower` are raw seam parameters.
+        // Pointer values are read through the safe entity borrow.
+        // `tr` and `tookPower` are raw parameters.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let self_npc = ctx.entity(self_).NPC;
@@ -2954,7 +2953,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -3278,7 +3277,7 @@ pub fn G_InGetUpAnim(ps: *mut playerState_t) -> bool {
 /// Source: `oracle/codemp/game/w_force.c:3025-3042`
 pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
     // FLAG: gclient_t deref stays raw. `ent` can be an NPC pool client.
-    // We read the pointer value through the safe entity borrow.
+    // The pointer value is read through the safe entity borrow.
     let cl = match ent {
         Some(e) if !ctx.entity(e).client.is_null() => ctx.entity(e).client,
         _ => return,
@@ -3300,7 +3299,7 @@ pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
 pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
     unsafe {
         // FLAG: gclient_t derefs stay raw. `self_` and targets can be NPC pool clients.
-        // We read the pointer value through the safe entity borrow.
+        // The pointer value is read through the safe entity borrow.
         // Entity fields are read through `ctx.world.entity(id)` at the point of use.
         // `push_list` holds `EntityId` handles, not raw `gentity_t*` pointers.
         let cl = ctx.entity(self_).client;
@@ -3723,7 +3722,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
             //method1:
             for x in 0..ent_count {
                 // FLAG: gclient_t deref stays raw. The target can be an NPC pool client.
-                // We read the pointer value through the safe entity borrow.
+                // The pointer value is read through the safe entity borrow.
                 let pcl = ctx.world.entity(push_list[x]).client;
                 let mut modPowerLevel = powerLevel;
 
@@ -3902,9 +3901,9 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                                     && !ctx.world.entity(veh_id).client.is_null()
                                     && !ctx.world.entity(veh_id).m_pVehicle.is_null()
                                 {
-                                    // FLAG: vehicle-vtable seam. `m_pVehicle`/`m_pVehicleInfo` derefs stay raw.
+                                    // FLAG: the vehicle vtable holds `m_pVehicle`/`m_pVehicleInfo`, and their derefs stay raw.
                                     // `eject` takes a raw `bgEntity_t*` (no EntityId overload, one-file rule).
-                                    // We materialize the pointer tight at the call site.
+                                    // The pointer is materialized tight at the call site.
                                     let pVeh = ctx.world.entity(veh_id).m_pVehicle;
                                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                                         || (*(*pVeh).m_pVehicleInfo).r#type
@@ -4140,7 +4139,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
 pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let wasActive = (*cl).ps.fd.forcePowersActive;
@@ -4279,8 +4278,8 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
 pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
-        // `self_`'s number is invariant, so we hoist it as a local.
+        // Pointer values are read through the safe entity borrow.
+        // `self_`'s number is invariant, so it is hoisted as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -4607,7 +4606,7 @@ fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
 fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // We read pointer values through the safe entity borrow.
+        // Pointer values are read through the safe entity borrow.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let g_time_since = ctx.world.globals.g_TimeSinceLastFrame;
@@ -4673,7 +4672,7 @@ fn WP_ForcePowerRun(
 ) {
     // Raven declares `extern usercmd_t ucmd;` here but never references it.
     unsafe {
-        // FLAG: gclient_t deref stays raw. `cmd` is a raw seam parameter.
+        // FLAG: gclient_t deref stays raw. `cmd` is a raw parameter.
         let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
 
@@ -4887,7 +4886,7 @@ pub fn WP_DoSpecificPower(
     forcepower: forcePowers_t,
 ) -> c_int {
     unsafe {
-        // FLAG: gclient_t deref stays raw. `ucmd` is a raw seam parameter.
+        // FLAG: gclient_t deref stays raw. `ucmd` is a raw parameter.
         let cl = ctx.entity(self_).client;
 
         let mut powerSucceeded = 1;
@@ -5028,7 +5027,7 @@ pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
     //Find another client that would be considered a threat.
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // `self_`'s number is invariant, so we hoist it as a local.
+        // `self_`'s number is invariant, so it is hoisted as a local.
         let scl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let mut besten: Option<EntityId> = None;
@@ -5085,7 +5084,7 @@ pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
 pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // FLAG: gclient_t derefs stay raw.
-        // `self_`'s number is invariant, so we hoist it as a local.
+        // `self_`'s number is invariant, so it is hoisted as a local.
         let cl = ctx.entity(self_).client;
         let self_number = ctx.entity(self_).s.number;
         let level_time = ctx.world.level.time;
@@ -5510,7 +5509,7 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
         let mut usingForce = qfalse;
         let mut prepower: c_int = 0;
 
-        // FLAG: gclient_t deref stays raw. `ucmd` is a raw seam parameter.
+        // FLAG: gclient_t deref stays raw. `ucmd` is a raw parameter.
         // `self_` null OR null-client returns, matching Raven's paired guard.
         let self_ = match self_ {
             Some(s) if !ctx.entity(s).client.is_null() => s,

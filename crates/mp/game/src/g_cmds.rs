@@ -1,8 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_cmds.c`.
-//!
-//! The jampgame mega-pass filled this file.
-//! Pass 2 retrofitted it with `ctx: GameContext`.
-//! Pass 3 blind-transcribed it against the settled fork rulings, the va/printf mapping table, and the EntityId/fn-enum idioms.
+//! Port of `oracle/codemp/game/g_cmds.c`.
 //!
 //! Every function has a real body.
 //! `ClientCommand`'s dispatch tail drops the `#ifdef _DEBUG`/`VM_MEMALLOC_DEBUG` branches as dead surface (§20).
@@ -157,7 +153,7 @@ pub fn DeathmatchScoreboardMessage(ctx: &mut GameContext, ent: EntityId) {
         stringlength += j;
     }
 
-    // still want to know the total # of clients
+    //still want to know the total # of clients
     let i = ctx.world.level.numConnectedClients;
 
     let cmd = format!(
@@ -616,7 +612,6 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
             if auto_ban > 0 && tkcount >= auto_ban {
                 // Oracle guards this with `if ( ent->client->sess.IPstring )`.
                 // IPstring is a `char[32]` array, so its address is never null, and this ban runs unconditionally.
-                // The port preserves the always-true quirk.
                 // `IPstring` is now a `String`, but `AddIP` still takes `char*`, so this stages it in a C buffer.
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
@@ -645,7 +640,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 trap::SendConsoleCommand(ctx.engine, EXEC_INSERT as c_int, &cc);
                 return;
             }
-            // okay, not gone (yet), but warn them...
+            //okay, not gone (yet), but warn them...
             if auto_ban > 0 && (auto_kick <= 0 || auto_ban < auto_kick) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "WARNINGTKBAN");
                 let s = format!("print \"{}\n\"", m);
@@ -697,7 +692,6 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
             if auto_ban > 0 && killcount >= auto_ban {
                 // Oracle guards this with `if ( ent->client->sess.IPstring )`.
                 // IPstring is a `char[32]` array, so its address is never null, and this ban runs unconditionally.
-                // The port preserves the always-true quirk.
                 // `IPstring` is now a `String`, but `AddIP` still takes `char*`, so this stages it in a C buffer.
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
@@ -755,7 +749,7 @@ pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // The EntityId port carries the owning entity, whose client index is `ent.index()`.
     let cidx = ent.index();
     for i in 0..ctx.world.level.maxclients {
-        // Faithful to Raven's `if (wCl && wCl != client && …)`.
+        // Raven's check is `if (wCl && wCl != client && …)`.
         // `wCl != client` is the slot-identity test, a different client than `ent`'s.
         if i as usize != cidx
             && ctx.world.client(i as usize).pers.connected == CON_CONNECTED
@@ -948,7 +942,7 @@ pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: &str) {
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             if ctx.world.client(cidx).tempSpectate >= ctx.world.level.time && team == TEAM_SPECTATOR
             {
-                // sorry, can't do that.
+                //sorry, can't do that.
                 return;
             }
 
@@ -1407,7 +1401,7 @@ pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
         // `ent` is the commanding player, so its client slot is `ent.index()`.
         let cidx = ent.index();
 
-        // Raven's `goto argCheck` is preserved here as the natural fall-through of the if/else below.
+        // Raven's `goto argCheck` becomes the natural fall-through of the if/else below.
         // Both arms reach the same trailing logic (§C10).
         if ctx.world.client(cidx).sess.sessionTeam == TEAM_SPECTATOR {
             crate::w_force::WP_InitForcePowers(ctx, Some(ent));
@@ -2085,7 +2079,7 @@ pub fn SanitizeString2(r#in: &str) -> String {
     // follower (Raven reads the NUL), so it takes the bare-`^` arm.
     while i < bytes.len() {
         if i >= MAX_NAME_LENGTH - 1 {
-            // the ui truncates the name here..
+            //the ui truncates the name here..
             break;
         }
 
@@ -2094,11 +2088,11 @@ pub fn SanitizeString2(r#in: &str) -> String {
         if c == b'^' {
             let next = if i + 1 < bytes.len() { bytes[i + 1] } else { 0 };
             if next >= b'0' && next <= b'9' {
-                // only skip it if there's a number after it for the color
+                //only skip it if there's a number after it for the color
                 i += 2;
                 continue;
             } else {
-                // just skip the ^
+                //just skip the ^
                 i += 1;
                 continue;
             }

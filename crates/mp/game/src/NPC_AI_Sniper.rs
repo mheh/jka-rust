@@ -869,7 +869,7 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
         }
 
         if ctx.world.entity(npc_id).enemy == None {
-            // WTF? somehow we lost our enemy?
+            //WTF?  somehow we lost our enemy?
             NPC_BSSniper_Patrol(ctx);
             return;
         }

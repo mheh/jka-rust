@@ -17,7 +17,7 @@ use crate::w_saber::HasSetSaberOnly;
 /// Raven's initializer list has only 16 entries, but the array is `[WP_NUM_WEAPONS]` (19).
 /// The trailing 3 slots are C zero-init NULL, and glibc `printf("%s", NULL)` renders those as `(null)`.
 /// The names are also index-shifted relative to the modern `weapon_t` enum, because they predate `WP_MELEE`.
-/// This is a faithful Raven quirk, preserved.
+/// This is a Raven quirk.
 /// Source: `oracle/codemp/game/g_log.c:79-97`
 const weaponNameFromIndex: [*const c_char; WP_NUM_WEAPONS as usize] = [
     c"No Weapon".as_ptr(),
@@ -42,7 +42,7 @@ const weaponNameFromIndex: [*const c_char; WP_NUM_WEAPONS as usize] = [
 ];
 
 /// Raven `G_LogWeaponInit`: zeroes every per-player weapon-log accumulator at level start.
-/// It faithfully omits `G_WeaponLogClientTouch`, because the oracle's `memset` list skips it.
+/// It omits `G_WeaponLogClientTouch`, because the oracle's `memset` list skips it.
 /// Source: `oracle/codemp/game/g_log.c:108-121`
 pub fn G_LogWeaponInit(ctx: &mut GameContext) {
     let g = &mut ctx.world.globals;
@@ -144,7 +144,7 @@ pub fn G_LogWeaponPowerup(ctx: &mut GameContext, client: c_int, powerupid: c_int
         return;
     }
     // Divergence (porting-rules §19): Raven sizes this array `[HI_NUM_HOLDABLE]`, but the caller passes PW_* ids (`g_items.c:2035`).
-    // The late PW values are an OOB write into adjacent statics, with a stats-dump-only effect, so we skip instead.
+    // The late PW values are an OOB write into adjacent statics, with a stats-dump-only effect, so this skips them instead.
     if powerupid as usize >= HI_NUM_HOLDABLE as usize {
         return;
     }
@@ -756,7 +756,7 @@ pub fn CalculateTactician(ctx: &mut GameContext, ent: EntityId, kills: *mut c_in
 }
 
 /// Raven `CalculateDemolitionist`: awards the explosive-kills leader, provided they averaged at least two explosive kills per minute.
-/// `playTime` is measured from the passed player, a faithful Raven quirk.
+/// `playTime` is measured from the passed player, a Raven quirk.
 /// Source: `oracle/codemp/game/g_log.c:1087-1134`
 pub fn CalculateDemolitionist(ctx: &mut GameContext, ent: EntityId, kills: *mut c_int) -> qboolean {
     // FLAG: gclient_t deref stays raw.
@@ -1306,7 +1306,6 @@ pub fn GetWorstEnemyForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
 /// Raven declares it `int weaponFromMOD[MOD_MAX]`, not a named enum, so this stays a plain array of `c_int`, not an enum.
 /// The designated-initializer list only covers the first 38 of `MOD_MAX` (45) entries.
 /// The trailing entries (`MOD_FORCE_DARK`..`MOD_TRIGGER_HURT`) are C zero-init, which is `WP_NONE` (0) anyway.
-/// This array is faithfully padded with `WP_NONE`.
 /// Source: `oracle/codemp/game/g_log.c:35-77`
 pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
     let mut table = [WP_NONE; meansOfDeath_t::MOD_MAX as usize];

@@ -51,7 +51,7 @@ impl GameContext<'_> {
     /// Unlike a read of `s.number`, this does not depend on that field being current.
     ///
     /// SAFETY: `ent` is NULL, or it points into this world's contiguous `g_entities` arena, the only place `gentity_t` values live.
-    /// The pointer-to-index arithmetic stays confined to the [`ent_id_opt`] seam helper.
+    /// The pointer-to-index arithmetic stays confined to the [`ent_id_opt`] helper.
     #[inline]
     pub fn entity_id_of(&self, ent: *const gentity_t) -> Option<EntityId> {
         unsafe { ent_id_opt(self.world.g_entities.as_ptr(), ent) }

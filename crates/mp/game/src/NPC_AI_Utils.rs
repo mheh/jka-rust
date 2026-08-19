@@ -14,7 +14,7 @@
 //! `gNPC_t` (`NPC`) has no accessor.
 //! NPCs carry a `BG_Alloc`'d pool `gclient_t` (`gClPtrs`, `g_utils.c:430`), not a `level.clients` slot, so `ent->client` is dereffed
 //! raw exactly as Raven does.
-//! This file is referee-blind, so parity rests on the compile and the golden test suite.
+//! Parity rests on the compile and the golden test suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

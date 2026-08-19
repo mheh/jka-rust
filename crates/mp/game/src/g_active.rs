@@ -2,12 +2,12 @@
 //!
 //! Entity parameters that cross this file's ABI seam are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
 //! A `gclient_t*` parameter becomes its owning entity's `EntityId`, or a `&mut gclient_t`/`&gentity_t` borrow for the ctx-free leaves.
-//! Many function bodies still hold raw seam derefs, for example gclient/`ps` walks, vehicle chases, and `pm`/ucmd traffic.
+//! Many function bodies still hold raw pointer derefs, for example gclient/`ps` walks, vehicle chases, and `pm`/ucmd traffic.
 //! These functions convert at the signature only.
 //! Each function re-derives its raw pointer(s) at the top of the body, for example `let ent: *mut gentity_t = ctx.entity_mut(id);`.
-//! The referee-verified body stays verbatim.
+//! The body stays unchanged.
 //! The remaining raw bodies are unconverted work.
-//! Behavior stays byte-identical because this is a mechanical reshape, and the referee verifies it.
+//! Behavior stays byte-identical because this is a mechanical reshape.
 //! An unconverted caller bridges its raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, non_camel_case_types, unused, clippy::all)]
 
@@ -591,7 +591,7 @@ pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_active.c:478-506`
 pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
     // The checked entity borrows read `ent`/`other` fields.
-    // The raw `*mut gentity_t` pairs get re-acquired at the point of use for the `dispatch_touch` seam, which threads `ctx`
+    // The raw `*mut gentity_t` pairs get re-acquired at the point of use for the `dispatch_touch` call, which threads `ctx`
     // alongside the two entity pointers.
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
@@ -650,7 +650,7 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
 pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
     // The checked entity borrows read `ent`/`hit` fields.
     // The `gclient_t*` deref stays raw because the client may be an NPC pool client.
-    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` seam calls.
+    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` calls.
     let client = ctx.world.entity(ent).client;
     unsafe {
         if client.is_null() {
@@ -782,7 +782,7 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_active.c:601-671`
 pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: vec3_t) {
     // The checked entity borrows read `ent`/`hit` fields.
-    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` seam call.
+    // The raw `*mut gentity_t` pairs get re-acquired at the `dispatch_touch` call.
     unsafe {
         // non-moving movers don't hit triggers!
         if VectorLengthSquared(ctx.world.entity(ent).s.pos.trDelta) == 0.0 {
@@ -908,8 +908,8 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             (*client).ps.speed = 400.0; // faster than normal
             (*client).ps.basespeed = 400;
 
-            // hmm, shouldn't have an anim if you're a spectator, make sure
-            // it gets cleared.
+            //hmm, shouldn't have an anim if you're a spectator, make sure
+            //it gets cleared.
             (*client).ps.legsAnim = 0;
             (*client).ps.legsTimer = 0;
             (*client).ps.torsoAnim = 0;
@@ -936,7 +936,9 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             // perform a pmove
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = GameCallbacksImpl {
-                // `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field, so a raw store is required here.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -972,7 +974,7 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             }
 
             if (*client).sess.spectatorState == SPECTATOR_FOLLOW && (*ucmd).upmove > 0 {
-                // jump now removes you from follow mode
+                //jump now removes you from follow mode
                 StopFollowing(ctx, ent);
             }
         }
@@ -1887,7 +1889,7 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
 pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut *mut usercmd_t) {
     // The checked entity borrow reads `ent`/`monster` fields.
     // The `gclient_t*` values `cl`/`mcl` are dereffed raw because the clients may be NPC pool clients.
-    // The Rancor attach is a bg-seam call over the raw client `ps`, and `ucmd` stays raw too.
+    // The Rancor attach call takes the raw client `ps`, and `ucmd` stays raw too.
     let cl = match ent {
         Some(e) => ctx.world.entity(e).client,
         None => core::ptr::null_mut(),
@@ -2199,7 +2201,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         // This code was moved here from clientThink to fix a problem with
         // g_synchronousClients being set to 1 when in vehicles.
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
-            // driving a vehicle
+            //driving a vehicle
             if !ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize]
                 .client
                 .is_null()
@@ -2209,12 +2211,12 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 let vehVehicle = (*veh).m_pVehicle;
 
                 if !vehVehicle.is_null() && (*vehVehicle).m_pPilot == ent as *mut _ {
-                    // only take input from the pilot...
+                    //only take input from the pilot...
                     let vehClient = (*veh).client;
                     (*vehClient).ps.commandTime = (*client).ps.commandTime;
                     (*vehVehicle).m_ucmd = (*client).pers.cmd;
                     if (*vehVehicle).m_ucmd.buttons & BUTTON_TALK != 0 {
-                        // forced input if "chat bubble" is up
+                        //forced input if "chat bubble" is up
                         (*vehVehicle).m_ucmd.buttons = BUTTON_TALK;
                         (*vehVehicle).m_ucmd.forwardmove = 0;
                         (*vehVehicle).m_ucmd.rightmove = 0;
@@ -3291,7 +3293,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         {
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = GameCallbacksImpl {
-                // `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field, so a raw store is required here.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -3843,7 +3847,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         // This code was moved here from clientThink to fix a problem with
         // g_synchronousClients being set to 1 when in vehicles.
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
-            // driving a vehicle
+            //driving a vehicle
             // run it
             let vehEnt =
                 &mut ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;

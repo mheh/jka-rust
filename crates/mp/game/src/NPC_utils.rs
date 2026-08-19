@@ -1,14 +1,14 @@
 //! Port of `oracle/codemp/game/NPC_utils.c`.
 //!
-//! SPINE (`docs/architecture/engine-seam.md`, precedent `w_force.rs`/`g_client.rs`) is the calling convention this file follows.
+//! This file follows the calling convention in `docs/architecture/engine-seam.md` (precedent `w_force.rs`/`g_client.rs`).
 //! Functions that reach `level`, cvars, `g_entities`, or traps thread a `GameContext<'_>` receiver.
 //! The receiver is `.world: *mut GameWorld` and `.engine`, added as an additive first parameter.
-//! The faithful C signature carries none of this.
+//! The C signature carries none of this.
 //! Globals live as `GameWorld` fields: `level` becomes `ctx.world.level`, and `g_entities[i]` becomes `ctx.world.g_entities[i]`.
 //! This file's own `teamNumbers`, `teamStrength`, and `teamCounter` file-scope globals were added to `GameWorld` the same way.
 //! The Raven names are kept (see `world/game_world.rs`).
 //! Traps go through `trap::X(ctx.engine, ...)`.
-//! Cross-file callees take the packet's resolved raw-pointer signatures verbatim, because their own porters thread the spine.
+//! Cross-file callees take raw-pointer signatures verbatim, because their own files use the same calling convention.
 //! Raw `gentity_t*`/`gclient_t*` chains stay `unsafe` raw-pointer field access that mirrors the C exactly.
 //!
 //! Entity-pointer params are `EntityId` or `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
@@ -139,7 +139,7 @@ pub fn CalcEntitySpot(
         }
         spot_t::SPOT_CHEST | spot_t::SPOT_HEAD => {
             // FLAG: the entity may be an NPC that carries a BG_Alloc'd pool client.
-            // We deref the client pointer raw, through the safe entity borrow.
+            // The client pointer derefs raw, through the safe entity borrow.
             let client = ctx.world.entity(ent_id).client;
             //Actual tag_head eyespot!
             //FIXME: Stasis aliens may have a problem here...
@@ -172,7 +172,7 @@ pub fn CalcEntitySpot(
         }
         spot_t::SPOT_HEAD_LEAN => {
             // FLAG: the entity may be an NPC that carries a BG_Alloc'd pool client.
-            // We deref the client pointer raw, through the safe entity borrow.
+            // The client pointer derefs raw, through the safe entity borrow.
             let client = ctx.world.entity(ent_id).client;
             if !client.is_null()
                 && unsafe { VectorLengthSquared((*client).renderInfo.eyePoint) } != 0.0
@@ -412,7 +412,7 @@ pub fn NPC_AimWiggle(ctx: &mut GameContext, enemy_org: &mut vec3_t) {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return;
     };
@@ -646,11 +646,11 @@ pub fn NPC_UpdateShootAngles(
 /// FIXME: Don't include medics?
 ///
 /// Raven's outer loop is `for ( i = 0; i < 1 ; i++ )`, a known-dead loop bound that only ever checks `g_entities[0]`.
-/// We preserve it faithfully (§C10/§19).
+/// This port keeps that loop bound (§C10/§19).
 /// The average-health division is UB in Raven when `teamNumbers[i] == 0`: int/int division, then an implicit float-to-int
 /// conversion on the `floor()` result.
 /// Rust's `f32` division yields `NaN`/`inf` instead, and `as c_int` on those saturates to 0.
-/// We pick that as the one defined behavior, per §19.
+/// That is the one defined behavior, per §19.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:818-847`
 pub fn SetTeamNumbers(ctx: &mut GameContext) {
@@ -758,7 +758,7 @@ pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char
     let target_slot = match found_slot {
         Some(s) => s,
         None => {
-            // didn't find it, create it
+            //didn't find it, create it
             match first_free {
                 None => {
                     crate::g_main::Com_Printf("WARNING: NPC has no free bone indexes\n");
@@ -779,7 +779,7 @@ pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char
     };
 
     // Copy the angles over the vector in the entitystate, so we can use the corresponding index
-    // to set the bone angles on the client.
+    //to set the bone angles on the client.
     {
         let e = ctx.world.entity_mut(ent);
         match target_slot {
@@ -922,7 +922,7 @@ pub fn NPC_ClearLOS(ctx: &mut GameContext, start: vec3_t, end: vec3_t) -> qboole
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -937,7 +937,7 @@ pub fn NPC_ClearLOS5(ctx: &mut GameContext, end: vec3_t) -> qboolean {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -952,7 +952,7 @@ pub fn NPC_ClearLOS4(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -967,7 +967,7 @@ pub fn NPC_ClearLOS3(ctx: &mut GameContext, start: vec3_t, ent: Option<EntityId>
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -982,7 +982,7 @@ pub fn NPC_ClearLOS2(ctx: &mut GameContext, ent: Option<EntityId>, end: vec3_t) 
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -1103,7 +1103,7 @@ pub fn NPC_TargetVisible(ctx: &mut GameContext, ent: Option<EntityId>) -> qboole
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -1221,7 +1221,7 @@ pub fn NPC_PickEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> *mut ge
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return core::ptr::null_mut();
     };
@@ -1285,7 +1285,7 @@ pub fn NPC_FindPlayer(ctx: &mut GameContext) -> qboolean {
 ///
 /// Raven: the live body is a hardcoded `return qfalse;//MOOT in MP`.
 /// The entire real implementation is commented out `#if 0`-style, dead in this build.
-/// We preserve it faithfully as an always-false stub.
+/// This stays an always-false stub.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1367-1399`
 fn NPC_CheckPlayerDistance() -> qboolean {
@@ -1295,7 +1295,7 @@ fn NPC_CheckPlayerDistance() -> qboolean {
 /// Raven `NPC_FindEnemy`.
 ///
 /// Raven: the `SVF_IGNORE_ENEMIES` branch is hardcoded `if (0)` dead source in the oracle (`//rwwFIXMEFIXME: support for flag`).
-/// We keep it as the always-false condition it faithfully is.
+/// It stays the always-false condition.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1407-1461`
 pub fn NPC_FindEnemy(ctx: &mut GameContext, checkAlerts: qboolean) -> qboolean {
@@ -1303,7 +1303,7 @@ pub fn NPC_FindEnemy(ctx: &mut GameContext, checkAlerts: qboolean) -> qboolean {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -1373,7 +1373,7 @@ pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboole
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -1494,7 +1494,7 @@ pub fn NPC_CheckCanAttackExt(ctx: &mut GameContext) -> qboolean {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return qfalse;
     };
@@ -1605,7 +1605,7 @@ pub fn NPC_CheckCharmed(ctx: &mut GameContext) {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return;
     };
@@ -1738,7 +1738,7 @@ pub fn NPC_EnemyRangeFromBolt(ctx: &mut GameContext, boltIndex: c_int) -> f32 {
     // §19: Raven reads the ambient `NPC` global, which is stale or null outside an NPC think.
     // For example, the G_SetEnemy or G_AlertTeam damage cascade runs outside an NPC think.
     // A stale value gave retail a wrong but crashless result, and a null value crashed retail.
-    // We pick the defined behavior: no current NPC returns early with no effect.
+    // The defined behavior: no current NPC returns early with no effect.
     let Some(npc_id) = ctx.entity_id_of(npc) else {
         return f32::MAX;
     };

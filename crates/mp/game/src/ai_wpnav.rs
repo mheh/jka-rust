@@ -1,6 +1,6 @@
-//! FAITHFUL port of `oracle/codemp/game/ai_wpnav.c`.
+//! Port of `oracle/codemp/game/ai_wpnav.c`.
 //!
-//! The waypoint/node arena globals keep their faithful C layout in `GameGlobals`.
+//! The waypoint/node arena globals keep the C layout in `GameGlobals`.
 //! `gWPArray` is `WpArray([*mut wpobject_t; 4096])`, a raw-pointer array into the `B_Alloc` bump arena.
 //! `nodetable` is `NodeTable(Box<[nodeobject_t; 16384]>)`.
 //! `gSpawnPoints` is `SpawnPointArray([*mut gentity_t; 64])`.
@@ -96,7 +96,7 @@ pub const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
 // `CONTENTS_PLAYERCLIP` / `MASK_PLAYERSOLID` come from the prelude (`mp_qshared::shared::surface_flags`).
 
 /// `trap_Trace` helper: a point/box solid trace.
-/// It faithfully passes NULL for `mins`/`maxs` when the caller wants a point trace, because Raven passes literal `NULL`.
+/// It passes NULL for `mins`/`maxs` when the caller wants a point trace, because Raven passes literal `NULL`.
 /// This keeps every trace call site a one-liner.
 #[inline]
 unsafe fn wp_trace(
@@ -284,13 +284,13 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                     }
 
                     if (i - inc_checker) > 4 {
-                        break; // don't render too many at once
+                        break; //don't render too many at once
                     }
                     i += 1;
                 }
 
                 if i >= ctx.world.globals.gWPNum {
-                    ctx.world.globals.gWPRenderTime = ctx.world.level.time as f32 + 1500.0; // wait a bit after we finish doing the whole trail
+                    ctx.world.globals.gWPRenderTime = ctx.world.level.time as f32 + 1500.0; //wait a bit after we finish doing the whole trail
                     ctx.world.globals.gWPRenderedFrame = 0;
                 }
             }
@@ -302,11 +302,11 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             let viewent_id = EntityId(0);
 
             if ctx.entity(viewent_id).client.is_null() {
-                // client isn't in the game yet?
+                //client isn't in the game yet?
                 return;
             }
 
-            let mut bestdist: f32 = 256.0; // max distance for showing point info
+            let mut bestdist: f32 = 256.0; //max distance for showing point info
             let mut gotbestindex = false;
 
             let mut i: c_int = 0;
@@ -338,7 +338,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 ctx.world.globals.gLastPrintedIndex = bestindex;
                 let flagstr_s = cstr_to_str(flagstr);
                 // C `%f` promotes the float weight to double and prints 6 decimals.
-                // We format via `as f64` to mirror that promotion exactly.
+                // The `as f64` cast mirrors that promotion.
                 // Source: `oracle/codemp/game/ai_wpnav.c:335`
                 let s = format!(
                     "^3Waypoint {}\nFlags - {} ({}) (w{:.6})\nOrigin - ({} {} {})\n",
@@ -352,11 +352,11 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 );
                 G_Printf(ctx, &s);
                 // GetFlagStr allocates 128 bytes for this, if it's changed then obviously this must be as well
-                B_TempFree(ctx, 128); // flagstr
+                B_TempFree(ctx, 128); //flagstr
 
                 let plum_id = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
                 ctx.entity_mut(plum_id).r.svFlags |= SVF_BROADCAST;
-                ctx.entity_mut(plum_id).s.time = bestindex; // render it once
+                ctx.entity_mut(plum_id).s.time = bestindex; //render it once
             } else if !gotbestindex {
                 ctx.world.globals.gLastPrintedIndex = -1;
             }
@@ -494,7 +494,7 @@ pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
 /// Raven `RemoveWP`.
 ///
 /// Pops the last waypoint.
-/// This faithfully reproduces Raven's `memset(p, 0, sizeof(p))`, the `sizeof` of the *pointer*, not the object.
+/// This reproduces Raven's `memset(p, 0, sizeof(p))`, the `sizeof` of the *pointer*, not the object.
 /// Only the first `size_of::<*mut wpobject_t>()` bytes (`origin[0..1]`) are zeroed before `inuse` is cleared.
 /// The slot memory is reused, never freed.
 ///
@@ -1050,7 +1050,6 @@ pub fn CanGetToVectorTravel(
 /// Branch-searches the node grid from `startindex` to `endindex`, then walks the found chain back inserting waypoints.
 /// It falls back to a one-way flag pair when unreachable.
 /// The `g_RMG` short-circuit at the top means the inner `g_RMG` branch-distance block is only reached when `g_RMG` is off.
-/// It is transcribed faithfully regardless.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1000-1399`
 pub fn ConnectTrail(
@@ -2027,7 +2026,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         let mut i_cv: isize;
 
         // Raven `B_TempAlloc`s `routePath` (1024 bytes), `Com_sprintf`s the path into it, opens the file, then `B_TempFree`s it.
-        // We build the path as an owned `String` directly, but we keep the alloc/free pair for bump-allocator stack parity.
+        // This port builds the path as an owned `String` directly, but keeps the alloc/free pair for bump-allocator stack parity.
         let _route_path = B_TempAlloc(ctx, 1024);
         let filename_s = cstr_to_str(filename);
         let route_path_s = format!("botroutes/{}.wnt", filename_s);
@@ -2356,7 +2355,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         }
 
         // See `LoadPathData`'s note. `routePath` is a `B_TempAlloc`'d scratch buffer in Raven.
-        // We keep the alloc/free pair for bump-allocator stack parity, even though we build the path as an owned `String`.
+        // The alloc/free pair stays for bump-allocator stack parity, even though the path builds as an owned `String`.
         let _route_path = B_TempAlloc(ctx, 1024);
         let filename_s = cstr_to_str(filename);
         let route_path_s = format!("botroutes/{}.wnt", filename_s);
@@ -2384,7 +2383,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         FlagObjects(ctx); // currently only used for flagging waypoints nearest CTF flags
 
         // C `%f` promotes each float arg to double and prints 6 decimals.
-        // We format the weight/origin/flLen fields via `as f64` to mirror that promotion.
+        // The weight/origin/flLen fields format via `as f64` to mirror that promotion.
         // Source: `oracle/codemp/game/ai_wpnav.c:2418,2447`
         let p0 = ctx.world.globals.gWPArray.0[i as usize];
         let mut file_string = format!(
@@ -2398,7 +2397,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         );
 
         // Raven builds `storeString` for waypoint 0's neighbor list but never concatenates it into `fileString`.
-        // This is a genuine Raven bug, preserved per §19.
+        // This is a genuine Raven bug, per §19.
         let mut n: c_int = 0;
         let mut store_string = String::new();
         while n < (*p0).neighbornum {
@@ -2810,7 +2809,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
         }
         let terrain_id = terrain_id.unwrap();
         // Terrain bounds are loop-invariant, because this fn never mutates the terrain entity.
-        // We hoist them to value copies, so the loops below hold no entity borrow.
+        // They hoist to value copies, so the loops below hold no entity borrow.
         let t_absmin = ctx.entity(terrain_id).r.absmin;
         let t_absmax = ctx.entity(terrain_id).r.absmax;
 

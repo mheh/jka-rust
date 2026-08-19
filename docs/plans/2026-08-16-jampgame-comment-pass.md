@@ -70,9 +70,11 @@ Lessons for the waves:
 
 Untranscribed Raven comment content found by the pilot (CB-5): the `ai_main_consts.rs` header glosses, the 13 `g_mover.c` QUAKED blocks, the `w_saber.rs:8506` trailing clause, the commented-out `VectorCopy` under the `g_utils` WTF block. A candidate transcription wave after this campaign, verified against the oracle side, not by token identity. The wave-1 through wave-4 reviews grew this inventory heavily: QUAKED blocks are missing across `g_team` (4), `g_target` (15), `NPC_spawn` (~50), `g_trigger` (12), `g_saga` (5), `g_nav` waypoints, and Raven FIXME/dead-code comment clusters are missing across the NPC AI files (`NPC_AI_GalakMech`, `NPC_AI_Sniper`, `NPC_reactions`, `NPC_senses`, `NPC_AI_Utils`, `g_turret_G2`, `g_log`, `g_navnew`, `NPC_stats`, `g_spawn`) - each wave's worker reports hold the per-file oracle line lists.
 
-Retroactive CB-12/CB-13/CB-14 sweep (rules ratified 2026-08-18, batch-4 walk): the 40 files committed in the pilot and waves 1-3 predate the assurance-voice, campaign-vocabulary, and port-status rules, so they still carry "faithful"/"preserved" assurance, "SPINE"/"mega-pass"/"packet" nouns, and progress-framed status notes. One dedicated sweep lane over those 40 files after the forward waves finish, same verification shape.
+Retroactive CB-12/CB-13/CB-14 sweep - EXECUTED 2026-08-19 (five lanes over the 40 pilot/wave-1-3 files, ~300 sites, plus the CB-15 seam rule and the leftover process cites). The `NPC_AI_Sniper.rs` `WTF?` double space rode the sweep as planned. The sweep walk added the referee-boilerplate example to CB-13 and ran a token-gap sweep over restored Raven comments.
 
-The `NPC_AI_Sniper.rs` single-space `WTF?` drift (oracle has a double space, site untouched by wave 4) rides the same sweep.
+Flagged for a future look (facts about test coverage, not assurance - plausibly fine): the "referee"/"byte-identical" scoping statements in `NPC_AI_Rancor.rs:7`, `NPC_AI_Wampa.rs:15`, `g_session.rs:168`, `g_icarus_set_type.rs:8`, `g_target.rs:243`, `trap.rs:1942`.
+
+The sweep grew the CB-5 inventory: `g_client.rs`'s `SET_ATTACKER` block drops two oracle lines about suicide-respawn rules (`g_client.c:292-293`), and `G_TempEntity`'s `//WTF?` block drops the trailing `//VectorCopy(...)` line (`g_utils.c:1071`).
 
 Wave 6 grew the CB-5 inventory further: untranscribed Raven inline comments and dead-code comment blocks across `NPC_AI_Mark1` (the largest set, ~20 sites), `NPC_AI_Droid` (~15 sites), `NPC_AI_Sentry` (7), `NPC_AI_ImperialProbe` (4), `g_object` (4), `g_timer` (3), and `g_vehicleTurret` (1) - the per-file oracle line lists live in the wave-6 worker reports.
 

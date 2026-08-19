@@ -1,6 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_items.c`.
-//!
-//! The jampgame mega-pass filled this file.
+//! Port of `oracle/codemp/game/g_items.c`.
 //!
 //! Client, NPC, and vehicle pointers stay raw throughout this file.
 //! An item, turret, or e-web callback may receive an NPC pool `gclient_t`, `gNPC_t`, or `Vehicle_t`, not a `level.clients` slot.
@@ -153,7 +151,7 @@ pub fn adjustRespawnTime(ctx: &mut GameContext, preRespawnTime: f32, kind: ItemK
         kind,
         ItemKind::Weapon(WP_THERMAL | WP_TRIP_MINE | WP_DET_PACK)
     ) {
-        // special case for these, use ammo respawn rate
+        //special case for these, use ammo respawn rate
         respawnTime = RESPAWN_AMMO;
     }
 
@@ -387,7 +385,7 @@ pub fn ShieldTouch(
             }
         }
     } else {
-        // let the person who dropped the shield through
+        //let the person who dropped the shield through
         if let (Some(p), Some(o)) = (parent, other) {
             if ctx.entity(p).s.number == ctx.entity(o).s.number {
                 ShieldGoNotSolid(ctx, self_);
@@ -633,7 +631,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
         ),
     );
     if tr.fraction > 0.9 {
-        // room in front
+        //room in front
         pos = tr.endpos;
         // drop to floor
         dest = [pos[0], pos[1], pos[2] - 4096.0];
@@ -876,7 +874,7 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
         if ctx.entity(target).s.eType == ET_NPC as c_int
             && ctx.entity(target).s.NPC_class == CLASS_VEHICLE as c_int
         {
-            // don't get mad at vehicles, silly.
+            //don't get mad at vehicles, silly.
             continue;
         }
 
@@ -1056,7 +1054,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     let mut clTrapped = qfalse;
     while i < numListedEntities {
         if iEntityList[i as usize] < mp_qshared::shared::MAX_CLIENTS as c_int {
-            // client stuck inside me. go nonsolid.
+            //client stuck inside me. go nonsolid.
             let clNum = iEntityList[i as usize];
 
             numListedEntities = trap::EntitiesInBox(
@@ -1324,7 +1322,7 @@ pub fn SP_PAS(ctx: &mut GameContext, base: EntityId) {
     }
 
     ctx.entity_mut(base).s.bolt1 = 1; // This is a sort of hack to indicate that this model needs special turret things done to it
-    ctx.entity_mut(base).s.bolt2 = ENTITYNUM_NONE; // store our current enemy index
+    ctx.entity_mut(base).s.bolt2 = ENTITYNUM_NONE; //store our current enemy index
 
     ctx.entity_mut(base).damage = 0; // start animation flag
 

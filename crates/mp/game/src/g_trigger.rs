@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_trigger.c`.
+//! Port of `oracle/codemp/game/g_trigger.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars, all `GameWorld` fields) through the threaded
 //! `GameContext`/`GameWorld` handle.
@@ -13,7 +13,6 @@
 //! An entity's `.client` field is a `level.clients` pointer only for a real client slot.
 //! NPC and vehicle triggers read the raw pointer value through the safe entity borrow and deref it in a tight
 //! `unsafe` block, the same as Raven.
-//! The referee suite confirms this behavior is byte-identical to the oracle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -123,7 +122,7 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
     let activator = ctx.world.entity(ent).activator;
 
     if ctx.world.entity(ent).genericValue4 != 0 {
-        // we want to activate target3 for team1 or target4 for team2
+        //we want to activate target3 for team1 or target4 for team2
         let gv4 = ctx.world.entity(ent).genericValue4;
         let target3 = ctx.world.entity(ent).target3.clone();
         let target4 = ctx.world.entity(ent).target4.clone();
@@ -150,7 +149,7 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.entity_mut(ent).nextthink = nt;
     } else if wait > 0.0 {
         if ctx.world.entity(ent).painDebounceTime != ctx.world.level.time {
-            // first ent to touch it this frame
+            //first ent to touch it this frame
             // C evaluates the whole right-hand side in `double`, because `crandom()` returns `double`.
             // The result truncates once into the `int` nextthink.
             let w = ctx.world.entity(ent).wait as f64;
@@ -164,7 +163,7 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
     } else if wait < 0.0 {
         // we can't just remove (self) here, because this is a touch function
         // called while looping through area links...
-        ctx.world.entity_mut(ent).r.contents &= !CONTENTS_TRIGGER; // so the EntityContact trace doesn't have to be done against me
+        ctx.world.entity_mut(ent).r.contents &= !CONTENTS_TRIGGER; //so the EntityContact trace doesn't have to be done against me
         ctx.world.entity_mut(ent).think = FnId::NONE;
         ctx.world.entity_mut(ent).use_ = FnId::NONE;
         // Don't remove, Icarus may barf?
@@ -200,11 +199,11 @@ pub fn G_NameInTriggerClassList(list: *mut c_char, str: *mut c_char) -> qboolean
             cmp[j as usize] = 0;
 
             if q_shared::Q_stricmp(str, cmp.as_ptr()) == 0 {
-                // found it
+                //found it
                 return qtrue;
             }
             if *list.offset(i) != b'|' as c_char {
-                // reached the end and never found it
+                //reached the end and never found it
                 return qfalse;
             }
             i += 1;

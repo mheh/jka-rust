@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_stats.c`.
+//! Port of `oracle/codemp/game/NPC_stats.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
@@ -634,7 +634,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                // Raven bug (transcribed faithfully): sprintf's from `token` (still "playerTeam"), not the just-parsed `value`.
+                // Raven bug: sprintf's from `token` (still "playerTeam"), not the just-parsed `value`.
                 let tk = format!("NPC{}", token);
                 player_team =
                     GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &tk);

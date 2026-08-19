@@ -1,6 +1,6 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC.c`.
+//! Port of `oracle/codemp/game/NPC.c`.
 //!
-//! The jampgame mega-pass filled this file, so all bodies are live.
+//! All bodies in this file are live.
 //! Functions that reach file-scope NPC-AI state (the `NPC`, `NPCInfo`, `client`, and `ucmd` file-scope globals,
 //! `level`, `g_entities`, cvars) read it through `ctx.world.globals`.
 //! These functions keep raw-pointer internals, deferred to the post-port refactor, matching the g_utils.c precedent.
@@ -64,7 +64,7 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
     crate::g_active::ClientThink(ctx, self_num, ucmd_ptr);
 
     // FLAG: the NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) is not a `level.clients` slot.
-    // The pointer is read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b).
+    // The pointer is read through the safe entity borrow, then dereffed raw exactly as Raven does.
     // §19: the oracle derefs `self->client` (NPC_class, ps, respawnTime, and so on) unconditionally throughout.
     // The `!client.is_null()` guards below are defensive.
     // Source: oracle/codemp/game/NPC.c:54-103
@@ -149,7 +149,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
     ctx.world.entity_mut(self_).nextthink = ctx.world.level.time + FRAMETIME;
 
     // FLAG: `gNPC_t` (NPCInfo) and the NPC pool `gclient_t` have no accessor.
-    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b/2c).
+    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does.
     // §19: the oracle derefs `self->NPC` and `self->client` unconditionally throughout.
     // The `!npc.is_null()`/`!client.is_null()` guards below are defensive.
     // Source: oracle/codemp/game/NPC.c:115-223
@@ -284,7 +284,7 @@ pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
     // This ctx-free leaf takes `&gentity_t`.
     // The `ent.is_null()` guard is vacuous behind a reference, so it is dropped.
     // The `client` null guard stays, because it is not vacuous.
-    // FLAG: the NPC pool `gclient_t` has no accessor, so the deref stays raw (recipe 2b).
+    // FLAG: the NPC pool `gclient_t` has no accessor, so the deref stays raw.
     let client = ent.client;
     if client.is_null() {
         return 0;
@@ -319,7 +319,7 @@ pub fn NPC_RemoveBodyEffect(ctx: &mut GameContext) {
     }
     let npc_id = ctx.entity_id_of(npc).unwrap();
     // FLAG: the NPC pool `gclient_t` has no accessor.
-    // The pointer is read through the safe entity borrow, only null-checked here and never dereffed (recipe 2b).
+    // The pointer is read through the safe entity borrow, only null-checked here and never dereffed.
     let client = ctx.world.entity(npc_id).client;
     if client.is_null() || (ctx.world.entity(npc_id).s.eFlags & EF_NODRAW) != 0 {
         return;
@@ -433,7 +433,7 @@ pub fn pitch_roll_for_slope(
 
         let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
 
-        // FLAG: the NPC pool `gclient_t` has no accessor, so the deref stays raw (recipe 2b).
+        // FLAG: the NPC pool `gclient_t` has no accessor, so the deref stays raw.
         let client = ctx.world.entity(forwhom).client;
         if !client.is_null() {
             (*client).ps.viewangles[PITCH] = dot * pitch;
@@ -475,7 +475,7 @@ pub fn DeadThink(ctx: &mut GameContext) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
     // FLAG: `gNPC_t` (NPCInfo) and the NPC pool `gclient_t` have no accessor.
-    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b/2c).
+    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does.
     let npc_info = ctx.world.globals.NPCInfo;
     let client = ctx.world.entity(npc_id).client;
     unsafe {
@@ -665,7 +665,7 @@ pub fn DeadThink(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC.c:617-623`
 pub fn SetNPCGlobals(ctx: &mut GameContext, ent: EntityId) {
     // FLAG: `gNPC_t` (NPCInfo) and the NPC pool `gclient_t` globals hold raw pointers with no accessor.
-    // The fields are read through the safe entity borrow and stored verbatim (recipe 2b/2c).
+    // The fields are read through the safe entity borrow and stored verbatim.
     let npc_info = ctx.world.entity(ent).NPC;
     let client = ctx.world.entity(ent).client;
     let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
@@ -759,7 +759,7 @@ pub fn NPC_ApplyScriptFlags(ctx: &mut GameContext) {
         BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING,
     };
 
-    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so all derefs stay raw (recipe 2c).
+    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so all derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         let scriptFlags = (*npc_info).scriptFlags;
@@ -819,7 +819,7 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
 
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so all derefs stay raw (recipe 2c).
+    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so all derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         //FIXME: make these flags checks a function call like NPC_CheckAIFlagsAndTimers
@@ -844,7 +844,7 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
             && (*npc_info).greetingDebounceTime < ctx.world.level.time
         {
             // This makes two `Q_irand` draws as call args, and the C evaluation order is unspecified.
-            // The referee-oracle compiler (g++-16) verifies that args evaluate left-to-right, so the event draw precedes the delay draw.
+            // The oracle's C++ compiler (g++-16) evaluates call args left to right here, so the event draw precedes the delay draw.
             // Source: oracle/codemp/game/NPC.c:813
             let ev = ctx.world.bg_state.rng.Q_irand(
                 entity_event_t::EV_VICTORY1 as c_int,
@@ -898,7 +898,7 @@ pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
 
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so derefs stay raw (recipe 2c).
+    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
         // If they don't have an enemy they shouldn't hold their attack anim.
@@ -942,7 +942,7 @@ pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
 pub fn NPC_KeepCurrentFacing(ctx: &mut GameContext) {
     // `PITCH`/`YAW` resolve to the canonical `crate::q_math` consts via the prelude.
 
-    // FLAG: the NPC pool `gclient_t` has no accessor, so derefs stay raw (recipe 2b).
+    // FLAG: the NPC pool `gclient_t` has no accessor, so derefs stay raw.
     let client = ctx.world.globals.client;
     unsafe {
         if ctx.world.globals.ucmd.angles[YAW] == 0 {
@@ -1260,7 +1260,7 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
     // FLAG: `gNPC_t` (NPCInfo) and the NPC pool `gclient_t` have no accessor.
-    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b/2c).
+    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does.
     // `npc_ent` is retained only as the raw ABI handle passed across the trap seam.
     let npc_info = ctx.world.globals.NPCInfo;
     let client = ctx.world.entity(npc_id).client;
@@ -1439,7 +1439,7 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
     // FLAG: `gNPC_t` (NPCInfo) and the NPC pool `gclient_t` have no accessor.
-    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b/2c).
+    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does.
     let npc_info = ctx.world.globals.NPCInfo;
     let client = ctx.world.globals.client;
     unsafe {
@@ -1597,7 +1597,7 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
 pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
     let npc_ent = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc_ent).unwrap();
-    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so derefs stay raw (recipe 2c).
+    // FLAG: `gNPC_t` (NPCInfo) has no accessor, so derefs stay raw.
     // `npc_ent` is retained only as the raw ABI handle passed across the seam.
     let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
@@ -1641,7 +1641,7 @@ pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC.c:1787-1814`
 pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
     // FLAG: the NPC pool `gclient_t` has no accessor.
-    // The pointer is read through the safe entity borrow, then dereffed raw (recipe 2b).
+    // The pointer is read through the safe entity borrow, then dereffed raw.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
@@ -1704,7 +1704,7 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
     ctx.world.globals.ucmd = usercmd_t::default();
 
     // FLAG: `gNPC_t` (NPCInfo, `npc`) and the NPC pool `gclient_t` (`client`) have no accessor.
-    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does (recipe 2b/2c).
+    // The pointers are read through the safe entity borrow, then dereffed raw exactly as Raven does.
     // Raven reads `self->client->ps.moveDir` unconditionally before the null check below.
     // `self->client` is always valid by the time `NPC_Think` is wired as an entity think, matching the oracle's implicit non-null assumption here.
     let client = ctx.world.entity(self_).client;
@@ -1715,8 +1715,8 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
             (*client).ps.moveDir = VEC3_ORIGIN;
         }
 
-        // Raven's `self` NULL guard is vacuous behind the `EntityId` handle, so it is dropped (§F2).
-        // The `NPC`/`client` NULL guards are preserved.
+        // Raven's `self` NULL guard is vacuous behind the `EntityId` handle, so it is dropped.
+        // The `NPC`/`client` NULL guards stay.
         if ctx.world.entity(self_).NPC.is_null() || ctx.world.entity(self_).client.is_null() {
             return;
         }
@@ -1857,7 +1857,7 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
 /// Raven `NPC_InitAI`.
 ///
 /// Raven: the real body is commented out (cvar registration, upstream).
-/// The live function is an empty no-op, ported faithfully as-is.
+/// The live function is an empty no-op.
 /// Source: `oracle/codemp/game/NPC.c:1981-2009`
 pub fn NPC_InitAI() {}
 

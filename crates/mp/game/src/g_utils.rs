@@ -1,9 +1,8 @@
-//! FAITHFUL port of `oracle/codemp/game/g_utils.c`.
+//! Port of `oracle/codemp/game/g_utils.c`.
 //!
-//! The jampgame mega-pass filled this file.
-//! Pass 2 resolved the ctx threading and the vec3 out-param reshape, so almost every stateful or vec3 function is ported here.
-//! The pass backfilled four `GameGlobals` `()` placeholders along the way: `remappedShaders`, `gClPtrs`, `gG2KillIndex`,
-//! and `g_vehiclePoolOccupied` (see `game_globals.rs`).
+//! Most of this file's functions are stateful or return a `vec3_t`.
+//! `GameGlobals` fields `remappedShaders`, `gClPtrs`, `gG2KillIndex`, and `g_vehiclePoolOccupied` back functions here
+//! (see `game_globals.rs`).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -96,7 +95,7 @@ pub fn AddRemap(
 pub fn BuildShaderStateConfig(ctx: &GameContext) -> String {
     // Raven accumulates into a `static char buff[MAX_STRING_CHARS*4]` via `Q_strcat` and returns it by pointer.
     // The owned `String` return makes the scratch buffer unnecessary.
-    // The `Q_strcat` total bound (`MAX_STRING_CHARS*4 - 1` bytes) is preserved by truncating the concatenation once at the end.
+    // The `Q_strcat` total bound (`MAX_STRING_CHARS*4 - 1` bytes) holds by truncating the concatenation once at the end.
     // Once full, `Q_strcat` is a no-op, so a final truncation is byte-identical to the per-append bound.
     // `MAX_STRING_CHARS` resolves via the crate prelude glob.
     let mut buff = String::new();
@@ -211,7 +210,7 @@ pub fn G_BSPIndex(ctx: &mut GameContext, name: &str) -> c_int {
 /// Raven `G_PlayerHasCustomSkeleton`.
 ///
 /// Raven: the real siege-class-flag body is `#if 0`'d out upstream.
-/// The live function unconditionally returns `qfalse`, ported faithfully as-is.
+/// The live function unconditionally returns `qfalse`, ported as-is.
 /// Source: `oracle/codemp/game/g_utils.c:162-188`
 pub fn G_PlayerHasCustomSkeleton(ent: &gentity_t) -> qboolean {
     // This is a ctx-free leaf borrow &gentity_t (the body ignores `ent`, the `#if 0` stub).
@@ -462,7 +461,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
 ///
 /// Raven: the dynamic-free path is commented out upstream ("or not, the
 /// dynamic stuff is busted somehow at the moment").
-/// The live function body is empty, ported faithfully as a no-op.
+/// The live function body is empty, a no-op.
 /// Source: `oracle/codemp/game/g_utils.c:376-381`
 pub fn G_FreeFakeClient(cl: *mut *mut gclient_t) {}
 
@@ -481,7 +480,7 @@ pub fn G_AllocateVehicleObject(ctx: &mut GameContext, pVeh: *mut *mut Vehicle_t)
         }
 
         while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
-            // iterate through and try to find a free one
+            //iterate through and try to find a free one
             if ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] == qfalse {
                 ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] = qtrue;
                 let slot = &mut ctx.world.globals.g_vehiclePool.0[i as usize] as *mut Vehicle_t;
@@ -504,7 +503,7 @@ pub fn G_FreeVehicleObject(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         if ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] == qtrue
             && core::ptr::eq(&ctx.world.globals.g_vehiclePool.0[i as usize], pVeh)
         {
-            // guess this is it
+            //guess this is it
             ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] = qfalse;
             break;
         }
@@ -646,7 +645,7 @@ pub fn GlobalUse(
     activator: Option<EntityId>,
 ) {
     // This uses Option handles, and `self_` fields read via the accessor.
-    // The fn-enum dispatch still takes raw gentity pointers, taken from the accessor as values at the call (sanctioned seam, not a held reference).
+    // The fn-enum dispatch still takes raw gentity pointers, taken from the accessor as values at the call (not a held reference).
     let Some(self_id) = self_ else {
         return;
     };
@@ -751,7 +750,7 @@ pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Opt
 pub fn tv(ctx: &mut GameContext, x: f32, y: f32, z: f32) -> *mut f32 {
     unsafe {
         // Raven's function-local `static int index` and `static vec3_t vecs[8]` now live on `GameWorld.scratch`.
-        // The 8-slot ring rotation is preserved exactly.
+        // The rotation still wraps every 8 slots, matching Raven's static array size.
         let idx = ctx.world.scratch.tv_index as usize;
         ctx.world.scratch.tv_index = (ctx.world.scratch.tv_index + 1) & 7;
 
@@ -770,7 +769,7 @@ pub fn tv(ctx: &mut GameContext, x: f32, y: f32, z: f32) -> *mut f32 {
 pub fn vtos(ctx: &mut GameContext, v: vec3_t) -> String {
     // Raven returns one of 8 rotating `static char str[8][32]` buffers, so several `vtos` results survive in one `printf`.
     // An owned `String` per call makes the ring unnecessary.
-    // The `Com_sprintf(s, 32, ...)` bound (31 bytes) is preserved.
+    // The `Com_sprintf(s, 32, ...)` bound (31 bytes) still applies.
     // `ctx` is unused now, because the ring is gone, but it stays so the ~13 call sites are untouched.
     let _ = ctx;
     let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
@@ -808,7 +807,7 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
         ent.inuse = qtrue;
         ent.s.number = e.index() as c_int;
         ent.r.ownerNum = mp_qshared::shared::ENTITYNUM_NONE;
-        ent.s.modelGhoul2 = 0; // assume not
+        ent.s.modelGhoul2 = 0; //assume not
     }
 
     // ICARUS information must be added after this point.
@@ -989,7 +988,7 @@ pub fn G_SendG2KillQueue(ctx: &mut GameContext) {
     if ctx.world.globals.gG2KillNum < 0 {
         // Raven: "hmm, should be impossible, but I'm paranoid as we're
         // far past beta." `assert(0)` in a debug build.
-        // The port clamps faithfully instead.
+        // The port clamps instead.
         debug_assert!(false, "gG2KillNum went negative");
         ctx.world.globals.gG2KillNum = 0;
     }
@@ -1019,7 +1018,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
     // `ed_ptr` is taken fresh from the accessor for each trap or `write_bytes` call that needs a raw gentity pointer.
     // The NPC pool client (gClPtrs, g_utils.c:430) is dereffed raw, exactly as Raven does, because it is not a `level.clients` slot.
     // Raven derefs `ed` unconditionally, and NULL is undefined behavior there.
-    // Callers are null-tolerant, so we treat None as a no-op (rule 19: pick the one defined behavior).
+    // Callers are null-tolerant, so `None` is a no-op (rule 19: pick the one defined behavior).
     let Some(ed_id) = ed else {
         return;
     };
@@ -1037,7 +1036,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
         return;
     }
 
-    // rww - this may seem a bit hackish, but unfortunately we have no
+    //rww - this may seem a bit hackish, but unfortunately we have no
     // access to anything ghoul2-related on the server and thus must send
     // a message to let the client know he needs to clean up all the g2
     // stuff for this now-removed entity.
@@ -1055,7 +1054,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
     if ctx.world.entity(ed_id).s.eType == ET_NPC as c_int
         && !ctx.world.entity(ed_id).m_pVehicle.is_null()
     {
-        // tell the "vehicle pool" that this one is now free
+        //tell the "vehicle pool" that this one is now free
         let veh = ctx.world.entity(ed_id).m_pVehicle;
         G_FreeVehicleObject(ctx, veh);
     }
@@ -1063,7 +1062,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
     if ctx.world.entity(ed_id).s.eType == ET_NPC as c_int
         && !ctx.world.entity(ed_id).client.is_null()
     {
-        // this "client" structure is one of our dynamically allocated
+        //this "client" structure is one of our dynamically allocated
         // ones, so free the memory.
         // This is an NPC pool client, dereffed raw.
         let client = ctx.world.entity(ed_id).client;
@@ -1078,8 +1077,8 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 
         if saberEntNum > 0 && ctx.world.g_entities[saberEntNum as usize].inuse != qfalse {
             ctx.world.g_entities[saberEntNum as usize].neverFree = qfalse;
-            // Faithful to Raven's `ent_id_opt` (pointer→index, no ENTITYNUM_NONE
-            // filter): a valid in-range slot → `Some(EntityId(n))`.
+            // Matches Raven's `ent_id_opt` (pointer→index, no ENTITYNUM_NONE
+            // filter): a valid in-range slot maps to `Some(EntityId(n))`.
             G_FreeEntity(ctx, Some(EntityId(saberEntNum as u32)));
         }
 
@@ -1137,10 +1136,10 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 
     let ed_ptr = ctx.world.entity_mut(ed_id) as *mut gentity_t;
     unsafe {
-        // Owned-`String` tail fields are not zero-valid, so we drop them first (`take_owned_strings`).
+        // Owned-`String` tail fields are not zero-valid, so `take_owned_strings` drops them first.
         // Then comes the byte-wise zero (Raven `memset(ed, 0, sizeof(*ed))`).
         // Then valid empty `String`s re-seat into those now-zeroed slots (`seat_owned_strings`).
-        // We never drop the invalid zeroed image. This mirrors the ClientSpawn dance.
+        // The invalid zeroed image is never dropped. This mirrors the ClientSpawn dance.
         (*ed_ptr).take_owned_strings();
         core::ptr::write_bytes(ed_ptr, 0, 1);
         gentity_t::seat_owned_strings(ed_ptr);
@@ -1341,7 +1340,7 @@ pub fn G_AddPredictableEvent(ent: Option<&mut gentity_t>, event: c_int, eventPar
 pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
     // This is a ctx-free leaf, and `ent` fields go through the borrow.
     // This is a ctx-less boundary fn, because Raven reads the `level` global directly.
-    // World comes via the `g_strap` seam world cell, and engine (for the zero-event G_Printf) comes via the
+    // World comes via the `g_strap` world cell, and engine (for the zero-event G_Printf) comes via the
     // strap_engine() precedent (see G_ModelIndex/G_SoundIndex).
     if event == 0 {
         let msg = format!("G_AddEvent: zero event added for entity {}\n", ent.s.number);
@@ -1379,7 +1378,7 @@ pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1250-1260`
 pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
-    // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` seam cells (world and engine) so `G_TempEntity` can allocate.
+    // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` world and engine cells so `G_TempEntity` can allocate.
     // This mirrors Raven reaching the `level`/`g_entities` globals directly (see G_AddEvent).
     // te fields go through the accessor.
     let mut ctx = GameContext {
@@ -1401,7 +1400,7 @@ pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
 /// Source: `oracle/codemp/game/g_utils.c:1267-1284`
 pub fn G_PlayEffectID(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
     // play an effect by the G_EffectIndex'd ID instead of a predefined effect ID
-    // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` seam cells (see G_PlayEffect).
+    // Ctx-less boundary fn. Ctx rebuilt from the `g_strap` cells (see G_PlayEffect).
     // te fields go through the accessor.
     let mut ctx = GameContext {
         world: unsafe { &mut *crate::g_strap::strap_world() },
@@ -1486,7 +1485,8 @@ pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
 pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, soundIndex: c_int) {
     // This takes an `ent` handle, and te fields go through the accessor.
     // `ent->client` is a pool client (gClPtrs), dereffed raw.
-    // Raven reads ent->r.currentOrigin unconditionally, so the later null-check is vacuous, and we treat None as a no-op.
+    // Raven reads ent->r.currentOrigin unconditionally, so the later null-check is vacuous.
+    // `None` is a no-op.
     // No assert on soundIndex. Raven's G_Sound accepts 0 as a benign no-sound event.
     // A porter-invented debug_assert here once killed live bot spawns.
     let Some(ent_id) = ent else {
@@ -1664,7 +1664,7 @@ pub fn G_CanUseDispOn(ctx: &mut GameContext, ent: Option<EntityId>, dispType: c_
     const STAT_HEALTH: usize = statIndex_t::STAT_HEALTH as usize;
     const STAT_MAX_HEALTH: usize = statIndex_t::STAT_MAX_HEALTH as usize;
     // Raven `#define LAST_USEABLE_WEAPON WP_BRYAR_OLD` (bg_weapons.h:43).
-    // The port has no shared const for it, so we mirror it locally from canonical WP_BRYAR_OLD.
+    // The port has no shared const for it, so this local const mirrors canonical WP_BRYAR_OLD.
     const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 
     let Some(ent_id) = ent else {
@@ -2351,7 +2351,7 @@ pub fn G_ROFF_NotetrackCallback(
     notetrack: *const c_char,
 ) {
     // This takes an Option handle, and cent fields go through the accessor.
-    // `notetrack` is a raw c-string (seam), parsed under a tight unsafe block.
+    // `notetrack` is a raw c-string (ABI seam), parsed under a tight unsafe block.
     let Some(cent_id) = cent else {
         return;
     };

@@ -1,19 +1,19 @@
 //! Port of `oracle/codemp/game/NPC_reactions.c`.
 //!
-//! SPINE (`docs/architecture/engine-seam.md`, precedent `w_force.rs`/`NPC_utils.rs`) is the calling convention this file follows.
+//! This file follows the calling convention in `docs/architecture/engine-seam.md` (precedent `w_force.rs`/`NPC_utils.rs`).
 //! Functions that reach `level`, cvars, or traps thread the `GameContext<'_>` receiver as an additive first parameter.
 //! The receiver is `.world: &mut GameWorld` and `.engine`.
-//! The faithful C signature carries none of this.
+//! The C signature carries none of this.
 //! `level` becomes `ctx.world.level`, and cvars become `ctx.world.cvars`.
 //! Traps go through `trap::X(ctx.engine, ...)`.
-//! Cross-file callees take the packet's resolved raw-pointer signatures verbatim, because their own porters thread the spine.
+//! Cross-file callees take raw-pointer signatures verbatim, because their own files use the same calling convention.
 //! Raw `gNPC_t*`/`gclient_t*` chains stay `unsafe` raw-pointer field access that mirrors the C exactly.
 //! `gentity_t::NPC` is `*mut gNPC_t`, and `::client` is a BG_Alloc'd pool `*mut gclient_t`.
 //!
 //! Ambient-state resolution: the bot-AI "current actor" globals that Raven's `ai_main.c` think loop sets per frame (`NPC`, `NPCInfo`).
 //! These are threaded as `ctx.world.globals.NPC` and `.NPCInfo`.
 //! `NPC_ChoosePainAnimation` indexes the runtime-populated `bgAllAnims`/`bgHumanoidAnimations` tables through `ctx.world.bg_state`.
-//! `NPC_Respond`'s droid-class `va(fmt, ...)` sound-path calls are ported faithfully through `format!()`.
+//! `NPC_Respond`'s droid-class `va(fmt, ...)` sound-path calls are ported through `format!()`.
 //! They format one `int`, so the string is byte-identical to Raven's.
 //!
 //! Entity-pointer params are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
@@ -22,7 +22,6 @@
 //! `gNPC_t` (`gentity_t::NPC`/`globals.NPCInfo`) has no accessor.
 //! An NPC entity carries a BG_Alloc'd pool client (`gentity_t::client`, `gClPtrs`) for which `level.clients` is not valid.
 //! Each of these reads through a copied pointer value in a tight, FLAGged `unsafe` block.
-//! Behavior is byte-identical and referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -414,7 +413,7 @@ pub fn NPC_ChoosePainAnimation(
         } else {
             // §19: Raven indexes `anims[pain_anim]`/`bgHumanoidAnimations[pain_anim]` unconditionally, so pain_anim == -1 reads element [-1].
             // This is a deterministic garbage animLength.
-            // We pick 0, so painDebounceTime becomes level.time.
+            // This picks 0, so painDebounceTime becomes level.time.
             // Source: `oracle/codemp/game/NPC_reactions.c:351`
             0
         };
@@ -698,7 +697,7 @@ pub fn NPC_Touch(
         // FLAG: pool client (gClPtrs) deref stays raw.
         let other_client = ctx.world.entity(other_id).client;
         if !other_client.is_null() && ctx.world.entity(other_id).s.number < MAX_CLIENTS_I32 {
-            // This is a faithful empty body, because Raven's key-pickup logic here is commented out in the oracle.
+            // This body is empty, because Raven's key-pickup logic here is commented out in the oracle.
         }
     }
 
@@ -1172,7 +1171,7 @@ pub fn NPC_Use(
         if gonk_use {
             // must be using the gonk, so attempt to give battery power.
             // Oracle itself leaves the Add_Batteries call commented out (`//rwwFIXMEFIXME: support for this?`).
-            // This is a faithful empty body, not a port gap.
+            // This body is empty, not a port gap.
         }
 
         if ctx.world.entity(self_).behavior_set_str(BSET_USE as usize).is_some() {

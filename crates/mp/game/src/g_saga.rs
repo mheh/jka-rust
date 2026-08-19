@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_saga.c`, the Siege gametype game-side module.
+//! Port of `oracle/codemp/game/g_saga.c`, the Siege gametype game-side module.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -66,7 +66,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(ctx: &mut GameContext, team: c_int) {
                     let mut j = 0;
                     while j < WP_NUM_WEAPONS {
                         if (*scl).weapons & (1 << j) != 0 {
-                            // we use this weapon so register it.
+                            //we use this weapon so register it.
                             RegisterItem(ctx, BG_FindItemForWeapon(j));
                         }
                         j += 1;
@@ -74,7 +74,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(ctx: &mut GameContext, team: c_int) {
                     j = 0;
                     while j < HI_NUM_HOLDABLE {
                         if (*scl).invenItems & (1 << j) != 0 {
-                            // we use this item so register it.
+                            //we use this item so register it.
                             RegisterItem(ctx, BG_FindItemForHoldable(j));
                         }
                         j += 1;
@@ -121,7 +121,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             // reset
             SiegeSetCompleteData(ctx, 0);
 
-            // get pers data in case it existed from last level
+            //get pers data in case it existed from last level
             if ctx.world.cvars.g_siegeTeamSwitch.integer != 0 {
                 trap::SiegePersGet(
                     ctx.engine,
@@ -139,7 +139,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                     trap::SetConfigstring(ctx.engine, CS_SIEGE_TIMEOVERRIDE, "0");
                 }
             } else {
-                // hmm, ok, nothing.
+                //hmm, ok, nothing.
                 trap::SetConfigstring(ctx.engine, CS_SIEGE_TIMEOVERRIDE, "0");
             }
 
@@ -201,13 +201,13 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         "none",
                     ) != 0
                 {
-                    // check for override
+                    //check for override
                     ctx.world.globals.team1 = strncpyz_string(
                         cstr_from_chars(&ctx.world.cvars.g_siegeTeam1.string).to_bytes(),
                         512,
                     );
                 } else {
-                    // otherwise use level default
+                    //otherwise use level default
                     if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team1")
                     {
                         ctx.world.globals.team1 = val;
@@ -596,7 +596,7 @@ pub fn UseSiegeTarget(
         }
         // Raven derefs `ent` unconditionally here.
         // When `ent` is null, with no client and no `other`, that is a null deref and undefined behavior.
-        // This case is unreachable in practice, so the `Some` guard preserves the defined path (porting-rules §19).
+        // This case is unreachable in practice, so the `Some` guard keeps the path defined (porting-rules §19).
         if let Some(ent_id) = ent {
             if ctx.world.entity(ent_id).inuse == 0 {
                 crate::g_main::G_Printf(ctx, "entity was removed while using targets\n");
@@ -656,7 +656,7 @@ pub fn BroadcastObjectiveCompletion(
         let cid = EntityId::from_num(client).unwrap();
         // FLAG: gclient_t has no accessor.
         // The client-pointer deref stays raw.
-        // We read the pointer through the safe entity borrow, then deref it in a tight unsafe block.
+        // The pointer is read through the safe entity borrow, then dereffed in a tight unsafe block.
         let cl = ctx.world.entity(cid).client;
         if !cl.is_null() && unsafe { (*cl).sess.sessionTeam } == team {
             let client_origin = unsafe { (*cl).ps.origin };
@@ -1650,7 +1650,7 @@ pub fn SiegeItemRemoveOwner(ctx: &mut GameContext, ent: EntityId, carrier: Optio
 pub fn SiegeItemRespawnEffect(ctx: &mut GameContext, ent: EntityId, newOrg: vec3_t) {
     unsafe {
         // `target5` is an owned `String`, where `""` means absent.
-        // We fire it through the `Option<&str>` target seam.
+        // It reaches `G_UseTargets2` as `Option<&str>`.
         let target5 = ctx.world.entity(ent).target5.clone();
         if !target5.is_empty() {
             G_UseTargets2(ctx, Some(ent), Some(ent), Some(&target5));
@@ -1840,8 +1840,8 @@ pub fn SiegeItemTouch(
     trace: *mut trace_t,
 ) {
     unsafe {
-        // `other`, the toucher, can be an NPC, so we read its `client` pointer through the accessor.
-        // We deref it raw only once the guard proves it is a real player slot.
+        // `other`, the toucher, can be an NPC, so its `client` pointer is read through the accessor.
+        // The deref stays raw only once the guard proves it is a real player slot.
         let other_bad = match other {
             None => true,
             Some(o) => {
@@ -2341,8 +2341,8 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
         while i < ctx.world.level.num_entities && count < MAX_EXDATA_ENTS_TO_SEND {
             let id = EntityId(i as u32);
             // FLAG: this loop walks arbitrary entities, which may be NPCs.
-            // We read the client pointers through the accessor,
-            // and deref them raw only after the null and `ET_PLAYER` guard proves a real client slot.
+            // The client pointers are read through the accessor,
+            // and dereffed raw only after the null and `ET_PLAYER` guard proves a real client slot.
             // This fn's outer unsafe block covers it.
             let ent_cl = ctx.world.entity(id).client;
             let msgtarg_cl = ctx.world.entity(msgTarg).client;

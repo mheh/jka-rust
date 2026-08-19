@@ -1,21 +1,21 @@
-//! FAITHFUL port of `oracle/codemp/game/g_spawn.c`: entity spawn dispatch, `level.spawnVars[]` parsing, and `worldspawn`.
+//! Port of `oracle/codemp/game/g_spawn.c`: entity spawn dispatch, `level.spawnVars[]` parsing, and `worldspawn`.
 //!
-//! SPINE (`docs/architecture/engine-seam.md`, precedent `g_client.rs`/`w_force.rs`) is the calling convention this file follows.
+//! `docs/architecture/engine-seam.md` (precedent `g_client.rs`/`w_force.rs`) documents the calling convention this file follows.
 //! Functions that reach `level`, cvars, `g_entities`, or traps thread the `GameContext<'_>` receiver.
 //! The receiver is `.world: &mut GameWorld` and `.engine`, added as a first parameter.
 //! This parameter is not present on the staged raw-pointer skeleton.
 //! Globals are `GameWorld` fields: `level` becomes `ctx.world.level`, cvars become `ctx.world.cvars`,
 //! and `g_entities[i]` becomes `ctx.world.g_entities[i]`.
 //! Traps go through `trap::X(ctx.engine, <Name>Args::new(...))`.
-//! Cross-file callees take the packet's resolved raw-pointer signatures verbatim.
+//! Cross-file callees take the resolved raw-pointer signatures verbatim.
 //!
 //! `fields[]` (`BG_field_t[]`, `g_spawn.c:54-149`) is this file's own file-scope table.
 //! It is not defined out-of-file.
 //! The port transcribes it below as `FIELDS`, with offsets from `offset_of!(gentity_t, ...)` against the already-ported, offset-asserted `gentity_t`.
 //! This mirrors the `g_client.rs`/`g_mover.rs`/`g_team.rs` precedent of `offset_of!(gentity_t, targetname)` for `G_Find`.
 //!
-//! `GT_*`/`TEAM_*`/`BSET_SPAWN` constant spellings that the packet does not enumerate are transcribed as local consts,
-//! at their faithful Raven values.
+//! `GT_*`/`TEAM_*`/`BSET_SPAWN` constant spellings that are not otherwise enumerated are transcribed as local consts,
+//! at their Raven values.
 //! This is the same convention as `g_team.rs`'s local `TEAM_RED`/`TEAM_BLUE`.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -164,7 +164,7 @@ pub fn G_SpawnVector(
 // `sscanf_3f`/`sscanf_1f` route through the shared libc-`%f` scanner `native_string::sscanf::sscanf_f32s`.
 // ---------------------------------------------------------------------
 
-/// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared libc-`%f`-faithful scanner.
+/// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared libc-`%f` scanner.
 /// Unmatched components are left at whatever value `out` already held (porting-rules §19).
 /// Callers pre-seed `out` before the call.
 /// An empty `s` matches nothing, mirroring the old NULL-pointer early return.
@@ -172,7 +172,7 @@ fn sscanf_str_3f(s: &str, out: &mut [f32; 3]) {
     sscanf_f32s(s, out);
 }
 
-/// `sscanf(s, "%f", out)` via the shared libc-`%f`-faithful scanner.
+/// `sscanf(s, "%f", out)` via the shared libc-`%f` scanner.
 /// This leaves `*out` untouched on a failed match (porting-rules §19).
 fn sscanf_str_1f(s: &str, out: &mut f32) {
     sscanf_f32s(s, std::slice::from_mut(out));
@@ -1052,7 +1052,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
                 // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
                 // A raw store is required for bg-seam re-entry.
                 // The callbacks handle and both the `&mut bg_state` and `bgHumanoidAnimations` derefs alias one world.
-                // The whole `BG_ParseAnimationFile` seam stays a raw-pointer group.
+                // The whole `BG_ParseAnimationFile` call stays a raw-pointer group.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };

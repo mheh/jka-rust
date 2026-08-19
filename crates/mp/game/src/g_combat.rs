@@ -1,7 +1,7 @@
-//! FAITHFUL port of `oracle/codemp/game/g_combat.c`.
+//! Port of `oracle/codemp/game/g_combat.c`.
 //!
 //! `tools/closure-prototype/fnskel.py` generated this file from the fnsweep manifest.
-//! Pass 3 (zero-park blind transcription) filled in all functions against the settled fork rulings.
+//! All functions here are filled in against the settled fork rulings.
 //! Those rulings are ctx threading, vec3 reshape, `Option<EntityId>` stored fields, fn-ptr dispatch enums,
 //! the BgState/BgTraps/GameCallbacks bg-tier channel, and va/printf mapping.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -65,7 +65,7 @@ const ARMOR_REDUCTION_FACTOR: f32 = 0.50;
 ///
 /// Raven declares `char *modNames[MOD_MAX]` (MOD_MAX = 45) with only 42 initializers.
 /// The last 3 slots (MOD_TARGET_LASER, MOD_TRIGGER_HURT, MOD_TEAM_CHANGE) are NULL.
-/// The bounds check and the null-print site below preserve that.
+/// The bounds check and the null-print site below account for that.
 /// Source: `oracle/codemp/game/g_combat.c:755-797`
 pub(crate) const modNames: [*const c_char; meansOfDeath_t::MOD_MAX as usize] = [
     c"MOD_UNKNOWN".as_ptr(),
@@ -161,7 +161,7 @@ pub fn ObjectDie(
         G_UseTargets(ctx, Some(self_), attacker);
     }
 
-    // remove my script_targetname
+    //remove my script_targetname
     G_FreeEntity(ctx, Some(self_));
 }
 
@@ -360,7 +360,7 @@ pub fn ExplodeDeath(ctx: &mut GameContext, self_: EntityId) {
     let mut forward: vec3_t = [0.0; 3];
 
     let e = ctx.entity_mut(self_);
-    e.takedamage = qfalse; // stop chain reaction runaway loops
+    e.takedamage = qfalse; //stop chain reaction runaway loops
 
     e.s.loopSound = 0;
     e.s.loopIsSoundset = qfalse;
@@ -443,12 +443,12 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
     let weapon = ctx.entity(self_).s.weapon;
 
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-        // no dropping weaps
+        //no dropping weaps
         return;
     }
 
     if weapon <= WP_BRYAR_PISTOL as c_int {
-        // can't have this
+        //can't have this
         return;
     }
 
@@ -470,7 +470,7 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
         ammoQuan -= -ammoSub;
 
         if ammoQuan <= 0 {
-            // no ammo
+            //no ammo
             return;
         }
     }
@@ -518,7 +518,7 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
             let has =
                 unsafe { ((*client).ps.stats[statIndex_t::STAT_WEAPONS as usize] & (1 << i)) != 0 };
             if has && i != WP_NONE as c_int {
-                // this one's good
+                //this one's good
                 weap = i;
                 break;
             }
@@ -658,7 +658,7 @@ pub fn LookAtKiller(
         (*client).ps.stats[statIndex_t::STAT_DEAD_YAW as usize] = vectoyaw(dir) as c_int;
     }
 
-    // Raven computes `angles` here but never consumes it. We keep this dead computation faithfully.
+    // Raven computes `angles` here but never consumes it. This dead computation stays.
     angles[YAW] = vectoyaw(dir);
     angles[PITCH] = 0.0;
     angles[ROLL] = 0.0;
@@ -1386,7 +1386,7 @@ pub fn G_AlertTeam(
             continue;
         }
 
-        // gNPC_t pointer. The deref stays raw (trap 2c).
+        // gNPC_t pointer. The deref stays raw.
         let npc = ctx.entity(check).NPC;
 
         // This NPC specifically flagged to ignore alerts
@@ -5944,7 +5944,7 @@ pub fn G_DamageFromKiller(
             && !veh.is_null()
             && !unsafe { (*veh).m_pPilot }.is_null()
         {
-            // vehicle-struct/pilot pointers deref raw (trap 2c).
+            // vehicle-struct/pilot pointers deref raw.
             let pilot_ptr = unsafe { (*veh).m_pPilot } as *mut gentity_t;
             killer = ctx.entity_id_of(pilot_ptr);
         }
@@ -6129,7 +6129,7 @@ pub fn G_RadiusDamage(
             dir[2] += 24.0;
             // Match the oracle's short-circuit ordering: `attacker->m_pVehicle`
             // must only be read after the `attacker` / `m_pVehicle` null guards.
-            // The vehicle-struct/pilot pointers deref raw (trap 2c).
+            // The vehicle-struct/pilot pointers deref raw.
             let use_pilot = match attacker {
                 Some(attacker_id) => {
                     let veh = ctx.entity(attacker_id).m_pVehicle;

@@ -1,9 +1,9 @@
 //! Port of `oracle/codemp/game/g_navnew.c`.
 //!
 //! Logic functions that reach `level`, cvars, or traps thread the `GameContext<'_>` receiver
-//! (`.world: &mut GameWorld`, `.engine`) as an additive first parameter, per the engine seam
+//! (`.world: &mut GameWorld`, `.engine`) as an additive first parameter
 //! (`docs/architecture/engine-seam.md`, precedent `NPC_reactions.rs`/`w_force.rs`).
-//! The faithful C signature carries none of this parameter.
+//! The C signature carries none of this parameter.
 //! Globals map to `GameWorld` fields: `level` becomes `ctx.world.level`, and cvars become `ctx.world.cvars`.
 //! Traps go through `trap::X(ctx.engine, ..)`.
 //! `vec3_t` (`[f32; 3]`) is `Copy`, so the oracle's inline vector macros (`VectorCopy`, `VectorMA`,
@@ -13,11 +13,12 @@
 //! `gentity_t::NPC` and `::client` are opaque `*mut c_void`, cast to `gNPC_t`/`gclient_t` per the
 //! `NPC_reactions.rs` precedent.
 //!
-//! `NAVNEW_DanceWithBlocker` and `NAVNEW_SidestepBlocker` cannot receive their faithful `movedir`
+//! `NAVNEW_DanceWithBlocker` and `NAVNEW_SidestepBlocker` cannot receive their `movedir`
 //! out-param as a by-value `vec3_t`.
-//! This file owns the `movedir` out-params, unlike the frozen cross-file callee in the
-//! `vec3-outparam-seam` park precedent (`g_combat.rs`), so porting rule §C7 (out-params become
-//! return values or mutable references) declares them `movedir: &mut vec3_t` here instead of parking them.
+//! This file owns the `movedir` out-params, unlike the cross-file callee `G_GetHitLocation`
+//! (`g_combat.rs`), whose frozen signature takes its out-param by value.
+//! Porting rule §C7 (out-params become return values or mutable references) declares this file's
+//! out-params `movedir: &mut vec3_t` instead.
 //!
 //! Entity-pointer parameters are `EntityId`/`Option<EntityId>` handles (porting rule §B5) instead of
 //! raw `gentity_t*`.
@@ -290,9 +291,9 @@ pub fn NAVNEW_PushBlocker(
 ///
 /// Raven: sees if blocker has any lateral movement.
 ///
-/// The faithful `movedir` out-param is declared `&mut vec3_t` (§C7) instead of by-value.
-/// This file owns the signature, unlike the frozen cross-file callee in the `vec3-outparam-seam`
-/// park precedent (`g_combat.rs`), so it is fixed here instead of parked.
+/// The `movedir` out-param is declared `&mut vec3_t` (§C7) instead of by-value.
+/// This file owns the signature, unlike the cross-file callee `G_GetHitLocation` (`g_combat.rs`),
+/// whose frozen signature takes its out-param by value.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
@@ -848,7 +849,7 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
         ignoreEntNum = ctx.world.entity(ignore_id).s.number;
     } else {
         // §19: Raven copies `playerMaxs` into `mins` here.
-        // This is Raven's own bug, preserved, and it leaves `maxs` uninitialized before the reads below.
+        // This is Raven's own bug, and it leaves `maxs` uninitialized before the reads below.
         // The zeroed `maxs` declared above is the defined-behavior choice for that C undefined behavior.
         crate::q_math::_VectorCopy(localPlayerMins, &mut mins);
         crate::q_math::_VectorCopy(localPlayerMaxs, &mut mins);

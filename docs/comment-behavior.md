@@ -83,7 +83,7 @@ Words that tell a reviewer the port is correct - "faithful", "faithfully", "pres
 
 ## CB-13 - campaign vocabulary and dated provenance are process history
 
-Internal campaign nouns - "mega-pass", "Land phase", "SPINE", "packet", "referee-blind", "load-bearing", and their kin - delete from comments even when the tool or process that coined them still exists on disk. The fact each term was attached to stays in plain words. Dated provenance parentheticals, for example "(lockstep frame-364 find, 2026-07-14)", delete too: durable evidence belongs in the DEC ledger, and the comment keeps only the divergence fact the evidence established.
+Internal campaign nouns - "mega-pass", "Land phase", "SPINE", "packet", "referee-blind", "load-bearing", and their kin - delete from comments even when the tool or process that coined them still exists on disk. The fact each term was attached to stays in plain words. The stock boilerplate sentence "Behavior is byte-identical, referee-verified." and its variants delete the same way wherever they carry no residual fact. A variant that carries a real fact (a mechanical-reshape note, an evaluation-order constraint) restyles to the fact alone. Dated provenance parentheticals, for example "(lockstep frame-364 find, 2026-07-14)", delete too: durable evidence belongs in the DEC ledger, and the comment keeps only the divergence fact the evidence established.
 
 ## CB-14 - port-status notes state the constraint, not the progress
 

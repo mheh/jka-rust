@@ -167,7 +167,7 @@ const MAX_WPARRAY_SIZE: usize = mp_qshared::shared::limits::MAX_WPARRAY_SIZE as 
 const MAX_NODETABLE_SIZE: usize = crate::ai_wpnav::MAX_NODETABLE_SIZE as usize;
 
 // Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` / `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`).
-// The porting rules allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
+// The porting rules allow replacing a ()-placeholder field's type with the real one once a live call needs it.
 pub(crate) const MAX_SHADER_REMAPS: usize = 128;
 pub(crate) const MAX_G2_KILL_QUEUE: usize = 256;
 pub(crate) const MAX_VEHICLES_AT_A_TIME: usize = 128;
@@ -224,7 +224,7 @@ impl BotStates {
     /// This is the `Box`'s stable heap address, or null when the slot is `None`.
     /// `ai_main.c`'s body code reads bot state across `ctx`-mutating calls, which is irreducible aliasing.
     /// It takes this raw pointer rather than a checked borrow.
-    /// `ptr(i).is_null()` is the faithful equivalent of Raven's `botstates[i] == NULL`.
+    /// `ptr(i).is_null()` is the equivalent of Raven's `botstates[i] == NULL`.
     #[inline]
     pub fn ptr(&self, i: usize) -> *mut bot_state_t {
         match &self.0[i] {
@@ -293,7 +293,8 @@ array_newtype!(boxed;
     pub BotChatBuffer, [c_char; MAX_CHAT_BUFFER_SIZE], MAX_CLIENTS);
 
 array_newtype!(null;
-    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` is the waypoint arena, faithfully a fixed array of raw pointers into the `B_Alloc` bump arena (individually allocated, never freed).
+    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` is the waypoint arena, a fixed array of raw pointers into the
+    /// `B_Alloc` bump arena (individually allocated, never freed).
     /// This is a newtype because a 4096-element array has no library `Default` (over 32 elements) and the entries are raw pointers (null-init).
     /// Source: `oracle/codemp/game/ai_main.h:398`
     pub WpArray, *mut wpobject_t, MAX_WPARRAY_SIZE);
@@ -464,7 +465,7 @@ pub struct GameGlobals {
     pub _saved_client: *mut gclient_t,
     /// `client`. Source: `oracle/codemp/game/NPC.c:35`
     pub client: *mut gclient_t,
-    /// Porting rules §E13 allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
+    /// Porting rules §E13 allow replacing a ()-placeholder field's type with the real one once a live call needs it.
     /// Source: `oracle/codemp/game/NPC.c:38`
     pub enemyVisibility: crate::npc::visibility_t::visibility_t,
     /// `ucmd`. Source: `oracle/codemp/game/NPC.c:36`
@@ -713,8 +714,8 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/g_items.c:101`
     pub shieldLoopSound: qhandle_t,
     // --- `g_log.c` file-scope globals ---
-    // The porting rules allow this: "replace a ()-placeholder field's type with the real one if your packet cites it".
-    // The shapes are exactly what the `g_log.md` packet's TODO comments spelled out.
+    // The porting rules allow replacing a ()-placeholder field's type with the real one once a live call needs it.
+    // The shapes match what the `g_log.md` TODO comments spelled out.
     /// `qboolean G_WeaponLogClientTouch[MAX_CLIENTS]`.
     /// Source: `oracle/codemp/game/g_log.c:27`
     pub G_WeaponLogClientTouch: [qboolean; MAX_CLIENTS],

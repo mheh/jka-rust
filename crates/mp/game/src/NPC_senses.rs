@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_senses.c`.
+//! Port of `oracle/codemp/game/NPC_senses.c`.
 //!
 //! Functions reach file-scope game state through the threaded `GameContext`/`GameWorld` handle.
 //! This state is `level`, the current-NPC `NPC`/`NPCInfo` globals, `g_entities`, and `vec3_origin`.
@@ -784,7 +784,7 @@ pub fn AddSoundEvent(
     needLOS: qboolean,
 ) {
     // `alertEvent_t.owner` is still a raw `*mut gentity_t` field.
-    // The handle turns back into a pointer for storage (id→pointer seam bridge).
+    // The handle turns back into a pointer for storage.
     let owner: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 
@@ -838,7 +838,7 @@ pub fn AddSightEvent(
     addLight: f32,
 ) {
     // `alertEvent_t.owner` is still a raw `*mut gentity_t` field.
-    // The handle turns back into a pointer for storage (id→pointer seam bridge).
+    // The handle turns back into a pointer for storage.
     let owner: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 

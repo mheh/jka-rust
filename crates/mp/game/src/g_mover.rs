@@ -1,7 +1,7 @@
-//! This is a faithful port of `oracle/codemp/game/g_mover.c`.
+//! This is a port of `oracle/codemp/game/g_mover.c`.
 //!
-//! The safe-state migration (campaign 2c) converts entity params that cross this file's ABI seam to
-//! `EntityId`/`Option<EntityId>` handles (§B5), instead of raw `gentity_t*`.
+//! Entity params crossing this file's public functions convert to `EntityId`/`Option<EntityId>`
+//! handles (§B5), instead of raw `gentity_t*`.
 //! The pilot for this conversion is `crate::g_object`.
 //! The single-entity spawn and think setters convert to the accessor regime: `SP_func_*`,
 //! `InitMover`/`InitBBrush`, `SetMoverState`, `ReturnToPos1`, the door-sound helpers, the
@@ -14,7 +14,7 @@
 //! The change is a mechanical reshape.
 //!
 //! The genuinely entangled bodies keep raw `*mut gentity_t` re-derived at the top of the
-//! body, with the logic verified verbatim against the referee.
+//! body.
 //! This covers the push machinery in `G_MoverPush`, `G_TryPushingEntity`, and `G_MoverTeam` (two
 //! simultaneous mutable entities, gclient walks, and the `pushed[]` save-stack).
 //! It also covers the `teamchain`/`teammaster` pointer chases in `MatchTeam`, `CalcTeamDoorCenter`,
@@ -272,7 +272,7 @@ pub fn G_TryPushingEntity(
             && ((*pusher).spawnflags & 16) != 0
             && Q_stricmp(&(*pusher).classname_str(), "func_rotating") == 0
         {
-            // just blow the fuck out of them
+            //just blow the fuck out of them
             G_Damage(
                 ctx,
                 ctx.entity_id_of(check),
@@ -545,7 +545,7 @@ pub fn G_MoverPush(
             if (*check).s.eType == entityType_t::ET_BODY as c_int
                 || ((*check).s.eType == entityType_t::ET_PLAYER as c_int && (*check).health < 1)
             {
-                // whatever, just crush it
+                //whatever, just crush it
                 G_Damage(
                     ctx,
                     ctx.entity_id_of(check),
@@ -646,7 +646,7 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
                 angles[2] - (*part).r.currentAngles[2],
             ];
             if r#move != [0.0, 0.0, 0.0] || amove != [0.0, 0.0, 0.0] {
-                // actually moved
+                //actually moved
                 if G_MoverPush(
                     ctx,
                     ctx.entity_id_of(part).unwrap(),
@@ -881,7 +881,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.loopIsSoundset = qfalse;
 
         if (*ent).moverState == MOVER_1TO2 {
-            // reached open
+            //reached open
             let mut doorcenter: vec3_t = [0.0; 3];
 
             let ent_eid = ctx.entity_id_of(ent).unwrap();
@@ -917,7 +917,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
             let opentarget = (*ent).opentarget.clone();
             G_UseTargets2(ctx, ent_eid, activator_eid, opentarget.as_deref());
         } else if (*ent).moverState == MOVER_2TO1 {
-            // closed
+            //closed
             let mut doorcenter: vec3_t = [0.0; 3];
 
             let ent_eid = ctx.entity_id_of(ent).unwrap();
@@ -990,7 +990,7 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
 
         // if all the way up, just delay before coming down
         if (*ent).moverState == MOVER_POS2 {
-            // have to do this because the delay sets our think to Use_BinaryMover_Go
+            //have to do this because the delay sets our think to Use_BinaryMover_Go
             (*ent).think = Some(EntThink::ReturnToPos1).into();
             let ent_eid = ctx.entity_id_of(ent);
             let activator_ptr =

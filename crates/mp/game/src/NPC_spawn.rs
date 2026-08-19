@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_spawn.c`.
+//! Port of `oracle/codemp/game/NPC_spawn.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
@@ -14,7 +14,7 @@
 //! stay raw in tight `unsafe` blocks through a copied pointer value.
 //! `NPC_Spawn_Do` and `NPC_SpawnType` still re-derive a raw pointer at the top of the function body: each
 //! cross-copies a fresh `G_Spawn` entity with the spawner, so two live entities exist at once.
-//! This file is referee-blind. Parity rests on the compile and the golden suite.
+//! Parity rests on the compile and the golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_utils::G_ModelIndex;
@@ -210,7 +210,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                         WP_THERMAL | WP_BLASTER => {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
                             if (*npc).rank >= RANK_LT || (*client).ps.weapon == WP_THERMAL {
-                                // officers, grenade-throwers use alt-fire
+                                //officers, grenade-throwers use alt-fire
                             }
                         }
                         _ => {}
@@ -278,7 +278,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if (*client).NPC_class == CLASS_SEEKER && ctx.world.entity(ent).activator.is_some() {
-            // assume my teams are already set correctly
+            //assume my teams are already set correctly
         } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && ctx.world.entity(ent).s.NPC_class != CLASS_VEHICLE as c_int
         {
@@ -303,7 +303,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
 /// and go from there? - dmv
 /// Source: `oracle/codemp/game/NPC_spawn.c:509-749`
 pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: &str) -> c_int {
-    // This is a faithful transcription of the C string-compare cascade.
+    // This transcribes the C string-compare cascade.
     // `NPC_type` is the NPC species name.
     // The caller maps Raven's NULL pointer to an empty string.
     let name = NPC_type;
@@ -2661,11 +2661,9 @@ pub fn NPC_SpawnType(
     targetname: Option<&str>,
     isVehicle: qboolean,
 ) -> *mut gentity_t {
-    // `ent` is `Option<EntityId>`, and the body null-checks it, then re-derives it to a raw pointer, with the
-    // body preserved verbatim, as open work.
+    // `ent` is `Option<EntityId>`, and the body null-checks it, then re-derives it to a raw pointer.
     // `npc_type` is a name string (`&str`).
-    // Raven's nullable `targetname` becomes `Option<&str>`, so the "only set NPC_targetname when non-NULL"
-    // distinction is preserved.
+    // Raven's nullable `targetname` becomes `Option<&str>`, so the code sets `NPC_targetname` only when it is `Some`.
     // The return stays a raw `*mut gentity_t`, because return-type conversion is a later pass.
     let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |i| ctx.entity_mut(i));
     let npc_spawner_eid = G_Spawn(ctx);

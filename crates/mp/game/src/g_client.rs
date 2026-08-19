@@ -1,16 +1,16 @@
-//! FAITHFUL port of `oracle/codemp/game/g_client.c`: client functions that do not run every frame.
+//! Port of `oracle/codemp/game/g_client.c`: client functions that do not run every frame.
 //!
 //! Entity params that cross this file's ABI seam are `EntityId`/`Option<EntityId>` handles (§B5), not raw
 //! `gentity_t*`. A `gclient_t*` param becomes its owning entity's `EntityId`, and a ctx-free leaf borrows
 //! `&mut gentity_t`. `crate::g_object` is the pilot for this shape.
 //!
-//! Each function body still holds raw seam derefs (gclient/`ps` walks, ghoul2/vehicle chases, spawn-point
+//! Each function body still holds raw pointer derefs (gclient/`ps` walks, ghoul2/vehicle chases, spawn-point
 //! loops), so each function converts at the signature only. It re-derives its raw pointer at the top of the
-//! body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and keeps the referee-verified body as is. The raw
-//! bodies still to convert are conversion debt.
+//! body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and keeps the body unchanged. The raw bodies still
+//! to convert are conversion debt.
 //!
-//! Behavior stays byte-identical, because this is a mechanical reshape, referee-verified. An unconverted
-//! caller bridges its raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
+//! Behavior stays byte-identical, because this is a mechanical reshape. An unconverted caller bridges its
+//! raw pointer at the boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::BotAIShutdownClient;
@@ -238,7 +238,7 @@ pub fn SiegePointUse(self_: &mut gentity_t, other: Option<EntityId>, activator: 
 pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-        // turn into a DM spawn if not in siege game mode
+        //turn into a DM spawn if not in siege game mode
         ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"info_player_deathmatch"));
         SP_info_player_deathmatch(ctx, ent);
         return;
@@ -252,7 +252,7 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
     );
 
     if soff != 0 {
-        // start disabled
+        //start disabled
         ctx.world.entity_mut(ent).genericValue1 = 0;
     } else {
         ctx.world.entity_mut(ent).genericValue1 = 1;
@@ -267,7 +267,7 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
 pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-        // turn into a DM spawn if not in siege game mode
+        //turn into a DM spawn if not in siege game mode
         ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"info_player_deathmatch"));
         SP_info_player_deathmatch(ctx, ent);
         return;
@@ -281,7 +281,7 @@ pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
     );
 
     if soff != 0 {
-        // start disabled
+        //start disabled
         ctx.world.entity_mut(ent).genericValue1 = 0;
     } else {
         ctx.world.entity_mut(ent).genericValue1 = 1;
@@ -326,8 +326,8 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
         let mut altVelocity: c_int = 0;
 
         if ent.is_null() || (*ent).enemy != ent_id_opt(base, self_) {
-            // something has gone very wrong (this should never happen)
-            // but in case it does.. find the saber manually
+            //something has gone very wrong (this should never happen)
+            //but in case it does.. find the saber manually
             ent = ctx
                 .world
                 .globals
@@ -710,7 +710,7 @@ pub fn SpotWouldTelefrag2(ctx: &mut GameContext, mover: EntityId, dest: vec3_t) 
     qfalse
 }
 
-/// Raven `SelectNearestDeathmatchSpawnPoint`: find the spot we do not want.
+/// Raven `SelectNearestDeathmatchSpawnPoint`: finds the spot to avoid.
 ///
 /// Source: `oracle/codemp/game/g_client.c:590-611`
 pub fn SelectNearestDeathmatchSpawnPoint(ctx: &mut GameContext, from: vec3_t) -> *mut gentity_t {

@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_nav.c`.
+//! Port of `oracle/codemp/game/g_nav.c`.
 //!
 //! Entity reaches go through the checked `ctx.entity(id)` / `ctx.entity_mut(id)` accessors (§B5), not raw `gentity_t*` re-derives.
 //! The raw derefs that remain are, by design, the ABI seam and the pool-allocated structs.
@@ -6,7 +6,6 @@
 //! It also threads `*mut trace_t` / `*mut navInfo_t` / `*mut c_int` out-param pointers verbatim (not `gentity_t`).
 //! The pool-allocated `gclient_t` (`ent.client`) and `gNPC_t` (`ent.NPC`, `globals.NPCInfo`) structs have no arena accessor.
 //! Each such deref is a tight `unsafe` block through a copied pointer value, and it is FLAGged at the site.
-//! Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::gclient::gclient_t;
@@ -171,7 +170,7 @@ pub fn NPC_SetMoveGoal(
     }
 
     let temp_goal_id = match unsafe { (*npc).tempGoal } {
-        Some(id) => id, // must still have a goal
+        Some(id) => id, //must still have a goal
         None => return,
     };
 
@@ -240,7 +239,7 @@ pub fn NAV_HitNavGoal(
             }
             return (VectorLengthSquared(diff) <= (radius * radius) as f32) as qboolean;
         } else {
-            // must hit exactly
+            //must hit exactly
             return (DistanceSquared(dest, point) <= (radius * radius) as f32) as qboolean;
         }
     } else {
@@ -321,7 +320,7 @@ pub fn NAV_ClearPathToPoint(
         // Clients can step up things, or if this is a navgoal check, a client will be using this info
         mins[2] += STEPSIZE;
 
-        // don't let box get inverted
+        //don't let box get inverted
         if mins[2] > maxs[2] {
             mins[2] = maxs[2];
         }
@@ -347,7 +346,7 @@ pub fn NAV_ClearPathToPoint(
             ),
         );
         if trace.startsolid != 0 && (trace.contents & CONTENTS_BOTCLIP) != 0 {
-            // started inside do not enter, so ignore them
+            //started inside do not enter, so ignore them
             clipmask &= !CONTENTS_BOTCLIP;
             trap::Trace(
                 ctx.engine,
@@ -494,8 +493,8 @@ pub fn NAV_FindClosestWaypointForPoint(
     G_SetOrigin(ctx.entity_mut(marker_id), point);
 
     let ent_mins = ctx.entity(ent).r.mins;
-    ctx.entity_mut(marker_id).r.mins = ent_mins; // stepsize?
-    ctx.entity_mut(marker_id).r.maxs = ent_mins; // crouching?
+    ctx.entity_mut(marker_id).r.mins = ent_mins; //stepsize?
+    ctx.entity_mut(marker_id).r.maxs = ent_mins; //crouching?
 
     let ent_clipmask = ctx.entity(ent).clipmask;
     ctx.entity_mut(marker_id).clipmask = ent_clipmask;
@@ -661,7 +660,7 @@ pub fn NAV_CheckAhead(
     // `trace` is a caller-owned out-param pointer, not an entity, so its derefs stay raw.
     if unsafe { (*trace).startsolid } != 0 && (unsafe { (*trace).contents } & CONTENTS_BOTCLIP) != 0
     {
-        // started inside do not enter, so ignore them
+        //started inside do not enter, so ignore them
         clipmask &= !CONTENTS_BOTCLIP;
         trap::Trace(
             ctx.engine,
@@ -2198,7 +2197,8 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
     }
     let i = ctx.world.globals.numStoredWaypoints as usize;
     // `ent`'s string fields are `*mut c_char` into the arena, disjoint from `globals`.
-    // This snapshots the pointer values so the `globals` write borrow does not conflict. `Q_strncpyz` reads through them at the seam.
+    // This snapshots the pointer values so the `globals` write borrow does not conflict.
+    // `Q_strncpyz` reads through them at that point.
     let targetname = ctx.entity(ent).targetname_str();
     let target = ctx.entity(ent).target.clone();
     let target2 = ctx.entity(ent).target2.clone();

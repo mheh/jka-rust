@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/w_saber.c`.
+//! Port of `oracle/codemp/game/w_saber.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
@@ -11,7 +11,6 @@
 //! The per-body entity and client pointers stay raw by design.
 //! This file is gclient-saturated (`(*ent).client as *mut gclient_t` chains), and gclient dissolution is out of scope.
 //! For that reason the per-body entity re-derives and their `unsafe` blocks legitimately hold genuine raw ops.
-//! Behavior is byte-identical and referee-verified.
 //! `BG_MySaber`'s `ents` is the `g_entities` array base (pointer arithmetic), so it stays raw by design.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -247,28 +246,28 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
 
     unsafe {
         if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != enemy_number {
-            // dueling but not with this person
+            //dueling but not with this person
             return false;
         }
 
         if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != self_number {
-            // other guy dueling but not with me
+            //other guy dueling but not with me
             return false;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer < mp_bg::public::gametype::GT_TEAM {
-        // ok, sure
+        //ok, sure
         return true;
     }
 
     if ctx.world.cvars.g_friendlyFire.integer != 0 {
-        // if ff on then can inflict damage normally on teammates
+        //if ff on then can inflict damage normally on teammates
         return true;
     }
 
     if OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
-        // ff not on, don't hurt teammates
+        //ff not on, don't hurt teammates
         return false;
     }
 
@@ -311,7 +310,7 @@ pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attackin
                     x if x == saber_styles_t::SS_STRONG as c_int => 8,
                     x if x == saber_styles_t::SS_MEDIUM as c_int => 16,
                     x if x == saber_styles_t::SS_FAST as c_int => 24,
-                    _ => 16, // dual, staff, etc.
+                    _ => 16, //dual, staff, etc.
                 };
 
                 let a = (*client).lastSaberBase_Always;
@@ -2772,7 +2771,7 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // This is irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
+            // This is irreducible. The DEC-28 `GameCallbacksImpl` adapter holds a raw `*mut GameWorld`.
             // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
@@ -2831,7 +2830,7 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // This is irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
+            // This is irreducible. The DEC-28 `GameCallbacksImpl` adapter holds a raw `*mut GameWorld`.
             // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
@@ -4612,7 +4611,7 @@ pub fn CheckSaberDamage(
     // Raven's `vec3_t saberEnd` decays to `float*`, so the interpolate retrace loop's writes propagate to the
     // caller's array, reused for `trail.tip` and the mid-point gate.
     // A by-value parameter here dropped that write-back and caused the lockstep frame-1806 saber-collision
-    // divergence found on 2026-07-14.
+    // divergence.
     saberEnd: &mut vec3_t,
     doInterpolate: qboolean,
     mut trMask: c_int,
@@ -10715,7 +10714,7 @@ pub fn WP_SaberPositionUpdate(
                         break;
                     }
                     // Raven's `self->client->saber[1].model` operand is an array address, always non-NULL.
-                    // Only the `model[0]` byte test is load-bearing.
+                    // Only the `model[0]` byte test controls the branch.
                     if rSaberNum > 0
                         && (*client).saber[1].model[0] != 0
                         && (*client).ps.saberHolstered == 1
@@ -10735,7 +10734,7 @@ pub fn WP_SaberPositionUpdate(
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir;
 
                         // Raven's `!saber[1].model` operand is an always-false array-address test.
-                        // Only `!saber[1].model[0]` is load-bearing.
+                        // Only `!saber[1].model[0]` controls the branch.
                         if rBladeNum > 0
                             && (*client).saber[1].model[0] == 0
                             && (*client).saber[rSaberNum as usize].numBlades > 1
@@ -10768,7 +10767,6 @@ pub fn WP_SaberPositionUpdate(
                                     continue;
                                 }
                                 // Raven reads `saberent`, the outer saber-num entity, not `saberEnt`.
-                                // This is ported faithfully.
                                 if (*saberent).s.saberInFlight != qfalse {
                                     // spinning
                                     BG_EvaluateTrajectory(

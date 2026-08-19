@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_weapon.c`.
+//! Port of `oracle/codemp/game/g_weapon.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -24,7 +24,7 @@ use crate::level::damage_flags::{
 };
 use mp_bg::bg_misc::snap_vector;
 
-// Raven `qboolean` is `c_int`. We keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`. The source spelling stays at assignment sites.
 
 // `MASK_SHOT` resolves via the prelude's `surface_flags` re-export.
 // The canonical source is `mp_qshared::shared::surface_flags::MASK_SHOT` (`oracle/codemp/game/bg_public.h:1177`).
@@ -193,7 +193,7 @@ pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: bool) -> f32 {
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:182-218`
 // Oracle writes the wall-corrected point back through the `start` out-param, `VectorCopy(tr.endpos, start)`.
-// We return it so callers pick up the adjustment.
+// The return value carries it, so callers pick up the adjustment.
 pub fn W_TraceSetStart(
     ctx: &mut GameContext,
     ent: EntityId,
@@ -217,7 +217,7 @@ pub fn W_TraceSetStart(
     }
 
     // FLAG: The firing entity may be an NPC with a pool client.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let ent_client = ctx.world.entity(ent).client;
     if ent_client.is_null() {
         return start;
@@ -397,7 +397,7 @@ pub fn WP_FireBlasterMissile(
     let mut damage: c_int = BLASTER_DAMAGE;
 
     if ctx.world.entity(ent).s.eType == entityType_t::ET_NPC as c_int {
-        // animent
+        //animent
         damage = 10;
     }
 
@@ -454,7 +454,7 @@ pub fn WP_FireTurboLaserMissile(ctx: &mut GameContext, ent: EntityId, start: vec
     // we don't want it to bounce forever
     m.bounceCount = 8;
 
-    // set veh as cgame side owner for purpose of fx overrides
+    //set veh as cgame side owner for purpose of fx overrides
     m.s.owner = e_number;
 
     // don't let them last forever (at 20000 speed, more than enough)
@@ -558,7 +558,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
             if traces >= 10 {
                 break;
             }
-            // need to loop this in case we hit a Jedi who dodges the shot
+            //need to loop this in case we hit a Jedi who dodges the shot
             if ctx.world.cvars.d_projectileGhoul2Collision.integer != 0 {
                 trap::G2Trace(
                     ctx.engine,
@@ -602,7 +602,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 && ctx.world.entity(traceEnt_id).inuse != 0
                 && !traceEnt_client.is_null()
             {
-                // g2 collision checks -rww
+                //g2 collision checks -rww
                 if ctx.world.entity(traceEnt_id).inuse != 0
                     && !traceEnt_client.is_null()
                     && !ctx.world.entity(traceEnt_id).ghoul2.is_null()
@@ -627,7 +627,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
             }
 
             if Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, hit_loc) {
-                // act like we didn't even hit him
+                //act like we didn't even hit him
                 start = tr.endpos;
                 ignore = (tr.entityNum) as i32;
                 traces += 1;
@@ -646,7 +646,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                     0,
                 ) != 0
                 {
-                    // broadcast and stop the shot because it was blocked
+                    //broadcast and stop the shot because it was blocked
                     let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_MAIN_SHOT) as i32);
                     let muzzle = ctx.world.globals.muzzle;
                     let tent = ctx.entity_mut(tent_id);
@@ -1047,7 +1047,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
 pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: bool) {
     let mut altFire = altFire;
     // FLAG: The firing entity may be an NPC with a pool client.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let client = match ent {
         None => std::ptr::null_mut(),
         Some(id) => ctx.world.entity(id).client,
@@ -1123,7 +1123,7 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
     let mut dir: vec3_t = [0.0; 3];
 
     // FLAG: The firing entity may be an NPC with a pool client.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let ent_client = ctx.world.entity(ent).client;
     if ent_client.is_null() {
         count = 1;
@@ -1360,7 +1360,7 @@ pub fn WP_DEMP2_MainFire(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_weapon.c:1164-1307`
 pub fn DEMP2_AltRadiusDamage(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        // `ent` is the DEMP2 shell projectile. We read its constant fields once.
+        // `ent` is the DEMP2 shell projectile. Its constant fields are read once.
         let ent_origin = ctx.world.entity(ent).r.currentOrigin;
         let ent_count = ctx.world.entity(ent).count;
         let ent_damage = ctx.world.entity(ent).damage;
@@ -1779,7 +1779,7 @@ pub fn prox_mine_think(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1509-1541`
 // Oracle writes the wall-corrected point back through the `start` out-param, `VectorCopy(tr.endpos, start)`.
-// We return it so callers pick up the adjustment.
+// The return value carries it, so callers pick up the adjustment.
 pub fn WP_TraceSetStart(
     ctx: &mut GameContext,
     ent: EntityId,
@@ -1803,7 +1803,7 @@ pub fn WP_TraceSetStart(
     }
 
     // FLAG: The firing entity may be an NPC with a pool client.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let ent_client = ctx.world.entity(ent).client;
     if ent_client.is_null() {
         return start;
@@ -1989,7 +1989,7 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
     }
 
     // FLAG: The enemy is an arbitrary entity, and a pool client is possible.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let no_enemy = ctx.world.entity(ent).enemy.is_none() || {
         let eid = ctx.world.entity(ent).enemy.unwrap();
         let enemy_client = ctx.world.entity(eid).client;
@@ -2785,7 +2785,7 @@ pub fn proxMineThink(ctx: &mut GameContext, ent: EntityId) {
     let now = ctx.world.level.time;
     ctx.world.entity_mut(ent).nextthink = now;
 
-    // FLAG: The owner pool client deref stays raw, so we read the client pointer value directly.
+    // FLAG: The owner pool client deref stays raw, and the client pointer value is read directly.
     let owner_client = match owner {
         Some(o) => ctx.world.entity(o).client,
         None => std::ptr::null_mut(),
@@ -3189,7 +3189,7 @@ pub fn charge_stick(
         VectorNPos(td, &mut tN);
         // C: `vNor[i]*(tN[i]*(((float)Q_irand(1,10))*0.1))`.
         // The bare `0.1` is a double, so it runs the whole product chain in f64, narrowed once at the `+=` store.
-        // The `vNor[1]` on the [2] component is a faithful oracle bug.
+        // The `vNor[1]` on the [2] component is an oracle bug, kept as written.
         // Source: `oracle/codemp/game/g_weapon.c:2671-2673`
         let r0 = ctx.world.bg_state.rng.Q_irand(1, 10);
         let r1 = ctx.world.bg_state.rng.Q_irand(1, 10);
@@ -3274,7 +3274,7 @@ pub fn charge_stick(
         e.s.apos.trDelta = [0.0, 0.0, 0.0];
     }
 
-    // `trace` is the engine-provided raw out-param. We normalize it in place, as Raven does.
+    // `trace` is the engine-provided raw out-param. The normalization happens in place, as Raven does.
     unsafe { VectorNormalize(&mut (*trace).plane.normal) };
 
     let tnorm = unsafe { (*trace).plane.normal };
@@ -3556,7 +3556,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: bo
         return;
     };
     // FLAG: The firing entity may be an NPC with a pool client.
-    // We read the client pointer value and deref it raw, as Raven does.
+    // The client pointer value is read and dereffed raw, as Raven does.
     let ent_client = ctx.world.entity(ent).client;
     if ent_client.is_null() {
         return;
@@ -3737,7 +3737,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                 && ctx.world.entity(traceEnt_id).inuse != 0
                 && !traceEnt_client.is_null()
             {
-                // g2 collision checks -rww
+                //g2 collision checks -rww
                 if ctx.world.entity(traceEnt_id).inuse != 0
                     && !traceEnt_client.is_null()
                     && !ctx.world.entity(traceEnt_id).ghoul2.is_null()
@@ -3967,7 +3967,7 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
         let mut muzzleStun: vec3_t;
 
         // FLAG: The firing entity may be an NPC with a pool client.
-        // We read the client pointer value and deref it raw, as Raven does.
+        // The client pointer value is read and dereffed raw, as Raven does.
         let ent_client = ctx.world.entity(ent).client;
         let ent_num = ctx.world.entity(ent).s.number;
 
@@ -4240,7 +4240,7 @@ pub fn LogAccuracyHit(ctx: &mut GameContext, target: EntityId, attacker: Option<
         return false;
     }
 
-    // FLAG: The target pool client deref stays raw, so we read the client pointer value directly.
+    // FLAG: The target pool client deref stays raw, and the client pointer value is read directly.
     let targetClient = ctx.world.entity(target).client;
     if unsafe { (*targetClient).ps.stats[statIndex_t::STAT_HEALTH as usize] } <= 0 {
         return false;
@@ -4318,7 +4318,7 @@ pub fn CalcMuzzlePointOrigin(
     up: vec3_t,
     muzzlePoint: vec3_t,
 ) -> vec3_t {
-    // FLAG: The pool client `viewheight` deref stays raw, so we read the client pointer value directly.
+    // FLAG: The pool client `viewheight` deref stays raw, and the client pointer value is read directly.
     let client = ent.client;
     let mut muzzlePoint = ent.s.pos.trBase;
     muzzlePoint[2] += unsafe { (*client).ps.viewheight } as f32;
@@ -4342,7 +4342,7 @@ pub fn WP_TouchVehMissile(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // `trace` is the engine-provided raw out-param. We copy it by value.
+    // `trace` is the engine-provided raw out-param. This copies it by value.
     let mut myTrace: trace_t = unsafe { *trace };
     if let Some(other_id) = other {
         myTrace.entityNum = ctx.world.entity(other_id).s.number as i16;
@@ -4549,7 +4549,7 @@ pub fn WP_FireVehicleWeapon(
                 (*missile).r.ownerNum = (ent_num as u32) as i32;
             }
 
-            // set veh as cgame side owner for purpose of fx overrides
+            //set veh as cgame side owner for purpose of fx overrides
             (*missile).s.owner = ent_num;
             if alt_fire {
                 // use the second weapon's iShotFX
@@ -4927,7 +4927,7 @@ pub fn WP_VehLeadCrosshairVeh(
     unsafe {
         if ctx.world.cvars.g_vehAutoAimLead.integer != 0 {
             // FLAG: The camera-trace target may be an NPC or a vehicle with a pool client.
-            // We read the client pointer value and deref it raw.
+            // The client pointer value is read and dereffed raw.
             let cam_client = match camTraceEnt {
                 Some(id) => ctx.world.entity(id).client,
                 None => core::ptr::null_mut(),
@@ -4968,7 +4968,7 @@ pub fn WP_VehCheckTraceFromCamPos(
     // SEAM-BG-REENTRY (DEC-28, sanctioned).
     // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
     // A raw store is required for bg-seam re-entry.
-    // The `ctx.world_raw()` `GameCallbacksImpl` seam adapters are built beside the live `ctx` borrow for the `BG_VehTraceFromCamPos` call.
+    // The `ctx.world_raw()` `GameCallbacksImpl` adapters are built beside the live `ctx` borrow for the `BG_VehTraceFromCamPos` call.
     // The raw `ent` cast (`ent as *mut bgEntity_t`) is irreducibly raw at that bg boundary.
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
@@ -5053,7 +5053,7 @@ pub fn WP_VehCheckTraceFromCamPos(
                     &mut newEnd,
                     &mut *shotDir,
                     trace.fraction * ctx.world.globals.g_cullDistance,
-                    // This is irreducible. The ruling-21 `GameCallbacksImpl` seam adapter holds a raw `*mut GameWorld`.
+                    // This is irreducible. The DEC-28 `GameCallbacksImpl` adapter holds a raw `*mut GameWorld`.
                     // `bg_state` is read raw here, to coexist with the `world:` field it fills in the same call.
                     &(*ctx.world_raw()).bg_state,
                     &GameBgTraps::new(ctx.engine),
@@ -5456,7 +5456,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: bool) {
         }
 
         // Raven's file statics `forward, vright, up` / `muzzle` (g_weapon.c:13-14) are `GameGlobals` fields here.
-        // We seed them exactly where the oracle seeds its statics, so the WP_Fire* readers below observe them.
+        // This seeds them exactly where the oracle seeds its statics, so the WP_Fire* readers below observe them.
         // Source: `oracle/codemp/game/g_weapon.c:4448-4512`
         let forward = ctx.world.globals.forward;
         let vright = ctx.world.globals.vright;
@@ -5542,7 +5542,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: bool) {
         }
 
         // C passes the live file-scope forward/vright/up arrays.
-        // We re-copy after the AngleVectors branch above, because the entry-time copies are stale.
+        // This re-copies after the AngleVectors branch above, because the entry-time copies are stale.
         let forward = ctx.world.globals.forward;
         let vright = ctx.world.globals.vright;
         let up = ctx.world.globals.up;
@@ -5685,7 +5685,7 @@ pub fn emplaced_gun_use(
         return;
     };
 
-    // FLAG: The activator pool client deref stays raw, so we read the client pointer value directly.
+    // FLAG: The activator pool client deref stays raw, and the client pointer value is read directly.
     let activator_client = ctx.world.entity(activator).client;
     if activator_client.is_null() {
         return;
@@ -5889,7 +5889,7 @@ pub fn emplaced_gun_update(ctx: &mut GameContext, self_: EntityId) {
     }
 
     let activator = ctx.world.entity(self_).activator;
-    // FLAG: The activator pool client deref stays raw, so we read the client pointer value directly.
+    // FLAG: The activator pool client deref stays raw, and the client pointer value is read directly.
     let activator_client = match activator {
         Some(a) => ctx.world.entity(a).client,
         None => core::ptr::null_mut(),

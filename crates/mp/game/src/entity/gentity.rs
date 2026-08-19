@@ -119,7 +119,7 @@ pub struct gentity_t {
     /// Damage will be ignored if it comes from this team.
     /// Raven field source: `oracle/codemp/game/g_local.h:186`
     pub teamnodmg: c_int,
-    // We deleted Raven's `roffname` and `rofftarget` (`g_local.h:188-189`).
+    // Raven's `roffname` and `rofftarget` (`g_local.h:188-189`) are gone.
     // `rofftarget` had zero readers repo-wide.
     // `roffname` only ever fed the resolved `roffid` int.
     // So both spawn keys became `F_IGNORE`, parsed and silently discarded, and the ICARUS `roffname` store dropped.
@@ -485,7 +485,7 @@ pub enum PrefixSet<'a> {
 }
 
 /// Selects a prefix pool-pointer slot for [`gentity_t::alias_from`].
-/// These are the sites that faithfully copy Raven's shared allocation, one pool buffer reachable
+/// These are the sites that copy Raven's shared allocation, one pool buffer reachable
 /// from two entities' slots, instead of making a fresh copy.
 pub enum PrefixSlot {
     /// `targetname` slot.
@@ -498,16 +498,16 @@ pub enum PrefixSlot {
 
 impl gentity_t {
     /// Aliases a prefix pool pointer from `src`'s slot into `self`'s same slot.
-    /// This is a raw pointer copy that preserves Raven's shared-allocation semantics.
+    /// This is a raw pointer copy that matches Raven's shared-allocation semantics.
     /// The C `dst->x = src->x` left both slots pointing at the one `G_Alloc` buffer.
-    /// Prefix slots stay `*mut c_char` (drop-in ABI), so a pointer copy is the faithful port.
+    /// Prefix slots stay `*mut c_char` (drop-in ABI), so this uses a pointer copy.
     /// `G_FindTeams` uses this: the master inherits the slave's `targetname`.
     /// `NPC_Spawn_Do` also uses this: the spawner clones its template's slots.
     ///
     /// # Safety
     /// The aliased pointer stays valid regardless of either entity's lifetime.
     /// The pointed-at bytes are owned by the level-lifetime, append-only prefix arena ([`GameWorld::prefixStrings`]).
-    /// This arena never drops an entry on entity free, byte-faithful to Raven's never-freed `G_Alloc` pool.
+    /// This arena never drops an entry on entity free, matching Raven's never-freed `G_Alloc` pool.
     /// So the copy is sound until level teardown.
     pub unsafe fn alias_from(&mut self, src: &gentity_t, slot: PrefixSlot) {
         match slot {
@@ -622,7 +622,7 @@ impl GameContext<'_> {
     /// This reproduces Raven `G_NewString`'s `\n`-escape translation and returns a `*mut c_char` into
     /// that owned `CString`'s stable heap buffer for a prefix slot.
     /// This method replaces `G_NewString`.
-    /// The copy is owned for the level's lifetime and is never freed on entity free, byte-faithful to
+    /// The copy is owned for the level's lifetime and is never freed on entity free, matching
     /// Raven's never-freed `G_Alloc` pool.
     /// Taking the pointer before moving the `CString` into the `Vec` is sound.
     /// The move relocates only the `CString` struct, not its heap buffer, so the pointer stays valid
@@ -735,7 +735,7 @@ mod fn_id_niche_tests {
         use core::ptr::addr_of;
         let z = MaybeUninit::<gentity_t>::zeroed();
         let p = z.as_ptr();
-        // SAFETY: `p` points at zeroed, correctly-aligned storage.
+        // SAFETY: `p` points at zeroed, aligned storage.
         // Each `FnId<EntXxx>` field is one byte, and its all-zero pattern is the valid `None` encoding.
         // So reading it out is sound, because no `String` slot is touched.
         unsafe {

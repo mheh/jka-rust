@@ -1,17 +1,15 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Jedi.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Jedi.c`.
 //!
 //! This is a pass-3 transcription.
 //! `ctx: GameContext` threads the ai_main globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `ctx.world`.
 //! RNG routes to the one `BgState.rng`.
 //! The stored `enemy`, `goalEntity`, `activator`, and `lastEnemy` fields are `Option<EntityId>`.
 //!
-//! This is the safe-state migration body sweep.
 //! Every world reach is a checked `ctx.world.…` borrow.
 //! The transitional `(*ctx.world_raw())` raw-deref regime, and its `let world = ctx.world_raw();` aliases, are retired.
 //! Per-body entity, `gNPC_t`, and `gclient_t` re-derives stay raw by design.
-//! `// STAGE-1:` markers and their `unsafe` blocks hold the genuine raw ops.
+//! Unsafe blocks hold the genuine raw ops.
 //! ctx-borrowing call args are hoisted into role-named locals in source order, so RNG and trap ordering stay unchanged.
-//! This file is referee-blind.
 //! Parity rests on the compile and golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -47,10 +45,9 @@ use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 use crate::q_shared;
 
-// This is the safe-state migration.
 // Entity-pointer params are `EntityId` or `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
 // ctx-free leaf helpers take `&gentity_t`.
-// Non-leaf bodies re-derive the raw pointers verbatim at the top (`// STAGE-1:` markers), which stays as known debt for a later pass.
+// Non-leaf bodies re-derive the raw pointers verbatim at the top, inside unsafe blocks.
 // Callers bridge at the boundary through `ctx.entity_id_of(ptr)`.
 
 /// Raven `G_StartMatrixEffect`.

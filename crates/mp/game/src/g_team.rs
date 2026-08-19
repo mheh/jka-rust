@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/g_team.c`.
+//! Port of `oracle/codemp/game/g_team.c`.
 //!
 //! Functions that reach file-scope game state (`level`, `teamgame`, `g_entities`, cvars) or an engine trap thread the `GameContext` handle.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -154,7 +154,6 @@ pub fn TeamColorString(team: c_int) -> *const c_char {
 /// teamIndex used to print team name
 /// Source: `oracle/codemp/game/g_team.c:100-132`
 pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, ctfMessage: c_int) {
-    // MAX_CLIENTS is not threaded through this packet's resolved surface.
     // This uses the Raven literal directly (g_team.c:106 hardcodes the same +1 idiom).
     let plIndex = if plIndex == -1 { 32 + 1 } else { plIndex };
     let teamIndex = if teamIndex == -1 { 50 } else { teamIndex };
@@ -458,7 +457,6 @@ pub fn Team_FragBonuses(
 
         // did the attacker frag the flag carrier?
         // Oracle sets `tokens = 0` here (g_team.c:394) and never changes it, so the `if (tokens)` block below is dead.
-        // This is preserved as a dead branch (porting-rules §20).
         let tokens = 0;
         if (*targ_cl).ps.powerups[enemy_flag_pw as usize] != 0 {
             (*attacker_cl).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
@@ -635,7 +633,6 @@ pub fn Team_FragBonuses(
             let carrier_origin = ctx.world.entity(carrier).r.currentOrigin;
             // Oracle typo (g_team.c:517-518): VectorSubtract writes v1 on both lines.
             // v2 never gets recomputed here and stays stale (the attacker-flag value from the base-flag block above).
-            // This is preserved verbatim (porting-rules §19).
             v1[0] = targ_origin[0] - carrier_origin[0];
             v1[1] = targ_origin[1] - carrier_origin[1];
             v1[2] = targ_origin[2] - carrier_origin[2];
@@ -775,7 +772,6 @@ pub fn Team_ResetFlags(ctx: &mut GameContext) {
 pub fn Team_ReturnFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
     let Some(ent) = ent else {
         // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") is dropped.
-        // The logging trap is not resolved in this packet's call surface.
         // The early return still happens.
         return;
     };
@@ -839,7 +835,6 @@ pub fn Team_TakeFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_
 pub fn Team_CaptureFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
     let Some(ent) = ent else {
         // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") is dropped.
-        // The logging trap is not resolved in this packet's call surface.
         return;
     };
 
@@ -1282,8 +1277,7 @@ pub fn SelectRandomTeamSpawnPoint(
         if class_count > 0 {
             let selection = (ctx.world.bg_state.rng.rand() % class_count) as usize;
             // Oracle returns `spots[selection]` here (g_team.c:1034), not `classSpots[selection]`.
-            // This is a Raven bug: selection is bounded by classCount but indexes the full spots array.
-            // This is preserved (porting-rules §19).
+            // This is a Raven bug: selection is bounded by classCount but indexes the full spots array (porting-rules §19).
             return spots[selection];
         }
     }

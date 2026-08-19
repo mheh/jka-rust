@@ -1,4 +1,4 @@
-//! FAITHFUL port of `oracle/codemp/game/NPC_combat.c`.
+//! Port of `oracle/codemp/game/NPC_combat.c`.
 //!
 //! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
@@ -13,7 +13,6 @@
 //! tables, caller-provided `trace_t`/ABI buffers, and the `Debug_Printf` cvar-pointer sites.
 //! The `Debug_Printf` sites keep an irreducible `&raw mut ctx.world.cvars.debugNPCAI` alias
 //! (marked in-code), passed alongside `ctx` to the raw-ABI callee.
-//! Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::flags::FL_NOTARGET;
@@ -785,7 +784,7 @@ pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_i
 ///
 /// The oracle comments out the entire body as dead code.
 /// A `rwwFIXMEFIXME` note says NPC weapon-changing should work the same way as players do.
-/// This port is faithfully a no-op.
+/// This port is a no-op.
 /// Source: `oracle/codemp/game/NPC_combat.c:844-873`
 pub fn NPC_ChangeWeapon(newWeapon: c_int) {
     //rwwFIXMEFIXME: Change the same way as players, all this stuff is just crazy.
@@ -1841,7 +1840,7 @@ pub fn NPC_CheckEnemy(
             }
         }
 
-        // if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
+        //if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
         // The oracle comments out this branch too.
         // NPC_utils.rs matches this dead branch.
         // Source: oracle/codemp/game/NPC_combat.c:1922
@@ -2372,7 +2371,7 @@ pub fn NPC_CheckCanAttack(
                     {
                         //easy to kill - go for it
                         //rwwFIXMEFIXME: ExplodeDeath_Wait?
-                        // The oracle guards this block with `if (0)`, so this port skips it too, faithfully.
+                        // The oracle guards this block with `if (0)`, so this port skips it too.
                     } else {
                         let mut forward: vec3_t = [0.0; 3];
                         AngleVectors((*client).ps.viewangles, Some(&mut forward), None, None);
@@ -2935,7 +2934,7 @@ pub fn NPC_ReserveCombatPoint(ctx: &mut GameContext, combatPointID: c_int) -> qb
     //Make sure it's valid
     // §19: Raven guards only the upper bound.
     // A -1 id reads combatPoints[-1] in C, which is undefined behavior and reads as not occupied, so it returns qfalse.
-    // We reject negative ids here to match that same effect.
+    // This rejects negative ids here to match that same effect.
     if combatPointID > ctx.world.level.numCombatPoints || combatPointID < 0 {
         return 0;
     }
@@ -2969,7 +2968,7 @@ pub fn NPC_FreeCombatPoint(
         //Make sure it's valid
         // §19: Raven guards only the upper bound.
         // A -1 id reads combatPoints[-1] in C, which is undefined behavior and reads as not occupied, so it returns qfalse.
-        // We reject negative ids here to match that same effect.
+        // This rejects negative ids here to match that same effect.
         if combatPointID > ctx.world.level.numCombatPoints || combatPointID < 0 {
             return qfalse;
         }
