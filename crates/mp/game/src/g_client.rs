@@ -2301,8 +2301,10 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                 f,
                 &mut animSpeedScale as *mut f32,
                 (*((*self_).client)).ps.brokenLimbs,
-                // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
-                // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
+                // `my_saber` reaches the game arena by client number. This replaces the old `g_entities` base arg.
                 &mut crate::bg_channel::GameCallbacksImpl {
                     world: ctx.world_raw(),
                     engine: ctx.engine,
@@ -3429,8 +3431,9 @@ pub fn SetupGameGhoul2Model(
                 if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE {
                     write_cstr_field(&mut vehicleName, &cstr_to_str(modelname));
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                        // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
-                        // A raw store is required (bg-seam re-entry).
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                        // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                        // A raw store is required for bg-seam re-entry.
                         world: ctx.world_raw(),
                         engine: ctx.engine,
                     };
@@ -3659,9 +3662,10 @@ pub fn SetupGameGhoul2Model(
         if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
             let humanoid_anims = ctx.world.bg_state.bgHumanoidAnimations.as_mut_ptr();
             if mp_bg::bg_panimate::BG_ParseAnimationFile(
-                // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld`
-                // field aliasing bg_state, so `bg_state` is read raw here to coexist with the `world:`
-                // field it fills in the same call.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
+                // `bg_state` is read raw here to coexist with the `world:` field it fills in the same call.
                 &mut (*ctx.world_raw()).bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
                 &mut crate::bg_channel::GameCallbacksImpl {
@@ -3705,9 +3709,10 @@ pub fn SetupGameGhoul2Model(
                     }
 
                     (*ent).localAnimIndex = mp_bg::bg_panimate::BG_ParseAnimationFile(
-                        // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld`
-                        // field aliasing bg_state, so `bg_state` is read raw here to coexist with the `world:`
-                        // field it fills in the same call.
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                        // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                        // A raw store is required for bg-seam re-entry.
+                        // `bg_state` is read raw here to coexist with the `world:` field it fills in the same call.
                         &mut (*ctx.world_raw()).bg_state,
                         &crate::bg_channel::GameBgTraps::new(ctx.engine),
                         &mut crate::bg_channel::GameCallbacksImpl {

@@ -1,16 +1,11 @@
-// PORT-COMPLETE: NPC_sounds.c
-
-//! FAITHFUL port of `oracle/codemp/game/NPC_sounds.c`.
+//! Port of `oracle/codemp/game/NPC_sounds.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Ctx-free leaf helpers take `&mut`/`&gentity_t`.
+//! Bodies re-derive the raw pointers verbatim at the top, and the gNPC_t / gclient_t deref regime is deferred.
+//! Callers bridge at the boundary via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_timer::{TIMER_Done, TIMER_Set};
@@ -28,9 +23,8 @@ pub fn G_AddVoiceEvent(
     event: c_int,
     speakDebounceTime: c_int,
 ) {
-    // `NPC`/`client` are raw `gNPC_t`/`gclient_t` pointer fields read by value
-    // through the entity accessor; the derefs below stay `unsafe` (the gNPC_t /
-    // gclient_t deref regime is deferred — safe-state task #7).
+    // `NPC` and `client` are raw `gNPC_t` / `gclient_t` pointer fields read by value through the entity accessor.
+    // The derefs below stay `unsafe`. The gNPC_t / gclient_t deref regime is deferred.
     let npc = ctx.entity(self_).NPC;
     if npc.is_null() {
         return;
@@ -87,10 +81,9 @@ pub fn G_AddVoiceEvent(
 ///
 /// Source: `oracle/codemp/game/NPC_sounds.c:66-93`
 pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
-    // `NPC`/`client` raw pointer fields read by value through the entity
-    // accessor; the derefs below stay `unsafe` (gNPC_t / gclient_t deref regime
-    // deferred — safe-state task #7). The `client` deref is confined to the
-    // short-circuit operand, preserving Raven's evaluation order.
+    // `NPC` and `client` are raw pointer fields read by value through the entity accessor.
+    // The derefs below stay `unsafe`, and the gNPC_t / gclient_t deref regime is deferred.
+    // The `client` deref is confined to the short-circuit operand, matching Raven's evaluation order.
     let npc = ctx.entity(self_).NPC;
     let client = ctx.entity(self_).client;
 

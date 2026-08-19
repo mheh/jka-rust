@@ -1,4 +1,3 @@
-// PORT-COMPLETE: AnimalNPC.c
 //! Game-only half of `oracle/codemp/game/AnimalNPC.c`.
 //!
 //! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` moved
@@ -11,15 +10,15 @@
 use crate::g_main::level_time;
 use crate::prelude::*;
 
-/// Raven `DeathUpdate` — update death sequence.
+/// Raven `DeathUpdate` - update death sequence.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:97-148`
 pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = level_time(ctx);
         if level_time >= (*pVeh).m_iDieTime {
-            // If the vehicle is not empty. (`Inhabited`/`EjectAll` have
-            // no Animal override, so dispatch resolves to the generic base.)
+            // If the vehicle is not empty.
+            // `Inhabited` and `EjectAll` have no Animal override, so dispatch resolves to the generic base.
             if crate::veh_dispatch::inhabited(ctx, pVeh) != qfalse {
                 crate::veh_dispatch::eject_all(ctx, pVeh);
             }
@@ -27,7 +26,7 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `Update` — like a think or move command, this updates various
+/// Raven `Update` - like a think or move command, this updates various
 /// vehicle properties.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
@@ -36,10 +35,10 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
     crate::g_vehicles::Update(ctx, pVeh, pUcmd)
 }
 
-/// Raven `AnimalProcessOri` — temp hack til mp speeder controls are sorted
-/// (`_JK2MP` only). The `ProcessOrientCommands` body it forwards to moved to bg;
-/// this game-tier adapter builds a `pm`-null `PmoveContext` to reach it. It has
-/// no live caller (Raven only `extern`-declares it), kept for faithfulness.
+/// Raven `AnimalProcessOri` - temp hack til mp speeder controls are sorted
+/// (`_JK2MP` only). The `ProcessOrientCommands` body it forwards to moved to bg.
+/// This game-tier adapter builds a `pm`-null `PmoveContext` to reach it.
+/// Raven only `extern`-declares it, so it has no live caller.
 /// Source: `oracle/codemp/game/AnimalNPC.c:467-470`
 pub fn AnimalProcessOri(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
@@ -65,14 +64,14 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let level_time = level_time(ctx);
 
-        // We're dead.
+        // We're dead (boarding is reused here so I don't have to make another variable :-).
         if ctx.world.entity(parent_id).health <= 0 {
             return;
         }
 
-        // If they're bucking, play the animation and leave... `parent->client` is
-        // a pool-allocated gclient_t for vehicle NPCs: read the ptr via the
-        // accessor, deref it raw (recipe 2c pool-client).
+        // If they're bucking, play the animation and leave...
+        // `parent->client` is a pool-allocated gclient_t for vehicle NPCs.
+        // Read the pointer via the accessor, and deref it raw.
         let parent_client = ctx.world.entity(parent_id).client;
         if parent_client.is_null() == false && (*parent_client).ps.legsAnim == BOTH_VT_BUCK as c_int
         {
@@ -194,11 +193,11 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `AnimateRiders` — makes sure the riders in this vehicle are
+/// Raven `AnimateRiders` - makes sure the riders in this vehicle are
 /// properly animated.
 ///
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
-/// or it will feel awful and lagged.
+/// or it will feel awful and lagged
 /// Source: `oracle/codemp/game/AnimalNPC.c:620-849`
 pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
@@ -208,8 +207,8 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let pilot = (*pVeh).m_pPilot as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let parent_id = ctx.entity_id_of(parent).unwrap();
-        // `pilot` may be NULL; when present it's an arena entity — read its
-        // `playerState` (pool-client ptr, derefed raw below) via the accessor.
+        // `pilot` may be NULL. When present, it is an arena entity.
+        // Read its `playerState` (pool-client pointer, derefed raw below) via the accessor.
         let pilotPS = if pilot.is_null() {
             None
         } else {
@@ -255,8 +254,8 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
             (*pVeh).m_ulFlags &= !(VEH_CRASHING as u64);
 
-            // MP `#ifdef _JK2MP`: don't interrupt attack anims — if a shot is
-            // mid-fire the current anim is left untouched (skips pose + SetAnim).
+            // MP `#ifdef _JK2MP` does not interrupt attack anims.
+            // If a shot is mid-fire, the current anim is left untouched (skips pose + SetAnim).
             if let Some(pps) = pilotPS {
                 if !pps.is_null() && (*pps).weaponTime > 0 {
                     return;
@@ -299,8 +298,8 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 }
 
                 if !left_mut && !right_mut {
-                    // The enemy-direction auto-aim block is `#ifndef _JK2MP` — dead
-                    // in MP; only the WP_SABER fallback survives preprocessing.
+                    // The enemy-direction auto-aim block is `#ifndef _JK2MP`, so it is dead in MP.
+                    // Only the WP_SABER fallback survives preprocessing.
                     // Source: oracle/codemp/game/AnimalNPC.c:746-777
                     if !pilotPS.is_none()
                         && !pilotPS.unwrap().is_null()
@@ -371,14 +370,15 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-// `G_SetAnimalVehicleFunctions` retired — it only assigned the now-removed
-// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
-// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
+// `G_SetAnimalVehicleFunctions` retired.
+// It only assigned the now-removed `vehicleInfo_t` fn-ptr slots.
+// Vehicle dispatch is `vehicleType_t`-keyed in `crate::veh_dispatch`.
+// Source: `oracle/codemp/game/AnimalNPC.c:857-885`
 
-/// Raven `G_CreateAnimalNPC` — create/allocate a new Animal Vehicle
+/// Raven `G_CreateAnimalNPC` - create/allocate a new Animal Vehicle
 /// (initializing it as well).
 ///
-/// Raven: this is a BG function too in MP so don't un-bg-compatibilify it.
+/// Raven: this is a BG function too in MP so don't un-bg-compatibilify it -rww
 /// Source: `oracle/codemp/game/AnimalNPC.c:904-925`
 pub fn G_CreateAnimalNPC(
     ctx: &mut GameContext,
@@ -389,8 +389,9 @@ pub fn G_CreateAnimalNPC(
         crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
         core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };

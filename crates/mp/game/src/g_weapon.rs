@@ -4965,8 +4965,10 @@ pub fn WP_VehCheckTraceFromCamPos(
     shotStart: [f32; 3],
     shotDir: &mut [f32; 3],
 ) -> qboolean {
-    // SEAM-BG-REENTRY (DEC-28, sanctioned): the `ctx.world_raw()` `GameCallbacksImpl` seam adapters
-    // are built beside the live `ctx` borrow for the `BG_VehTraceFromCamPos` call.
+    // SEAM-BG-REENTRY (DEC-28, sanctioned).
+    // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+    // A raw store is required for bg-seam re-entry.
+    // The `ctx.world_raw()` `GameCallbacksImpl` seam adapters are built beside the live `ctx` borrow for the `BG_VehTraceFromCamPos` call.
     // The raw `ent` cast (`ent as *mut bgEntity_t`) is irreducibly raw at that bg boundary.
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {

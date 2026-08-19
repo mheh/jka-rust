@@ -23,8 +23,9 @@ Where a prior pass merged, paraphrased, or "corrected" a Raven comment, restore 
 "The text" includes every character-level dimension:
 
 - Casing and terminal punctuation. There is no separate transcription-convention layer, and file-internal uniformity never overrides oracle fidelity.
-- Inter-token whitespace inside restored C call text (`gi.Printf (...)` keeps its space).
-- The spacing between the comment token and the text: Raven's `//text` stays `//text`, and `// text` stays `// text`. The one normalization: a tab after the comment token becomes one space (`//<TAB>text` becomes `// text`).
+- Developer signatures (`-rww`, `-MCG`, and kin). A signature is part of the text and restores with it.
+- Inter-token whitespace inside restored C text. `gi.Printf (...)` keeps its space, and alignment tabs inside a restored declaration stay literal tabs.
+- The spacing between the comment token and the text: Raven's `//text` stays `//text`, and `// text` stays `// text`. The one normalization: a tab in this first gap becomes one space (`//<TAB>text` becomes `// text`). The normalization never touches whitespace inside the text.
 
 Verification byte-diffs each restored comment against its cited oracle line, because prose reads miss whitespace drift.
 
@@ -54,7 +55,9 @@ Fabricated and confirmed citations are always removed, never repaired into a val
 
 ## CB-8 - DEC-anchored named invariants read as one family
 
-A named invariant with a ledger anchor, for example `SEAM-BG-REENTRY (DEC-28, sanctioned)`, is uniform: every member site carries the same named tag in the same shape, so the family greps as one. A member hiding under anonymous prose, or under a retired campaign tag, retags into the family shape, never into ordinary prose. Before restyling a site that carries a retired tag (`STAGE-2b` and kin), grep the crate for the tag and check the DEC ledger for the superseding family. The protection covers the named tag and its anchor only - the surrounding prose restyles like any port prose, em dashes stripped. This rule covers DEC-anchored families only: task-number and plain prefix families restyle under CB-6.
+A named invariant with a ledger anchor, for example `SEAM-BG-REENTRY (DEC-28, sanctioned)`, is uniform: every member site carries the same named tag in the same shape, so the family greps as one. A member hiding under anonymous prose, or under a retired campaign tag, retags into the family shape, never into ordinary prose. Before restyling a site that carries a retired tag (`STAGE-2b` and kin), grep the crate for the tag and check the DEC ledger for the superseding family.
+
+`SEAM-BG-REENTRY` is full-shape uniform: every member site carries the same three-line comment (the tag-and-anchor line, the `GameCallbacksImpl.world` aliasing fact, and "A raw store is required for bg-seam re-entry."). A site-specific fact beyond those three lines goes on its own following line, never lost. For every other DEC-anchored family the protection covers the named tag and its anchor only - the surrounding prose restyles like any port prose, em dashes stripped. This rule covers DEC-anchored families only: task-number and plain prefix families restyle under CB-6.
 
 ## CB-9 - deletion beats rewording when CB-0 rule 1 fails
 

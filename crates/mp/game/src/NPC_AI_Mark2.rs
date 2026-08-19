@@ -1,9 +1,6 @@
-// PORT-COMPLETE: NPC_AI_Mark2.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark2.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Mark2.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::hit_location::HL_GENERIC1;
@@ -165,7 +162,7 @@ pub fn Mark2_Hunt(ctx: &mut GameContext) {
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
-    // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: NPCInfo (gNPC_t) goalEntity, raw read.
     let goal = unsafe { (*npc_info).goalEntity };
     if goal.is_none() {
         let enemy = ctx.world.entity(npc_id).enemy;
@@ -176,7 +173,7 @@ pub fn Mark2_Hunt(ctx: &mut GameContext) {
 
     NPC_FaceEnemy(ctx, qtrue);
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: NPCInfo (gNPC_t) combatMove, raw write.
     unsafe {
         (*npc_info).combatMove = qtrue;
     }
@@ -283,7 +280,7 @@ pub fn Mark2_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
         b"attackDelay\0".as_ptr() as *const c_char,
     ) == qtrue
     {
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: NPCInfo (gNPC_t) localState, raw read.
         if unsafe { (*npc_info).localState } == LSTATE_NONE {
             let delay = ctx.world.bg_state.rng.Q_irand(500, 2000);
             TIMER_Set(
@@ -328,8 +325,8 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
     let visible = NPC_ClearLOS4(ctx, npc_enemy);
     let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
 
-    // He's been ordered to get up.
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // He's been ordered to get up
+    // FLAG: NPCInfo (gNPC_t) localState, raw read.
     if unsafe { (*npc_info).localState } == LSTATE_RISINGUP {
         ctx.world.entity_mut(npc_id).flags &= !FL_SHIELDED;
         NPC_SetAnim(
@@ -339,7 +336,7 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
             BOTH_RUN1START as c_int,
             SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
         );
-        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        // FLAG: NPC pool `gclient_t`, raw deref for ps.legsTimer / ps.torsoAnim.
         let client = ctx.world.entity(npc_id).client;
         let (legs_timer, torso_anim) = unsafe { ((*client).ps.legsTimer, (*client).ps.torsoAnim) };
         if legs_timer <= 0 && torso_anim == BOTH_RUN1START as c_int {
@@ -350,9 +347,9 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
         return;
     }
 
-    // If we cannot see our target, move to see it.
+    // If we cannot see our target, move to see it
     if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: NPCInfo (gNPC_t) localState, raw read.
         let local_state = unsafe { (*npc_info).localState };
         if local_state == LSTATE_DOWN || local_state == LSTATE_DROPPINGDOWN {
             if TIMER_Done(ctx, Some(npc_id), b"downTime\0".as_ptr() as *const c_char) == qtrue {
@@ -381,7 +378,7 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
     }
 
     // He's down but he could advance if he wants to.
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: NPCInfo (gNPC_t) localState, raw read.
     if advance == qtrue
         && TIMER_Done(ctx, Some(npc_id), b"downTime\0".as_ptr() as *const c_char) == qtrue
         && unsafe { (*npc_info).localState } == LSTATE_DOWN
@@ -407,7 +404,7 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
 
     NPC_FaceEnemy(ctx, qtrue);
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: NPCInfo (gNPC_t) localState, raw read.
     let local_state = unsafe { (*npc_info).localState };
     if local_state == LSTATE_DROPPINGDOWN {
         NPC_SetAnim(
@@ -425,7 +422,7 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
             delay,
         );
 
-        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        // FLAG: NPC pool `gclient_t`, raw deref for ps.legsTimer / ps.torsoAnim.
         let client = ctx.world.entity(npc_id).client;
         let (legs_timer, torso_anim) = unsafe { ((*client).ps.legsTimer, (*client).ps.torsoAnim) };
         if legs_timer <= 0 && torso_anim == BOTH_RUN1STOP as c_int {
@@ -499,12 +496,12 @@ pub fn NPC_BSMark2_Default(ctx: &mut GameContext) {
 
     if ctx.world.entity(npc_id).enemy.is_some() {
         let enemy = ctx.world.entity(npc_id).enemy;
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: NPCInfo (gNPC_t) goalEntity, raw write.
         unsafe {
             (*npc_info).goalEntity = enemy;
         }
         Mark2_AttackDecision(ctx);
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: NPCInfo (gNPC_t) scriptFlags, raw read.
     } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
         Mark2_Patrol(ctx);
     } else {

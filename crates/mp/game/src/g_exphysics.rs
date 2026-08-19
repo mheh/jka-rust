@@ -1,8 +1,6 @@
-// PORT-COMPLETE: g_exphysics.c
-//! FAITHFUL port of `oracle/codemp/game/g_exphysics.c`.
+//! Port of `oracle/codemp/game/g_exphysics.c`.
 //!
-//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and
-//! engine traps through the threaded `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ent_fn_enums::dispatch_touch;
@@ -30,14 +28,15 @@ pub fn G_RunExPhys(
     g2Bolts: *mut c_int,
     numG2Bolts: c_int,
 ) {
-    // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
+    // `trace_t` has no zeroing constructor.
+    // The `mem::zeroed` call is a plain POD init.
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut projectedOrigin: vec3_t = [0.0; 3];
     let mut vNorm: vec3_t = [0.0; 3];
     let velScaling: f32 = 0.1f32;
 
-    // C `assert` is elided under NDEBUG (release), so out-of-range mass is
-    // tolerated in shipping builds; `debug_assert!` mirrors that.
+    // C's `assert` is elided under NDEBUG (release), so shipping builds tolerate out-of-range mass.
+    // `debug_assert!` mirrors that behavior.
     debug_assert!(mass <= 1.0 && mass >= 0.01);
 
     if gravity != 0.0 {
@@ -138,7 +137,7 @@ pub fn G_RunExPhys(
         let mut boneOrg: vec3_t = [0.0; 3];
         let mut projectedBoneOrg: vec3_t = [0.0; 3];
         let mut collisionRootPos: vec3_t = [0.0; 3];
-        // mdxaBone_t/trace_t POD-inits, as with `tr` above.
+        // `mdxaBone_t` and `trace_t` here get the same POD init as `tr` above.
         let mut matrix: mdxaBone_t = unsafe { core::mem::zeroed() };
         let mut bestCollision: trace_t = unsafe { core::mem::zeroed() };
         let mut hasFirstCollision = false;
@@ -154,8 +153,8 @@ pub fn G_RunExPhys(
         );
 
         for i in 0..numG2Bolts {
-            // `g2Bolts` is a raw caller-owned bolt array; the indexed read is
-            // the one genuinely unsafe op in this fn.
+            // `g2Bolts` is a raw caller-owned bolt array.
+            // The indexed read is the one unsafe operation in this function.
             let bolt = unsafe { *g2Bolts.add(i as usize) };
             trap::G2API_GetBoltMatrix(
                 ctx.engine,

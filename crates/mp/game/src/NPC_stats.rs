@@ -408,8 +408,9 @@ pub fn G_ParseAnimFileSet(
     unsafe {
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field.
-            // A raw store is required here for bg-seam re-entry.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -2039,8 +2040,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 Q_strncpyzBytes(saber_dest, value.as_bytes(), 4096);
 
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-                    // A raw store is required here for bg-seam re-entry.
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                    // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                    // A raw store is required for bg-seam re-entry.
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };
@@ -2078,8 +2080,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     Q_strncpyzBytes(saber_dest, value.as_bytes(), 4096);
 
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                        // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-                        // A raw store is required here for bg-seam re-entry.
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                        // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                        // A raw store is required for bg-seam re-entry.
                         world: ctx.world_raw(),
                         engine: ctx.engine,
                     };
@@ -2387,8 +2390,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 //use "kyle" for a default then
                 npcSaber1 = G_ModelIndex(ctx, "@Kyle");
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-                    // A raw store is required here for bg-seam re-entry.
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                    // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                    // A raw store is required for bg-seam re-entry.
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };

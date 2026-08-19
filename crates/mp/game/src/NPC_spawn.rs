@@ -1177,8 +1177,9 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         if Q_stricmp(&(*ent).classname_str(), "NPC_Vehicle") == 0 {
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-                // A raw store is required here, because this is bg-seam re-entry.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -1626,8 +1627,9 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             .as_ref()
             .map_or(core::ptr::null(), |c| c.as_ptr());
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-            // A raw store is required here, because this is bg-seam re-entry.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -1677,8 +1679,10 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
                         let anim_path = cstr(&format!("{}/animation.cfg", &gla_name[..slash_pos]));
 
                         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
-                        // SEAM-BG-REENTRY (DEC-28, sanctioned): `GameCallbacksImpl.world` is a `*mut GameWorld` field aliasing `bg_state`.
-                        // A raw store is required here, because this is bg-seam re-entry, fed by the `world_raw()` accessor.
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                        // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                        // A raw store is required for bg-seam re-entry.
+                        // The `world_raw()` accessor feeds the store.
                         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                             world: ctx.world_raw(),
                             engine: ctx.engine,

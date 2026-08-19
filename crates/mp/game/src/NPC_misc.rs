@@ -1,18 +1,13 @@
-// PORT-COMPLETE: NPC_misc.c
-
-//! FAITHFUL port of `oracle/codemp/game/NPC_misc.c`.
+//! Debug logging functions for NPC AI.
 //!
-//! Debug logging functions for NPC AI. Both functions thread GameContext
-//! as the first parameter and access level.time from the game world.
+//! Both functions thread `GameContext` as the first parameter and read `level.time` from the game world.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::Com_Printf;
 use crate::prelude::*;
 
-// Raven DEBUG_LEVEL_* constants from b_local.h. The former values here
-// (DETAIL 1 / WARNING 5 / ERROR 7) were guessed and inverted the severity
-// ordering the `cv->value < debugLevel` gate depends on — a live bug — so they
-// are corrected to the oracle values.
+// Raven DEBUG_LEVEL_* constants from b_local.h.
+// The severity order must match the oracle values, because the `cv->value < debugLevel` gate depends on it.
 // Source: oracle/codemp/game/b_local.h:22-25
 const DEBUG_LEVEL_DETAIL: c_int = 4;
 const DEBUG_LEVEL_INFO: c_int = 3;
@@ -21,8 +16,7 @@ const DEBUG_LEVEL_ERROR: c_int = 1;
 
 /// Raven `Debug_Printf`.
 ///
-/// Debug logging function that formats a message if the debug level is enabled,
-/// then prints it with timestamp prefix. The cvar is checked first to gate output.
+/// This prints a message with a color and time prefix when the debug cvar allows the given level.
 ///
 /// Source: `oracle/codemp/game/NPC_misc.c:10-35`
 pub fn Debug_Printf(
@@ -30,13 +24,12 @@ pub fn Debug_Printf(
     cv: *mut vmCvar_t,
     debugLevel: c_int,
     fmt: *mut c_char,
-    // variadic `...` — C varargs, seam decision pending
+    // variadic `...`, C var args do not cross the Rust ABI boundary
 ) {
-    // C varargs cannot be captured in safe Rust; call sites (NPC_combat.rs)
-    // pre-format the message and pass it here.
+    // C var args cannot be captured in safe Rust.
+    // Call sites (NPC_combat.rs) pre-format the message and pass it here.
 
     unsafe {
-        // Check if cvar value is less than debug level; if so, don't print
         if (*cv).value < debugLevel as f32 {
             return;
         }
@@ -60,9 +53,8 @@ pub fn Debug_Printf(
 
 /// Raven `Debug_NPCPrintf`.
 ///
-/// Debug logging function similar to Debug_Printf, but adds NPC identification
-/// (name and Q_COLOR_ESCAPE prefix) to the output. Format: `^c^t^i (npc) msg`
-/// where c is the color escape, t is time, i is the NPC targetname.
+/// This is like `Debug_Printf`, but it adds the NPC name and a `Q_COLOR_ESCAPE` prefix to the output.
+/// Format: `^c^t^i (npc) msg`, where c is the color escape, t is time, and i is the NPC targetname.
 ///
 /// Source: `oracle/codemp/game/NPC_misc.c:41-73`
 pub fn Debug_NPCPrintf(
@@ -71,19 +63,17 @@ pub fn Debug_NPCPrintf(
     cv: *mut vmCvar_t,
     debugLevel: c_int,
     fmt: *mut c_char,
-    // variadic `...` — C varargs, seam decision pending
+    // variadic `...`, C var args do not cross the Rust ABI boundary
 ) {
-    // C varargs cannot be captured in safe Rust; call sites pre-format the
-    // message and pass it here.
+    // C var args cannot be captured in safe Rust.
+    // Call sites pre-format the message and pass it here.
 
     unsafe {
-        // Check if cvar value is less than debug level; if so, don't print
         if (*cv).value < debugLevel as f32 {
             return;
         }
 
-        // Map debug level to color code. Raven's COLOR_* are the ASCII digit
-        // chars '7'/'2'/'3'/'1', emitted as literal bytes (not control codes).
+        // Raven's COLOR_* values are the ASCII digit characters '7'/'2'/'3'/'1', emitted as literal bytes, not control codes.
         let color: char = match debugLevel {
             DEBUG_LEVEL_DETAIL => '7',  // COLOR_WHITE
             DEBUG_LEVEL_INFO => '2',    // COLOR_GREEN

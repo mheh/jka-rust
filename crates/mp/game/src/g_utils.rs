@@ -579,8 +579,10 @@ pub fn G_SetAnim(
         let ps = &mut (*((*ent).client)).ps as *mut playerState_t;
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld`
-            // field held alongside the `&mut ctx.world.bg_state` borrow below.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
+            // The field is held alongside the `&mut ctx.world.bg_state` borrow below.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };

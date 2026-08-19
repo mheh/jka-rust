@@ -1,9 +1,6 @@
-// PORT-COMPLETE: g_arenas.c
-
-//! FAITHFUL port of `oracle/codemp/game/g_arenas.c`.
+//! Port of `oracle/codemp/game/g_arenas.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 #![deny(unsafe_code)]
@@ -60,9 +57,9 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
         );
         write_cstr_field(&mut msg, &formatted);
     } else {
-        // Raven's `player->client` aliases `&level.clients[playerClientNum]`: a
-        // client entity's `client` pointer is set to its own slot in the owned
-        // arena at spawn (§B5), so the index is the entity number `playerClientNum`.
+        // Raven's `player->client` aliases `&level.clients[playerClientNum]`.
+        // A client entity's `client` pointer is set to its own slot in the owned arena at spawn (§B5), so the index
+        // is the entity number `playerClientNum`.
         let client = ctx.world.client(playerClientNum as usize);
         if client.accuracy_shots != 0 {
             accuracy = client.accuracy_hits * 100 / client.accuracy_shots;
@@ -81,9 +78,8 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
                     > ctx.world.level.teamScores[TEAM_RED as usize];
             }
         } else {
-            // `&level.clients[playerClientNum] == &level.clients[sortedClients[0]]`
-            // is an identity test over the contiguous client arena — equivalent to
-            // comparing the two indices (g_arenas.c:70).
+            // `&level.clients[playerClientNum] == &level.clients[sortedClients[0]]` is an identity test over the
+            // contiguous client arena, equivalent to comparing the two indices (g_arenas.c:70).
             if playerClientNum == ctx.world.level.sortedClients[0] {
                 won = true;
                 score1 = ctx
@@ -149,15 +145,14 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
         if (msglen + buflen + 1) as usize >= MAX_STRING_CHARS {
             break;
         }
-        // strcat(msg, buf)
         let msg_len = msg.iter().position(|&c| c == 0).unwrap_or(0);
         let buf_len = buf.iter().position(|&c| c == 0).unwrap_or(0);
         for j in 0..buf_len {
             msg[msg_len + j] = buf[j];
         }
         msg[msg_len + buf_len] = 0;
-        // Oracle never updates `msglen` in this loop (g_arenas.c:90-99): the guard
-        // above keeps comparing the original length every iteration. Preserved.
+        // Oracle never updates `msglen` in this loop (g_arenas.c:90-99).
+        // The guard above keeps comparing the original length on every iteration.
         i += 1;
     }
 

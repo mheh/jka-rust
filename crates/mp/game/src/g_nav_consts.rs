@@ -27,9 +27,8 @@ pub const MAX_WAYPOINT_REACHED_DIST_SQUARED: c_int = 1024;
 /// Source: `oracle/codemp/game/g_nav.h:11`
 pub const MAX_COLL_AVOID_DIST: c_int = 128;
 
-/// Raven `NAVGOAL_USE_RADIUS` — used to force the waypoint_navgoals with a
-/// manually set radius to actually do a `DistanceSquared` check, not just
-/// bounds overlap.
+/// Raven `NAVGOAL_USE_RADIUS` forces a waypoint navgoal with a manually set radius to run a `DistanceSquared` check
+/// instead of a bounds-overlap check.
 ///
 /// Source: `oracle/codemp/game/g_nav.h:12`
 pub const NAVGOAL_USE_RADIUS: c_int = 16384;

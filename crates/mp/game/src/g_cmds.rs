@@ -1485,8 +1485,9 @@ pub fn G_SetSaber(
         }
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
-            // A raw store is required at this bg-seam re-entry.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };

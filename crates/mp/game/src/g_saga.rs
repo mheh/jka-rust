@@ -306,8 +306,9 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             // Load the player class types
             let mut callbacks = GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld` field.
-                // A raw store is required for this bg-seam re-entry.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -398,8 +399,9 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             // precache saber data for classes that use sabers on both teams
             let mut callbacks = GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned): GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
-                // A raw store is required for this bg-seam re-entry.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };

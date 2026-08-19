@@ -4,11 +4,11 @@
 //! types), verified against oracle with size/offset asserts.
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-// The pass-3 port reaches world state through raw pointers (`(*ctx.world_raw()).…`),
-// so container indexing on those paths implicitly autorefs through the deref —
-// the exact pattern this deny-by-default lint flags. The refs are intentional
-// (single-writer world, seam-confined unsafe); silencing beats 130 noisy
-// explicit-ref rewrites. Revisit when the safe-state migration lands.
+// The port reaches world state through raw pointers (`(*ctx.world_raw()).…`).
+// Container indexing on those paths implicitly autorefs through the deref, the exact pattern this deny-by-default lint flags.
+// The refs are intentional: single-writer world, seam-confined unsafe.
+// Silencing beats 130 noisy explicit-ref rewrites.
+// Revisit when the safe-state migration lands.
 #![deny(dangerous_implicit_autorefs)]
 
 pub mod ai;
@@ -24,7 +24,7 @@ pub mod saber;
 pub mod say;
 pub mod teams;
 
-// --- jampgame function skeletons + generated boilerplate (mega-pass) ---
+// jampgame function skeletons and generated boilerplate.
 pub mod AnimalNPC;
 pub mod FighterNPC;
 pub mod NPC_AI_Atst;
@@ -123,23 +123,19 @@ pub mod world;
 
 pub use world::{EntityId, GameContext, GameWorld};
 
-// Pass-3 prep C1 (agenda B6 prelude/re-export fix): crate-root re-exports of the
-// qshared subsystems that pass-2 porter bodies spell as `crate::shared::…` /
-// `crate::trajectory::…` (the module lives in `mp_qshared`, but the game tier is
-// its logical home in those transcriptions). Re-homing under `crate::` resolves
-// the absolute-path references without touching each call site.
+// These qshared subsystems live in `mp_qshared`.
+// Ported code refers to them as `crate::shared::…` and `crate::trajectory::…`, so the game crate is their logical home at those call sites.
+// Re-exporting them under `crate::` resolves the paths without editing each call site.
 pub use mp_qshared::common::mp::qcommon::taskID_t;
 pub use mp_qshared::shared;
 pub use mp_qshared::shared::trajectory;
 
-// The export-command enum, re-exported so the jampgame shell names it through
-// its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell
-// property stays intact — the shell sees the seam through the logic crate).
+// The export-command enum re-exports here so the jampgame shell names it through its existing two edges.
+// SEAM-D10's exactly-two-edges shell property holds: the shell sees the seam through the logic crate.
 pub use mp_abi::game::exports::MpGameExport;
 
-// The per-command vmMain call types the shell's dispatch match names, seen
-// through the logic crate on the same item-25 principle (checkpoint-7 finding:
-// mechanical extension — the shell's arms need the C marker/Args types).
+// The per-command vmMain call types the shell's dispatch match names.
+// The shell's arms need the C marker and Args types, so they route through the logic crate the same way.
 pub mod vmcalls {
     pub use mp_abi::game::vmcalls::BOTAI_START_FRAME::BotAiStartFrame;
     pub use mp_abi::game::vmcalls::GAME_CLIENT_BEGIN::GameClientBegin;

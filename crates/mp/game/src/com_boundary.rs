@@ -1,15 +1,14 @@
-//! Print-sink seam for the two ctx-free fn-ptr boundaries `Com_Printf`/
-//! `Com_Error` (`g_main.rs`), mirroring Raven's own file-static syscall
-//! pointer at this same boundary.
+//! Print-sink boundary for the two ctx-free fn-pointer callers `Com_Printf` and `Com_Error` (`g_main.rs`).
+//! It mirrors Raven's own file-static syscall pointer at the same boundary.
 //!
-//! Source: `oracle/codemp/game/g_syscalls.c` (file-static
-//! `trap_*` pointers filled by `dllEntry`); the ctx-free callers this
-//! stands in for are `oracle/codemp/game/g_main.c:1208-1228`.
+//! Source: `oracle/codemp/game/g_syscalls.c` (file-static `trap_*` pointers filled by `dllEntry`).
+//! The ctx-free callers here stand in for `oracle/codemp/game/g_main.c:1208-1228`.
 //!
-//! Narrow SEAM-D1 extension (approved 2026-07-06): the shell registers these
-//! two fn pointers at `dllEntry` so `Com_Printf`/`Com_Error` can reach
-//! `G_PRINT`/`G_ERROR` instead of `eprint!`/`panic!`. Deliberately print-only
-//! — widening this to a general ambient engine handle needs a new ruling.
+//! This is the SEAM-D1 narrow extension (DEC-12).
+//! The shell registers these two fn pointers at `dllEntry`.
+//! That lets `Com_Printf` and `Com_Error` reach `G_PRINT` and `G_ERROR` instead of `eprint!` and `panic!`.
+//! The route only prints.
+//! Widening it to a general ambient engine handle needs a new ruling.
 
 use std::ffi::c_char;
 use std::sync::OnceLock;
@@ -42,8 +41,8 @@ pub(crate) fn com_error_sink() -> Option<fn(*const c_char)> {
     COM_ERROR_SINK.get().copied()
 }
 
-/// Builds the shell's `Com_Printf` sink fn body: routes `msg` through
-/// `trap_Printf` (`G_PRINT`) exactly as `G_Printf` does (`g_main.rs`).
+/// This builds the shell's `Com_Printf` sink fn body.
+/// It routes `msg` through `trap_Printf` (`G_PRINT`), matching `G_Printf` in `g_main.rs`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1219-1228`
 pub fn route_print(engine: &Engine, msg: *const c_char) {
@@ -53,8 +52,8 @@ pub fn route_print(engine: &Engine, msg: *const c_char) {
     }
 }
 
-/// Builds the shell's `Com_Error` sink fn body: routes `msg` through
-/// `trap_Error` (`G_ERROR`) exactly as `G_Error` does (`g_main.rs`).
+/// This builds the shell's `Com_Error` sink fn body.
+/// It routes `msg` through `trap_Error` (`G_ERROR`), matching `G_Error` in `g_main.rs`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1208-1217`
 pub fn route_error(engine: &Engine, msg: *const c_char) {
