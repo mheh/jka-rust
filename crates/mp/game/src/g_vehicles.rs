@@ -1,43 +1,30 @@
-// PORT-STATUS: g_vehicles.c — pass-3 blind fill: all 14 remaining fns bodied
-// against the resolved (LAW) signatures. Boundary-set fns (Vehicle_SetAnim,
-// Update, G_FlyVehicleImpactDir, G_SetVehDamageFlags, G_FlyVehicleDestroySurface)
-// carry no ctx/bg channel in their fixed vtable/fn-ptr slot signatures yet reach
-// world/engine/rng — those references are transcribed against the game channel
-// (`ctx`) pending the vtable-dispatch retrofit.
-//! FAITHFUL port of `oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
-//! `QAGAME` compile path).
+//! Port of `oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` + `QAGAME` compile path).
 //!
-//! Filled by the jampgame mega-pass.
+//! `Vehicle_SetAnim`, `Update`, `G_FlyVehicleImpactDir`, `G_SetVehDamageFlags`, and `G_FlyVehicleDestroySurface`
+//! carry no ctx or bg channel in their fixed vtable or function-pointer slot signatures.
+//! Even so, they reach world, engine, and RNG state, so those references go through the game channel (`ctx`)
+//! until the vtable-dispatch retrofit lands.
 //!
-//! Parking pattern in this file (see the workflow's recurring escalations):
-//! - `raw-ptr-skeleton-no-world-handle`: reads `level.time`/`g_entities`/cvar
-//!   globals or calls engine traps, none reachable from the raw-pointer skeleton
-//!   signature (`level`/`g_entities`/cvars live on the world).
-//! - `vec3-outparam-seam`: relies on `AngleVectors`/`VectorNormalize` out-params,
-//!   whose resolved signatures take `vec3_t` ([f32;3]) by value and so cannot
-//!   write back — the signature can't be re-declared here.
-//! - `packet-contract`: passes a C `NULL` where the resolved callee (`G_Damage`)
-//!   takes a `vec3_t` by value, which cannot express a null argument.
-//! - `bg-anim-globals`: indexes the runtime-populated `bgAllAnims` global table,
-//!   which has no handle in scope.
-//! - `vehicle-vtable`: the `vehicleInfo_t` vtable fields are
-//!   `Option<unsafe extern "C" fn>` but the ported member fns are plain-Rust —
-//!   assigning them needs an unsettled extern-"C" seam (vtable dispatch).
+//! Some sites in this file cannot take the ideal signature.
+//! A read of `level.time`, `g_entities`, a cvar global, or an engine trap call has no reachable world handle
+//! from a raw-pointer skeleton signature, because `level`, `g_entities`, and the cvars live on the world.
+//! `AngleVectors` and `VectorNormalize` write through out-params, but their resolved signatures take `vec3_t`
+//! (`[f32; 3]`) by value, so a call cannot write back through them, and the signature at the call site cannot change to fix this.
+//! A call that needs to pass a C `NULL` where the resolved callee (`G_Damage`) takes a `vec3_t` by value has no way to express a null argument.
+//! Some code indexes the runtime-populated `bgAllAnims` global table, which has no handle in scope at the call site.
+//! The `vehicleInfo_t` vtable fields are `Option<unsafe extern "C" fn>`, but the ported member functions are plain Rust,
+//! so assigning them needs an extern "C" vtable-dispatch bridge that does not exist yet.
 //!
-//! The `Ghost`/`UnGhost`/`SHIPSURF_*`/`SVF_*`/`EF_*`/`CONTENTS_*` constants are
-//! spelled with their Raven names as bare identifiers (staging convention: the
-//! integrator wires the const, the name preserves intent).
+//! The `Ghost`, `UnGhost`, `SHIPSURF_*`, `SVF_*`, `EF_*`, and `CONTENTS_*` constants keep their Raven names as bare identifiers.
+//! The constant home is not chosen yet, so the names stay local.
 //!
-//! Safe-state migration **Stage 2c**: `gentity_t*` params are `EntityId` /
-//! `Option<EntityId>` handles (§B5); ctx-free leaf helpers take `&mut gentity_t`.
-//! Entity fields are reached through `ctx.world.entity(id)` / `entity_mut(id)` at
-//! the point of use (no fn-top raw re-derives). `Vehicle_t*`/`bgEntity_t*` params
-//! and the vehicle fn-pointer tables are NOT entity handles and stay raw (§D12
-//! seam), as do the BG_Alloc pool clients (`.client`/`playerState`, recipe 2b) and
-//! `gNPC_t` (`NPC`); those derefs remain in tight `unsafe` blocks through copied
-//! pointer values. Entity pointers reached via a seam field (e.g.
-//! `pVeh->m_pParentEntity`) are resolved to a handle with `ctx.entity_id_of(ptr)`
-//! at the seam deref, then accessed through the accessor.
+//! `gentity_t*` params are `EntityId` / `Option<EntityId>` handles (§B5), and ctx-free leaf helpers take `&mut gentity_t`.
+//! Entity fields go through `ctx.world.entity(id)` or `entity_mut(id)` at the point of use, not through a raw re-derive at the top of the function.
+//! `Vehicle_t*` and `bgEntity_t*` params, and the vehicle function-pointer tables, are not entity handles, so they stay raw (§D12).
+//! The same is true of the `BG_Alloc` pool clients (`.client` / `playerState`) and `gNPC_t` (`NPC`).
+//! Their derefs stay in tight `unsafe` blocks through copied pointer values.
+//! An entity pointer reached through a raw pointer field, for example `pVeh->m_pParentEntity`, resolves to a handle
+//! with `ctx.entity_id_of(ptr)` at that raw deref, then reads through the accessor.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
@@ -57,8 +44,8 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::vehicles::vehicleType_t;
 use native_string::Q_strncmp;
 
-// Raven vehicle constants spelled locally per this file's staging convention
-// (the integrator wires the const home later; the name preserves intent).
+// This file spells Raven vehicle constants locally.
+// The constant home is not chosen yet, so the names stay local.
 // Boarding sentinels stored in `m_iBoarding`.
 // Source: `oracle/codemp/game/bg_vehicles.h:402-403`
 pub const VEH_MOUNT_THROW_LEFT: c_int = -5;
@@ -78,8 +65,8 @@ pub const VEH_EJECT_BOTTOM: c_int = 5;
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
-// `SVF_NOCLIENT` resolves via the crate prelude glob (`crate::g_public_consts`);
-// the shadowing local copy was removed by the placeholder-const sweep.
+// `SVF_NOCLIENT` resolves through the crate prelude glob (`crate::g_public_consts`).
+// This file no longer carries a shadowing local copy of it.
 
 /// Raven vehicle-surface indices (`bg_vehicles.h:427-430`).
 pub const SHIPSURF_FRONT: c_int = 0;
@@ -106,15 +93,17 @@ pub const SHIPSURF_BROKEN_E: c_int = 1 << 4; // wing 3
 pub const SHIPSURF_BROKEN_F: c_int = 1 << 5; // wing 4
 pub const SHIPSURF_BROKEN_G: c_int = 1 << 6; // front
 
-/// Raven `TURN_OFF` — `NPC_SetSurfaceOnOff` flag; this TU's local `#define`.
+/// Raven `TURN_OFF`: the `NPC_SetSurfaceOnOff` flag.
+/// This file's local `#define`.
 /// Source: `oracle/codemp/game/g_vehicles.c:2928`
 const TURN_OFF: c_int = 0x0000_0100;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-// `PITCH`/`YAW`/`ROLL` resolve via the crate prelude glob (`crate::q_math`);
-// the shadowing local copies were removed by the placeholder-const sweep.
+// `PITCH`/`YAW`/`ROLL` resolve through the crate prelude glob (`crate::q_math`).
+// This file no longer carries shadowing local copies of them.
 
 /// Raven `Vehicle_SetAnim`.
 ///
@@ -127,25 +116,26 @@ pub fn Vehicle_SetAnim(
     setAnimFlags: c_int,
     iBlend: c_int,
 ) {
-    // `ent` is an `EntityId`; entity fields go through the accessor.
-    // FLAG: `.client` is a BG_Alloc pool client on vehicle/NPC entities
-    // (recipe 2b); the client deref stays raw.
+    // `ent` is an `EntityId`. Entity fields go through the accessor.
+    // FLAG: `.client` is a BG_Alloc pool client on vehicle/NPC entities.
+    // The client deref stays raw.
     let client = ctx.world.entity(ent).client;
     // Raven: assert(ent->client);
     debug_assert!(!client.is_null());
     // MP `_JK2MP` path:
     //   BG_SetAnim(&client->ps, bgAllAnims[ent->localAnimIndex].anims,
     //              setAnimParts, anim, setAnimFlags, iBlend)
-    // `BG_SetAnim` is a `PmoveContext` method (`bgAllAnims` off `BgState`);
-    // build a pm-null per-call context from `ctx`, matching the `G_SetAnim`
-    // game-tier wrapper precedent (`g_utils.rs`).
+    // `BG_SetAnim` is a `PmoveContext` method, with `bgAllAnims` coming from `BgState`.
+    // This code builds a pm-null per-call context from `ctx`, matching the `G_SetAnim` game-tier wrapper precedent (`g_utils.rs`).
     let idx = ctx.world.entity(ent).localAnimIndex as usize;
     let anims = ctx.world.bg_state.bgAllAnims[idx].anims;
     unsafe {
         let ps = &mut (*client).ps as *mut playerState_t;
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -153,7 +143,7 @@ pub fn Vehicle_SetAnim(
             crate::bg_channel::PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
         pmc.BG_SetAnim(ps, anims, setAnimParts, anim, setAnimFlags, iBlend);
     }
-    // FLAG: pool-client read (recipe 2b) stays raw.
+    // FLAG: pool-client read stays raw.
     let legs = unsafe { (*client).ps.legsAnim };
     ctx.world.entity_mut(ent).s.legsAnim = legs;
 }
@@ -190,8 +180,8 @@ pub fn G_VehicleTrace(
 /// Source: `oracle/codemp/game/g_vehicles.c:111-120`
 pub fn G_IsRidingVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>) -> *mut Vehicle_t {
     if let Some(id) = pEnt {
-        // FLAG: `.client` is a pool client on vehicle/NPC entities (recipe 2b);
-        // the deref stays raw.
+        // FLAG: `.client` is a pool client on vehicle/NPC entities.
+        // The deref stays raw.
         let client = ctx.world.entity(id).client;
         if !client.is_null() {
             let npc_class = unsafe { (*client).NPC_class };
@@ -206,8 +196,8 @@ pub fn G_IsRidingVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>) -> *mut 
 
 /// Raven `G_CanJumpToEnemyVeh`.
 ///
-/// Raven: the entire body is `#ifndef _JK2MP`; in the MP (`_JK2MP`) compile it
-/// reduces to `return 0.0f;`.
+/// Raven: the entire body is `#ifndef _JK2MP`.
+/// In the MP (`_JK2MP`) compile, it reduces to `return 0.0f;`.
 /// Source: `oracle/codemp/game/g_vehicles.c:124-183`
 pub fn G_CanJumpToEnemyVeh(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> f32 {
     0.0
@@ -217,7 +207,7 @@ pub fn G_CanJumpToEnemyVeh(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> f32
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:186-244`
 pub fn G_VehicleSpawn(ctx: &mut GameContext, self_: EntityId) {
-    // `self_` is an `EntityId`; entity fields go through the accessor.
+    // `self_` is an `EntityId`. Entity fields go through the accessor.
     let cur = ctx.world.entity(self_).r.currentOrigin;
     ctx.world.entity_mut(self_).s.origin = cur;
     let self_ptr = ctx.world.entity_mut(self_) as *mut gentity_t;
@@ -227,18 +217,18 @@ pub fn G_VehicleSpawn(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).count = 1;
     }
 
-    // save this because self gets removed in next func
+    //save this because self gets removed in next func
     let yaw = ctx.world.entity(self_).s.angles[YAW];
 
     let vehEnt = NPC_Spawn_Do(ctx, self_);
     if vehEnt.is_null() {
-        return; // return NULL;
+        return; //return NULL;
     }
     let vehEnt_id = ctx.entity_id_of(vehEnt).unwrap();
 
     ctx.world.entity_mut(vehEnt_id).s.angles[YAW] = yaw;
-    // FLAG: Vehicle_t / vehicleInfo_t / gNPC_t are seam types (recipe §D12 /
-    // 2c) — the field is read through the accessor, the deref stays raw.
+    // FLAG: Vehicle_t, vehicleInfo_t, and gNPC_t are raw pointer types (§D12).
+    // The field reads through the accessor. The deref stays raw.
     let vp = ctx.world.entity(vehEnt_id).m_pVehicle;
     unsafe {
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -248,19 +238,19 @@ pub fn G_VehicleSpawn(ctx: &mut GameContext, self_: EntityId) {
         }
     }
 
-    // special check in case someone disconnects/dies while boarding
+    //special check in case someone disconnects/dies while boarding
     if ctx.world.entity(vehEnt_id).spawnflags & 1 != 0 {
-        // die without pilot
+        //die without pilot
         if ctx.world.entity(vehEnt_id).damage == 0 {
-            // default 10 sec
+            //default 10 sec
             ctx.world.entity_mut(vehEnt_id).damage = 10000;
         }
         if ctx.world.entity(vehEnt_id).speed == 0.0 {
-            // default 512 units
+            //default 512 units
             ctx.world.entity_mut(vehEnt_id).speed = 512.0;
         }
         let t = ctx.world.level.time + ctx.world.entity(vehEnt_id).damage;
-        // FLAG: Vehicle_t seam deref (recipe §D12) stays raw.
+        // FLAG: Vehicle_t deref (§D12) stays raw.
         unsafe {
             (*vp).m_iPilotTime = t;
         }
@@ -283,8 +273,8 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
     let veh_waypoint = ctx.world.entity(veh_id).waypoint;
     ctx.world.entity_mut(ent_id).waypoint = veh_waypoint; // take the veh's waypoint as your own
 
-    // FLAG: Vehicle_t / ghoul2 / pool-client are seam values (recipe §D12 / 2b);
-    // the field is read through the accessor, the deref stays raw.
+    // FLAG: Vehicle_t, ghoul2, and pool-client are raw values (§D12).
+    // The field reads through the accessor. The deref stays raw.
     let vp = ctx.world.entity(veh_id).m_pVehicle;
     if vp.is_null() {
         return;
@@ -325,7 +315,7 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
     trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 }
 
-/// Raven `Animate` — animate the vehicle and its riders.
+/// Raven `Animate`: animate the vehicle and its riders.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:481-493`
 pub fn Animate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
@@ -349,8 +339,8 @@ pub fn ValidateBoard(
 ) -> qboolean {
     unsafe {
         // Determine where the entity is entering the vehicle from (left, right, or back).
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw; the
-        // parent/ent entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The parent/ent entity fields go through the accessor.
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let ent = pEnt as *mut gentity_t;
@@ -436,14 +426,15 @@ pub fn ValidateBoard(
 /// Source: `oracle/codemp/game/g_vehicles.c:630-872`
 pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     unsafe {
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw; the
-        // ent/parent entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The ent/parent entity fields go through the accessor.
         let ent = pEnt as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
 
-        // If it's not a valid entity, OR the vehicle is dead, OR we're already
-        // being boarded, OR the person trying to get on is already in a vehicle.
+        // If it's not a valid entity, OR if the vehicle is blowing up (it's dead), OR it's not
+        // empty, OR we're already being boarded, OR the person trying to get on us is already
+        // in a vehicle (that was a fun bug :-), leave!
         if ent.is_null() {
             return qfalse;
         }
@@ -467,7 +458,8 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
             return qfalse;
         }
 
-        // Tell everybody their status. ALWAYS let the player be the pilot.
+        // Tell everybody their status.
+        // ALWAYS let the player be the pilot.
         if ctx.world.entity(ent_id).s.number < MAX_CLIENTS as c_int {
             (*pVeh).m_pOldPilot = (*pVeh).m_pPilot;
 
@@ -621,8 +613,8 @@ pub fn VEH_TryEject(
     ejectDir: c_int,
     vExitPos: &mut vec3_t,
 ) -> qboolean {
-    // `parent`/`ent` are `EntityId`s; entity fields go through the accessor.
-    // FLAG: Vehicle_t / vehicleInfo_t seam deref (recipe §D12) stays raw.
+    // `parent`/`ent` are `EntityId`s. Entity fields go through the accessor.
+    // FLAG: Vehicle_t / vehicleInfo_t deref (§D12) stays raw.
     let vi = unsafe { (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t };
 
     // Make sure that the entity is not 'stuck' inside the vehicle (since their
@@ -719,8 +711,8 @@ pub fn VEH_TryEject(
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:989-1016`
 pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qboolean) {
-    // FLAG: `m_pDroidUnit` is a Vehicle_t seam pointer (recipe §D12); read the
-    // raw value, resolve to an id, reach entity fields through the accessor.
+    // FLAG: `m_pDroidUnit` is a Vehicle_t pointer (§D12).
+    // This reads the raw value, resolves it to an id, and reaches entity fields through the accessor.
     let droid = unsafe { (*pVeh).m_pDroidUnit as *mut gentity_t };
     let droid_id = ctx.entity_id_of(droid).unwrap();
     ctx.world.entity_mut(droid_id).s.m_iVehicleNum = ENTITYNUM_NONE;
@@ -731,7 +723,7 @@ pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qbool
     ctx.world.entity_mut(droid_id).r.ownerNum = ENTITYNUM_NONE;
     let dc = ctx.world.entity(droid_id).client;
     if !dc.is_null() {
-        // FLAG: pool client (recipe 2b) — deref stays raw.
+        // FLAG: pool-client deref. This stays raw.
         unsafe {
             (*dc).ps.m_iVehicleNum = ENTITYNUM_NONE;
         }
@@ -741,7 +733,7 @@ pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qbool
         let num = ctx.world.entity(droid_id).s.number;
         crate::g_utils::G_MuteSound(ctx, num, CHAN_VOICE);
         let origin = ctx.world.entity(droid_id).s.origin;
-        // Raven passes NULL for `dir`; carried as `None`.
+        // Raven passes NULL for `dir`. This is carried as `None`.
         crate::g_combat::G_Damage(
             ctx,
             Some(droid_id),
@@ -755,7 +747,7 @@ pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qbool
         );
     }
 
-    // FLAG: Vehicle_t seam write (recipe §D12) stays raw.
+    // FLAG: Vehicle_t write (§D12) stays raw.
     unsafe {
         (*pVeh).m_pDroidUnit = core::ptr::null_mut();
     }
@@ -774,8 +766,8 @@ pub fn EjectAll(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
         (*pVeh).m_iBoarding = 0;
         (*pVeh).m_bWasBoarding = qfalse;
 
-        // Throw them off. (FLAG: Vehicle_t / vehicleInfo_t seam derefs stay raw;
-        // rider entity fields go through the accessor.)
+        // Throw them off.
+        // FLAG: Vehicle_t and vehicleInfo_t derefs stay raw. Rider entity fields go through the accessor.
         if !(*pVeh).m_pPilot.is_null() {
             let pilot = (*pVeh).m_pPilot as *mut gentity_t;
             crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
@@ -865,8 +857,8 @@ pub fn EjectAll(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:1451-1482`
 pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOverride: c_int) {
-    // FLAG: Vehicle_t / vehicleInfo_t are seam pointers (recipe §D12); read the
-    // raw values, reach the parent entity through the accessor.
+    // FLAG: Vehicle_t and vehicleInfo_t are raw pointers (§D12).
+    // This reads the raw values and reaches the parent entity through the accessor.
     let (parent, vi) = unsafe {
         (
             (*pVeh).m_pParentEntity as *mut gentity_t,
@@ -888,7 +880,7 @@ pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOv
         let snd = G_SoundIndex(ctx, "sound/vehicles/common/fire_lp.wav");
         let client = ctx.world.entity(parent_id).client;
         ctx.world.entity_mut(parent_id).s.loopSound = snd;
-        // FLAG: pool client (recipe 2b) — deref stays raw.
+        // FLAG: pool-client deref. This stays raw.
         unsafe {
             (*client).ps.loopSound = snd;
         }
@@ -900,8 +892,8 @@ pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOv
 /// Source: `oracle/codemp/game/g_vehicles.c:1626-1757`
 pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client / gNPC_t seam derefs stay
-        // raw; the parent entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, pool-client, and gNPC_t derefs stay raw.
+        // The parent entity fields go through the accessor.
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
 
@@ -967,7 +959,7 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
         }
 
         if (*vi).maxPassengers > 0 {
-            // MP uses the static pointer array; just NULL every slot.
+            // MP uses the static pointer array. This just sets every slot to NULL.
             let mut i: c_int = 0;
             while i < (*vi).maxPassengers {
                 *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = core::ptr::null_mut();
@@ -990,7 +982,7 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
         // memset(-1) over int arrays: byte 0xFF fills each int with -1.
         (*pVeh).m_iExhaustTag.fill(-1);
         (*pVeh).m_iMuzzleTag.fill(-1);
-        // m_Muzzles memset is `#ifndef _JK2MP` (SP only) — skipped.
+        // m_Muzzles memset is `#ifndef _JK2MP` (SP only). This port skips it.
         (*pVeh).m_iDroidUnitTag = -1;
 
         // initialize to blaster
@@ -1003,19 +995,20 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
             let iFlags = SETANIM_FLAG_NORMAL;
             let iBlend = 300;
             (*pVeh).m_ulFlags |= (VEH_GEARSOPEN as u64); // MP
-                                                         // MP `_JK2MP` path:
-                                                         //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
-                                                         //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
-                                                         //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
-                                                         // `BG_SetAnim` is a `PmoveContext<'_>` method (bgAllAnims off BgState +
-                                                         // receiver); build a pm-null per-call context from `ctx`, matching the
-                                                         // `Vehicle_SetAnim` precedent above.
+            // MP `_JK2MP` path:
+            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
+            //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
+            //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
+            // `BG_SetAnim` is a `PmoveContext<'_>` method, with `bgAllAnims` coming from `BgState` along with the receiver.
+            // This code builds a pm-null per-call context from `ctx`, matching the `Vehicle_SetAnim` precedent above.
             let ps = &mut (*pc).ps as *mut playerState_t;
             let idx = ctx.world.entity(parent_id).localAnimIndex as usize;
             let anims = ctx.world.bg_state.bgAllAnims[idx].anims;
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -1043,8 +1036,8 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
 /// Source: `oracle/codemp/game/g_vehicles.c:1763-2334`
 pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_t) -> qboolean {
     unsafe {
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw; the
-        // parent/pilot entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The parent/pilot entity fields go through the accessor.
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -1222,7 +1215,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
             }
         }
 
-        // MP: the "always knock guys around" block is `#ifndef _JK2MP` (SP only) — skipped.
+        // MP: the "always knock guys around" block is `#ifndef _JK2MP` (SP only). This port skips it.
 
         // MP: eject if the pilot disconnected/died while boarding
         if (*pVeh).m_iBoarding != 0 {
@@ -1416,9 +1409,8 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
         }
 
         // Process the move commands.
-        // Oracle declares `int prevSpeed`/`int nextSpeed` — truncating the float
-        // `speed` to int — and gates the shift sound on integer compares; fractional
-        // speeds must not flip the term or the Q_irand draw desyncs.
+        // The oracle declares `int prevSpeed`/`int nextSpeed`, truncating the float `speed` to int, and gates the shift sound on integer compares.
+        // A fractional speed must not flip the term, or the Q_irand draw desyncs.
         // Source: g_vehicles.c:1770-1771,2245-2247
         let prevSpeed = (*parentPS).speed as c_int;
         crate::veh_dispatch::process_move_commands(ctx, pVeh);
@@ -1492,7 +1484,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
             (*pclient).ps.vehBoarding = qfalse;
         }
 
-        // The pilot-enemy copy block is `#ifndef _JK2MP` (SP only) — skipped.
+        // The pilot-enemy copy block is `#ifndef _JK2MP` (SP only). This port skips it.
 
         qtrue
     }
@@ -1514,8 +1506,8 @@ pub fn UpdateRider(
             return qtrue;
         }
 
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw; the
-        // rider/parent entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The rider/parent entity fields go through the accessor.
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let rider = pRider as *mut gentity_t;
@@ -1616,8 +1608,8 @@ pub fn UpdateRider(
         if (*vi).r#type != vehicleType_t::VH_FIGHTER && (*vi).r#type != vehicleType_t::VH_WALKER {
             // Jump off.
             if (*pUmcd).upmove > 0 {
-                // The G_CanJumpToEnemyVeh / enemy-veh-boarding block is `#ifndef _JK2MP`
-                // (SP only) — skipped.
+                // The G_CanJumpToEnemyVeh / enemy-veh-boarding block is `#ifndef _JK2MP` (SP only).
+                // This port skips it.
                 if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
                     // Allow them to force jump off.
                     _VectorScale((*pc).ps.velocity, 0.5f32, &mut (*rc).ps.velocity);
@@ -1706,8 +1698,8 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             ctx.world.level.time,
         );
 
-        // FLAG: Vehicle_t / pool-client / ghoul2 seam derefs stay raw; parent and
-        // rider entity fields go through the accessor.
+        // FLAG: Vehicle_t, pool-client, and ghoul2 derefs stay raw.
+        // Parent and rider entity fields go through the accessor.
         if !(*pVeh).m_pPilot.is_null() {
             let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
             let parent_id = ctx.entity_id_of(parent).unwrap();
@@ -1864,15 +1856,15 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `Ghost` — make someone invisible and un-collidable.
+/// Raven `Ghost`: make someone invisible and un-collidable.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2734-2756`
 pub fn Ghost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     if pEnt.is_null() {
         return;
     }
-    // FLAG: `pEnt` is a bgEntity_t seam pointer (recipe §D12); cast + id lookup
-    // to reach the arena entity.
+    // FLAG: `pEnt` is a bgEntity_t pointer (§D12).
+    // A cast plus an id lookup reaches the arena entity.
     let ent_id = ctx.entity_id_of(pEnt as *mut gentity_t).unwrap();
 
     // This was introduced to prevent one extra entity from being sent to the clients.
@@ -1881,7 +1873,7 @@ pub fn Ghost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
     ctx.world.entity_mut(ent_id).s.eFlags |= EF_NODRAW;
     let client = ctx.world.entity(ent_id).client;
     if !client.is_null() {
-        // FLAG: pool client (recipe 2b) — deref stays raw.
+        // FLAG: pool-client deref. This stays raw.
         unsafe {
             (*client).ps.eFlags |= EF_NODRAW;
         }
@@ -1889,15 +1881,15 @@ pub fn Ghost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
     ctx.world.entity_mut(ent_id).r.contents = 0;
 }
 
-/// Raven `UnGhost` — make someone visible and collidable.
+/// Raven `UnGhost`: make someone visible and collidable.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2759-2781`
 pub fn UnGhost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     if pEnt.is_null() {
         return;
     }
-    // FLAG: `pEnt` is a bgEntity_t seam pointer (recipe §D12); cast + id lookup
-    // to reach the arena entity.
+    // FLAG: `pEnt` is a bgEntity_t pointer (§D12).
+    // A cast plus an id lookup reaches the arena entity.
     let ent_id = ctx.entity_id_of(pEnt as *mut gentity_t).unwrap();
 
     // make sure the client is sent again
@@ -1906,7 +1898,7 @@ pub fn UnGhost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_
     ctx.world.entity_mut(ent_id).s.eFlags &= !EF_NODRAW;
     let client = ctx.world.entity(ent_id).client;
     if !client.is_null() {
-        // FLAG: pool client (recipe 2b) — deref stays raw.
+        // FLAG: pool-client deref. This stays raw.
         unsafe {
             (*client).ps.eFlags &= !EF_NODRAW;
         }
@@ -1922,7 +1914,7 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     let bDist = 256.0f32; // estimated distance to back from origin
     let wDist = 32.0f32; // width on each side from origin
     let hDist = 32.0f32; // height on each side from origin
-                         // FLAG: Vehicle_t seam pointer (recipe §D12); resolve the parent to an id.
+    // FLAG: Vehicle_t pointer (§D12). This resolves the parent to an id.
     let parent = unsafe { (*pVeh).m_pParentEntity as *mut gentity_t };
     let parent_id = ctx.entity_id_of(parent).unwrap();
 
@@ -1935,7 +1927,7 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 
     // only do anything if all wings are stripped off.
-    // FLAG: Vehicle_t seam reads (recipe §D12) stay raw.
+    // FLAG: Vehicle_t reads (§D12) stay raw.
     let removed = unsafe { (*pVeh).m_iRemovedSurfaces };
     if (removed & SHIPSURF_BROKEN_C) == 0
         || (removed & SHIPSURF_BROKEN_D) == 0
@@ -1971,7 +1963,7 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     _VectorMA(a, -hDist, up, &mut back);
 
     // trace and see if our new mins/maxs are safe
-    // FLAG: pool client (recipe 2b) — `ps` deref stays raw.
+    // FLAG: pool-client `ps` deref. This stays raw.
     let pcl = ctx.world.entity(parent_id).client;
     let pcl_origin = unsafe { (*pcl).ps.origin };
     let parent_number = ctx.world.entity(parent_id).s.number;
@@ -2013,9 +2005,9 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2843-2924`
 pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut trace_t) -> c_int {
-    // `veh` is an `EntityId`; entity fields go through the accessor.
-    // FLAG: Vehicle_t / pool-client are seam values (recipe §D12 / 2b) — read
-    // through the accessor, the derefs stay raw.
+    // `veh` is an `EntityId`. Entity fields go through the accessor.
+    // FLAG: Vehicle_t and pool-client are raw values (§D12).
+    // They read through the accessor. The derefs stay raw.
     let pVeh = ctx.world.entity(veh).m_pVehicle;
     let vcl = ctx.world.entity(veh).client;
     if trace.is_null() || pVeh.is_null() || vcl.is_null() {
@@ -2126,7 +2118,7 @@ pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut t
     }
 }
 
-/// Raven `G_ShipSurfaceForSurfName` — map a surface name to its ship surface id.
+/// Raven `G_ShipSurfaceForSurfName`: map a surface name to its ship surface id.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2930-2959`
 pub fn G_ShipSurfaceForSurfName(surfaceName: &str) -> c_int {
@@ -2163,13 +2155,14 @@ pub fn G_SetVehDamageFlags(
     shipSurf: c_int,
     damageLevel: c_int,
 ) {
-    // `veh` is an `EntityId`; entity fields go through the accessor.
-    // FLAG: `.client` is a pool client on the vehicle (recipe 2b); the
-    // `brokenLimbs` bitwork stays on the raw pool `ps`.
+    // `veh` is an `EntityId`. Entity fields go through the accessor.
+    // FLAG: `.client` is a pool client on the vehicle.
+    // The `brokenLimbs` bitwork stays on the raw pool `ps`.
     let vcl = ctx.world.entity(veh).client;
     match damageLevel {
         3 => {
-            // destroyed — add both flags so cgame knows this surf is GONE
+            // destroyed
+            // add both flags so cgame side knows this surf is GONE
             unsafe {
                 let dmgFlag = SHIPSURF_DAMAGE_FRONT_HEAVY + (shipSurf - SHIPSURF_FRONT);
                 (*vcl).ps.brokenLimbs |= 1 << dmgFlag;
@@ -2182,7 +2175,7 @@ pub fn G_SetVehDamageFlags(
             // check droid
             if shipSurf == SHIPSURF_BACK {
                 // destroy the droid if we have one
-                // FLAG: Vehicle_t seam deref (recipe §D12) stays raw.
+                // FLAG: Vehicle_t deref (§D12) stays raw.
                 let vp = ctx.world.entity(veh).m_pVehicle;
                 let droidEnt = if !vp.is_null() {
                     unsafe { (*vp).m_pDroidUnit as *mut gentity_t }
@@ -2194,14 +2187,15 @@ pub fn G_SetVehDamageFlags(
                     let flags = ctx.world.entity(droid_id).flags;
                     let health = ctx.world.entity(droid_id).health;
                     if (flags & FL_UNDYING) != 0 || health > 0 {
-                        // make it vulnerable, then blow it up
+                        // make it vulnerable
                         ctx.world.entity_mut(droid_id).flags &= !FL_UNDYING;
-                        // resolve veh->enemy (Option<EntityId>) — round-trips to the
-                        // same handle, so read it straight off the accessor.
+                        // `veh->enemy` (Option<EntityId>) round-trips to the same handle.
+                        // This reads it straight off the accessor.
                         let enemy_id = ctx.world.entity(veh).enemy;
-                        // Raven passes NULL for both `dir` and `point`; `dir` is
-                        // carried as `None`, `point` as the zero-vec convention.
+                        // Raven passes NULL for both `dir` and `point`.
+                        // `dir` is carried as `None`, `point` as the zero-vec convention.
                         let null_point: vec3_t = [0.0; 3];
+                        // blow it up
                         crate::g_combat::G_Damage(
                             ctx,
                             Some(droid_id),
@@ -2229,7 +2223,8 @@ pub fn G_SetVehDamageFlags(
             // copy down
             let bl = unsafe { (*vcl).ps.brokenLimbs };
             ctx.world.entity_mut(veh).s.brokenLimbs = bl;
-            // check droid — make it vulnerable if we have one
+            // check droid
+            // make the droid vulnerable if we have one
             if shipSurf == SHIPSURF_BACK {
                 let vp = ctx.world.entity(veh).m_pVehicle;
                 let droidEnt = if !vp.is_null() {
@@ -2281,12 +2276,12 @@ pub fn G_VehicleSetDamageLocFlags(
     impactDir: c_int,
     deathPoint: c_int,
 ) {
-    // `veh` is an `EntityId`; entity fields go through the accessor.
+    // `veh` is an `EntityId`. Entity fields go through the accessor.
     if ctx.world.entity(veh).client.is_null() {
         return;
     }
     // Raven shadows the `deathPoint` parameter with a local of the same name.
-    // FLAG: Vehicle_t / vehicleInfo_t seam derefs (recipe §D12) stay raw.
+    // FLAG: Vehicle_t / vehicleInfo_t derefs (§D12) stay raw.
     let vp = ctx.world.entity(veh).m_pVehicle;
 
     let deathPoint: c_int;
@@ -2345,7 +2340,7 @@ pub fn G_FlyVehicleDestroySurface(
     veh: EntityId,
     surface: c_int,
 ) -> qboolean {
-    // `veh` is an `EntityId`; entity fields go through the accessor.
+    // `veh` is an `EntityId`. Entity fields go through the accessor.
     let mut surfName: [*const c_char; 4] = [core::ptr::null(); 4]; // up to 4 surfs at once
     let mut numSurfs: c_int = 0;
     let mut smashedBits: c_int = 0;
@@ -2404,7 +2399,7 @@ pub fn G_FlyVehicleDestroySurface(
         crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, veh, surfName[numSurfs as usize], TURN_OFF);
     }
 
-    // FLAG: Vehicle_t seam deref (recipe §D12) stays raw.
+    // FLAG: Vehicle_t deref (§D12) stays raw.
     let vp = ctx.world.entity(veh).m_pVehicle;
     if unsafe { (*vp).m_iRemovedSurfaces } == 0 {
         // first time something got blown off
@@ -2422,7 +2417,7 @@ pub fn G_FlyVehicleDestroySurface(
     }
 
     // do some explosive damage, but don't damage this ship with it
-    // FLAG: pool client (recipe 2b) — `ps` deref stays raw.
+    // FLAG: pool-client `ps` deref. This stays raw.
     let vcl = ctx.world.entity(veh).client;
     let vcl_origin = unsafe { (*vcl).ps.origin };
     crate::g_combat::G_RadiusDamage(
@@ -2455,21 +2450,20 @@ pub fn G_FlyVehicleSurfaceDestruction(
     magnitude: c_int,
     force: qboolean,
 ) {
-    // `veh` is an `EntityId`; entity fields go through the accessor.
+    // `veh` is an `EntityId`. Entity fields go through the accessor.
     if ctx.world.entity(veh).ghoul2.is_null() || ctx.world.entity(veh).m_pVehicle.is_null() {
         // no g2 instance.. or no vehicle instance
         return;
     }
 
-    // FLAG: Vehicle_t / vehicleInfo_t seam derefs (recipe §D12) stay raw.
+    // FLAG: Vehicle_t / vehicleInfo_t derefs (§D12) stay raw.
     let vp = ctx.world.entity(veh).m_pVehicle;
     let vi = unsafe { (*vp).m_pVehicleInfo as *mut vehicleInfo_t };
 
     let mut impactDir = G_FlyVehicleImpactDir(ctx, veh, trace);
     let mut alreadyRebroken = qfalse;
-    // Raven declares `deathPoint = -1` before the `anotherImpact` label; the
-    // goto-loop keeps the prior value when a `default` impactDir leaves it
-    // unset, so it is declared outside the rewritten loop.
+    // Raven declares `deathPoint = -1` before the `anotherImpact` label.
+    // The goto-loop keeps the prior value when a `default` impactDir leaves it unset, so this declares it outside the rewritten loop.
     let mut deathPoint: c_int = -1;
 
     // Raven: `anotherImpact:` goto-loop.
@@ -2528,14 +2522,14 @@ pub fn G_FlyVehicleSurfaceDestruction(
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3261-3273`
 pub fn G_VehUpdateShields(targ: &mut gentity_t) {
-    // `targ` is a live `&mut gentity_t`; the `targ.is_null()` guard is vacuous.
+    // `targ` is a live `&mut gentity_t`. The `targ.is_null()` guard is vacuous.
     let client = targ.client;
     let vp = targ.m_pVehicle;
     if client.is_null() || vp.is_null() {
         return;
     }
-    // FLAG: Vehicle_t / vehicleInfo_t / pool-client are seam values (recipe §D12
-    // / 2b); the derefs stay raw.
+    // FLAG: Vehicle_t, vehicleInfo_t, and pool-client are raw values (§D12).
+    // The derefs stay raw.
     unsafe {
         if (*vp).m_pVehicleInfo.is_null() {
             return;
@@ -2550,7 +2544,7 @@ pub fn G_VehUpdateShields(targ: &mut gentity_t) {
     }
 }
 
-/// Raven `SetParent` — set the parent entity of this Vehicle NPC.
+/// Raven `SetParent`: set the parent entity of this Vehicle NPC.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3277-3277`
 pub fn SetParent(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pParentEntity: *mut bgEntity_t) {
@@ -2559,7 +2553,7 @@ pub fn SetParent(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pParentEntity: *mu
     }
 }
 
-/// Raven `SetPilot` — add a pilot to the vehicle.
+/// Raven `SetPilot`: add a pilot to the vehicle.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3280-3280`
 pub fn SetPilot(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
@@ -2568,7 +2562,7 @@ pub fn SetPilot(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pPilot: *mut bgEnti
     }
 }
 
-/// Raven `AddPassenger` — add a passenger to the vehicle (false if we're full).
+/// Raven `AddPassenger`: add a passenger to the vehicle. Returns false when the vehicle is full.
 ///
 /// Raven: the generic implementation always returns false.
 /// Source: `oracle/codemp/game/g_vehicles.c:3283-3283`
@@ -2576,7 +2570,7 @@ pub fn AddPassenger(pVeh: *mut Vehicle_t) -> qboolean {
     qfalse
 }
 
-/// Raven `Inhabited` — whether this vehicle is currently inhabited (by anyone).
+/// Raven `Inhabited`: whether anyone currently occupies this vehicle.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3286-3286`
 pub fn Inhabited(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
@@ -2599,8 +2593,8 @@ pub fn Eject(
     forceEject: qboolean,
 ) -> qboolean {
     unsafe {
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw; the
-        // ent/parent/rider entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The ent/parent/rider entity fields go through the accessor.
         let ent = pEnt as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
 
@@ -2622,8 +2616,8 @@ pub fn Eject(
                 || ec0.is_null()
                 || (*ec0).pers.connected != CON_CONNECTED
             {
-                // MP: if someone disconnects on us, we still have to clear our owner
-                // — jump straight to the ownership-cleanup section (`getItOutOfMe`).
+                // MP: if someone disconnects on us, we still have to clear our owner.
+                // This jumps straight to the ownership-cleanup section (`getItOutOfMe`).
                 taintedRider = qtrue;
             } else if ctx.world.entity(eid).health < 1 {
                 deadRider = qtrue;
@@ -2698,8 +2692,8 @@ pub fn Eject(
             let ent_ptr = ctx.world.entity_mut(ent_id) as *mut gentity_t;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 
-            // If it's the player, stop overrides. (MP: the override-clear body is
-            // `#ifndef _JK2MP` — nothing to do here.)
+            // If it is the player, stop overrides. MP: the override-clear body is
+            // `#ifndef _JK2MP`, so there is nothing to do here.
             if ctx.world.entity(ent_id).s.number < MAX_CLIENTS as c_int {}
         }
 
@@ -2753,9 +2747,8 @@ pub fn Eject(
                             *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize) =
                                 core::ptr::null_mut();
                             // QAGAME: server just needs to tell client which passenger he is
-                            // FLAG: `moved` is a transient pointer read out of the
-                            // Vehicle_t seam passenger array; kept raw exactly as Raven
-                            // (which derefs it without a null guard).
+                            // FLAG: `moved` is a transient pointer read out of the Vehicle_t passenger array.
+                            // It stays raw exactly as Raven does, which derefs it without a null guard.
                             let moved = *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize)
                                 as *mut gentity_t;
                             if !(*moved).client.is_null() {
@@ -2842,8 +2835,8 @@ pub fn Eject(
         ctx.world.entity_mut(ent_id).s.m_iVehicleNum = 0;
 
         // The jump-out velocity, SP facing block, and the weapon-switch on-hop-off
-        // logic are all `#ifndef _JK2MP` or commented-out in Raven — MP does nothing
-        // in the weapon `if/else` here.
+        // logic are all `#ifndef _JK2MP` or commented out in Raven.
+        // MP does nothing in the weapon `if/else` here.
 
         mp_bg::bg_panimate::BG_SetLegsAnimTimer(&mut (*ec).ps, 0);
         mp_bg::bg_panimate::BG_SetTorsoAnimTimer(&mut (*ec).ps, 0);
@@ -2860,8 +2853,8 @@ pub fn Eject(
 /// Source: `oracle/codemp/game/g_vehicles.c:1485-1617`
 pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
-        // FLAG: Vehicle_t / vehicleInfo_t / pool-client seam derefs stay raw;
-        // the parent entity fields go through the accessor.
+        // FLAG: Vehicle_t, vehicleInfo_t, and pool-client derefs stay raw.
+        // The parent entity fields go through the accessor.
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -2997,16 +2990,17 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             }
         }
         // MP: the `else` "let everyone around me know I'm gonna blow" danger-sound
-        // block is `#ifndef _JK2MP` (SP only) — omitted.
+        // block is `#ifndef _JK2MP` (SP only). This port omits it.
     }
 }
 
 // Source: oracle/codemp/game/g_vehicles.c:1618-1620
-/// Raven `RegisterAssets` — register all the assets used by this vehicle. The
-/// base implementation is an empty function body in Raven (see cite); this
-/// stub matches that faithfully rather than panicking.
+/// Raven `RegisterAssets`: register all the assets used by this vehicle.
+///
+/// The base implementation is an empty function body in Raven (see the cite above).
+/// This stub matches that empty body instead of panicking.
 pub unsafe extern "C" fn RegisterAssets(pVeh: *mut Vehicle_t) {}
 
-// 2026-07-03: `G_SetSharedVehicleFunctions` retired — it only assigned the now-removed
-// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
-// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
+// Raven's `G_SetSharedVehicleFunctions` has no port here. It only assigned the now-removed `vehicleInfo_t` function-pointer slots.
+// Vehicle dispatch is `vehicleType_t`-keyed in `crate::veh_dispatch` instead.
+// Source: see the per-class setter in the oracle .c file.

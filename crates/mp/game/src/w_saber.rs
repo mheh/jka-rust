@@ -1,34 +1,27 @@
-// PORT-COMPLETE: w_saber.c
-//! FAITHFUL port of `oracle/codemp/game/w_saber.c`.
+//! Port of `oracle/codemp/game/w_saber.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5) instead of raw `gentity_t*`; ctx-free leaf
-//! helpers borrow `&gentity_t`/`&mut gentity_t`.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5) instead of raw
+//! `gentity_t*`. Ctx-free leaf helpers borrow `&gentity_t`/`&mut gentity_t`.
 //!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` field access — the transitional `ctx.world`
-//! raw-deref regime (F1) is gone (one irreducible `&mut vec3_t` out-param site
-//! into `G_Damage` excepted, marked in-code). The per-body entity/client
-//! pointers stay raw by design: this file is gclient-saturated (`(*ent).client
-//! as *mut gclient_t` chains), and gclient dissolution is out of scope, so the
-//! `// STAGE-1:` entity re-derives and their `unsafe` blocks legitimately hold
-//! genuine raw ops. Behavior is byte-identical, referee-verified.
-//! `BG_MySaber`'s `ents` is the `g_entities` array base (pointer arithmetic),
-//! so it stays raw by design.
+//! Every world reach is a checked `ctx.world.…` field access.
+//! The one exception is an irreducible `&mut vec3_t` out-param site into `G_Damage`, marked in-code.
+//! The per-body entity and client pointers stay raw by design.
+//! This file is gclient-saturated (`(*ent).client as *mut gclient_t` chains), and gclient dissolution is out of scope.
+//! For that reason the per-body entity re-derives and their `unsafe` blocks legitimately hold genuine raw ops.
+//! `BG_MySaber`'s `ents` is the `g_entities` array base (pointer arithmetic), so it stays raw by design.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
-// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version).
+// Genuine pointer-vs-pointer survivors use the qualified `crate::q_shared::Q_stricmp` path instead.
 use native_string::Q_stricmp;
 
-// Constants used by the ported (non-parked) bodies below. Raven `#define`/enum
-// constants live in the already-ported qshared/bg type modules; the prelude
-// re-exports the owning *types* but not these value consts, so name them here.
+// Constants used by the bodies below.
+// Raven `#define`/enum constants live in the already-ported qshared/bg type modules.
+// The prelude re-exports the owning types but not these value consts, so this file names them here.
 use mp_bg::public::saber_move_name::{
     LS_A_BACK, LS_A_BACKSTAB, LS_A_BACK_CR, LS_K1_BL, LS_K1_BR, LS_K1_TL, LS_K1_TR, LS_K1_T_,
     LS_NONE, LS_PARRY_LL, LS_PARRY_LR, LS_PARRY_UL, LS_PARRY_UP, LS_PARRY_UR, LS_REFLECT_LL,
@@ -44,18 +37,9 @@ use mp_qshared::probe;
 use mp_qshared::shared::saber_blocked_type::saberBlockedType_t;
 use mp_qshared::shared::CHAN_WEAPON;
 
-// --- pass-2 body-fill callee/const imports (jampgame shard 1/2) ---
-// SPINE (fork rulings 1/4/8 + `engine-seam.md`): stateful fns thread
-// `GameContext` (`.world: &mut GameWorld`, `.engine`); `level` →
-// `ctx.world.level`, cvars → `ctx.world.cvars`, `g_entities[i]` →
-// `ctx.world.g_entities[i]`, traps → `trap::X(ctx.engine, …)`. Cross-file
-// callees use their resolved raw-pointer signatures verbatim.
-//
-// NOTE (integration-deferred, mirroring `w_force.rs`): a few Raven constants
-// this shard needs are not yet surfaced by the prelude nor an owning enum
-// (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
-// preserves the Raven spelling; their exact enum-qualification / module path is
-// resolved at integration (the mega-pass tree is not compiled per porter).
+// Stateful functions thread `GameContext` (`.world: &mut GameWorld`, `.engine`): `level` becomes `ctx.world.level`,
+// cvars become `ctx.world.cvars`, `g_entities[i]` becomes `ctx.world.g_entities[i]`, and traps become
+// `trap::X(ctx.engine, …)`. Cross-file callees use their resolved raw-pointer signatures verbatim.
 use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
 use crate::client::render_info::renderInfo_t;
 use crate::g_combat::{G_Damage, G_Knockdown};
@@ -84,7 +68,6 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_FORCE_LIGHTNING, BUTTON_GESTURE,
 };
 use mp_qshared::shared::RAND_MAX;
-// --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
 use crate::ai_wpnav::G_TestLine;
 use crate::g_client::{G_UpdateClientAnims, SetClientViewAngle};
 use crate::g_team::OnSameTeam;
@@ -121,7 +104,6 @@ use mp_bg::bg_saber::PM_SaberInBrokenParry;
 use mp_bg::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
-// --- pass-3 shard-2 body-fill imports (resolved owning modules per packet) ---
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, VectorClear,
     VectorSet,
@@ -131,7 +113,6 @@ use crate::saber::w_saber_consts::{
     SABER_REFLECT_MISSILE_CONE, SEF_BLOCKED, SEF_DEFLECTED, SEF_HITENEMY, SEF_HITOBJECT,
     SEF_HITWALL, SEF_PARRIED,
 };
-// --- pass-3 shard-1 (angles/lock/deflection/collide) body-fill imports ---
 use crate::npc::g_npc_t::gNPC_t;
 use crate::npc::look_mode::lookMode_t;
 use crate::saber::saber_flags::SFL_NOT_LOCKABLE;
@@ -139,8 +120,7 @@ use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLIS
 use mp_qshared::shared::saber_block_type::saberBlockType_t;
 use crate::q_shared;
 
-// w_saber.c file-local `#define`s used by this shard (matching the file's
-// existing file-local const scoping, e.g. `SABER_NONATTACK_DAMAGE` above).
+// These are `w_saber.c` file-local `#define`s, matching the file's own file-local const scoping used throughout.
 /// Source: `oracle/codemp/game/w_saber.c:1091`
 const SABER_HITDAMAGE: c_int = 35;
 /// Source: `oracle/codemp/game/w_saber.c:2850`
@@ -149,15 +129,15 @@ const SABER_EXTRAPOLATE_DIST: f32 = 16.0;
 const MAX_SABER_SWING_INC: f32 = 0.33;
 /// Source: `oracle/codemp/game/w_saber.c:639`
 const LOOK_DEFAULT_SPEED: f32 = 0.15;
-// `saberBlockedType_t` variants used by this shard's bodies (stored as `c_int`
-// in playerState), surfaced like the file's existing `BLOCKED_*` consts.
+// These `saberBlockedType_t` variants are used by the bodies below.
+// PlayerState stores them as `c_int`, so this surfaces them like the file's other `BLOCKED_*` consts.
 const BLOCKED_BOUNCE_MOVE: c_int = saberBlockedType_t::BLOCKED_BOUNCE_MOVE as c_int;
 const BLOCKED_PARRY_BROKEN: c_int = saberBlockedType_t::BLOCKED_PARRY_BROKEN as c_int;
 const BLOCKED_ATK_BOUNCE: c_int = saberBlockedType_t::BLOCKED_ATK_BOUNCE as c_int;
 
-// Raven `#define`s local to `w_saber.c` itself (not `w_saber.h`), so they are
-// not part of the `saber::w_saber_consts` header-const family; named here at
-// their one call site, matching the oracle's file-local scoping.
+// These are Raven `#define`s local to `w_saber.c` itself, not `w_saber.h`.
+// They are not part of the `saber::w_saber_consts` header-const family.
+// This file names them at their one call site, matching the oracle's file-local scoping.
 /// Source: `oracle/codemp/game/w_saber.c:7`
 const SABER_BOX_SIZE: f32 = 16.0;
 /// Source: `oracle/codemp/game/w_saber.c:284`
@@ -180,9 +160,9 @@ const SABER_RETRIEVE_DELAY: c_int = 3000;
 /// Source: `oracle/codemp/game/w_saber.c:7115`
 const SABER_MAX_THROW_DISTANCE: f32 = 700.0;
 
-// `saberBlockedType_t`/`weaponstate_t` are `#[repr(i32)]` enums, but the
-// playerState `saberBlocked`/`weaponstate` fields are stored as `c_int` — so
-// surface the variants used by the ported switch bodies as `c_int` consts.
+// `saberBlockedType_t` and `weaponstate_t` are `#[repr(i32)]` enums.
+// The playerState `saberBlocked` and `weaponstate` fields store them as `c_int`.
+// This surfaces the variants used by the switch bodies below as `c_int` consts.
 const BLOCKED_NONE: c_int = saberBlockedType_t::BLOCKED_NONE as c_int;
 const BLOCKED_UPPER_RIGHT: c_int = saberBlockedType_t::BLOCKED_UPPER_RIGHT as c_int;
 const BLOCKED_UPPER_LEFT: c_int = saberBlockedType_t::BLOCKED_UPPER_LEFT as c_int;
@@ -198,9 +178,9 @@ const WEAPON_FIRING: c_int = weaponstate_t::WEAPON_FIRING as c_int;
 const WEAPON_RAISING: c_int = weaponstate_t::WEAPON_RAISING as c_int;
 const WEAPON_DROPPING: c_int = weaponstate_t::WEAPON_DROPPING as c_int;
 
-// Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
-// `qtrue`/`qfalse` spellings are not exported here, so the ported bodies below
-// return the bare `1`/`0` those constants alias.
+// Raven `qboolean` is `c_int`, where `qfalse` is `0` and `qtrue` is `1`.
+// The lowercase `qtrue` and `qfalse` spellings are not exported here.
+// The bodies below return the bare `1` and `0` values those constants alias.
 
 /// Raven `RandFloat`.
 ///
@@ -213,11 +193,9 @@ pub fn RandFloat(ctx: &mut GameContext, min: f32, max: f32) -> f32 {
 
 /// Raven `G_DebugBoxLines`.
 ///
-/// `DEBUG_SABER_BOX` is `#define`d unconditionally at `g_local.h:82`, so this
-/// compiles into every oracle game TU; every call site is further gated at
-/// runtime behind the `g_saberDebugBox` `CVAR_CHEAT` cvar (default `"0"`),
-/// which is why normal play — including the combat corpus — never draws
-/// these lines.
+/// `DEBUG_SABER_BOX` is `#define`d unconditionally at `g_local.h:82`, so this compiles into every oracle game TU.
+/// Every call site is further gated at runtime behind the `g_saberDebugBox` `CVAR_CHEAT` cvar, default `"0"`.
+/// Normal play, including the combat corpus, never draws these lines for that reason.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:46-78`
 pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, duration: c_int) {
@@ -266,31 +244,30 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
         (se.client, ee.client, se.s.number, ee.s.number)
     };
 
-    // FLAG: pool clients (NPC-capable combatants); deref raw per recipe 2b.
     unsafe {
         if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != enemy_number {
-            // dueling but not with this person
+            //dueling but not with this person
             return false;
         }
 
         if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != self_number {
-            // other guy dueling but not with me
+            //other guy dueling but not with me
             return false;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer < mp_bg::public::gametype::GT_TEAM {
-        // ok, sure
+        //ok, sure
         return true;
     }
 
     if ctx.world.cvars.g_friendlyFire.integer != 0 {
-        // if ff on then can inflict damage normally on teammates
+        //if ff on then can inflict damage normally on teammates
         return true;
     }
 
     if OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
-        // ff not on, don't hurt teammates
+        //ff not on, don't hurt teammates
         return false;
     }
 
@@ -301,9 +278,9 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
 ///
 /// Source: `oracle/codemp/game/w_saber.c:120-217`
 pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attacking: bool) -> c_int {
-    // Raven asserts a live entity here; every caller passes one.
+    // Raven asserts a live entity here.
+    // Every caller passes one.
     let ent = ent.unwrap();
-    // FLAG: pool client (NPC-capable saber wielder); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
     unsafe {
         debug_assert!(!client.is_null());
@@ -318,8 +295,8 @@ pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attackin
         }
 
         if attacking {
-            // The attacker gets a boost to help penetrate defense; general boost
-            // up so the individual levels make a bigger difference.
+            // The attacker gets a boost to help penetrate defense.
+            // General boost up so the individual levels make a bigger difference.
             baseLevel *= 2;
             baseLevel += 1;
 
@@ -333,7 +310,7 @@ pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attackin
                     x if x == saber_styles_t::SS_STRONG as c_int => 8,
                     x if x == saber_styles_t::SS_MEDIUM as c_int => 16,
                     x if x == saber_styles_t::SS_FAST as c_int => 24,
-                    _ => 16, // dual, staff, etc.
+                    _ => 16, //dual, staff, etc.
                 };
 
                 let a = (*client).lastSaberBase_Always;
@@ -394,7 +371,6 @@ pub fn WP_DeactivateSaber(ctx: &mut GameContext, self_: Option<EntityId>, clearL
         Some(e) => e,
         None => return,
     };
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
@@ -433,7 +409,6 @@ pub fn WP_ActivateSaber(ctx: &mut GameContext, self_: Option<EntityId>) {
         Some(e) => e,
         None => return,
     };
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
@@ -480,7 +455,6 @@ pub fn WP_ActivateSaber(ctx: &mut GameContext, self_: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/w_saber.c:286-358`
 pub fn SaberUpdateSelf(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let level_time = ctx.world.level.time;
@@ -569,15 +543,15 @@ pub fn SaberGotHit(
     trace: *mut trace_t,
 ) {
     let _ = (other, trace);
-    // `own = &g_entities[self->r.ownerNum]` — an array slot, never null; the
-    // oracle's `!own` guard is vacuous in Rust, only the client check bites.
+    // `own = &g_entities[self->r.ownerNum]` is an array slot, never null.
+    // The oracle's `!own` guard is vacuous in Rust, so only the client check bites.
     let owner_num = ctx.world.entity(self_).r.ownerNum;
-    // FLAG: pool client (NPC-capable); read the pointer via the safe borrow.
     let own_client = ctx.world.entity(EntityId(owner_num as u32)).client;
     if own_client.is_null() {
         return;
     }
-    // Raven no-op: projectiles are now handled in their own functions.
+    // This function body is a no-op in Raven.
+    // Saber projectile handling moved to separate functions.
 }
 
 /// Raven `SetSaberBoxSize`.
@@ -593,7 +567,8 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
     let mut alwaysBlock = [[qfalse; MAX_BLADES as usize]; MAX_SABERS as usize];
     let mut forceBlock = qfalse;
 
-    // Raven asserts a live saber entity; every caller passes one.
+    // Raven asserts a live saber entity here.
+    // Every caller passes one.
     let saberent = saberent.unwrap();
     debug_assert!(ctx.world.entity(saberent).inuse != 0);
 
@@ -616,7 +591,6 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
         }
     };
 
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let oc = ctx.world.entity(owner_id).client;
 
     unsafe {
@@ -671,9 +645,10 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
             }
         }
 
-        // Raven reads saber[j].blade[k] with j left over from the broken-parry+forceBlock
-        // loops (terminal MAX_BLADES/numBlades) — an OOB read; the loops here use fresh
-        // i/jj, so j and k stay 0 and we read saber[0].blade[0] as the defined behavior (§19).
+        // Raven reads saber[j].blade[k] with j left over from the broken-parry+forceBlock loops (terminal
+        // MAX_BLADES/numBlades), an OOB read.
+        // The loops here use fresh i/jj, so j and k stay 0.
+        // This file reads saber[0].blade[0] as the defined behavior (§19).
         if (level_time - (*oc).lastSaberStorageTime) > 200
             || (level_time - (*oc).saber[j as usize].blade[k as usize].storageTime) > 100
         {
@@ -802,7 +777,8 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
                 ce.think = Some(EntThink::G_FreeEntity).into();
                 ce.nextthink = level_time;
             } else {
-                // take it as my own; free but don't issue a kg2.
+                // Take it as my own.
+                // This frees it but does not issue a kg2, to avoid overflowing clients.
                 ctx.world.entity_mut(check_id).s.modelGhoul2 = 0;
                 G_FreeEntity(ctx, Some(check_id));
 
@@ -824,7 +800,6 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
         }
     };
 
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let ec = ctx.world.entity(ent).client;
     let saber_number = ctx.world.entity(saberent).s.number;
     unsafe {
@@ -869,7 +844,6 @@ pub fn G_CheckLookTarget(
     lookAngles: &mut vec3_t,
     lookingSpeed: *mut f32,
 ) -> bool {
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(ent).client;
 
     // an NPC bolted to a vehicle should just look around randomly
@@ -882,7 +856,6 @@ pub fn G_CheckLookTarget(
     if is_bolted_npc {
         let look_around = cstr("lookAround");
         if TIMER_Done(ctx, Some(ent), look_around.as_ptr()) != 0 {
-            // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
             let npc = ctx.world.entity(ent).NPC;
             let yaw = ctx.world.bg_state.rng.flrand(0.0, 360.0);
             unsafe {
@@ -891,7 +864,6 @@ pub fn G_CheckLookTarget(
             let look_time = ctx.world.bg_state.rng.Q_irand(500, 3000);
             TIMER_Set(ctx, Some(ent), look_around.as_ptr(), look_time);
         }
-        // FLAG: gNPC_t (NPCInfo); deref raw.
         let npc = ctx.world.entity(ent).NPC;
         let shoot_yaw = unsafe { (*npc).shootAngles[YAW as usize] };
         VectorSet(lookAngles, 0.0, shoot_yaw, 0.0);
@@ -907,16 +879,15 @@ pub fn G_CheckLookTarget(
             let mut eyeOrg: vec3_t = [0.0; 3];
 
             if (*sc).renderInfo.lookMode == lookMode_t::LM_ENT {
-                // `lookCent = &g_entities[lookTarget]` — an array slot, never null.
+                // `lookCent = &g_entities[lookTarget]` is an array slot, never null.
                 let look_cent = EntityId(look_target as u32);
-                // `enemy` is `Option<EntityId>`; identity-compare by id.
+                // `enemy` is `Option<EntityId>`, and this compares identity by id.
                 if ctx.world.entity(ent).enemy != Some(look_cent) {
                     // We turn heads faster than headbob speed, but not as fast
                     // as if watching an enemy
                     *lookingSpeed = LOOK_DEFAULT_SPEED;
                 }
 
-                // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
                 let lcc = ctx.world.entity(look_cent).client;
                 if !lcc.is_null() {
                     lookOrg = (*lcc).renderInfo.eyePoint;
@@ -965,7 +936,6 @@ pub fn G_G2NPCAngles(
     legs: *mut vec3_t,
     angles: &mut vec3_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let cranium_bone = cstr("cranium");
@@ -984,8 +954,8 @@ pub fn G_G2NPCAngles(
             || (*sc).NPC_class == CLASS_R5D2
             || (*sc).NPC_class == CLASS_ATST
         {
-            // Raven leaves this local uninitialized (the CG_ATSTLegsYaw call is
-            // commented out); zero-init is the chosen defined behavior (§19).
+            // Raven leaves this local uninitialized, since the CG_ATSTLegsYaw call is commented out.
+            // Zero-init is the chosen defined behavior here (§19).
             let mut trailingLegsAngles: vec3_t = [0.0; 3];
 
             if (*ent).s.eType == ET_NPC as c_int
@@ -1050,7 +1020,8 @@ pub fn G_G2NPCAngles(
                 // normalize
                 lookAngles[YAW as usize] = AngleNormalize180(lookAngles[YAW as usize]);
 
-                // slowly lerp to this new value; remember last headAngles
+                // This slowly lerps to the new value.
+                // Remember last headAngles.
                 oldLookAngles = (*sc).renderInfo.lastHeadAngles;
                 if !VectorCompare(oldLookAngles, lookAngles) {
                     lookAngles[YAW as usize] = oldLookAngles[YAW as usize]
@@ -1093,7 +1064,6 @@ pub fn G_G2PlayerAngles(
     legs: *mut vec3_t,
     legsAngles: &mut vec3_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let sc = (*ent).client;
@@ -1357,7 +1327,6 @@ pub fn G_G2PlayerAngles(
 /// Source: `oracle/codemp/game/w_saber.c:1036-1073`
 pub fn SaberAttacking(self_: &gentity_t) -> bool {
     let client = self_.client;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let (saberMove, weaponstate, saberBlocked) = unsafe {
         let ps = &(*client).ps;
         (ps.saberMove, ps.weaponstate, ps.saberBlocked)
@@ -1403,8 +1372,8 @@ pub fn G_SaberLockAnim(
     lockOrBreakOrSuperBreak: c_int,
     winOrLose: c_int,
 ) -> c_int {
-    // `BOTH_LK_*` are `animNumber_t` enum variants; `baseAnim` is arithmetic
-    // `int` in Raven, so each seed is taken as its `c_int` discriminant.
+    // `BOTH_LK_*` are `animNumber_t` enum variants.
+    // `baseAnim` is arithmetic `int` in Raven, so each seed is taken as its `c_int` discriminant.
     let ss_fast = saber_styles_t::SS_FAST as c_int;
     let ss_tavion = saber_styles_t::SS_TAVION as c_int;
     let ss_dual = saber_styles_t::SS_DUAL as c_int;
@@ -1501,7 +1470,6 @@ pub fn WP_SabersCheckLock2(
     defender: EntityId,
     mut lockMode: sabersLockMode_t,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t = ctx.entity_mut(attacker);
     let defender: *mut gentity_t = ctx.entity_mut(defender);
     unsafe {
@@ -1585,7 +1553,7 @@ pub fn WP_SabersCheckLock2(
                 return false;
             }
         } else {
-            // use the new system — all new saberlocks are 46.08 apart
+            // This uses the new system. All new saberlocks are 46.08 apart.
             idealDist = LOCK_IDEAL_DIST_JKA;
             if lockMode == LOCK_TOP {
                 // top lock
@@ -1811,7 +1779,8 @@ pub fn WP_SabersCheckLock2(
         defAngles[ROLL as usize] = 0.0;
         SetClientViewAngle(&mut *defender, defAngles);
 
-        // MATCH POSITIONS — diff is the total error in dist
+        // MATCH POSITIONS
+        // diff is the total error in dist.
         diff = VectorNormalize(&mut defDir) - idealDist;
         // try to move attacker half the diff towards the defender
         _VectorMA(
@@ -1878,7 +1847,6 @@ pub fn WP_SabersCheckLock2(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:1462-1889`
 pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent1: *mut gentity_t = ctx.entity_mut(ent1);
     let ent2: *mut gentity_t = ctx.entity_mut(ent2);
     unsafe {
@@ -2470,7 +2438,6 @@ pub fn WP_GetSaberDeflectionAngle(
     defender: Option<EntityId>,
     saberHitFraction: f32,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     let defender: *mut gentity_t =
@@ -2489,7 +2456,8 @@ pub fn WP_GetSaberDeflectionAngle(
         let dc = (*defender).client;
 
         if (ctx.world.level.time - (*ac).lastSaberStorageTime) > 500 {
-            // last update too long ago; something prevents his saber from updating
+            // The last update was too long ago.
+            // Something prevents his saber from updating.
             return false;
         }
         if (ctx.world.level.time - (*dc).lastSaberStorageTime) > 500 {
@@ -2576,7 +2544,8 @@ pub fn WP_GetSaberDeflectionAngle(
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                 return false;
             } else {
-                // attack hit at an angle; figure out what angle it bounces off att
+                // The attack hit at an angle.
+                // Figure out what angle it should bounce off att.
                 quadDiff = defQuad - attQuadEnd;
                 // add half the diff between the defense and attack end to attack end
                 if quadDiff > 4 {
@@ -2760,10 +2729,11 @@ pub fn WP_GetSaberDeflectionAngle(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2210-2233`
 pub fn G_KnockawayForParry(r#move: c_int) -> c_int {
-    // FIXME(Raven): need actual anims for this; need to know which side of the
-    // saber was hit — presume it gets knocked away from the center.
-    // Oracle's `case LS_PARRY_UR:` falls through into `default:` (both return
-    // LS_K1_TR), so the `_` arm covers LS_PARRY_UR and every unmatched value.
+    // FIXME(Raven): this needs actual anims.
+    // FIXME(Raven): this needs to know which side of the saber was hit.
+    // For now, this presumes the saber gets knocked away from the center.
+    // Oracle's `case LS_PARRY_UR:` falls through into `default:`, and both return LS_K1_TR.
+    // The `_` arm covers LS_PARRY_UR and every unmatched value for that reason.
     match r#move {
         LS_PARRY_UP => LS_K1_T_, // push up
         LS_PARRY_UL => LS_K1_TL, // push up and to left
@@ -2783,7 +2753,6 @@ pub fn G_GetAttackDamage(
     maxDmg: c_int,
     multPoint: f32,
 ) -> c_int {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let sc = (*self_).client;
@@ -2802,9 +2771,8 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
-            // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
-            // arena by client number (replaces the old `g_entities` base arg).
+            // This is irreducible. The DEC-28 `GameCallbacksImpl` adapter holds a raw `*mut GameWorld`.
+            // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
@@ -2845,7 +2813,6 @@ pub fn G_GetAttackDamage(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2290-2310`
 pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(self_).client;
     let local_anim_index = ctx.world.entity(self_).localAnimIndex;
     let s_number = ctx.world.entity(self_).s.number;
@@ -2863,9 +2830,8 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
-            // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
-            // arena by client number (replaces the old `g_entities` base arg).
+            // This is irreducible. The DEC-28 `GameCallbacksImpl` adapter holds a raw `*mut GameWorld`.
+            // `my_saber` reaches the game arena by client number, replacing the old `g_entities` base arg.
             &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
@@ -2888,7 +2854,6 @@ pub fn G_ClientIdleInWorld(ent: &gentity_t) -> bool {
         return false;
     }
     let client = ent.client;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let (upmove, forwardmove, rightmove, buttons) = unsafe {
         let cmd = &(*client).pers.cmd;
         (cmd.upmove, cmd.forwardmove, cmd.rightmove, cmd.buttons)
@@ -2976,7 +2941,7 @@ pub fn G_G2TraceCollide(
             fRadius = (traceMaxs[0] - traceMins[0]) / 2.0f32;
         }
 
-        // memset(&G2Trace,0,sizeof(G2Trace)) — covered by zeroed() above.
+        // Raven's `memset(&G2Trace,0,sizeof(G2Trace))` is covered by `zeroed()` above.
         while tN < MAX_G2_COLLISIONS as c_int {
             G2Trace[tN as usize].mEntityNum = -1;
             tN += 1;
@@ -3040,7 +3005,7 @@ pub fn G_G2TraceCollide(
                 );
             }
 
-            // Referee probe: saber ghoul2 collide check — trace ent vs G2 hit ent.
+            // Referee probe: saber ghoul2 collide check, trace ent vs G2 hit ent.
             probe!(
                 "SAB_CD",
                 "t={} en={} m={}",
@@ -3055,7 +3020,7 @@ pub fn G_G2TraceCollide(
                 (*tr).allsolid = 0;
                 return false;
             } else {
-                // The ghoul2 trace result matches; copy the collision position back.
+                // The ghoul2 trace result matches, so this copies the collision position back.
                 (*tr).endpos = G2Trace[0].mCollisionPosition;
                 (*tr).plane.normal = G2Trace[0].mCollisionNormal;
 
@@ -3096,8 +3061,8 @@ pub fn G_BuildSaberFaces(
     fList: *mut *mut saberFace_t,
 ) {
     unsafe {
-        // Raven's function-local `static saberFace_t faces[12]` is returned by
-        // pointer; `GameWorld.scratch` owns it (§B3), same persistent-buffer behavior.
+        // Raven's function-local `static saberFace_t faces[12]` is returned by pointer.
+        // `GameWorld.scratch` owns it here (§B3), the same persistent-buffer behavior.
         let faces = &mut ctx.world.scratch.faces;
         let mut i: usize = 0;
         let mut invFwd: vec3_t = [0.0; 3];
@@ -3155,7 +3120,8 @@ pub fn G_BuildSaberFaces(
             i += 1;
         }
 
-        // top surface — face 1
+        // top surface
+        // face 1
         _VectorMA(tip, radius / 2.0f32, fwd, &mut faces[i].v1);
         let v = faces[i].v1;
         _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v1);
@@ -3185,7 +3151,8 @@ pub fn G_BuildSaberFaces(
 
         i += 1;
 
-        // bottom surface — face 1
+        // bottom surface
+        // face 1
         _VectorMA(base, radius / 2.0f32, fwd, &mut faces[i].v1);
         let v = faces[i].v1;
         _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v1);
@@ -3401,7 +3368,6 @@ pub fn G_SaberCollide(
     mut atkMaxs: vec3_t,
     mut impactPoint: vec3_t,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let atk: *mut gentity_t = ctx.entity_mut(atk);
     let def: *mut gentity_t = ctx.entity_mut(def);
     unsafe {
@@ -3512,7 +3478,6 @@ pub fn WP_SaberBladeLength(saber: *mut saberInfo_t) -> f32 {
 pub fn WP_SaberLength(ent: &gentity_t) -> f32 {
     // return largest length
     let client = ent.client;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     if client.is_null() {
         return 0.0f32;
     }
@@ -3554,7 +3519,6 @@ pub fn WP_SabersIntersect(
     ent2: Option<EntityId>,
     checkDir: qboolean,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent1: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
     let ent2: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
     let _ = ctx;
@@ -3802,7 +3766,6 @@ pub fn G_PowerLevelForSaberAnim(
     saberNum: c_int,
     mySaberHit: qboolean,
 ) -> c_int {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() || saberNum >= MAX_SABERS as c_int {
@@ -4303,9 +4266,9 @@ pub fn WP_SaberApplyDamage(ctx: &mut GameContext, self_: EntityId) {
 
         let dmg_spot = ctx.world.globals.dmgSpot[iu];
         let total_dmg = ctx.world.globals.totalDmg[iu] as c_int;
-        // STAGE-2b: irreducible — G_Damage's `dir` is a `&mut vec3_t` out-param,
-        // so a checked `&mut ctx.world.globals.dmgDir[iu]` would alias `ctx`
-        // across the call; derive it through the raw world so it holds no borrow.
+        // This is irreducible. `G_Damage`'s `dir` is a `&mut vec3_t` out-param.
+        // A checked `&mut ctx.world.globals.dmgDir[iu]` would alias `ctx` across the call.
+        // This derives it through the raw world instead, so it holds no borrow.
         let dmg_dir = Some(unsafe { &mut (*ctx.world_raw()).globals.dmgDir[iu] });
         G_Damage(
             ctx,
@@ -4329,7 +4292,6 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
     if ctx.world.globals.numVictims == 0 {
         return;
     }
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(self_).client;
     unsafe {
         let mut i = 0;
@@ -4349,7 +4311,6 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
 
             let dmg_spot = ctx.world.globals.dmgSpot[iu];
             if !ctx.world.entity(victim_id).client.is_null() {
-                // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
                 let vc = ctx.world.entity(victim_id).client;
                 let npc_class = (*vc).NPC_class;
 
@@ -4373,7 +4334,7 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
             }
 
             let te_eid = G_TempEntity(ctx, dmg_spot, EV_SABER_HIT as c_int);
-            // Raven's `if (te)` guard is vacuous — G_TempEntity never returns NULL.
+            // Raven's `if (te)` guard is vacuous, since `G_TempEntity` never returns NULL.
             let victim_num = ctx.world.globals.victimEntityNum[iu];
             let self_num = ctx.world.entity(self_).s.number;
             let dmg_dir = ctx.world.globals.dmgDir[iu];
@@ -4439,7 +4400,6 @@ pub fn WP_SaberRadiusDamage(
     damage: c_int,
     knockBack: f32,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
@@ -4598,7 +4558,6 @@ pub fn WP_SaberBounceSound(
         Some(e) => e,
         None => return,
     };
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
     if client.is_null() {
         return;
@@ -4626,8 +4585,8 @@ pub fn WP_SaberBounceSound(
             let snd = (*saber).block2Sound[ctx.world.bg_state.rng.Q_irand(0, 2) as usize];
             G_Sound(ctx, Some(ent), CHAN_AUTO as c_int, snd);
         } else {
-            // `va("sound/weapons/saber/saberblock%d.wav", index)` — rendered as an
-            // owned NUL-terminated string (appendix ruling: va -> owned String).
+            // `va("sound/weapons/saber/saberblock%d.wav", index)` is rendered as an owned NUL-terminated string.
+            // The appendix ruling turns `va` into an owned `String`.
             let path = format!("sound/weapons/saber/saberblock{}.wav", index);
             let sound = G_SoundIndex(ctx, &path);
             G_Sound(
@@ -4649,16 +4608,15 @@ pub fn CheckSaberDamage(
     rSaberNum: c_int,
     rBladeNum: c_int,
     mut saberStart: vec3_t,
-    // C `vec3_t saberEnd` decays to float*: the interpolate retrace loop's
-    // writes propagate to the caller's array (reused for trail.tip and the
-    // mid-point gate). By-value here dropped that write-back — the lockstep
-    // frame-1806 saber-collision divergence (2026-07-14).
+    // Raven's `vec3_t saberEnd` decays to `float*`, so the interpolate retrace loop's writes propagate to the
+    // caller's array, reused for `trail.tip` and the mid-point gate.
+    // A by-value parameter here dropped that write-back and caused the lockstep frame-1806 saber-collision
+    // divergence.
     saberEnd: &mut vec3_t,
     doInterpolate: qboolean,
     mut trMask: c_int,
     extrapolate: qboolean,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
@@ -4814,7 +4772,7 @@ pub fn CheckSaberDamage(
                     &saberTrMaxs,
                     tr.fraction,
                     tr.entityNum as i32,
-                ); // TEMP G6
+                );
                 lastValidStart = *saberEnd;
                 lastValidEnd = saberStart;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -4903,7 +4861,7 @@ pub fn CheckSaberDamage(
                         &saberTrMaxs,
                         tr.fraction,
                         tr.entityNum as i32,
-                    ); // TEMP G6
+                    );
                     lastValidStart = *saberEnd;
                     lastValidEnd = saberStart;
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -4973,7 +4931,7 @@ pub fn CheckSaberDamage(
                     &saberTrMaxs,
                     tr.fraction,
                     tr.entityNum as i32,
-                ); // TEMP G6
+                );
                 lastValidStart = saberStart;
                 lastValidEnd = saberEndExtrapolated;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -6325,11 +6283,10 @@ pub fn G_SPSaberDamageTraceLerped(
     endNew: &mut vec3_t,
     clipmask: c_int,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let ec = (*self_).client;
-        // Referee probe: saber trail lerp — new base/tip vs stored trail base/tip.
+        // Referee probe: saber trail lerp, new base/tip vs stored trail base/tip.
         {
             let tb = &(*ec).saber[saberNum as usize].blade[bladeNum as usize].trail;
             probe!(
@@ -6576,7 +6533,6 @@ pub fn WP_SaberStartMissileBlockCheck(
     self_: EntityId,
     ucmd: *mut usercmd_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
@@ -6817,7 +6773,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                     //players don't auto-handle these at all
                     continue;
                 } else {
-                    // (Raven `if (0)` placed-explosive branch dropped per §20 — never taken.)
+                    // Raven's `if (0)` placed-explosive branch is dropped per §20, since it is never taken.
                     if dist < (*ent).splashRadius as f32
                         && (*sc).ps.groundEntityNum != ENTITYNUM_NONE
                         && (_DotProduct(dir, forward) < SABER_REFLECT_MISSILE_CONE
@@ -7018,7 +6974,6 @@ pub fn CheckThrownSaberDamaged(
     returning: c_int,
     noDCheck: qboolean,
 ) -> bool {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     let saberOwner: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), saberOwner) };
@@ -7360,8 +7315,8 @@ pub fn CheckThrownSaberDamaged(
 pub fn saberCheckRadiusDamage(ctx: &mut GameContext, saberent: EntityId, returning: c_int) {
     let mut i = 0;
     let dist: c_int;
-    // saberOwner is an array slot, never null; the oracle's `!saberOwner`
-    // guard is vacuous in Rust.
+    // saberOwner is an array slot, never null.
+    // The oracle's `!saberOwner` guard is vacuous in Rust for that reason.
     let owner_num = ctx.world.entity(saberent).r.ownerNum;
     let saber_owner = EntityId(owner_num as u32);
 
@@ -7371,7 +7326,6 @@ pub fn saberCheckRadiusDamage(ctx: &mut GameContext, saberent: EntityId, returni
         dist = (MIN_SABER_SLICE_DISTANCE) as i32;
     }
 
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saber_owner).client;
     if soc.is_null() {
         return;
@@ -7413,8 +7367,8 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         BG_EvaluateTrajectory(&e.s.apos, level_time, &mut e.r.currentAngles);
     }
 
-    // compensation test code — `THROWN_SABER_COMP` is `#define`d
-    // unconditionally in the oracle, so this block is compiled in.
+    // compensation test code.
+    // `THROWN_SABER_COMP` is `#define`d unconditionally in the oracle, so this block is compiled in.
     if goingBack == qfalse && ctx.world.entity(ent).s.pos.trType != trType_t::TR_GRAVITY {
         // acts as a fallback in case touch code fails, keeps saber from
         // going through things between predictions
@@ -7459,9 +7413,9 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         {
             VectorClear(&mut ctx.world.entity_mut(ent).s.pos.trDelta);
 
-            // Unfortunately restoring `origin` would defeat the purpose of
-            // the compensation; we settle for a jerk on the client.
-            // we'll skip the dist check, since we just hit it physically
+            // Restoring `origin` here would defeat the purpose of the compensation.
+            // This settles for a jerk on the client instead.
+            // This skips the dist check, since it just hit the target physically.
             CheckThrownSaberDamaged(
                 ctx,
                 ent,
@@ -7576,7 +7530,6 @@ pub fn MakeDeadSaber(ctx: &mut GameContext, ent: EntityId) {
     let owner_num = ctx.world.entity(ent).r.ownerNum;
     if owner_num >= 0 && owner_num < ENTITYNUM_WORLD {
         let owner_id = EntityId(owner_num as u32);
-        // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
         let oc = ctx.world.entity(owner_id).client;
         let ok = ctx.world.entity(owner_id).inuse != 0
             && !oc.is_null()
@@ -7634,7 +7587,6 @@ pub fn DownedSaberThink(ctx: &mut GameContext, saberent: EntityId) {
     }
 
     let saberOwn_id = EntityId(ctx.world.entity(saberent).r.ownerNum as u32);
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwn_id).client;
 
     if ctx.world.entity(saberOwn_id).inuse == 0
@@ -7796,7 +7748,6 @@ pub fn saberReactivate(ctx: &mut GameContext, saberent: EntityId, saberOwner: En
         se.s.weapon = WP_SABER as c_int;
     }
 
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     unsafe {
         (*soc).ps.saberEntityState = 1;
@@ -7819,7 +7770,6 @@ pub fn saberKnockDown(
     other: EntityId,
 ) {
     let level_time = ctx.world.level.time;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
 
     unsafe {
@@ -7893,7 +7843,6 @@ pub fn saberKnockDown(
             let mut otherFwd: vec3_t = [0.0; 3];
             let deflectSpeed = 200.0f32;
 
-            // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
             let ooc = ctx.world.entity(other).client;
             let viewangles = unsafe { (*ooc).ps.viewangles };
             AngleVectors(viewangles, Some(&mut otherFwd), None, None);
@@ -7929,8 +7878,8 @@ pub fn saberKnockDown(
 /// Source: `oracle/codemp/game/w_saber.c:6589-6595`
 pub fn WP_SaberRemoveG2Model(ctx: &mut GameContext, saberent: EntityId) {
     if !ctx.entity(saberent).ghoul2.is_null() {
-        // `ghoul2` is never dereferenced here — its address is handed to the
-        // engine seam as a raw `*mut c_void`, so no `unsafe` deref is needed.
+        // `ghoul2` is never dereferenced here.
+        // Its address is handed to the engine seam as a raw `*mut c_void`, so no `unsafe` deref is needed.
         let ghoul2 = &mut ctx.entity_mut(saberent).ghoul2 as *mut *mut c_void as *mut c_void;
         trap::G2API_RemoveGhoul2Models(
             ctx.engine,
@@ -7962,8 +7911,8 @@ pub fn WP_SaberAddG2Model(
         unsafe { cstr_to_str(saberModel) }
     };
     let modelindex = ctx.entity(saberent).s.modelindex;
-    // `ghoul2`'s address is handed to the engine seam as a raw pointer; it is
-    // never dereferenced in module code, so no `unsafe` deref is needed.
+    // `ghoul2`'s address is handed to the engine seam as a raw pointer.
+    // It is never dereferenced in module code, so no `unsafe` deref is needed.
     let ghoul2 = &mut ctx.entity_mut(saberent).ghoul2 as *mut *mut c_void;
     trap::G2API_InitGhoul2Model(
         ctx.engine,
@@ -7998,7 +7947,6 @@ pub fn saberKnockOutOfHand(
         return false;
     }
 
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 {
@@ -8096,7 +8044,6 @@ pub fn saberCheckKnockdown_DuelLoss(
     {
         return false;
     }
-    // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
@@ -8152,7 +8099,7 @@ pub fn saberCheckKnockdown_DuelLoss(
         if !ctx.world.entity(other).client.is_null() {
             disarmChance += (*ooc).saber[0].disarmBonus;
             if (*ooc).saber[1].model[0] != 0 && (*ooc).ps.saberHolstered == 0 {
-                // Raven no-op: `other->client->saber[1].disarmBonus;` (discarded read)
+                // Raven's `other->client->saber[1].disarmBonus;` is a no-op, a discarded read.
                 let _ = (*ooc).saber[1].disarmBonus;
             }
         }
@@ -8188,7 +8135,6 @@ pub fn saberCheckKnockdown_BrokenParry(
     {
         return false;
     }
-    // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
@@ -8280,7 +8226,6 @@ pub fn saberCheckKnockdown_Smashed(
     {
         return false;
     }
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
@@ -8295,7 +8240,6 @@ pub fn saberCheckKnockdown_Smashed(
 
     if ctx.world.entity(other).inuse != 0
         && !ctx.world.entity(other).client.is_null()
-        // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
         && unsafe { BG_InExtraDefenseSaberMove((*ctx.world.entity(other).client).ps.saberMove) != 0 }
     {
         // make sure the blow was strong enough
@@ -8335,7 +8279,6 @@ pub fn saberCheckKnockdown_Thrown(
     {
         return false;
     }
-    // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
 
@@ -8367,7 +8310,6 @@ pub fn saberCheckKnockdown_Thrown(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:6917-7076`
 pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     unsafe {
         let level_time = ctx.world.level.time;
@@ -8579,7 +8521,6 @@ pub fn thrownSaberTouch(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7117-7257`
 pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     unsafe {
         let level_time = ctx.world.level.time;
@@ -8774,7 +8715,6 @@ pub fn UpdateClientRenderBolts(
     renderAngles: vec3_t,
 ) {
     let level_time = ctx.world.level.time;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(self_).client;
     // `ghoul2`/`modelScale` are stable across the bolt reads below (the seam call
     // does not mutate them), so hoist the entity reads out of the loop.
@@ -8835,7 +8775,6 @@ pub fn UpdateClientRenderinfo(
     renderOrigin: vec3_t,
     renderAngles: vec3_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let client = (*self_).client;
@@ -9079,7 +9018,6 @@ pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> bool {
     if ctx.world.entity(ent).inuse == 0 || ctx.world.entity(ent).client.is_null() {
         return false;
     }
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
 
     unsafe {
@@ -9116,7 +9054,6 @@ pub fn G_TossTheMofo(ctx: &mut GameContext, ent: EntityId, tossDir: vec3_t, toss
         // no, silly
         return;
     }
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
 
     unsafe {
@@ -9137,7 +9074,7 @@ pub fn G_TossTheMofo(ctx: &mut GameContext, ent: EntityId, tossDir: vec3_t, toss
             // if they are alive, knock them down I suppose
             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
             (*client).ps.forceHandExtendTime = ctx.world.level.time + 700;
-            (*client).ps.forceDodgeAnim = 0; // toggles 1/0; 1 means play the get-up anim
+            (*client).ps.forceDodgeAnim = 0; // toggles 1/0, where 1 means play the get-up anim
         }
     }
 }
@@ -9161,11 +9098,10 @@ pub fn G_KickTrace(
     kickDamage: c_int,
     kickPush: f32,
 ) -> *mut gentity_t {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        // `kickDir` is passed to `G_Damage` as an out-shaped `&mut vec3_t`; rebind
-        // mutable (binding-only; the LAW-by-value type is unchanged).
+        // `kickDir` is passed to `G_Damage` as an out-shaped `&mut vec3_t`.
+        // This rebinds it mutable as a binding-only change, since the LAW-by-value type is unchanged.
         let mut kickDir = kickDir;
 
         let mut traceOrg: vec3_t = [0.0; 3];
@@ -9178,8 +9114,8 @@ pub fn G_KickTrace(
         let kickMaxs: vec3_t = [2.0f32, 2.0f32, 2.0f32];
 
         //FIXME: variable kick height?
-        // Raven null-checks the `kickEnd` array param; by-value `vec3_t` can't be
-        // NULL, so callers pass `vec3_origin` for Raven NULL (same branch taken).
+        // Raven null-checks the `kickEnd` array param, but a by-value `vec3_t` cannot be NULL.
+        // Callers pass `vec3_origin` for Raven NULL, so the same branch is taken.
         if !VectorCompare(kickEnd, vec3_origin) {
             //they passed us the end point of the trace, just use that
             //this makes the trace flat
@@ -9355,7 +9291,6 @@ pub fn G_KickTrace(
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7644-7956`
 pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client;
@@ -9707,8 +9642,8 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
 
         if doKick != 0 {
             //		G_KickTrace( ent, kickDir, kickDist, kickEnd, kickDamage, kickPush );
-            // Raven passes NULL for `kickEnd`; the by-value signature takes
-            // `vec3_origin`, which G_KickTrace treats identically (see its note).
+            // Raven passes NULL for `kickEnd`.
+            // The by-value signature here takes `vec3_origin`, which G_KickTrace treats identically (see its note).
             G_KickTrace(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
@@ -9736,11 +9671,10 @@ pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> bool {
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7969-8082`
 pub fn G_GrabSomeMofos(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let client = (*self_).client;
-        // `renderInfo_t *ri = &self->client->renderInfo;` — only `handRBolt` is read.
+        // Raven's `renderInfo_t *ri = &self->client->renderInfo;` reads only `handRBolt` from it.
         let handRBolt = (*client).renderInfo.handRBolt;
 
         if (*self_).ghoul2.is_null() || handRBolt == -1 {
@@ -9938,7 +9872,6 @@ pub fn WP_SaberPositionUpdate(
     self_: Option<EntityId>,
     ucmd: *mut usercmd_t,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
     unsafe {
@@ -10366,7 +10299,8 @@ pub fn WP_SaberPositionUpdate(
                         // but can throw it if only have 1 blade on
                         if (*client).saber[0].numBlades > 1 && (*client).ps.saberHolstered == 1 {
                             // have multiple blades and only one blade on
-                            (*client).ps.saberCanThrow = qtrue; // qfalse; want to be able to throw
+                            (*client).ps.saberCanThrow = qtrue; //qfalse;
+                            // Raven questions this value here, unsure if it should allow the throw instead.
                         } else {
                             // multiple blades on, can't throw
                             (*client).ps.saberCanThrow = qfalse;
@@ -10719,10 +10653,10 @@ pub fn WP_SaberPositionUpdate(
                         while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                             // Don't bother updating the bolt for each blade for this, it's just a
                             // very rough fallback method for during saberlocks
-                            // Raven indexes `saber[saberNum]` where saberNum is a saber ENTITY
-                            // number (>= MAX_CLIENTS) — an OOB write past saber[MAX_SABERS]; the
-                            // loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum]
-                            // show the intent, so index saber[rSaberNum] (§19).
+                            // Raven indexes `saber[saberNum]` where saberNum is a saber ENTITY number (>= MAX_CLIENTS), an
+                            // OOB write past saber[MAX_SABERS].
+                            // The loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum] show the intent, so
+                            // this indexes saber[rSaberNum] instead (§19).
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
                                 .base = boltOrigin;
@@ -10779,8 +10713,8 @@ pub fn WP_SaberPositionUpdate(
                         // don't do saber 1 if the left arm is broken
                         break;
                     }
-                    // Raven's `self->client->saber[1].model` operand is an array address
-                    // (always non-NULL); only the `model[0]` byte test is load-bearing.
+                    // Raven's `self->client->saber[1].model` operand is an array address, always non-NULL.
+                    // Only the `model[0]` byte test controls the branch.
                     if rSaberNum > 0
                         && (*client).saber[1].model[0] != 0
                         && (*client).ps.saberHolstered == 1
@@ -10799,8 +10733,8 @@ pub fn WP_SaberPositionUpdate(
                             .muzzleDirOld =
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir;
 
-                        // Raven's `!saber[1].model` operand is an always-false array-address
-                        // test; only `!saber[1].model[0]` is load-bearing.
+                        // Raven's `!saber[1].model` operand is an always-false array-address test.
+                        // Only `!saber[1].model[0]` controls the branch.
                         if rBladeNum > 0
                             && (*client).saber[1].model[0] == 0
                             && (*client).saber[rSaberNum as usize].numBlades > 1
@@ -10832,8 +10766,7 @@ pub fn WP_SaberPositionUpdate(
                                     rBladeNum = 0;
                                     continue;
                                 }
-                                // NOTE: Raven reads `saberent` (the outer saber-num entity), not
-                                // `saberEnt`; ported faithfully.
+                                // Raven reads `saberent`, the outer saber-num entity, not `saberEnt`.
                                 if (*saberent).s.saberInFlight != qfalse {
                                     // spinning
                                     BG_EvaluateTrajectory(
@@ -10978,9 +10911,9 @@ pub fn WP_SaberPositionUpdate(
                                 let mut trMask: c_int = CONTENTS_LIGHTSABER | CONTENTS_BODY;
                                 let mut sN: c_int = 0;
                                 let mut gotHit: qboolean = qfalse;
-                                // Raven leaves clientUnlinked[MAX_CLIENTS] uninitialized and can
-                                // read an entry the trace loop never wrote — UB; zero-init makes
-                                // the unwritten entries read as qfalse, the defined behavior (§19).
+                                // Raven leaves clientUnlinked[MAX_CLIENTS] uninitialized and can read an entry the trace
+                                // loop never wrote, which is UB.
+                                // Zero-init makes the unwritten entries read as qfalse, the defined behavior here (§19).
                                 let mut clientUnlinked: [qboolean; MAX_CLIENTS as usize] =
                                     [qfalse; MAX_CLIENTS as usize];
                                 let mut skipSaberTrace: qboolean = qfalse;
@@ -11283,8 +11216,8 @@ pub fn WP_SaberPositionUpdate(
                 }
 
                 WP_SaberApplyDamage(ctx, ctx.entity_id_of(self_).unwrap());
-                // NOTE: doing one call after the 2 loops above is cheaper tempentity-wise but won't
-                // use the correct saber and blade numbers, so we apply per-blade above.
+                // One call after the 2 loops above is cheaper tempentity-wise but would not use the correct saber and
+                // blade numbers, so this applies per-blade above instead.
 
                 if !mySaber.is_null() && (*mySaber).inuse != 0 {
                     trap::LinkEntity(
@@ -11326,11 +11259,10 @@ pub fn WP_MissileBlockForBlock(saberBlock: c_int) -> c_int {
 /// Raven `WP_SaberBlockNonRandom`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:9127-9198`
-// `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
-// read), never written — so it stays by-value `vec3_t`.
+// `hitloc` is a read-only input here, a VectorSubtract source with `hitloc[2]` read and never written.
+// It stays by-value `vec3_t` for that reason.
 pub fn WP_SaberBlockNonRandom(self_: &gentity_t, hitloc: vec3_t, missileBlock: qboolean) {
     let client = self_.client;
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     unsafe {
         let mut clEye: vec3_t = (*client).ps.origin;
         clEye[2] += (*client).ps.viewheight as f32;
@@ -11388,15 +11320,14 @@ pub fn WP_SaberBlockNonRandom(self_: &gentity_t, hitloc: vec3_t, missileBlock: q
 /// Raven `WP_SaberBlock`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:9200-9274`
-// `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
-// read), never written — so it stays by-value `vec3_t`.
+// `hitloc` is a read-only input here, a VectorSubtract source with `hitloc[2]` read and never written.
+// It stays by-value `vec3_t` for that reason.
 pub fn WP_SaberBlock(
     ctx: &mut GameContext,
     playerent: EntityId,
     hitloc: vec3_t,
     missileBlock: qboolean,
 ) {
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(playerent).client;
     unsafe {
         let mut diff: vec3_t = [
@@ -11462,9 +11393,9 @@ pub fn WP_SaberBlock(
 /// Raven `WP_SaberCanBlock`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:9276-9451`
-// `point` is read-only (passed to InFront/WP_SaberBlockNonRandom, never
-// written) — stays by-value `vec3_t`. Raven's `!point` null-guard is vestigial
-// for a by-value array and is dropped.
+// `point` is read-only, passed to InFront/WP_SaberBlockNonRandom and never written.
+// It stays by-value `vec3_t` for that reason.
+// Raven's `!point` null-guard is vestigial for a by-value array, so this drops it.
 pub fn WP_SaberCanBlock(
     ctx: &mut GameContext,
     self_: Option<EntityId>,
@@ -11483,7 +11414,6 @@ pub fn WP_SaberCanBlock(
     if ctx.world.entity(self_).client.is_null() {
         return 0;
     }
-    // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(self_).client;
 
     unsafe {
@@ -11537,7 +11467,8 @@ pub fn WP_SaberCanBlock(
             return 0;
         }
 
-        // Removed for now (pre-1.03 block-decision code); see oracle 9342-9384.
+        // This drops the pre-1.03 block-decision code for now.
+        // See oracle 9342-9384.
 
         if SaberAttacking(ctx.world.entity(self_)) {
             // attacking, can't block now

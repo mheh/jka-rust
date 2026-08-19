@@ -1,8 +1,7 @@
-// PORT-COMPLETE: g_svcmds.c
-//! Faithful port for `oracle/codemp/game/g_svcmds.c`.
+//! Port of `oracle/codemp/game/g_svcmds.c`.
 //!
 //! Server-side console commands: IP filtering, entity listing, team forcing.
-//! IP filter state is owned by `GameWorld`; accessed via `ctx.world.globals`.
+//! IP filter state belongs to `GameWorld`, reached through `ctx.world.globals`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::G_Printf;
@@ -14,7 +13,6 @@ use native_string::atoi_bytes;
 use native_string::latin1_to_string;
 use native_string::Q_stricmp;
 
-// IP filter type: holds mask and compare value for IP filtering.
 // Source: oracle/codemp/game/g_svcmds.c:41-45
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -23,12 +21,10 @@ pub struct ipFilter_t {
     pub compare: c_uint,
 }
 
-// Constants from the Raven source.
 pub const MAX_IPFILTERS: usize = 1024;
 
-/// Format an `ipFilter_t::compare` word as the oracle's dotted-quad plus a
-/// trailing space, walking the 4 bytes in native order (Raven's
-/// `((byte *)&compare)[0..3]`).
+/// Formats an `ipFilter_t::compare` word as the oracle's dotted-quad string, with a trailing space.
+/// It walks the 4 bytes in native order, matching Raven's `((byte *)&compare)[0..3]`.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:119-122`
 fn format_ip(ip: c_uint) -> String {
@@ -41,9 +37,9 @@ fn format_ip(ip: c_uint) -> String {
 /// Parse an IP address string into mask and compare values for IP filtering.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:62-102`
-// `f` typed to `*mut ipFilter_t`; the port's `*mut c_void` erasure is retired. Kept a raw pointer
-// (not `&mut`) because callers pass `&mut world.globals.ipFilters[i]` that aliases the `ctx` argument
-// (STAGE-2b irreducible marker at the AddIP/G_LoadIPBans call sites).
+// `f` is `*mut ipFilter_t`, a raw pointer rather than `&mut`.
+// Callers pass `&mut world.globals.ipFilters[i]`, which aliases the `ctx` argument at the AddIP and
+// G_LoadIPBans call sites.
 pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t) -> qboolean {
     let mut num = [0u8; 128];
     let mut i: c_int = 0;
@@ -80,12 +76,11 @@ pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t)
                 .unwrap_or_default()
                 .to_bytes(),
         );
-        // Oracle assigns `atoi(num)` (int) into a byte, truncating to the low 8
-        // bits (e.g. "300" -> 44); `as u8` reproduces that wrap. g_svcmds.c:89.
-        // `num` was hand-extracted above as a digit-only substring (the loop
-        // above only copies ASCII '0'-'9'), so a whole-token integer parse
-        // here is equivalent to libc `atoi` (no sign/whitespace/garbage to
-        // diverge on) — not re-flagged to `cstr_util::atoi`.
+        // Oracle assigns `atoi(num)` (an int) into a byte, truncating to the low 8 bits, so "300" becomes 44.
+        // `as u8` reproduces that wrap. g_svcmds.c:89.
+        // `num` is hand-extracted above as a digit-only substring, because the loop above only copies ASCII '0'-'9'.
+        // A whole-token integer parse here matches libc `atoi`, because there is no sign, whitespace, or garbage to diverge on.
+        // This call site is deliberately not re-flagged to `cstr_util::atoi`.
         b[i_val] = num_str.parse::<i32>().unwrap_or(0) as u8;
 
         if b[i_val] != 0 {
@@ -101,8 +96,8 @@ pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t)
     }
 
     let f_filter = f;
-    // Oracle `*(unsigned *)m` / `*(unsigned *)b`: reinterpret the 4 filled bytes as a native-endian
-    // u32. `from_ne_bytes` reproduces that exact read (g_svcmds.c:100-101).
+    // Oracle `*(unsigned *)m` / `*(unsigned *)b` reinterprets the 4 filled bytes as a native-endian u32.
+    // `from_ne_bytes` reproduces that read. g_svcmds.c:100-101.
     unsafe {
         (*f_filter).mask = u32::from_ne_bytes(m);
         (*f_filter).compare = u32::from_ne_bytes(b);
@@ -164,7 +159,7 @@ pub fn G_FilterPacket(ctx: &mut GameContext, from: *mut c_char) -> qboolean {
         }
     }
 
-    // Oracle `*(unsigned *)m`: reinterpret the 4 bytes as a native-endian u32 (g_svcmds.c:161).
+    // Oracle `*(unsigned *)m` reinterprets the 4 bytes as a native-endian u32. g_svcmds.c:161.
     in_ = u32::from_ne_bytes(m);
 
     for i in 0..(ctx.world.globals.numIPFilters as usize) {
@@ -190,12 +185,12 @@ pub fn G_FilterPacket(ctx: &mut GameContext, from: *mut c_char) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:173-194`
 pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
-    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
-    // `StringToFilter`/`G_Printf`/`UpdateIPBans` calls below — mirrors the
-    // Stage-1 `ctx.world_raw()` idiom (see `g_object.rs`).
+    // This is a raw pointer, not a tracked borrow, so `ctx` stays free for the `StringToFilter`,
+    // `G_Printf`, and `UpdateIPBans` calls below.
+    // See the `ctx.world_raw()` idiom in `g_object.rs`.
 
-    // Oracle's index runs to `numIPFilters` when no free slot is found, so the
-    // `i == numIPFilters` test below appends a new slot (g_svcmds.c:177-179).
+    // Oracle's index runs to `numIPFilters` when no free slot is found.
+    // The `i == numIPFilters` test below appends a new slot. g_svcmds.c:177-179.
     let mut i: c_int = 0;
     unsafe {
         while i < ctx.world.globals.numIPFilters {
@@ -213,9 +208,9 @@ pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
             ctx.world.globals.numIPFilters += 1;
         }
 
-        // STAGE-2b: irreducible — `&mut world.globals.ipFilters[i]` is an out-param
-        // that aliases the `ctx` passed to the same StringToFilter call; a raw world
-        // pointer hoisted before the call keeps it disjoint from ctx's borrow.
+        // `&mut world.globals.ipFilters[i]` is an out-param that aliases the `ctx` passed to the same
+        // StringToFilter call.
+        // A raw world pointer hoisted before the call keeps it disjoint from ctx's borrow.
         let world_ptr = ctx.world_raw();
         if StringToFilter(
             ctx,
@@ -238,9 +233,10 @@ pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
 pub fn G_ProcessIPBans(ctx: &mut GameContext) {
     let ban_ips_str = unsafe { cstr_to_str(ctx.world.cvars.g_banIPs.string.as_ptr()) };
 
-    // Raven scans the string with `strchr(s, ' ')`: only ' ' separates tokens
-    // (tab/newline do not), and the loop breaks at the first token with no
-    // trailing space, so a final non-space-terminated token is never added.
+    // Raven scans the string with `strchr(s, ' ')`, so only a space character separates tokens, not tab or
+    // newline.
+    // The loop breaks at the first token with no trailing space, so it never adds a final token that lacks
+    // a trailing space.
     let bytes = ban_ips_str.as_bytes();
     let mut t = 0usize;
     while t < bytes.len() {
@@ -327,9 +323,8 @@ pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:276-297`
 pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
-    // Raw pointer (not a tracked borrow) so `ctx` stays free for the `G_Printf`
-    // calls inside the loop below — mirrors the Stage-1 `ctx.world_raw()`
-    // idiom (see `g_object.rs`).
+    // This is a raw pointer, not a tracked borrow, so `ctx` stays free for the `G_Printf` calls inside the loop below.
+    // See the `ctx.world_raw()` idiom in `g_object.rs`.
 
     unsafe {
         G_Printf(
@@ -386,9 +381,8 @@ pub fn G_SaveBanIP(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:333-379`
 pub fn G_LoadIPBans(ctx: &mut GameContext) {
-    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
-    // `StringToFilter`/`G_Printf` calls below — mirrors the Stage-1
-    // `ctx.world_raw()` idiom (see `g_object.rs`).
+    // This is a raw pointer, not a tracked borrow, so `ctx` stays free for the `StringToFilter`/`G_Printf` calls below.
+    // See the `ctx.world_raw()` idiom in `g_object.rs`.
     let mut fh: i32 = 0;
     let mut ban_ip_buffer = vec![0u8; 32 * 1024]; // MAX_IPFILTERS * 32
 
@@ -405,18 +399,17 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     }
     trap::FS_FCloseFile(ctx.engine, fh);
 
-    // §19 DIVERGENCE: oracle passes the uninitialized `char banIPFile[MAX_QPATH]`
-    // to COM_BeginParseSession (UB); the name is only used in parse-error text, so
-    // we substitute "banip.txt". Source: `oracle/codemp/game/g_svcmds.c:339,352`.
+    // §19 DIVERGENCE: oracle passes the uninitialized `char banIPFile[MAX_QPATH]` to COM_BeginParseSession.
+    // That is undefined behavior in the oracle, and the name is only used in parse-error text.
+    // This code substitutes "banip.txt" instead. Source: `oracle/codemp/game/g_svcmds.c:339,352`.
     COM_BeginParseSession(&mut ctx.world.bg_state.qs, "banip.txt");
 
     let mut p: Option<&[u8]> = Some(&ban_ip_buffer[..]);
     let (token, rest) = COM_ParseExt(&mut ctx.world.bg_state.qs, p, true);
     p = rest;
 
-    // Raven's `if (token)` tests the (always non-NULL) `com_token` pointer — it is
-    // always true, and the loop's `else break` is correspondingly dead. Preserved
-    // by always entering.
+    // Raven's `if (token)` tests the `com_token` pointer, which is always non-NULL, so the test is always true.
+    // The loop's `else break` is dead code. This code always enters the loop body.
     ctx.world.globals.numIPFilters = atoi_bytes(token.as_bytes());
 
     for i in 0..(ctx.world.globals.numIPFilters as usize) {
@@ -425,10 +418,9 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
         if token.to_lowercase() == "unused" {
             (&mut ctx.world.globals.ipFilters)[i].compare = 0xffffffffu32;
         } else {
-            // STAGE-2b: irreducible — `&mut world.globals.ipFilters[i]` is an
-            // out-param that aliases the `ctx` passed to the same StringToFilter
-            // call; a raw world pointer hoisted before the call keeps it disjoint
-            // from ctx's borrow.
+            // `&mut world.globals.ipFilters[i]` is an out-param that aliases the `ctx` passed to the same
+            // StringToFilter call.
+            // A raw world pointer hoisted before the call keeps it disjoint from ctx's borrow.
             let world_ptr = ctx.world_raw();
             StringToFilter(ctx, cstr(&token).as_ptr() as *mut c_char, unsafe {
                 &mut (&mut (*world_ptr).globals.ipFilters)[i] as *mut ipFilter_t
@@ -458,8 +450,8 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             1 => "ET_PLAYER           ",
             2 => "ET_ITEM             ",
             3 => "ET_MISSILE          ",
-            // eType 4 (ET_SPECIAL) and 5 (ET_HOLOCRON) have no C case and fall
-            // through to the default numeric label.
+            // eType 4 (ET_SPECIAL) and 5 (ET_HOLOCRON) have no C case, so they fall through to the default
+            // numeric label.
             6 => "ET_MOVER            ",
             7 => "ET_BEAM             ",
             8 => "ET_PORTAL           ",
@@ -495,7 +487,7 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
 pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_t {
     // Check if it's a numeric slot
     if unsafe { *s >= b'0' as c_char && *s <= b'9' as c_char } {
-        // Plain `atoi(s)`; oracle has no -1 fallback here (g_svcmds.c:452).
+        // Plain `atoi(s)`. Oracle has no -1 fallback here. g_svcmds.c:452.
         let idnum: c_int = atoi(s);
 
         if idnum < 0 || idnum >= ctx.world.level.maxclients {
@@ -548,8 +540,8 @@ pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
     // Get the team string
     let team = trap::Argv(ctx.engine, 2, 128);
 
-    // Calculate the entity index from the client pointer (`cl - level.clients`);
-    // the client slot is its entity number, so it doubles as the `EntityId`.
+    // This calculates the entity index from the client pointer, `cl - level.clients`.
+    // The client slot is its entity number, so it doubles as the `EntityId`.
     let cl_idx =
         { (cl as usize - ctx.world.level.clients as usize) / std::mem::size_of::<gclient_t>() };
 

@@ -1,15 +1,10 @@
-// PORT-COMPLETE: ai_util.c
-//! FAITHFUL port of `oracle/codemp/game/ai_util.c`.
+//! Port of `oracle/codemp/game/ai_util.c`.
 //!
-//! Filled by the jampgame mega-pass. `BOT_ZMALLOC`/`BOTMEMTRACK`/`DEBUG` are not defined
-//! in this build (grep-confirmed no callers define them), so the
-//! `#ifdef BOT_ZMALLOC` branches are dead and their bodies are omitted
-//! faithfully (porting-rules §C10 — behavior, not shape).
+//! `BOT_ZMALLOC`, `BOTMEMTRACK`, and `DEBUG` are not defined in this build (grep-confirmed no callers define them).
+//! The `#ifdef BOT_ZMALLOC` branches are dead, so their bodies are omitted (porting rule §C10, behavior not shape).
 //!
-//! All 12 functions in the file are ported here. `BotDoChat`/`ReadChatGroups`/
-//! `BotUtilizePersonality` reach `gBotChatBuffer` and `trap::*` engine calls
-//! through the `GameContext` passed in; `B_InitAlloc` reaches `gWPArray` the
-//! same way.
+//! `BotDoChat`, `ReadChatGroups`, and `BotUtilizePersonality` reach `gBotChatBuffer` and `trap::*` engine calls through the `GameContext` passed in.
+//! `B_InitAlloc` reaches `gWPArray` the same way.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::CStr;
@@ -39,8 +34,7 @@ pub fn B_TempFree(ctx: &mut GameContext, size: c_int) {
 
 /// Raven `B_Alloc`.
 ///
-/// Raven: `BOT_ZMALLOC` is not defined in this build, so only the plain
-/// `return BG_Alloc(size);` branch (`ai_util.c:77`) is live.
+/// Raven: `BOT_ZMALLOC` is not defined in this build, so only the plain `return BG_Alloc(size);` branch (`ai_util.c:77`) is live.
 /// Source: `oracle/codemp/game/ai_util.c:25-80`
 pub fn B_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
     mp_bg::bg_misc::BG_Alloc(size, &mut ctx.world.bg_state)
@@ -48,40 +42,38 @@ pub fn B_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
 
 /// Raven `B_Free`.
 ///
-/// Raven: the entire body is guarded by `#ifdef BOT_ZMALLOC`
-/// (`ai_util.c:84-129`), which is not defined in this build, so this is a
-/// faithful no-op.
+/// Raven: the entire body is guarded by `#ifdef BOT_ZMALLOC` (`ai_util.c:84-129`).
+/// That flag is not defined in this build, so this function is a no-op.
 /// Source: `oracle/codemp/game/ai_util.c:82-131`
 pub fn B_Free(ptr: *mut c_void) {}
 
 /// Raven `B_InitAlloc`.
 ///
-/// Zeros out the waypoint arena and allocator tracking lists. The `BOT_ZMALLOC`
-/// branch is dead in this build (see module doc).
+/// Zeros out the waypoint arena and allocator tracking lists.
+/// The `BOT_ZMALLOC` branch is dead in this build (see module doc).
 ///
 /// Source: `oracle/codemp/game/ai_util.c:133-140`
 pub fn B_InitAlloc(ctx: &mut GameContext) {
-    // SAFETY: world is valid; globals.gWPArray is an owned field.
+    // SAFETY: world is valid.
+    // globals.gWPArray is an owned field.
     ctx.world.globals.gWPArray = crate::game_globals::WpArray::default();
 }
 
 /// Raven `B_CleanupAlloc`.
 ///
-/// Raven: the entire body is guarded by `#ifdef BOT_ZMALLOC`
-/// (`ai_util.c:144-157`), which is not defined in this build, so this is a
-/// faithful no-op.
+/// Raven: the entire body is guarded by `#ifdef BOT_ZMALLOC` (`ai_util.c:144-157`).
+/// That flag is not defined in this build, so this function is a no-op.
 /// Source: `oracle/codemp/game/ai_util.c:142-158`
 pub fn B_CleanupAlloc() {}
 
 /// Raven `GetValueGroup`.
 ///
-/// Finds the named `group { ... }` block in `buf` (the group name must be
-/// preceded by a newline and immediately followed by `{`), and copies its
-/// (nesting-aware) contents into `outbuf`. Returns `0` if not found.
+/// Finds the named `group { ... }` block in `buf`.
+/// The group name must be preceded by a newline and immediately followed by `{`.
+/// It copies the block's nesting-aware contents into `outbuf`, and returns `0` if the block is not found.
 ///
-/// Raven: ported as raw-pointer byte scanning to match the C pointer
-/// arithmetic exactly (`place - buf` offset math, no bounds other than the
-/// ones Raven itself relies on — same UB envelope, porting-rules §19).
+/// Raven: ported as raw-pointer byte scanning to match the C pointer arithmetic exactly (`place - buf` offset math).
+/// It keeps no bounds other than the ones Raven itself relies on, the same UB envelope.
 /// Source: `oracle/codemp/game/ai_util.c:160-234`
 pub fn GetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut c_char) -> c_int {
     unsafe {
@@ -152,16 +144,14 @@ pub fn GetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut c_char) 
 
 /// Raven `GetPairedValue`.
 ///
-/// Finds `key` in `buf` (word-boundary matched by whitespace/tab/newline/
-/// NUL), skips leading whitespace, and copies the rest of that line into
-/// `outbuf`. Also mutates `buf` in place, replacing `//`-comment lines with
-/// `/` characters up to the newline (Raven's own quirky comment-stripping
-/// pass, preserved verbatim).
+/// Finds `key` in `buf`, word-boundary matched by whitespace, tab, newline, or NUL.
+/// It skips leading whitespace, then copies the rest of that line into `outbuf`.
+/// It also mutates `buf` in place, replacing `//`-comment lines with `/` characters up to the newline.
+/// This is Raven's own quirky comment-stripping pass.
 ///
-/// Raven: `startletter` can go to `-1` when `key` matches at the very start
-/// of `buf`; the guard checks `== 0`, not `== -1`, so the backward
-/// `buf[startletter]` read is inherited UB, faithfully preserved (same UB
-/// envelope as `GetValueGroup` above, porting-rules §19).
+/// Raven: `startletter` can go to `-1` when `key` matches at the very start of `buf`.
+/// The guard checks `== 0`, not `== -1`, so the backward `buf[startletter]` read is inherited UB.
+/// This is the same UB envelope as `GetValueGroup` above.
 /// Source: `oracle/codemp/game/ai_util.c:236-326`
 pub fn GetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c_char) -> c_int {
     if buf.is_null() || key.is_null() || outbuf.is_null() {
@@ -254,11 +244,9 @@ pub fn GetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c_char) -
 
 /// Raven `BotDoChat`.
 ///
-/// Selects a random chat line from the named section of the bot's personality
-/// file (loaded into `gBotChatBuffer`), substitutes entity names for `%s` and
-/// `%a` markers, and schedules it for delivery (`bs->doChat`, `bs->chatTime`).
-/// Returns 1 on success, 0 if chat is disabled, unavailable, or frequency-rolled
-/// out.
+/// Selects a random chat line from the named section of the bot's personality file, loaded into `gBotChatBuffer`.
+/// It substitutes entity names for `%s` and `%a` markers, then schedules it for delivery (`bs->doChat`, `bs->chatTime`).
+/// It returns 1 on success, and 0 if chat is disabled, unavailable, or frequency-rolled out.
 ///
 /// Source: `oracle/codemp/game/ai_util.c:328-515`
 pub fn BotDoChat(
@@ -302,11 +290,9 @@ pub fn BotDoChat(
             B_TempAlloc(ctx, crate::game_globals::MAX_CHAT_BUFFER_SIZE as c_int) as *mut c_char;
 
         // Get the chat group from the personality buffer
-        // Raven indexes `gBotChatBuffer[bs->client]` unconditionally; `client`
-        // is always a valid slot in practice, but Rust array indexing would
-        // panic rather than read OOB, so this guard is a defensive divergence
-        // (never taken) applied consistently at every `gBotChatBuffer[client]`
-        // site in this file.
+        // Raven indexes `gBotChatBuffer[bs->client]` unconditionally, and `client` is always a valid slot in practice.
+        // Rust array indexing would panic rather than read OOB, so this guard is a defensive divergence (never taken).
+        // The same guard applies consistently at every `gBotChatBuffer[client]` site in this file.
         let gBotChatBuffer_base = &ctx.world.globals.gBotChatBuffer.0;
         let client_idx = bs_ref.client as usize;
 
@@ -415,8 +401,8 @@ pub fn BotDoChat(
             {
                 inc_1 += 1;
 
-                // Raven: `%s`/`%a` select chatObject/chatAltObject; a null
-                // handle mirrors Raven's null `cobject`, skipping the block.
+                // Raven: `%s`/`%a` select chatObject/chatAltObject.
+                // A null handle mirrors Raven's null `cobject`, skipping the block.
                 let cobject_id: Option<EntityId> = if *chatgroup_b.offset(inc_1) == b's' as u8 {
                     bs_ref.chatObject
                 } else if *chatgroup_b.offset(inc_1) == b'a' as u8 {
@@ -425,15 +411,14 @@ pub fn BotDoChat(
                     None
                 };
 
-                // Raven derefs `cobject->client->pers.netname`. chatObject can be
-                // an NPC (lastHurt = any attacker), whose client is pool-allocated,
-                // NOT level.clients[entnum] — so the netname read must go through
-                // the entity's client pointer (gclient deref regime, task #7).
+                // Raven derefs `cobject->client->pers.netname`.
+                // chatObject can be an NPC (lastHurt = any attacker), whose client is pool-allocated, not `level.clients[entnum]`.
+                // The netname read goes through the entity's own client pointer (gclient deref regime, DEC-29).
                 if let Some(id) = cobject_id {
                     let client = ctx.world.entity(id).client;
                     if !client.is_null() {
-                        // `netname` is a `String`; copy its bytes (no trailing
-                        // NUL — a C `netname[]` had none in its content either).
+                        // `netname` is a `String`, so the code copies its bytes.
+                        // There is no trailing NUL, and a C `netname[]` had none in its content either.
                         let nbytes = unsafe { (*client).pers.netname.as_bytes() };
                         let mut inc_n = 0usize;
 
@@ -459,12 +444,10 @@ pub fn BotDoChat(
         } else {
             bs_ref.doChat = 1;
         }
-        // Oracle uses `strlen(bs->currentChat)` — the post-%-substitution length.
-        // C types: `strlen` is size_t, so the (possibly-negative on LP64)
-        // `Q_irand` roll promotes to unsigned — a negative roll wraps to a
-        // huge value and the float conversion lands on 2^64 (chat scheduled
-        // never). Keep the size_t-width arithmetic; i32 math here made the
-        // bot chat immediately instead (lockstep frame-364 find, 2026-07-14).
+        // Oracle uses `strlen(bs->currentChat)`, the post-%-substitution length.
+        // `strlen` is a C `size_t`, so a possibly-negative (on LP64) `Q_irand` roll promotes to unsigned.
+        // A negative roll wraps to a huge value, and the float conversion lands on 2^64, so chat never gets scheduled.
+        // The code keeps the size_t-width arithmetic; i32 math here made the bot chat immediately instead (lockstep frame-364 find, 2026-07-14).
         bs_ref.chatTime_stored = (c_strlen(currentChat_b as *const u8))
             .wrapping_mul(45)
             .wrapping_add(ctx.world.bg_state.rng.Q_irand(1300, 1500) as isize as usize)
@@ -477,7 +460,7 @@ pub fn BotDoChat(
     }
 }
 
-/// Faithful `strcmp` over raw NUL-terminated C strings.
+/// `strcmp` over raw NUL-terminated C strings.
 unsafe fn c_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
     unsafe {
         let mut i = 0isize;
@@ -497,12 +480,10 @@ unsafe fn c_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
 
 /// Raven `ParseEmotionalAttachments`.
 ///
-/// Parses `{ name level }` pairs out of `buf` into `bs->loved[]` until
-/// `MAX_LOVED_ONES` is reached or the closing `}` is hit.
+/// Parses `{ name level }` pairs out of `buf` into `bs->loved[]` until `MAX_LOVED_ONES` is reached or the closing `}` is hit.
 ///
-/// Raven: `tbuf[16]` is a fixed 16-byte scratch buffer with no bounds check
-/// on the digit run copied into it (matches the oracle's own UB envelope,
-/// porting-rules §19 — same as the unchecked `name`/`tbuf` writes below).
+/// Raven: `tbuf[16]` is a fixed 16-byte scratch buffer with no bounds check on the digit run copied into it.
+/// This matches the oracle's own UB envelope, the same as the unchecked `name`/`tbuf` writes below.
 /// Source: `oracle/codemp/game/ai_util.c:517-572`
 pub fn ParseEmotionalAttachments(bs: *mut bot_state_t, buf: *mut c_char) {
     unsafe {
@@ -573,10 +554,9 @@ pub fn ParseEmotionalAttachments(bs: *mut bot_state_t, buf: *mut c_char) {
 
 /// Raven `ReadChatGroups`.
 ///
-/// Finds the `BEGIN_CHAT_GROUPS` marker in `buf` and copies everything after
-/// the next newline into `gBotChatBuffer[bs->client]` for later retrieval by
-/// `BotDoChat`. Returns 1 on success, 0 if the marker is not found or the
-/// section exceeds the buffer size.
+/// Finds the `BEGIN_CHAT_GROUPS` marker in `buf`.
+/// It copies everything after the next newline into `gBotChatBuffer[bs->client]` for later retrieval by `BotDoChat`.
+/// It returns 1 on success, and 0 if the marker is not found or the section exceeds the buffer size.
 ///
 /// Source: `oracle/codemp/game/ai_util.c:574-612`
 pub fn ReadChatGroups(ctx: &mut GameContext, bs: *mut bot_state_t, buf: *mut c_char) -> c_int {
@@ -637,10 +617,9 @@ pub fn ReadChatGroups(ctx: &mut GameContext, bs: *mut bot_state_t, buf: *mut c_c
 
 /// Raven `BotUtilizePersonality`.
 ///
-/// Loads a personality file (referenced in `bs->settings.personalityfile`),
-/// parses skill settings, weapon weights, emotional attachments, and chat
-/// groups, then populates the bot state accordingly. Falls back to defaults
-/// if the file is missing or malformed.
+/// Loads a personality file, referenced in `bs->settings.personalityfile`.
+/// It parses skill settings, weapon weights, emotional attachments, and chat groups, then populates the bot state accordingly.
+/// It falls back to defaults if the file is missing or malformed.
 ///
 /// Source: `oracle/codemp/game/ai_util.c:614-867`
 pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -657,7 +636,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
         // Open the personality file
         let mut f: fileHandle_t = 0;
-        // `personalityfile` is an owned `String` now — pass it straight through.
+        // `personalityfile` is an owned `String`, so the code passes it straight through.
         let path = bs_ref.settings.personalityfile.as_str();
         let len = trap::FS_FOpenFile(ctx.engine, path, &mut f, FS_READ);
 
@@ -834,9 +813,9 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
             bs_ref.forceinfo[copy_len] = 0;
         }
 
-        // Clear the chat buffer for this bot. Raven indexes unconditionally;
-        // guarded here for consistency with the other `gBotChatBuffer[client]`
-        // sites in this file (see BotDoChat above) — never taken in practice.
+        // Clear the chat buffer for this bot.
+        // Raven indexes unconditionally, and the guard here matches the other `gBotChatBuffer[client]` sites in this file (see BotDoChat above).
+        // The guard is never taken in practice.
         let client_idx = bs_ref.client as usize;
         if client_idx < mp_qshared::shared::MAX_CLIENTS {
             let mut i = 0usize;
@@ -947,7 +926,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
 // ---- local raw-C-string helpers (no libc dependency in this crate) ----
 
-/// Faithful `strlen` over a raw NUL-terminated byte pointer.
+/// `strlen` over a raw NUL-terminated byte pointer.
 unsafe fn c_strlen(s: *const u8) -> usize {
     let mut n = 0usize;
     unsafe {
@@ -958,7 +937,7 @@ unsafe fn c_strlen(s: *const u8) -> usize {
     n
 }
 
-/// Faithful `strstr` over raw NUL-terminated byte pointers.
+/// `strstr` over raw NUL-terminated byte pointers.
 unsafe fn c_strstr(haystack: *const u8, needle: *const u8) -> Option<*const u8> {
     unsafe {
         let needle_len = c_strlen(needle);

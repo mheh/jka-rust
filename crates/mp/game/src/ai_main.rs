@@ -1,24 +1,19 @@
-// PORT-COMPLETE: ai_main.c
-//! FAITHFUL port of `oracle/codemp/game/ai_main.c`.
+//! Port of `oracle/codemp/game/ai_main.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; `bot_state_t*` /
-//! `gclient_t*` non-entity params stay raw. Bodies re-derive the raw pointers
-//! verbatim at the top (`// STAGE-1:` markers) — Stage-2 debt. Returns of
-//! `*mut gentity_t` stay raw. Callers bridge via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! `bot_state_t*` / `gclient_t*` non-entity params stay raw.
+//! Some bodies re-derive the raw pointers verbatim at the top, inside `unsafe` blocks that hold genuine raw ops.
+//! This raw-pointer pattern remains, not yet replaced by typed entity views.
+//! Returns of `*mut gentity_t` stay raw.
+//! Callers bridge via `ctx.entity_id_of(ptr)`.
 //!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
-//! raw-deref regime (and its hoisted `let world = ctx.world_raw()` aliases) is
-//! gone. The per-body entity/`bot_state_t`/`gclient_t` re-derives stay raw by
-//! design, so the `// STAGE-1:` markers and their `unsafe` blocks legitimately
-//! hold genuine raw ops; `BotOrder`'s botstates table keeps one irreducible
-//! `&raw const` field pointer (live reads across `ctx`-mutating calls, marked
-//! in-code). Behavior is byte-identical, referee-verified.
+//! Every world reach is a checked `ctx.world.…` borrow.
+//! The per-body entity/`bot_state_t`/`gclient_t` re-derives stay raw by design.
+//! `BotOrder`'s botstates table keeps one irreducible `&raw const` field pointer for live reads across
+//! `ctx`-mutating calls, marked in code.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -31,19 +26,18 @@ use crate::game_globals::{zeroed_bot_state, BotStates};
 use crate::w_force::ForcePowerUsableOn;
 use mp_bg::bg_misc::BG_GetItemIndexByTag;
 use mp_bg::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
-// Weapon-id constants (Raven `weapon_t` values) used by the ported
-// pure-logic functions below; prelude re-exports only the type.
+// Weapon-id constants (Raven `weapon_t` values) used by the ported pure-logic functions below.
+// The prelude re-exports only the type.
 use mp_bg::weapons::weapon_t::{
     WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL, WP_DEMP2, WP_DET_PACK, WP_DISRUPTOR, WP_MELEE,
     WP_REPEATER, WP_ROCKET_LAUNCHER, WP_STUN_BATON, WP_THERMAL, WP_TRIP_MINE,
 };
 
-// ACTION_* bot-command flags (`botlib.h:66-82`) — `bot_input_t::actionflags`
-// bitmask — live in `mp_qshared::common::mp::botlib::action`, imported via
-// `crate::prelude::*`.
+// ACTION_* bot-command flags (`botlib.h:66-82`), the `bot_input_t::actionflags` bitmask, live in
+// `mp_qshared::common::mp::botlib::action`, imported via `crate::prelude::*`.
 
-// Pass-2 body imports: the outbound trap seam, the ai_main.h const families,
-// and the syscall `Args` builders each ported body constructs.
+// These imports cover the outbound trap seam, the ai_main.h const families, and the syscall
+// `Args` builders each ported body constructs.
 use crate::botai::bot_ctf_state_t::bot_ctf_state_t;
 use crate::botai::bot_teamplay_state_t::bot_teamplay_state_t;
 use crate::botai::bweaponrange::{
@@ -65,14 +59,13 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_color::Q_IsColorString;
 
-// Pass-3 shard-2 body imports (StandardBotAI + the bot-AI frame entrypoints).
+// These imports cover StandardBotAI and the bot-AI frame entrypoints.
 use crate::ai_wpnav::{
     WPFLAG_BLUE_FLAG, WPFLAG_DUCK, WPFLAG_JUMP, WPFLAG_NOMOVEFUNC, WPFLAG_NOVIS,
     WPFLAG_ONEWAY_BACK, WPFLAG_ONEWAY_FWD, WPFLAG_RED_FLAG, WPFLAG_SNIPEORCAMP,
     WPFLAG_SNIPEORCAMPSTAND, WPFLAG_WAITFORFUNC,
 };
 
-// Pass-3 shard-1 body imports.
 use crate::ai_main_consts::{
     BASE_FLAGWAIT_DISTANCE, BOT_FLAG_GET_DISTANCE, BOT_MAX_WEAPON_CHASE_CTF,
     BOT_MAX_WEAPON_CHASE_TIME, BOT_MAX_WEAPON_GATHER_TIME, BOT_MIN_SIEGE_GOAL_SHOOT,
@@ -115,8 +108,9 @@ use mp_bg::public::entity_event::entity_event_t::{
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 
-// Raven `qboolean` is `c_int`; keep the source `qtrue`/`qfalse` spelling at
-// return sites (house style, mirrors `g_items.rs`).
+// Raven `qboolean` is `c_int`.
+// This file keeps the source `qtrue`/`qfalse` spelling at return sites (house style, mirrors
+// `g_items.rs`).
 
 // Unported types referenced in this file (need porting before this compiles):
 // bot_settings_s
@@ -129,9 +123,9 @@ use mp_qshared::shared::cvar::vmCvar_t;
 /// Source: `oracle/codemp/game/ai_main.c:128-155`
 pub fn BotStraightTPOrderCheck(ent: Option<EntityId>, ordernum: c_int, bs: *mut bot_state_t) {
     unsafe {
-        // STAGE-1: `ent` is an `Option<EntityId>` handle; the arena-base pointer
-        // param and its `ent_id_opt(base, ent)` calls collapse to `ent`. `bs`
-        // (bot_state_t, not an entity) stays raw.
+        // `ent` is an `Option<EntityId>` handle.
+        // The arena-base pointer param and its `ent_id_opt(base, ent)` calls collapse to `ent`.
+        // `bs` (bot_state_t, not an entity) stays raw.
         match ordernum {
             0 => {
                 if (*bs).squadLeader == ent {
@@ -163,7 +157,8 @@ pub fn BotStraightTPOrderCheck(ent: Option<EntityId>, ordernum: c_int, bs: *mut 
 /// Source: `oracle/codemp/game/ai_main.c:157-165`
 pub fn BotSelectWeapon(ctx: &mut GameContext, client: c_int, weapon: c_int) {
     if weapon <= WP_NONE {
-        // Raven `assert(0)` here is commented out; just bail.
+        // Raven `assert(0)` here is commented out.
+        // This port just bails.
         return;
     }
     trap::EA_SelectWeapon(ctx.engine, BotlibEaSelectWeaponArgs::new(client, weapon));
@@ -193,15 +188,16 @@ pub fn BotReportStatus(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:184-276`
 pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, ordernum: c_int) {
     unsafe {
-        // `ent` reads through the checked entity borrow; `ent_cl` is its raw
-        // `gclient_t*`, dereffed raw. `bi` (bot_state_t) stays raw.
+        // `ent` reads through the checked entity borrow.
+        // `ent_cl` is its raw `gclient_t*`, dereffed raw. `bi` (bot_state_t) stays raw.
         let Some(ent_h) = ent else {
             return;
         };
         let base = ctx.world.g_entities.as_mut_ptr();
-        // STAGE-2b: irreducible — the botstates table is read across `ctx`-mutating
-        // calls (OnSameTeam/BotReportStatus/BotDoChat), so it stays a raw pointer to
-        // the field (live reads, no held borrow) rather than a checked `&` borrow.
+        // The botstates table read is irreducible.
+        // The code reads it across `ctx`-mutating calls (OnSameTeam/BotReportStatus/BotDoChat), so
+        // it stays a raw pointer to the field (live reads, no held borrow) rather than a checked
+        // `&` borrow.
         let botstates = &raw const ctx.world.globals.botstates;
 
         let mut stateMin: c_int = 0;
@@ -296,8 +292,8 @@ pub fn BotMindTricked(ctx: &mut GameContext, botClient: c_int, enemyClient: c_in
         if en.client.is_null() {
             return 0;
         }
-        // Raven's `if (!fd)` guards `&ps.fd`, a member address that is never
-        // null — a structurally dead check, dropped here.
+        // Raven's `if (!fd)` guards `&ps.fd`, a member address that is never null.
+        // This port drops the structurally dead check.
         let fd = &(*(en.client)).ps.fd;
         if botClient > 47 {
             if fd.forceMindtrickTargetIndex4 & (1 << (botClient - 48)) != 0 {
@@ -324,10 +320,10 @@ pub fn BotMindTricked(ctx: &mut GameContext, botClient: c_int, enemyClient: c_in
 pub fn BotAI_Print(
     r#type: c_int,
     fmt: *mut c_char,
-    // variadic `...` — C varargs, seam decision pending
 ) {
-    // Raven: `void QDECL BotAI_Print(int type, char *fmt, ...) { return; }` — a
-    // no-op stub in MP; the variadic tail is unused.
+    // Raven: `void QDECL BotAI_Print(int type, char *fmt, ...) { return; }`.
+    // This is a no-op stub in MP.
+    // The variadic tail is unused.
 }
 
 /// Raven `IsTeamplay`.
@@ -378,8 +374,6 @@ pub fn BotAI_GetEntityState(
         if ent.r.linked == qfalse {
             return qfalse;
         }
-        // SVF_NOCLIENT: only a file-local const exists (g_items.rs); referenced
-        // as cited and reported as a missing symbol pending a shared home.
         if ent.r.svFlags & SVF_NOCLIENT != 0 {
             return qfalse;
         }
@@ -450,12 +444,8 @@ pub fn BotChangeViewAngle(angle: f32, ideal_angle: f32, speed: f32) -> f32 {
 
 /// Raven `BotChangeViewAngles`.
 ///
-/// `PITCH`/`YAW` indices are 0/1 (Raven `q_shared.h`); no ported const module
-/// exports them, so the literal indices are used with a note.
-///
 /// Source: `oracle/codemp/game/ai_main.c:470-530`
 pub fn BotChangeViewAngles(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32) {
-    // `PITCH` (angle index) comes from the prelude (`crate::q_math::PITCH`).
     unsafe {
         let bs = &mut *bs;
         if bs.ideal_viewangles[PITCH] > 180.0 {
@@ -535,16 +525,16 @@ pub fn BotInputToUserCommand(
         let bi = &mut *bi;
         let ucmd = &mut *ucmd;
 
-        // clear the whole structure
+        //clear the whole structure
         core::ptr::write_bytes(ucmd as *mut usercmd_t, 0, 1);
-        // the duration for the user command in milli seconds
+        //the duration for the user command in milli seconds
         ucmd.serverTime = time;
 
         if bi.actionflags & ACTION_DELAYEDJUMP != 0 {
             bi.actionflags |= ACTION_JUMP;
             bi.actionflags &= !ACTION_DELAYEDJUMP;
         }
-        // set the buttons
+        //set the buttons
         if bi.actionflags & ACTION_RESPAWN != 0 {
             ucmd.buttons = BUTTON_ATTACK;
         }
@@ -568,7 +558,7 @@ pub fn BotInputToUserCommand(
         }
 
         if useTime < ctx.world.level.time && ctx.world.bg_state.rng.Q_irand(1, 10) < 5 {
-            // for now just hit use randomly in case there's something useable around
+            //for now just hit use randomly in case there's something useable around
             ucmd.buttons |= BUTTON_USE;
         }
 
@@ -577,17 +567,18 @@ pub fn BotInputToUserCommand(
         }
 
         ucmd.weapon = bi.weapon as u8;
-        // set the view angles (WITHOUT the delta angles)
+        //set the view angles
+        // NOTE: the ucmd->angles are the angles WITHOUT the delta angles
         ucmd.angles[PITCH] = ANGLE2SHORT(bi.viewangles[PITCH]);
         ucmd.angles[YAW] = ANGLE2SHORT(bi.viewangles[YAW]);
         ucmd.angles[ROLL] = ANGLE2SHORT(bi.viewangles[ROLL]);
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             let temp: c_short = (ucmd.angles[j] - *delta_angles.add(j)) as c_short;
             ucmd.angles[j] = temp as c_int;
         }
 
-        // movement is relative to the REAL view angles
+        // NOTE: movement is relative to the REAL view angles
         let mut angles: vec3_t = [0.0; 3];
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -675,7 +666,7 @@ pub fn BotUpdateInput(
             time,
             (*bs).noUseTime,
         );
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
@@ -686,9 +677,8 @@ pub fn BotUpdateInput(
 
 /// Raven `FloatTime()` (`#define FloatTime() floattime`).
 ///
-/// `floattime` (`ai_main.c:50`) is zero-initialized and never assigned
-/// anywhere in the MP oracle — a Q3 leftover the JKA bot brain stopped
-/// updating — so every read is constantly `0.0`.
+/// `floattime` (`ai_main.c:50`) is zero-initialized and never assigned anywhere in the MP oracle.
+/// It is a Q3 leftover the JKA bot brain stopped updating, so every read is constantly `0.0`.
 /// Source: `oracle/codemp/game/ai_main.h:410-411`
 pub fn FloatTime() -> f32 {
     0.0
@@ -708,9 +698,9 @@ pub fn BotAIRegularUpdate(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:674-688`
 pub fn RemoveColorEscapeSequences(text: *mut c_char) {
-    // Raven: strip Quake3 colour-escape pairs and drop bytes above 0x7E, in
-    // place. `text[i]` is signed `char`, so `> 0x7E` catches only 0x7F (bytes
-    // >=0x80 are negative) — faithful to the signed-char oracle behavior.
+    // Raven: strip Quake3 colour-escape pairs and drop bytes above 0x7E, in place.
+    // `text[i]` is signed `char`, so `> 0x7E` catches only 0x7F (bytes >=0x80 are negative).
+    // This matches the signed-char oracle behavior.
     unsafe {
         let mut i: isize = 0;
         let mut l: isize = 0;
@@ -719,8 +709,8 @@ pub fn RemoveColorEscapeSequences(text: *mut c_char) {
             if c == 0 {
                 break;
             }
-            // Q_IsColorString inspects text[i] and text[i+1]; with c != 0 the
-            // terminator guarantees text[i+1] is in-bounds.
+            // `Q_IsColorString` inspects `text[i]` and `text[i+1]`.
+            // With `c != 0`, the terminator guarantees `text[i+1]` is in-bounds.
             let pair = core::slice::from_raw_parts(text.offset(i) as *const u8, 2);
             if Q_IsColorString(pair) {
                 i += 2;
@@ -763,8 +753,8 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
                 // remove color escape sequences from the arguments
                 RemoveColorEscapeSequences(args.as_ptr() as *mut c_char);
             }
-            // Raven's Q_stricmp dispatch over "cp "/"cs"/"scores"/"clientLevelShot"
-            // has empty bodies in MP — no observable effect, dropped.
+            // Raven's Q_stricmp dispatch over "cp "/"cs"/"scores"/"clientLevelShot" has empty bodies in MP.
+            // It has no observable effect, so this port drops it.
         }
         // add the delta angles to the bot's current view angles
         for j in 0..3usize {
@@ -783,7 +773,7 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
 
         StandardBotAI(ctx, bs, thinktime);
 
-        // subtract the delta angles
+        //subtract the delta angles
         for j in 0..3usize {
             (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
@@ -839,13 +829,14 @@ pub fn BotAISetupClient(
     restart: qboolean,
 ) -> c_int {
     unsafe {
-        // First setup boxes a fresh zeroed state on the heap; re-setup resets the
-        // existing state in place (Raven reused the same `B_Alloc` pool block,
-        // `memset` to zero). `bot_state_t` owns a `String`-bearing `settings`, so
-        // the in-place reset drops that field, byte-zeros the POD bulk, then
-        // re-seats an empty `settings` — the codebase's take/zero/seat convention
-        // (`G_FreeEntity`). The owned `Box` also gives proper 8-byte alignment,
-        // so Raven's `BG_AllocPad8` pool-alignment step is no longer needed.
+        // First setup boxes a fresh zeroed state on the heap.
+        // Re-setup resets the existing state in place (Raven reused the same `B_Alloc` pool
+        // block, `memset` to zero).
+        // `bot_state_t` owns a `String`-bearing `settings`, so the in-place reset drops that
+        // field, byte-zeros the POD bulk, then re-seats an empty `settings`, the codebase's
+        // take/zero/seat convention (`G_FreeEntity`).
+        // The owned `Box` also gives proper 8-byte alignment, so Raven's `BG_AllocPad8`
+        // pool-alignment step is no longer needed.
         if ctx.world.globals.botstates.0[client as usize].is_none() {
             ctx.world.globals.botstates.0[client as usize] = Some(zeroed_bot_state());
         } else {
@@ -860,17 +851,17 @@ pub fn BotAISetupClient(
 
         let bs = ctx.world.globals.botstates.ptr(client as usize);
 
-        // The reset above zeroed `inuse`, so this faithfully-preserved Raven guard
-        // (`if (bs && bs->inuse)`) never fires; `bs` is a live `Box` address here,
-        // never null.
+        // The reset above zeroed `inuse`, so this Raven guard
+        // (`if (bs && bs->inuse)`) never fires.
+        // `bs` is a live `Box` address here, never null.
         if (*bs).inuse != qfalse {
             let msg = format!("BotAISetupClient: client {} already setup\n", client);
             BotAI_Print(PRT_FATAL, cstr(&msg).as_ptr() as *mut c_char);
             return qfalse;
         }
 
-        // Raven `memcpy(&bs->settings, settings, sizeof(bot_settings_t))` — clone
-        // the caller's owned-`String` settings into the freshly-seated field.
+        // Raven `memcpy(&bs->settings, settings, sizeof(bot_settings_t))`.
+        // This clones the caller's owned-`String` settings into the freshly-seated field.
         (*bs).settings = (*settings).clone();
 
         (*bs).client = client; // need the client number before personality stuff
@@ -940,11 +931,11 @@ pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboole
         trap::BotFreeGoalState(ctx.engine, BotlibAiFreeGoalStateArgs::new((*bs).gs));
         // free the weapon weights
         trap::BotFreeWeaponState(ctx.engine, BotlibAiFreeWeaponStateArgs::new((*bs).ws));
-        // clear the bot state (Raven `memset(bs, 0, sizeof(*bs))`): drop the owned
-        // `settings` String, byte-zero the POD bulk, then re-seat an empty
-        // `settings` (take/zero/seat convention — never dropping the zeroed image).
-        // The slot's `Box` stays allocated, mirroring Raven leaving the pool block
-        // in place with `inuse` cleared.
+        // clear the bot state (Raven `memset(bs, 0, sizeof(*bs))`).
+        // This drops the owned `settings` String, byte-zeros the POD bulk, then re-seats an
+        // empty `settings` (take/zero/seat convention, never dropping the zeroed image).
+        // The slot's `Box` stays allocated, mirroring Raven leaving the pool block in place with
+        // `inuse` cleared.
         core::ptr::drop_in_place(core::ptr::addr_of_mut!((*bs).settings));
         core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
         core::ptr::write(
@@ -962,8 +953,8 @@ pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboole
 /// Raven `BotResetState`.
 ///
 /// `cur_ps` is `Copy` and `settings` is moved out and back with `ptr::read`/
-/// `ptr::write` (its owned `String`s are preserved, never dropped), so the
-/// save/zero/restore mirrors Raven's memcpy+memset+memcpy exactly.
+/// `ptr::write` (its owned `String`s survive, never dropped), so the
+/// save/zero/restore mirrors Raven's memcpy+memset+memcpy.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:924-959`
 pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -982,7 +973,7 @@ pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
         // Byte-wise: `bs` is B_Alloc/BG_Alloc pool storage (4-byte aligned only),
         // not guaranteed 8-aligned for bot_state_t's pointer fields.
         core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
-        // Copy back the preserved state.
+        // Copy back the saved state.
         (*bs).ms = movestate;
         (*bs).gs = goalstate;
         (*bs).ws = weaponstate;
@@ -1066,8 +1057,8 @@ pub fn WPOrgVisible(
     ignore: c_int,
 ) -> c_int {
     unsafe {
-        // `bot`/`hitent`/`ownent` read through the checked entity borrow; the trace
-        // entity is recovered as an `EntityId` via `entity_id_of`.
+        // `bot`/`hitent`/`ownent` read through the checked entity borrow.
+        // The trace entity is recovered as an `EntityId` via `entity_id_of`.
         let base = ctx.world.g_entities.as_mut_ptr();
         let mut tr: trace_t = core::mem::zeroed();
 
@@ -1189,9 +1180,9 @@ pub fn CheckForFunc(ctx: &mut GameContext, org: vec3_t, ignore: c_int) -> c_int 
         }
 
         let fent = &ctx.world.g_entities[tr.entityNum as usize];
-        // Raven `if (!fent)` on `&g_entities[...]` is structurally dead. Raven
-        // then `strstr(fent->classname, ...)` and would deref a null classname
-        // (UB); guarding null is the one defined behavior here.
+        // Raven `if (!fent)` on `&g_entities[...]` is structurally dead.
+        // Raven then `strstr(fent->classname, ...)` and would deref a null classname (UB).
+        // Guarding null is the one defined behavior here.
         let cn = fent.classname_str();
         if cn.contains("func_") {
             return 1; // there's a func brush here
@@ -1347,8 +1338,8 @@ pub fn TotalTrailDistance(
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1263-1349`
 pub fn CheckForShorterRoutes(ctx: &mut GameContext, bs: *mut bot_state_t, newwpindex: c_int) {
-    // FORCEJUMP_INSTANTMETHOD is undefined in this build; the non-instant
-    // force-jump branch is ported.
+    // FORCEJUMP_INSTANTMETHOD is undefined in this build.
+    // The non-instant force-jump branch is ported.
     unsafe {
         let mut i: c_int = 0;
         let mut fj: c_int = 0;
@@ -1426,8 +1417,8 @@ pub fn CheckForShorterRoutes(ctx: &mut GameContext, bs: *mut bot_state_t, newwpi
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1353-1429`
 pub fn WPConstantRoutine(ctx: &mut GameContext, bs: *mut bot_state_t) {
-    // FORCEJUMP_INSTANTMETHOD is undefined in this build; the non-instant
-    // branches are ported.
+    // FORCEJUMP_INSTANTMETHOD is undefined in this build.
+    // The non-instant branches are ported.
     unsafe {
         let lt = ctx.world.level.time;
         if (*bs).wpCurrent.is_null() {
@@ -1642,7 +1633,8 @@ pub fn BotTrace_Strafe(ctx: &mut GameContext, bs: *mut bot_state_t, traceto: vec
         if AngleDifference((*bs).viewangles[YAW], dirAng[YAW]) > 60.0
             || AngleDifference((*bs).viewangles[YAW], dirAng[YAW]) < -60.0
         {
-            // not facing the direction we're going; too stupid to strafe around
+            // If we aren't facing the direction we're going here, then we've got enough excuse to
+            // be too stupid to strafe around anyway
             return 0;
         }
 
@@ -1912,9 +1904,10 @@ pub fn PassStandardEnemyChecks(
     en: Option<EntityId>,
 ) -> c_int {
     unsafe {
-        // `en` reads through the checked entity borrow; `en_cl` is that entity's raw
-        // `gclient_t*` (may be an NPC pool client — recipe 2b), dereffed raw. `bs`
-        // (bot_state_t) stays raw. `en.s.number` is invariant, read once up front.
+        // `en` reads through the checked entity borrow.
+        // `en_cl` is that entity's raw `gclient_t*` (may be an NPC pool client),
+        // dereffed raw. `bs` (bot_state_t) stays raw.
+        // `en.s.number` is invariant, read once up front.
         let base = ctx.world.g_entities.as_mut_ptr();
 
         if bs.is_null() || en.is_none() {
@@ -2034,9 +2027,10 @@ pub fn PassStandardEnemyChecks(
 /// Source: `oracle/codemp/game/ai_main.c:1861-1941`
 pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Option<EntityId>) {
     unsafe {
-        // `bot` is the hurt entity's raw `gclient_t*` (Raven's `bot`; may be an NPC
-        // pool client — recipe 2b), dereffed raw. `attacker` reads through the
-        // checked entity borrow; its `s.number` is invariant, read once up front.
+        // `bot` is the hurt entity's raw `gclient_t*` (Raven's `bot`, may be an NPC pool client),
+        // dereffed raw.
+        // `attacker` reads through the checked entity borrow.
+        // Its `s.number` is invariant, read once up front.
         let bot: *mut gclient_t = ctx.world.entity(bot).client;
         let base = ctx.world.g_entities.as_mut_ptr();
 
@@ -2128,8 +2122,9 @@ pub fn BotCanHear(
     endist: f32,
 ) -> c_int {
     unsafe {
-        // `en` reads through the checked entity borrow; `en_cl` is that entity's
-        // raw `gclient_t*` (may be an NPC pool client — recipe 2b), dereffed raw.
+        // `en` reads through the checked entity borrow.
+        // `en_cl` is that entity's raw `gclient_t*` (may be an NPC pool client),
+        // dereffed raw.
         // `en.s.number` is invariant here, read once up front.
         let Some(en_id) = en else {
             return 0;
@@ -2251,9 +2246,10 @@ pub fn PassLovedOneCheck(
     ent: Option<EntityId>,
 ) -> c_int {
     unsafe {
-        // `ent` reads through the checked entity borrow; `bs`/`loved` (bot_state_t)
-        // and the raw `clients` array stay raw. `ent.s.number` is invariant, read
-        // once (after the early returns that never touch it, matching Raven).
+        // `ent` reads through the checked entity borrow.
+        // `bs`/`loved` (bot_state_t) and the raw `clients` array stay raw.
+        // `ent.s.number` is invariant, read once (after the early returns that never touch it,
+        // matching Raven).
         let base = ctx.world.g_entities.as_mut_ptr();
         let clients = ctx.world.level.clients;
 
@@ -2282,8 +2278,8 @@ pub fn PassLovedOneCheck(
         let loved = ctx.world.globals.botstates.ptr(ent_num as usize);
 
         while i < (*bs).lovednum {
-            // `netname` is a `String`; compare against the remembered loved name
-            // (byte-exact strcmp equivalent, matching `GetLoveLevel`).
+            // `netname` is a `String`, compared against the remembered loved name (byte-exact
+            // strcmp equivalent, matching `GetLoveLevel`).
             if (*clients.add((*loved).client as usize)).pers.netname
                 == cstr_to_str((*bs).loved[i as usize].name.as_ptr() as *const c_char)
             {
@@ -2493,10 +2489,12 @@ pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
             return 0;
         }
 
-        // Raven's `goto jmPass` skips the pre-block; a labeled block emulates it.
+        // Raven's `goto jmPass` skips the pre-block.
+        // A labeled block emulates it.
         'pre: {
             if gt == GT_JEDIMASTER && (*bs).cur_ps.isJediMaster == qfalse {
-                // Then you may know no fear. Well, unless he's strong.
+                // Then you may know no fear.
+                // Well, unless he's strong.
                 let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
                 if !ce.is_null()
                     && !(*ce).client.is_null()
@@ -2948,15 +2946,15 @@ pub fn BotGetFlagHome(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
     }
 }
 
-/// Raven `GetNewFlagPoint` — get the nearest possible waypoint to the flag
-/// since it's not in its original position.
+/// Raven `GetNewFlagPoint`: get the nearest possible waypoint to the flag since it's not in its original position.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2739-2801`
 pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: EntityId, team: c_int) {
     unsafe {
-        // `wp` (wpobject_t, not an entity) stays raw. `flagEnt` reads through the
-        // checked entity borrow; its `s.pos.trBase`/`s.number` are invariant over
-        // this fn (flagEnt is never mutated), so they are read once up front.
+        // `wp` (wpobject_t, not an entity) stays raw.
+        // `flagEnt` reads through the checked entity borrow.
+        // Its `s.pos.trBase`/`s.number` are invariant over this fn (flagEnt is never mutated), so
+        // they are read once up front.
         let flag_base = ctx.world.entity(flagEnt).s.pos.trBase;
         let flag_num = ctx.world.entity(flagEnt).s.number;
         let mut i: c_int = 0;
@@ -3044,9 +3042,9 @@ pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: Enti
 
 /// Raven `CTFTakesPriority`.
 ///
-/// The `#ifdef BOT_CTF_DEBUG` debug print/test-line blocks are dropped (§20,
-/// debug-only, undefined in this build). Raven's `goto success` tail is a
-/// labeled block yielding whether a CTF sub-goal succeeded.
+/// The `#ifdef BOT_CTF_DEBUG` debug print/test-line blocks are dropped (§20, debug-only,
+/// undefined in this build).
+/// Raven's `goto success` tail is a labeled block yielding whether a CTF sub-goal succeeded.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2804-3034`
 pub fn CTFTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
@@ -3299,10 +3297,10 @@ pub fn EntityVisibleBox(
 
 /// Raven `Siege_TargetClosestObjective`.
 ///
-/// Raven's `goto hasPoint` (skip the search when the current destination is
-/// already a valid objective) is a guarded `if !skip_search { … }`. The
-/// `&g_entities[i]` sub-checks are trivially non-null (address-of), so only the
-/// `.use` presence check survives.
+/// Raven's `goto hasPoint` (skip the search when the current destination is already a valid
+/// objective) is a guarded `if !skip_search { … }`.
+/// The `&g_entities[i]` sub-checks are trivially non-null (address-of), so only the `.use`
+/// presence check survives.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:3055-3152`
 pub fn Siege_TargetClosestObjective(
@@ -3426,8 +3424,9 @@ pub fn Siege_TargetClosestObjective(
     }
 }
 
-/// Raven `Siege_DefendFromAttackers` — find our defending point by finding the
-/// nearest person on the opposing team (they'll most likely be on offense).
+/// Raven `Siege_DefendFromAttackers`: this may be a little cheap, but the best way to find our
+/// defending point is probably to just find the nearest person on the opposing team since
+/// they'll most likely be on offense in this situation.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:3154-3199`
 pub fn Siege_DefendFromAttackers(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -3527,8 +3526,8 @@ pub fn Siege_CountDefenders(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
 /// Source: `oracle/codemp/game/ai_main.c:3230-3252`
 pub fn Siege_CountTeammates(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
     unsafe {
-        // Raven re-derefs `g_entities[bs->client].client->sess.sessionTeam` each
-        // iteration; the bot's own client is always valid, so hoist it.
+        // Raven re-derefs `g_entities[bs->client].client->sess.sessionTeam` each iteration.
+        // The bot's own client is always valid, so this port hoists it.
         let myteam = {
             let me = &ctx.world.g_entities[(*bs).client as usize];
             (*(me.client)).sess.sessionTeam
@@ -3564,8 +3563,9 @@ pub fn SiegeTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int 
         let bcl: *mut gclient_t;
         let mut dif: vec3_t = [0.0; 3];
         let mut tr: trace_t = core::mem::zeroed();
-        // Raven assigns `flagForDefendableObjective` in the team branch below but
-        // never reads it (dead local); no premature use here.
+        // Raven assigns `flagForDefendableObjective` in the team branch below but never reads it
+        // (dead local).
+        // There is no premature use here.
         // Source: `oracle/codemp/game/ai_main.c:3259,3306,3312`
 
         if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
@@ -3620,8 +3620,8 @@ pub fn SiegeTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int 
             teammates = Siege_CountTeammates(ctx, bs);
 
             if defenders > teammates / 3 && teammates > 1 {
-                // devote around 1/4 of our team to completing our own side goals even if we're a
-                // defender. If we have no side goals we will realize that later on and join the defenders
+                // devote around 1/4 of our team to completing our own side goals even if we're a defender.
+                // If we have no side goals we will realize that later on and join the defenders
                 (*bs).siegeState = bot_siege_state_t::SIEGESTATE_ATTACKER as c_int;
             }
         }
@@ -3734,9 +3734,9 @@ pub fn SiegeTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int 
 
 /// Raven `JMTakesPriority`.
 ///
-/// `jmState` becomes the index for the one who carries the saber; -1 means the
-/// saber is currently without an owner. The commented `Com_Printf` debug block
-/// is dropped.
+/// `jmState` becomes the index for the one who carries the saber.
+/// -1 means the saber is currently without an owner.
+/// This port drops the commented `Com_Printf` debug block.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:3424-3496`
 pub fn JMTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
@@ -3818,10 +3818,10 @@ pub fn BotHasAssociated(ctx: &mut GameContext, bs: *mut bot_state_t, wp: *mut wp
             return 1;
         }
 
-        // `as_ent`'s only field read is its `.item` ([`ItemId`], Copy); the arena
-        // entity is borrowed momentarily to fetch it. The original
-        // `as_ent.is_null()` guard was dead (`&g_entities[i]` is never NULL), so
-        // only the `item.is_none()` guard survives.
+        // `as_ent`'s only field read is its `.item` ([`ItemId`], Copy).
+        // The arena entity is borrowed momentarily to fetch it.
+        // The original `as_ent.is_null()` guard was dead (`&g_entities[i]` is never NULL), so only
+        // the `item.is_none()` guard survives.
         let item = ctx
             .world
             .entity(EntityId((*wp).associated_entity as u32))
@@ -3928,10 +3928,10 @@ pub fn GetBestIdleGoal(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 
 /// Raven `GetIdealDestination`.
 ///
-/// The `#ifdef _DEBUG` `bot_nogoals` cvar-update/early-out is dropped (§20,
-/// debug-only). Raven indexes `gWPArray[tempInt]`/`gWPArray[cWPIndex±1]` before
-/// any bounds check (tempInt/cWPIndex may be -1 or past the end); guarded here
-/// per §S19.
+/// The `#ifdef _DEBUG` `bot_nogoals` cvar-update/early-out is dropped (§20, debug-only).
+/// Raven indexes `gWPArray[tempInt]`/`gWPArray[cWPIndex±1]` before any bounds check (tempInt/cWPIndex
+/// may be -1 or past the end).
+/// This port guards it per §S19.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:3625-3907`
 pub fn GetIdealDestination(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -4337,8 +4337,8 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut i: c_int = 0;
 
         if enemyHasOurFlag != 0 && weHaveEnemyFlag == 0 {
-            // start off with an attacker instead of a retriever if we don't have the enemy flag yet
-            // so that they can't capture it first. after that we focus on getting our flag back.
+            // start off with an attacker instead of a retriever if we don't have the enemy flag yet so that they can't capture it first.
+            // after that we focus on getting our flag back.
             attackRetrievePriority = 1;
         }
 
@@ -4389,8 +4389,8 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
     }
 }
 
-/// Raven `CommanderBotSiegeAI` — tell squad mates to do what I'm doing, up to
-/// half of team, let the other half make their own decisions.
+/// Raven `CommanderBotSiegeAI`: tell squad mates to do what I'm doing, up to half of team, let
+/// the other half make their own decisions.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:4077-4140`
 pub fn CommanderBotSiegeAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -4631,9 +4631,9 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
-        // a pool client for NPC enemies) is fetched via a momentary arena borrow
-        // and dereffed raw.
+        // `currentEnemy` is the enemy entity handle.
+        // Its `client` pointer (Copy, a pool client for NPC enemies) is fetched via a momentary
+        // arena borrow and dereffed raw.
         let currentEnemy = (*bs).currentEnemy.unwrap();
         let ce_client = ctx.world.entity(currentEnemy).client;
 
@@ -4736,9 +4736,9 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
-        // a pool client for NPC enemies) is fetched via momentary arena borrows at
-        // each use site (the borrow can't span the RNG/trace calls below) and
+        // `currentEnemy` is the enemy entity handle.
+        // Its `client` pointer (Copy, a pool client for NPC enemies) is fetched via momentary
+        // arena borrows at each use site (the borrow can't span the RNG/trace calls below) and
         // dereffed raw.
         let currentEnemy = (*bs).currentEnemy.unwrap();
         let ce_client = ctx.world.entity(currentEnemy).client;
@@ -5017,9 +5017,10 @@ pub fn BotAimLeading(
         let mut movement_vector = vel;
         crate::q_math::VectorNormalize(&mut movement_vector);
 
-        // x is int in Raven; the first assignment (frame_Enemy_Len*leadAmount) is
-        // a dead store, overwritten below. Raven's math promotes to double, then
-        // truncates to int, so compute the magnitude in f64 to match.
+        // `x` is int in Raven.
+        // The first assignment (frame_Enemy_Len*leadAmount) is a dead store, overwritten below.
+        // Raven's math promotes to double, then truncates to int, so this port computes the
+        // magnitude in f64 to match.
         if vtotal > 400.0 {
             vtotal = 400.0;
         }
@@ -5410,8 +5411,8 @@ pub fn BotFallbackNavigation(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_i
     }
 }
 
-/// Raven `BotTryAnotherWeapon` — out of ammo, resort to the first weapon we come
-/// across that has ammo.
+/// Raven `BotTryAnotherWeapon`: out of ammo, resort to the first weapon we come across that has
+/// ammo.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:5072-5103`
 pub fn BotTryAnotherWeapon(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
@@ -5555,8 +5556,8 @@ pub fn BotSelectIdealWeapon(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
     }
 }
 
-/// Raven `BotSelectChoiceWeapon` — if `!doselection` then bot will only check if
-/// he has the specified weapon and return 1 (yes) or 0 (no).
+/// Raven `BotSelectChoiceWeapon`: if `!doselection` then bot will only check if he has the
+/// specified weapon and return 1 (yes) or 0 (no).
 ///
 /// Source: `oracle/codemp/game/ai_main.c:5216-5251`
 pub fn BotSelectChoiceWeapon(
@@ -5644,8 +5645,8 @@ pub fn GetLoveLevel(ctx: &mut GameContext, bs: *mut bot_state_t, love: *mut bot_
             return 1;
         }
 
-        // Raven's `lname = netname[]` (array, never NULL) makes its `!lname`
-        // guard dead; read the name directly.
+        // Raven's `lname = netname[]` (array, never NULL) makes its `!lname` guard dead.
+        // This port reads the name directly.
         let lname_s = (*((*base.add((*love).client as usize)).client))
             .pers
             .netname
@@ -6441,7 +6442,8 @@ pub fn Bot_SetForcedMovement(
 ///
 /// Source: `oracle/codemp/game/ai_main.c:5931-7483`
 // Build config: FORCEJUMP_INSTANTMETHOD undefined (`ai_main.h:5`), BOT_STRAFE_AVOIDANCE
-// defined (`ai_main.c:1548`), FINAL_BUILD undefined — matching gated blocks ported/dropped.
+// defined (`ai_main.c:1548`), FINAL_BUILD undefined.
+// This port matches gated blocks ported/dropped.
 pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32) {
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
@@ -6449,7 +6451,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
         let clients = ctx.world.level.clients;
         let me = base.add((*bs).client as usize);
         let cl = clients.add((*bs).client as usize);
-        // id -> gentity_t* resolver (arena reload; the `ent_id`/`ent_id_opt` inverse).
+        // id -> gentity_t* resolver (arena reload, the `ent_id`/`ent_id_opt` inverse).
         let resolve = |o: Option<EntityId>| -> *mut gentity_t {
             match o {
                 Some(id) => unsafe { base.add(id.index()) },
@@ -7277,8 +7279,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 && (*ctx.world.globals.gWPArray.0[goalWPIndex as usize]).inuse != 0
                 && (ctx.world.globals.gLevelFlags & LEVELFLAG_NOPOINTPREDICTION) == 0
             {
-                // Raven indexes gWPArray[goalWPIndex] (which may be -1) before
-                // any bounds check; guarded here (§S19).
+                // Raven indexes gWPArray[goalWPIndex] (which may be -1) before any bounds check.
+                // This port guards it here (§S19).
                 _VectorSubtract(
                     (*ctx.world.globals.gWPArray.0[goalWPIndex as usize]).origin,
                     (*bs).origin,
@@ -7329,8 +7331,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     desiredIndex = (*(*bs).wpCurrent).index - 1;
                 }
 
-                // Raven derefs gWPArray[desiredIndex] before its own range
-                // check; guarded here (§S19).
+                // Raven derefs gWPArray[desiredIndex] before its own range check.
+                // This port guards it here (§S19).
                 if desiredIndex >= 0
                     && (desiredIndex as usize) < ctx.world.globals.gWPArray.0.len()
                     && !ctx.world.globals.gWPArray.0[desiredIndex as usize].is_null()
@@ -7474,8 +7476,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 _VectorCopy((*ce_cl).ps.origin, &mut headlevel);
                 headlevel[2] += (*ce_cl).ps.viewheight as f32;
             } else {
-                // Raven's else derefs the (here-NULL) client; substitute
-                // s.origin for the defined behavior (§S19).
+                // Raven's else derefs the (here-NULL) client.
+                // This port substitutes s.origin for the defined behavior (§S19).
                 _VectorCopy((*currentEnemy).s.origin, &mut headlevel);
             }
 
@@ -7491,8 +7493,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                         && (*bs).currentEnemy.is_some()
                         && !(*currentEnemy).client.is_null()
                     {
-                        // Raven stores a bool compare into the float `mLen`,
-                        // making the guard below unreachable; preserved.
+                        // Raven stores a bool compare into the float `mLen`, making the guard
+                        // below unreachable.
                         mLen = (VectorLength(a) > 128.0) as c_int as f32;
                         if mLen > 128.0 && mLen < 1024.0 {
                             _VectorSubtract(
@@ -8038,8 +8040,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
 /// Raven `BotAIStartFrame`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:7492-7568`
-// Raven's fn-local statics `local_time`/`lastbotthink_time` home on
-// GameGlobals; `botlib_residual` is dead in Raven and dropped (§20).
+// Raven's fn-local statics `local_time`/`lastbotthink_time` home on GameGlobals.
+// `botlib_residual` is dead in Raven, so this port drops it (§20).
 pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();

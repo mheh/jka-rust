@@ -1,24 +1,18 @@
-// PORT-COMPLETE: NPC_combat.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_combat.c`.
+//! Port of `oracle/codemp/game/NPC_combat.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Callers bridge at the boundary via
-//! `ctx.entity_id_of(ptr)`.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Ctx-free leaf helpers take `&mut`/`&gentity_t`.
+//! Callers bridge at the boundary via `ctx.entity_id_of(ptr)`.
 //!
-//! Safe-state migration **Stage 2c** (deref regime): entity-field reads/writes
-//! go through `ctx.world.entity(id)` / `entity_mut(id)` accessors at the point
-//! of use — the per-body `gentity_t*` re-derives are gone. What stays raw by
-//! design (each site FLAG-marked): `gNPC_t` (`NPCInfo`/`.NPC`) has no accessor;
-//! `gclient_t` pool clients (`.client`) are BG_Alloc'd, not `level.clients`;
-//! `gitem_t` item tables; caller-provided `trace_t`/ABI buffers; and the
-//! `Debug_Printf` cvar-pointer sites keep an irreducible `&raw mut
-//! ctx.world.cvars.debugNPCAI` alias (marked in-code) passed alongside `ctx` to
-//! the raw-ABI callee. Behavior is byte-identical, referee-verified.
+//! Entity-field reads and writes go through `ctx.world.entity(id)` / `entity_mut(id)` accessors at the point of use.
+//! The per-body `gentity_t*` re-derives are gone.
+//! What stays raw by design (each site FLAG-marked): `gNPC_t` (`NPCInfo`/`.NPC`) has no accessor,
+//! `gclient_t` pool clients (`.client`) are BG_Alloc'd and not `level.clients`, `gitem_t` item
+//! tables, caller-provided `trace_t`/ABI buffers, and the `Debug_Printf` cvar-pointer sites.
+//! The `Debug_Printf` sites keep an irreducible `&raw mut ctx.world.cvars.debugNPCAI` alias
+//! (marked in-code), passed alongside `ctx` to the raw-ABI callee.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::flags::FL_NOTARGET;
@@ -39,8 +33,8 @@ use crate::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, vectoangles, AngleVectors,
     DistanceHorizontalSquared, VectorLength, VectorLengthSquared, VectorNormalize, PITCH, YAW,
 };
-// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
-// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+// This import shadows the prelude's `crate::q_shared::Q_stricmp` glob export (the pointer version).
+// Genuine pointer-vs-pointer call sites re-qualify with `crate::q_shared::Q_stricmp` instead.
 use native_string::Q_stricmp;
 use crate::teams::class::*;
 use crate::teams::npcteam::{NPCTEAM_ENEMY, NPCTEAM_FREE, NPCTEAM_NEUTRAL, NPCTEAM_PLAYER};
@@ -68,12 +62,9 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::MASK_SHOT;
 use crate::q_shared;
 
-// Raven `DEBUG_LEVEL_INFO` (`b_local.h:23`) — not yet ported as a central
-// const; inlined here from the header value.
+// Raven `DEBUG_LEVEL_INFO` (`b_local.h:23`) is not yet ported as a central const.
+// This value is inlined here from the header.
 const DEBUG_LEVEL_INFO: c_int = 3;
-
-// Unported types referenced in this file (need porting before this compiles):
-// combatPt_t
 
 /// Raven `G_ClearEnemy`.
 ///
@@ -84,14 +75,16 @@ pub fn G_ClearEnemy(ctx: &mut GameContext, self_: EntityId) {
 
         let enemy_id = ctx.world.entity(self_).enemy;
         if !enemy_id.is_none() {
-            // FLAG: gclient_t is a BG_Alloc'd pool client for NPCs; deref stays raw (recipe 2b).
+            // FLAG: gclient_t is a BG_Alloc'd pool client for NPCs.
+            // The deref stays raw.
             let client = ctx.world.entity(self_).client;
             let enemy_number = ctx.world.entity(enemy_id.unwrap()).s.number;
             if !client.is_null() && (*client).renderInfo.lookTarget == enemy_number {
                 NPC_ClearLookTarget(ctx.entity_mut(self_));
             }
 
-            // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+            // FLAG: gNPC_t (NPC) has no accessor.
+            // The deref stays raw.
             let npc = ctx.world.entity(self_).NPC;
             if !npc.is_null() && enemy_id == (*npc).goalEntity {
                 (*npc).goalEntity = None;
@@ -113,7 +106,8 @@ pub fn G_AngerAlert(ctx: &mut GameContext, self_: Option<EntityId>) {
     unsafe {
         let self_id = self_.unwrap();
         let ent_id = ctx.world.entity(self_id).enemy;
-        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The deref stays raw.
         let npc = ctx.world.entity(self_id).NPC;
         if !npc.is_null() && ((*npc).scriptFlags & SCF_NO_GROUPS) != 0 {
             //I'm not a team playa...
@@ -140,17 +134,19 @@ pub fn G_AngerAlert(ctx: &mut GameContext, self_: Option<EntityId>) {
 
 /// Raven `G_TeamEnemy`.
 ///
-/// Raven: FIXME - Probably a better way to do this, is a linked list of your
+/// Raven: FIXME: Probably a better way to do this, is a linked list of your
 /// teammates already available?
 /// Source: `oracle/codemp/game/NPC_combat.c:67-115`
 pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     unsafe {
-        // FLAG: gclient_t pool client for NPCs; deref stays raw (recipe 2b).
+        // FLAG: gclient_t pool client for NPCs.
+        // The deref stays raw.
         let self_client = ctx.world.entity(self_).client;
         if self_client.is_null() || (*self_client).playerTeam == NPCTEAM_FREE {
             return 0;
         }
-        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The deref stays raw.
         let self_npc = ctx.world.entity(self_).NPC;
         if !self_npc.is_null() && ((*self_npc).scriptFlags & SCF_NO_GROUPS) != 0 {
             //I'm not a team playa...
@@ -166,7 +162,8 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             if ctx.world.entity(ent_id).health <= 0 {
                 continue;
             }
-            // FLAG: gclient_t pool client for NPCs; deref stays raw (recipe 2b).
+            // FLAG: gclient_t pool client for NPCs.
+            // The deref stays raw.
             let ent_client = ctx.world.entity(ent_id).client;
             if ent_client.is_null() {
                 continue;
@@ -196,7 +193,8 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_combat.c:117-310`
 pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId>) {
     unsafe {
-        // FLAG: gclient_t pool client / gNPC_t have no accessor; derefs stay raw (recipe 2b/2c).
+        // FLAG: gclient_t pool client and gNPC_t have no accessor.
+        // The derefs stay raw.
         let client = ctx.world.entity(self_).client;
         let npc = ctx.world.entity(self_).NPC;
         if enemy.is_none() || client.is_null() || npc.is_null() {
@@ -382,7 +380,8 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
 /// Source: `oracle/codemp/game/NPC_combat.c:312-340`
 pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+        // FLAG: gclient_t pool client.
+        // The deref stays raw.
         let client = ctx.world.entity(ent).client;
         if (*client).ps.saberInFlight != 0 {
             //alright, can't turn it on now in any case, so forget it.
@@ -442,7 +441,8 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
             return;
         }
 
-        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if npc.is_null() {
             ctx.world.entity_mut(self_).enemy = enemy;
@@ -455,14 +455,16 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
             return;
         }
 
-        // (debug assert( enemy != self ) omitted — release build)
+        // The oracle asserts `enemy != self` here.
+        // This port omits the assert, matching the release build.
 
         //	if ( enemy->client && enemy->client->playerTeam == TEAM_DISGUISE )
         //	{//unmask the player
         //		enemy->client->playerTeam = TEAM_PLAYER;
         //	}
 
-        // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+        // FLAG: gclient_t pool client(s).
+        // The derefs stay raw.
         let client = ctx.world.entity(self_).client;
         let enemy_client = ctx.world.entity(enemy_id).client;
         if !client.is_null()
@@ -611,7 +613,8 @@ pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_i
             return;
         }
         let ent_id = ent.unwrap();
-        // FLAG: gclient_t pool client / gNPC_t; derefs stay raw (recipe 2b/2c).
+        // FLAG: gclient_t pool client and gNPC_t.
+        // The derefs stay raw.
         let client = ctx.world.entity(ent_id).client;
         let npc = ctx.world.entity(ent_id).NPC;
         if client.is_null() || npc.is_null() {
@@ -779,9 +782,9 @@ pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_i
 
 /// Raven `NPC_ChangeWeapon`.
 ///
-/// Raven: entire body is commented out (dead code, rwwFIXMEFIXME note that
-/// NPC weapon-changing should work "the same way as players"); faithfully a
-/// no-op.
+/// The oracle comments out the entire body as dead code.
+/// A `rwwFIXMEFIXME` note says NPC weapon-changing should work the same way as players do.
+/// This port is a no-op.
 /// Source: `oracle/codemp/game/NPC_combat.c:844-873`
 pub fn NPC_ChangeWeapon(newWeapon: c_int) {
     //rwwFIXMEFIXME: Change the same way as players, all this stuff is just crazy.
@@ -794,7 +797,8 @@ pub fn NPC_ApplyWeaponFireDelay(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+        // FLAG: gclient_t pool client.
+        // The deref stays raw.
         let client = ctx.world.globals.client;
         let level_time = ctx.world.level.time;
 
@@ -830,7 +834,8 @@ pub fn ShootThink(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
+        // FLAG: gNPC_t and gclient_t pool client have no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -929,7 +934,8 @@ pub fn WeaponThink(ctx: &mut GameContext, inCombat: qboolean) {
         //MCG - Begin
         //For now, no-one runs out of ammo
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+        // FLAG: gclient_t pool client.
+        // The deref stays raw.
         let npc_client = ctx.world.entity(npc_id).client;
         if (*npc_client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize] < 10 {
             Add_Ammo(ctx, npc_id, (*client).ps.weapon, 100);
@@ -1028,7 +1034,8 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
         let mut traceEnt_id = EntityId(tr.entityNum as u32);
 
         // point blank, baby!
-        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The deref stays raw.
         let shooter_npc = ctx.world.entity(shooter).NPC;
         if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_none()
         {
@@ -1070,16 +1077,17 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
             spot[1] - tr.endpos[1],
             spot[2] - tr.endpos[2],
         ];
-        // Raven `random()` (`q_shared.h:1591`, `(rand()&0x7fff)/32767.0`) —
-        // the `bg_lib.c` `randSeed` LCG (distinct from the game's own
-        // `Q_flrand`/`Q_irand` LCG), reached via `bg_state.rng`.
+        // Raven `random()` (`q_shared.h:1591`, `(rand()&0x7fff)/32767.0`) maps to the `bg_lib.c`
+        // `randSeed` LCG here, distinct from the game's own `Q_flrand`/`Q_irand` LCG.
+        // This port reaches it via `bg_state.rng`.
         let random = ctx.world.bg_state.rng.random();
         if VectorLength(diff) < random * 32.0 {
             return 1;
         }
         //MCG - End
         // shot would hit a non-client
-        // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+        // FLAG: gclient_t pool client(s).
+        // The derefs stay raw.
         let traceEnt_client = ctx.world.entity(traceEnt_id).client;
         if traceEnt_client.is_null() {
             return 0;
@@ -1114,7 +1122,8 @@ pub fn NPC_CheckPossibleEnemy(ctx: &mut GameContext, other: Option<EntityId>, vi
         let other_ent = other.unwrap();
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         // is he is already our enemy?
@@ -1167,7 +1176,8 @@ pub fn NPC_AttackDebounceForWeapon(ctx: &mut GameContext) -> c_int {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
+        // FLAG: gNPC_t and gclient_t pool client have no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
         let npc_client = ctx.world.entity(npc_id).client;
         match (*npc_client).ps.weapon {
@@ -1184,7 +1194,8 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
+        // FLAG: gNPC_t and gclient_t pool client have no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc_info).stats.shootDistance > 0.0 {
@@ -1207,8 +1218,8 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
                 let npc_client = ctx.world.entity(npc_id).client;
                 if !npc_client.is_null() && (*npc_client).saber[0].blade[0].lengthMax != 0.0 {
                     //FIXME: account for whether enemy and I are heading towards each other!
-                    // C's `1.5` is a double literal: the `*1.5`, the sum, and the
-                    // square evaluate in f64, narrowing to float only on return.
+                    // C's `1.5` is a double literal, so the `*1.5`, the sum, and the square evaluate in f64.
+                    // The result narrows to f32 only on return.
                     let reach = (*npc_client).saber[0].blade[0].lengthMax as f64
                         + ctx.world.entity(npc_id).r.maxs[0] as f64 * 1.5;
                     (reach * reach) as f32
@@ -1240,7 +1251,8 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
         if (ctx.world.entity(ent_id).flags & FL_NOTARGET) == 0
             && ctx.world.entity(ent_id).health > 0
         {
-            // FLAG: gclient_t pool client / gNPC_t; derefs stay raw (recipe 2b/2c).
+            // FLAG: gclient_t pool client and gNPC_t.
+            // The derefs stay raw.
             let ent_client = ctx.world.entity(ent_id).client;
             if ent_client.is_null() {
                 return qtrue;
@@ -1293,7 +1305,8 @@ pub fn NPC_EnemyTooFar(
 
         if toShoot == qfalse {
             //Not trying to actually press fire button with this check
-            // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The deref stays raw.
             let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).ps.weapon == WP_SABER {
                 //Just have to get to him
@@ -1332,13 +1345,14 @@ pub fn NPC_PickEnemy(
         let closestTo_id = closestTo.unwrap();
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut num_choices: usize = 0;
-        // §19: a >128th valid candidate silently overruns the stack array in C
-        // (UB); here the writes ignore extra candidates (quirk ledger Q-37,
-        // ratified 2026-08-01), so a dense map cannot panic the server.
+        // §19: in C, a candidate past the 128th overruns the stack array, which is undefined behavior.
+        // Here the writes ignore extra candidates (quirk ledger Q-37, ratified 2026-08-01).
+        // A dense candidate map cannot panic the server.
         let mut choice: [c_int; 128] = [0; 128];
         let mut closestEnemy: Option<EntityId> = None;
         let mut bestDist: f32 = crate::g_public_consts::Q3_INFINITE as f32;
@@ -1400,7 +1414,8 @@ pub fn NPC_PickEnemy(
                     let newenemy_org = ctx.world.entity(newenemy_id).r.currentOrigin;
                     _VectorSubtract(closestTo_org, newenemy_org, &mut diff);
                     let mut relDist = VectorLengthSquared(diff);
-                    // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+                    // FLAG: gclient_t pool client.
+                    // The derefs stay raw.
                     let newenemy_client = ctx.world.entity(newenemy_id).client;
                     if (*newenemy_client).hiddenDist > 0.0 {
                         if relDist > (*newenemy_client).hiddenDist * (*newenemy_client).hiddenDist {
@@ -1427,8 +1442,8 @@ pub fn NPC_PickEnemy(
                                         dot
                                     );
                                     let cs = cstr(&s);
-                                    // STAGE-2b: irreducible — raw `&debugNPCAI` alias passed alongside `ctx`
-                                    // to the raw-ABI `Debug_Printf`.
+                                    // This raw `&debugNPCAI` alias is irreducible.
+                                    // It passes alongside `ctx` to the raw-ABI `Debug_Printf`.
                                     let dbg_cvar = &raw mut ctx.world.cvars.debugNPCAI;
                                     Debug_Printf(
                                         ctx,
@@ -1450,8 +1465,8 @@ pub fn NPC_PickEnemy(
                                 (*newenemy_client).hiddenDist
                             );
                             let cs = cstr(&s);
-                            // STAGE-2b: irreducible — raw `&debugNPCAI` alias passed alongside `ctx`
-                            // to the raw-ABI `Debug_Printf`.
+                            // This raw `&debugNPCAI` alias is irreducible.
+                            // It passes alongside `ctx` to the raw-ABI `Debug_Printf`.
                             let dbg_cvar = &raw mut ctx.world.cvars.debugNPCAI;
                             Debug_Printf(
                                 ctx,
@@ -1527,7 +1542,8 @@ pub fn NPC_PickEnemy(
                 continue;
             }
 
-            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The derefs stay raw.
             let newenemy_client = ctx.world.entity(newenemy_id).client;
             let ok = (!newenemy_client.is_null()
                 && NPC_ValidEnemy(ctx, Some(newenemy_id)) != qfalse)
@@ -1537,7 +1553,8 @@ pub fn NPC_PickEnemy(
                 continue;
             }
 
-            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The derefs stay raw.
             let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).playerTeam == NPCTEAM_PLAYER
                 && enemyTeam == NPCTEAM_PLAYER
@@ -1606,8 +1623,8 @@ pub fn NPC_PickEnemy(
                                 dot
                             );
                             let cs = cstr(&s);
-                            // STAGE-2b: irreducible — raw `&debugNPCAI` alias passed alongside `ctx`
-                            // to the raw-ABI `Debug_Printf`.
+                            // This raw `&debugNPCAI` alias is irreducible.
+                            // It passes alongside `ctx` to the raw-ABI `Debug_Printf`.
                             let dbg_cvar = &raw mut ctx.world.cvars.debugNPCAI;
                             Debug_Printf(
                                 ctx,
@@ -1629,8 +1646,8 @@ pub fn NPC_PickEnemy(
                         (*newenemy_client).hiddenDist
                     );
                     let cs = cstr(&s);
-                    // STAGE-2b: irreducible — raw `&debugNPCAI` alias passed alongside `ctx`
-                    // to the raw-ABI `Debug_Printf`.
+                    // This raw `&debugNPCAI` alias is irreducible.
+                    // It passes alongside `ctx` to the raw-ABI `Debug_Printf`.
                     let dbg_cvar = &raw mut ctx.world.cvars.debugNPCAI;
                     Debug_Printf(ctx, dbg_cvar, DEBUG_LEVEL_INFO, cs.as_ptr() as *mut c_char);
                 }
@@ -1699,7 +1716,8 @@ pub fn NPC_PickAlly(
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+        // FLAG: gclient_t pool client.
+        // The derefs stay raw.
         let npc_client = ctx.world.entity(npc_id).client;
 
         let mut closestAlly: Option<EntityId> = None;
@@ -1712,7 +1730,8 @@ pub fn NPC_PickAlly(
                 continue;
             }
 
-            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The derefs stay raw.
             let ally_client = ctx.world.entity(ally_id).client;
             if (*ally_client).playerTeam == (*npc_client).playerTeam
                 || (*npc_client).playerTeam == NPCTEAM_ENEMY
@@ -1805,7 +1824,8 @@ pub fn NPC_CheckEnemy(
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut forcefindNew = qfalse;
@@ -1820,8 +1840,9 @@ pub fn NPC_CheckEnemy(
             }
         }
 
-        // if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
-        // Oracle-commented dead branch (`NPC_combat.c:1922`), matching NPC_utils.rs.
+        //if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
+        // The oracle comments out this branch too.
+        // NPC_utils.rs matches this dead branch.
         // Source: oracle/codemp/game/NPC_combat.c:1922
 
         if !ctx.world.entity(npc_id).enemy.is_none() {
@@ -1844,13 +1865,15 @@ pub fn NPC_CheckEnemy(
             ) == qfalse
             {
                 //FIXME: should this be a line-of site check?
-                // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+                // FLAG: gclient_t pool client.
+                // The deref stays raw.
                 let enemy_client = ctx.world.entity(enemy_id).client;
                 if !enemy_client.is_null() && (*enemy_client).hiddenDist != 0.0 {
                     //He ducked into shadow while we weren't looking
                     NPC_LostEnemyDecideChase(ctx);
                 }
-                //else: not chasing him — logic left commented in oracle, never give him up
+                // else: this branch does nothing on purpose.
+                // The oracle comments out its lose-enemy logic here, so the NPC never gives up the enemy.
             }
         }
 
@@ -1893,7 +1916,8 @@ pub fn NPC_CheckEnemy(
         let npc_enemy = ctx.world.entity(npc_id).enemy;
         let enemy_dead = npc_enemy.is_some() && ctx.world.entity(npc_enemy.unwrap()).health <= 0;
         if npc_enemy.is_none() || enemy_dead || forcefindNew != qfalse {
-            //FIXME: NPCs that are moving after an enemy should ignore the can't hit enemy counter- that should only be for NPCs that are standing still
+            //FIXME: NPCs that are moving after an enemy should ignore the can't hit enemy counter-
+            // that should only be for NPCs that are standing still
             let mut foundenemy = qfalse;
 
             if findNew == qfalse {
@@ -1906,7 +1930,8 @@ pub fn NPC_CheckEnemy(
             }
 
             //If enemy dead or unshootable, look for others on out enemy's team
-            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The derefs stay raw.
             let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).enemyTeam != NPCTEAM_NEUTRAL {
                 //NOTE:  this only checks vis if can't hit enemy for 10 tries, which I suppose
@@ -1945,7 +1970,8 @@ pub fn NPC_CheckEnemy(
 
         if !ctx.world.entity(npc_id).enemy.is_none() {
             let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
-            // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client(s).
+            // The derefs stay raw.
             let enemy_client = ctx.world.entity(enemy_id).client;
             if !enemy_client.is_null() && (*enemy_client).playerTeam != 0 {
                 let npc_client = ctx.world.entity(npc_id).client;
@@ -2048,7 +2074,8 @@ pub fn NPC_ShotEntity(
         if npc_weapon == WP_THERMAL {
             //thermal aims from slightly above head
             //FIXME: what about low-angle shots, rolling the thermal under something?
-            // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The deref stays raw.
             let npc_client = ctx.world.entity(npc_id).client;
             CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_HEAD, &mut muzzle);
             let angles: vec3_t = [0.0, (*npc_client).ps.viewangles[1], 0.0];
@@ -2191,7 +2218,8 @@ pub fn NPC_CheckCanAttack(
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_ent = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
+        // FLAG: gNPC_t and gclient_t pool client have no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -2226,7 +2254,8 @@ pub fn NPC_CheckCanAttack(
         vectoangles(delta, &mut angleToEnemy);
         let distanceToEnemy = VectorNormalize(&mut delta);
 
-        // FLAG: gNPC_t (NPC) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The derefs stay raw.
         let npc_npc = ctx.world.entity(npc_ent).NPC;
         (*npc_npc).desiredYaw = angleToEnemy[YAW];
         NPC_UpdateFiringAngles(ctx, qfalse, qtrue);
@@ -2257,7 +2286,8 @@ pub fn NPC_CheckCanAttack(
             attack_ok = qtrue;
 
             //Check to duck
-            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            // FLAG: gclient_t pool client.
+            // The derefs stay raw.
             let enemy_client = ctx.world.entity(enemy_ent).client;
             if !enemy_client.is_null() {
                 if ctx.world.entity(enemy_ent).enemy == Some(npc_ent) {
@@ -2300,7 +2330,8 @@ pub fn NPC_CheckCanAttack(
 
                 hitspot = tr.endpos;
 
-                // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+                // FLAG: gclient_t pool client(s).
+                // The derefs stay raw.
                 let traceEnt_client = ctx.world.entity(traceEnt_id.unwrap()).client;
                 let npc_client = ctx.world.entity(npc_ent).client;
                 if traceEnt_id == Some(enemy_ent)
@@ -2339,7 +2370,8 @@ pub fn NPC_CheckCanAttack(
                             || EntIsGlass(ctx.entity(traceEnt_id.unwrap())) != 0)
                     {
                         //easy to kill - go for it
-                        //rwwFIXMEFIXME: ExplodeDeath_Wait? — dead code path, faithfully skipped (if(0) in oracle)
+                        //rwwFIXMEFIXME: ExplodeDeath_Wait?
+                        // The oracle guards this block with `if (0)`, so this port skips it too.
                     } else {
                         let mut forward: vec3_t = [0.0; 3];
                         AngleVectors((*client).ps.viewangles, Some(&mut forward), None, None);
@@ -2388,7 +2420,8 @@ pub fn IdealDistance(ctx: &mut GameContext, self_: EntityId) -> f32 {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The deref stays raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut ideal = 225.0 - 20.0 * (*npc_info).stats.aggression as f32;
@@ -2482,8 +2515,8 @@ pub fn CP_FindCombatPointWaypoints(ctx: &mut GameContext) {
 // Raven `CP_*` request-flag bits: `crate::npc::combat_point_flags`
 // (`b_local.h:243-261`).
 
-/// `combatPt_t` — local mirror of the oracle's file-local `typedef struct
-/// { float dist; int index; } combatPt_t` used only as the collector's
+/// `combatPt_t` is a local mirror of the oracle's file-local `typedef struct
+/// { float dist; int index; } combatPt_t`, used only as the collector's
 /// scratch array.
 ///
 /// Source: `oracle/codemp/game/NPC_combat.c:2569-2574`
@@ -2603,7 +2636,8 @@ pub fn NPC_FindCombatPoint(
 
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut points: [CombatPt; MAX_COMBAT_POINTS_LOCAL] = [CombatPt {
@@ -2658,7 +2692,8 @@ pub fn NPC_FindCombatPoint(
                 continue;
             }
 
-            //Need a clear LOS to our target... and be within shot range to enemy position (FIXME: make this a separate CS_ flag? and pass in a range?)
+            //Need a clear LOS to our target... and be within shot range to enemy position
+            // (FIXME: make this a separate CS_ flag? and pass in a range?)
             if (flags & CP_CLEAR) != 0 {
                 let enemy_id = ctx.world.entity(npc_id).enemy;
                 if NPC_ClearLOS3(ctx, ctx.world.level.combatPoints[i].origin, enemy_id) == qfalse {
@@ -2840,9 +2875,8 @@ pub fn NPC_FindCombatPoint(
     }
 }
 
-// Raven `ENTITYNUM_NONE` (`MAX_GENTITIES - 1`) — file-local alias of the
-// canonical `mp_qshared::shared::ENTITYNUM_NONE` (kept to avoid churning this
-// file's use sites).
+// Raven `ENTITYNUM_NONE` (`MAX_GENTITIES - 1`) has a file-local alias here to the canonical
+// `mp_qshared::shared::ENTITYNUM_NONE`, kept to avoid churning this file's use sites.
 const ENTITYNUM_NONE_LOCAL: c_int = mp_qshared::shared::ENTITYNUM_NONE;
 
 // Raven `CPF_DUCK`/`CPF_FLEE`/`CPF_INVESTIGATE`/`CPF_SQUAD`
@@ -2852,8 +2886,7 @@ const ENTITYNUM_NONE_LOCAL: c_int = mp_qshared::shared::ENTITYNUM_NONE;
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).
 
-// Raven `WORLD_SIZE` (`MAX_WORLD_COORD - MIN_WORLD_COORD`, `64*1024 -
-// (-64*1024)`) — not yet ported as a central const.
+// Raven `WORLD_SIZE` (`MAX_WORLD_COORD - MIN_WORLD_COORD`, `64*1024 - (-64*1024)`) is not yet ported as a central const.
 // Source: `oracle/codemp/game/q_shared.h:18-20`
 pub const WORLD_SIZE: f32 = 131072.0;
 
@@ -2899,8 +2932,9 @@ pub fn NPC_FindSquadPoint(ctx: &mut GameContext, position: vec3_t) -> c_int {
 /// Source: `oracle/codemp/game/NPC_combat.c:2923-2937`
 pub fn NPC_ReserveCombatPoint(ctx: &mut GameContext, combatPointID: c_int) -> qboolean {
     //Make sure it's valid
-    // §19: Raven only guards the upper bound; a -1 id reads combatPoints[-1] (UB,
-    // reads as not-occupied → returns qfalse). We reject negatives to that same effect.
+    // §19: Raven guards only the upper bound.
+    // A -1 id reads combatPoints[-1] in C, which is undefined behavior and reads as not occupied, so it returns qfalse.
+    // This rejects negative ids here to match that same effect.
     if combatPointID > ctx.world.level.numCombatPoints || combatPointID < 0 {
         return 0;
     }
@@ -2932,8 +2966,9 @@ pub fn NPC_FreeCombatPoint(
             (*npc_info).lastFailedCombatPoint = combatPointID;
         }
         //Make sure it's valid
-        // §19: Raven only guards the upper bound; a -1 id reads combatPoints[-1] (UB,
-        // reads as not-occupied → returns qfalse). We reject negatives to that same effect.
+        // §19: Raven guards only the upper bound.
+        // A -1 id reads combatPoints[-1] in C, which is undefined behavior and reads as not occupied, so it returns qfalse.
+        // This rejects negative ids here to match that same effect.
         if combatPointID > ctx.world.level.numCombatPoints || combatPointID < 0 {
             return qfalse;
         }
@@ -3070,8 +3105,8 @@ pub fn NPC_SearchForWeapons(ctx: &mut GameContext) -> *mut gentity_t {
     }
 }
 
-// Raven `NF_CLEAR_PATH` (`g_nav.h`, nav-flags bit) — not yet ported as a
-// central const; inlined here from the header value.
+// Raven `NF_CLEAR_PATH` (`g_nav.h`, nav-flags bit) is not yet ported as a central const.
+// This value is inlined here from the header.
 // Source: `oracle/codemp/game/g_nav.h:36`
 const NF_CLEAR_PATH_LOCAL: c_int = 0x0000_0002;
 
@@ -3083,7 +3118,8 @@ pub fn NPC_SetPickUpGoal(ctx: &mut GameContext, foundWeap: Option<EntityId>) {
         let foundWeap_id = foundWeap.unwrap();
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         //NPCInfo->goalEntity = foundWeap;
@@ -3099,9 +3135,9 @@ pub fn NPC_SetPickUpGoal(ctx: &mut GameContext, foundWeap: Option<EntityId>) {
     }
 }
 
-// Raven `SQUAD_TRANSITION` (`squadState_t`-family int, `b_local.h`) — not yet
-// ported as a central const; per-file precedent (`NPC_AI_Grenadier.rs`/
-// `NPC_AI_Sniper.rs` each keep their own private copy).
+// Raven `SQUAD_TRANSITION` (`squadState_t`-family int, `b_local.h`) is not yet ported as a
+// central const. `NPC_AI_Grenadier.rs` and `NPC_AI_Sniper.rs` each keep their own private copy
+// too, so this follows that precedent.
 const SQUAD_TRANSITION_LOCAL: i32 = 4;
 
 /// Raven `NPC_CheckGetNewWeapon`.
@@ -3111,7 +3147,8 @@ pub fn NPC_CheckGetNewWeapon(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t has no accessor.
+        // The derefs stay raw.
         let npc_info = ctx.world.globals.NPCInfo;
 
         if ctx.world.entity(npc_id).s.weapon == WP_NONE && !ctx.world.entity(npc_id).enemy.is_none()
@@ -3193,7 +3230,8 @@ pub fn NPC_AimAdjust(ctx: &mut GameContext, change: c_int) {
 /// Source: `oracle/codemp/game/NPC_combat.c:3131-3145`
 pub fn G_AimSet(ctx: &mut GameContext, self_: EntityId, aim: c_int) {
     unsafe {
-        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPC) has no accessor.
+        // The deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if !npc.is_null() {
             (*npc).currentAim = aim;

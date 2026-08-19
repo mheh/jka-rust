@@ -18,15 +18,16 @@ pub const FL_DONT_SHOOT: c_int = 0x00040000;
 pub const FL_SHIELDED: c_int = 0x00080000;
 pub const FL_UNDYING: c_int = 0x00100000; // takes damage down to 1, but never dies
 
-// ex-eFlags -rww (FL_BOUNCE intentionally shares FL_UNDYING's value in the original)
+//ex-eFlags -rww
+// FL_BOUNCE intentionally shares the value of FL_UNDYING in the original source.
 pub const FL_BOUNCE: c_int = 0x00100000; // for missiles
 pub const FL_BOUNCE_HALF: c_int = 0x00200000; // for missiles
 pub const FL_BOUNCE_SHRAPNEL: c_int = 0x00400000; // special shrapnel flag
 
-// vehicle game-local stuff -rww
+//vehicle game-local stuff -rww
 pub const FL_VEH_BOARDING: c_int = 0x00800000;
 
-// breakable flags -rww
+//breakable flags -rww
 pub const FL_DMG_BY_SABER_ONLY: c_int = 0x01000000; // only take dmg from saber
 pub const FL_DMG_BY_HEAVY_WEAP_ONLY: c_int = 0x02000000; // only take dmg from explosives
 

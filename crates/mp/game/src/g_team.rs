@@ -1,8 +1,6 @@
-// PORT-COMPLETE: g_team.c (PrintMsg dropped — dead, zero live callers)
-//! FAITHFUL port of `oracle/codemp/game/g_team.c`.
+//! Port of `oracle/codemp/game/g_team.c`.
 //!
-//! Functions that reach file-scope game state (`level`, `teamgame`,
-//! `g_entities`, cvars) or an engine trap thread the `GameContext` handle.
+//! Functions that reach file-scope game state (`level`, `teamgame`, `g_entities`, cvars) or an engine trap thread the `GameContext` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -21,14 +19,14 @@ use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
 use mp_qshared::shared::MAX_CLIENTS;
 use native_sort::qsort::qsort;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// This keeps the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
-// Relocated to the qshared tier (`q_shared.h` is a shared header) for the bg
-// crate; re-exported here so game importers and the prelude keep resolving
-// `crate::g_team::S_COLOR_*` unchanged. Canonical home:
-// `mp_qshared::shared::q_color`.
+// This relocates to the qshared tier because `q_shared.h` is a shared header for the bg crate.
+// The re-export here keeps `crate::g_team::S_COLOR_*` resolving unchanged for game importers and the prelude.
+// Canonical home: `mp_qshared::shared::q_color`.
 // Source: `oracle/codemp/game/q_shared.h:1145-1167`
 pub use mp_qshared::shared::q_color::{
     S_COLOR_BLUE, S_COLOR_GREEN, S_COLOR_RED, S_COLOR_WHITE, S_COLOR_YELLOW,
@@ -51,17 +49,16 @@ const TEAM_RED: c_int = 1;
 const TEAM_BLUE: c_int = 2;
 const TEAM_SPECTATOR: c_int = 3;
 
-// Siege team indices — canonical `#define`s in bg_saga.h (SIEGETEAM_TEAM1==1,
-// SIEGETEAM_TEAM2==2). Local decls were off-by-one (0/1), breaking the
-// `team == SIEGETEAM_TEAM1` spawn-class selection in SelectRandomTeamSpawnPoint.
+// Siege team indices are canonical `#define`s in bg_saga.h (SIEGETEAM_TEAM1 == 1, SIEGETEAM_TEAM2 == 2).
+// Local declarations were off by one (0/1), which broke the `team == SIEGETEAM_TEAM1` spawn-class selection in SelectRandomTeamSpawnPoint.
 // Source: `oracle/codemp/game/bg_saga.h:3-4`
 use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
 
 // Game state constant (oracle/codemp/game/g_team.c:974)
 const TEAM_BEGIN: c_int = 0;
 
-// `SVF_BROADCAST` (svflags #define) is canonical in `g_public_consts` and
-// reaches here via the prelude glob (`pub use crate::g_public_consts::*`).
+// `SVF_BROADCAST` (svflags #define) is canonical in `g_public_consts`.
+// It reaches here through the prelude glob (`pub use crate::g_public_consts::*`).
 // Source: `oracle/codemp/game/g_public.h:20`
 
 // CTF scoring bonuses (porting-rules §C8: `#define` -> `const`).
@@ -153,12 +150,11 @@ pub fn TeamColorString(team: c_int) -> *const c_char {
 
 /// Raven `PrintCTFMessage`.
 ///
-/// plIndex used to print pl->client->pers.netname; teamIndex used to print
-/// team name.
+/// plIndex used to print pl->client->pers.netname
+/// teamIndex used to print team name
 /// Source: `oracle/codemp/game/g_team.c:100-132`
 pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, ctfMessage: c_int) {
-    // MAX_CLIENTS not threaded through this packet's resolved surface; use
-    // the Raven literal directly (g_team.c:106 hardcodes the same +1 idiom).
+    // This uses the Raven literal directly (g_team.c:106 hardcodes the same +1 idiom).
     let plIndex = if plIndex == -1 { 32 + 1 } else { plIndex };
     let teamIndex = if teamIndex == -1 { 50 } else { teamIndex };
 
@@ -219,14 +215,14 @@ pub fn OnSameTeam(
     ent1: Option<EntityId>,
     ent2: Option<EntityId>,
 ) -> qboolean {
-    // Option<EntityId> params. Entity fields route through the checked
-    // arena accessor; the `.client` pointer is dereffed raw (see FLAG below).
+    // Option<EntityId> params.
+    // Entity fields route through the checked arena accessor.
+    // The `.client` pointer is dereffed raw (see FLAG below).
     let (Some(ent1), Some(ent2)) = (ent1, ent2) else {
         return qfalse;
     };
-    // FLAG (task #7): `.client` may be an NPC/vehicle pool `gclient_t` (`gClPtrs`,
-    // g_utils.c:430), not a `level.clients` slot — read the pointer via the safe
-    // entity borrow and deref it raw exactly as Raven does. (recipe 2c)
+    // FLAG: `.client` may be an NPC or vehicle pool `gclient_t` (`gClPtrs`, g_utils.c:430), not a `level.clients` slot.
+    // The pointer is read through the safe entity borrow and dereffed raw, exactly as Raven does.
     let c1 = ctx.world.entity(ent1).client;
     let c2 = ctx.world.entity(ent2).client;
     unsafe {
@@ -348,8 +344,9 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
 
         if modified != 0 {
             let ctfFlagStatusRemap: &[u8] = &[b'0', b'1', b'*', b'*', b'2'];
-            // §19: oracle reads `char st[4]` uninitialized outside CTF/CTY (UB);
-            // port zero-inits, sending "". Source: g_team.c:308-314
+            // §19: oracle reads `char st[4]` uninitialized outside CTF/CTY, which is UB.
+            // The port zero-inits it instead, sending "".
+            // Source: g_team.c:308-314
             let mut st: [c_char; 4] = [0; 4];
 
             if ctx.world.cvars.g_gametype.integer == GT_CTF as c_int
@@ -395,8 +392,8 @@ pub fn Team_ForceGesture(ctx: &mut GameContext, team: c_int) {
         if ctx.world.entity(id).inuse == 0 {
             continue;
         }
-        // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw
-        // as Raven does. (recipe 2c)
+        // FLAG: `.client` is read through the safe entity borrow.
+        // It is dereffed raw, the same as Raven.
         let client = ctx.world.entity(id).client;
         if client.is_null() {
             continue;
@@ -418,9 +415,10 @@ pub fn Team_FragBonuses(
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
 ) {
-    // EntityId targ + Option<EntityId> inflictor/attacker (`inflictor`
-    // unused, as in Raven). Entity fields route through the checked arena
-    // accessor; `.client` pointers are dereffed raw (see FLAG below).
+    // EntityId targ + Option<EntityId> inflictor/attacker.
+    // `inflictor` is unused, as in Raven.
+    // Entity fields route through the checked arena accessor.
+    // The `.client` pointers are dereffed raw (see FLAG below).
     let Some(attacker) = attacker else {
         return;
     };
@@ -434,11 +432,12 @@ pub fn Team_FragBonuses(
         return;
     }
 
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does (may be an NPC pool `gclient_t`, `gClPtrs`). (recipe 2c)
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven, because it may be an NPC pool `gclient_t` (`gClPtrs`).
     let targ_cl = ctx.world.entity(targ).client;
     let attacker_cl = ctx.world.entity(attacker).client;
-    // Entity origins are not mutated in this function; read once.
+    // Entity origins are not mutated in this function.
+    // This reads them once.
     let targ_origin = ctx.world.entity(targ).r.currentOrigin;
     let attacker_origin = ctx.world.entity(attacker).r.currentOrigin;
 
@@ -457,8 +456,7 @@ pub fn Team_FragBonuses(
         };
 
         // did the attacker frag the flag carrier?
-        // Oracle sets `tokens = 0` here (g_team.c:394) and never changes it, so the
-        // `if (tokens)` block below is dead. Preserved as a dead branch (porting-rules §20).
+        // Oracle sets `tokens = 0` here (g_team.c:394) and never changes it, so the `if (tokens)` block below is dead.
         let tokens = 0;
         if (*targ_cl).ps.powerups[enemy_flag_pw as usize] != 0 {
             (*attacker_cl).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
@@ -633,9 +631,8 @@ pub fn Team_FragBonuses(
 
         if let Some(carrier) = carrier.filter(|&c| c != attacker) {
             let carrier_origin = ctx.world.entity(carrier).r.currentOrigin;
-            // Oracle typo (g_team.c:517-518): VectorSubtract writes v1 on BOTH lines,
-            // so v2 is never recomputed here and stays stale (attacker-flag from the
-            // base-flag block above). Preserved verbatim (porting-rules §19).
+            // Oracle typo (g_team.c:517-518): VectorSubtract writes v1 on both lines.
+            // v2 never gets recomputed here and stays stale (the attacker-flag value from the base-flag block above).
             v1[0] = targ_origin[0] - carrier_origin[0];
             v1[1] = targ_origin[1] - carrier_origin[1];
             v1[2] = targ_origin[2] - carrier_origin[2];
@@ -693,8 +690,8 @@ pub fn Team_CheckHurtCarrier(
         return;
     }
 
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does. (recipe 2c)
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven.
     let targ_cl = ctx.world.entity(targ).client;
     let attacker_cl = ctx.world.entity(attacker).client;
     let time = ctx.world.level.time as f32;
@@ -774,9 +771,8 @@ pub fn Team_ResetFlags(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/g_team.c:608-624`
 pub fn Team_ReturnFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
     let Some(ent) = ent else {
-        // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") —
-        // logging trap not resolved in this packet's call surface; behavior
-        // (early return) preserved, message dropped.
+        // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") is dropped.
+        // The early return still happens.
         return;
     };
 
@@ -838,8 +834,7 @@ pub fn Team_TakeFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_
 /// Source: `oracle/codemp/game/g_team.c:664-680`
 pub fn Team_CaptureFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
     let Some(ent) = ent else {
-        // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") —
-        // logging trap not resolved in this packet's call surface.
+        // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") is dropped.
         return;
     };
 
@@ -861,8 +856,10 @@ pub fn Team_ReturnFlag(ctx: &mut GameContext, team: c_int) {
     let flag = Team_ResetFlag(ctx, team);
     Team_ReturnFlagSound(ctx, flag, team);
     if team == TEAM_FREE {
-        // PrintMsg(NULL, "The flag has returned!\n") — dead (StringEd-only
-        // client-side messaging, g_team.c:685).
+        //PrintMsg(NULL, "The flag has returned!\n" );
+        // This call is dead.
+        // StringEd handles messaging like this on the client only.
+        // Source: g_team.c:685
     } else {
         // flag should always have team in normal CTF
         PrintCTFMessage(ctx, -1, team, ctfMsg_t::CTFMESSAGE_FLAG_RETURNED as c_int);
@@ -889,10 +886,11 @@ pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
 
 /// Raven `Team_DroppedFlagThink`.
 ///
-/// Automatically set in `Launch_Item` if the item is one of the flags. Flags
-/// are unique in that if they are dropped, the base flag must be respawned
-/// when they time out. Stored as a fn pointer (`EntThink`) — the fn-ID enum
-/// wiring for the assignment site is separate from this body.
+/// Automatically set in `Launch_Item` if the item is one of the flags.
+/// Flags are unique in that if they are dropped, the base flag must be respawned when they time out.
+///
+/// This is stored as a fn pointer (`EntThink`).
+/// The fn-ID enum wiring for the assignment site lives separately from this body.
 /// Source: `oracle/codemp/game/g_team.c:714-729`
 pub fn Team_DroppedFlagThink(ctx: &mut GameContext, ent: EntityId) {
     let item = ctx.world.entity(ent).item;
@@ -908,7 +906,7 @@ pub fn Team_DroppedFlagThink(ctx: &mut GameContext, ent: EntityId) {
         TEAM_FREE
     };
 
-    // Team_ResetFlag will delete this entity.
+    // Reset Flag will delete this entity
     let flag = Team_ResetFlag(ctx, team);
     Team_ReturnFlagSound(ctx, flag, team);
 }
@@ -922,13 +920,15 @@ pub fn Team_TouchOurFlag(
     other: EntityId,
     team: c_int,
 ) -> c_int {
-    // EntityId params. Entity fields route through the checked arena
-    // accessor; the `.client` pointer is dereffed raw (see FLAG below).
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does. (recipe 2c)
+    // EntityId params.
+    // Entity fields route through the checked arena accessor.
+    // The `.client` pointer is dereffed raw (see FLAG below).
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven.
     let cl = ctx.world.entity(other).client;
     let num = ctx.world.entity(other).s.number;
-    // `ent` (the flag) origins are not mutated before use; read once.
+    // `ent` (the flag) origins are not mutated before use.
+    // This reads them once.
     let ent_origin = ctx.world.entity(ent).r.currentOrigin;
     let ent_trbase = ctx.world.entity(ent).s.pos.trBase;
     let ent_dropped = ctx.world.entity(ent).flags & FL_DROPPED_ITEM != 0;
@@ -941,7 +941,7 @@ pub fn Team_TouchOurFlag(
         };
 
         if ent_dropped {
-            // flag is not at home, return it by teleporting it back
+            // hey, its not home.  return it by teleporting it back
             PrintCTFMessage(
                 ctx,
                 num,
@@ -994,7 +994,7 @@ pub fn Team_TouchOurFlag(
                 continue;
             }
 
-            // FLAG (task #7): player `.client` dereffed raw as Raven does. (recipe 2c)
+            // FLAG: player `.client` is dereffed raw, the same as Raven.
             let pcl = ctx.world.entity(pid).client;
             if (*pcl).sess.sessionTeam as c_int != (*cl).sess.sessionTeam as c_int {
                 (*pcl).pers.teamState.lasthurtcarrier = -5.0;
@@ -1038,10 +1038,11 @@ pub fn Team_TouchEnemyFlag(
     other: EntityId,
     team: c_int,
 ) -> c_int {
-    // EntityId params. Entity fields route through the checked arena
-    // accessor; the `.client` pointer is dereffed raw (see FLAG below).
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does. (recipe 2c)
+    // EntityId params.
+    // Entity fields route through the checked arena accessor.
+    // The `.client` pointer is dereffed raw (see FLAG below).
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven.
     let cl = ctx.world.entity(other).client;
     let num = ctx.world.entity(other).s.number;
     let ent_origin = ctx.world.entity(ent).r.currentOrigin;
@@ -1082,11 +1083,12 @@ pub fn Pickup_Team(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
     } else if classname == "team_CTF_neutralflag" {
         TEAM_FREE
     } else {
-        // PrintMsg(other, "Don't know what team the flag is on.\n") — dead.
+        //PrintMsg ( other, "Don't know what team the flag is on.\n");
+        // This call is dead.
         return 0;
     };
 
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw. (recipe 2c)
+    // FLAG: `.client` is read through the safe entity borrow and dereffed raw.
     let cl = ctx.world.entity(other).client;
     let cl_team = unsafe { (*cl).sess.sessionTeam } as c_int;
     if team == cl_team {
@@ -1105,8 +1107,8 @@ pub fn Team_GetLocation(ctx: &mut GameContext, ent: EntityId) -> Option<EntityId
 
     let origin = ctx.world.entity(ent).r.currentOrigin;
 
-    // `level.locationHead` is a raw `*mut gentity_t` chain-head; convert it to a
-    // handle and walk `nextTrain` (already `Option<EntityId>`) through the arena.
+    // `level.locationHead` is a raw `*mut gentity_t` chain-head.
+    // This converts it to a handle and walks `nextTrain` (already `Option<EntityId>`) through the arena.
     let mut eloc = ctx.entity_id_of(ctx.world.level.locationHead);
     while let Some(eid) = eloc {
         let eloc_origin = ctx.world.entity(eid).r.currentOrigin;
@@ -1152,12 +1154,11 @@ pub fn Team_GetLocationMsg(
         return qfalse;
     };
 
-    // `message` is now an owned `Option<String>` (`None` ≡ Raven NULL); locations
-    // always carry one, so decode with an empty-string fallback for the absent case.
+    // `message` is now an owned `Option<String>` (`None` is equivalent to Raven NULL).
+    // Locations always carry one, so this decodes with an empty-string fallback for the absent case.
     let message = ctx.world.entity(best).message.clone().unwrap_or_default();
 
-    // Oracle gates on the original `best->count`, then clamps and writes the
-    // clamped value back into the entity (g_team.c:928-933).
+    // Oracle gates on the original `best->count`, then clamps it and writes the clamped value back into the entity (g_team.c:928-933).
     let formatted = if ctx.world.entity(best).count != 0 {
         if ctx.world.entity(best).count < 0 {
             ctx.world.entity_mut(best).count = 0;
@@ -1171,8 +1172,8 @@ pub fn Team_GetLocationMsg(
         message.to_string()
     };
 
-    // FLAG (task #7): `loc` is an engine-owned out-buffer; the raw slice write
-    // stays raw. (recipe 2c)
+    // FLAG: `loc` is an engine-owned out-buffer.
+    // The raw slice write stays raw.
     let loc_slice = unsafe { core::slice::from_raw_parts_mut(loc, loclen as usize) };
     write_cstr_field(loc_slice, &formatted);
 
@@ -1222,9 +1223,9 @@ pub fn SelectRandomTeamSpawnPoint(
     let mut spot: Option<EntityId> = None;
 
     loop {
-        // Oracle's `while ((spot = G_Find(...)) != NULL)` — break on null before
-        // taking an id (the STAGE-1 body unwrapped pre-null-check, which would
-        // panic on the terminating iteration; oracle just exits the loop).
+        // Oracle's `while ((spot = G_Find(...)) != NULL)` breaks on null before taking an id.
+        // An earlier version of this body unwrapped before the null check, which would have panicked on the terminating iteration.
+        // Oracle just exits the loop.
         let s = G_Find(ctx, spot, EntFindField::Classname, classname);
         spot = ctx.entity_id_of(s);
         if s.is_null() {
@@ -1259,7 +1260,7 @@ pub fn SelectRandomTeamSpawnPoint(
 
         while i < count {
             if let Some(sid) = spots[i as usize] {
-                // `.idealclass` is now an owned `String` (`""` ≡ absent).
+                // `.idealclass` is now an owned `String`, where `""` means absent.
                 let idealclass = ctx.world.entity(sid).idealclass.clone();
                 if !idealclass.is_empty() {
                     let bg_classes = &ctx.world.bg_state.bgSiegeClasses;
@@ -1275,9 +1276,8 @@ pub fn SelectRandomTeamSpawnPoint(
 
         if class_count > 0 {
             let selection = (ctx.world.bg_state.rng.rand() % class_count) as usize;
-            // Oracle returns `spots[selection]` here (g_team.c:1034), not
-            // `classSpots[selection]` — a Raven bug (selection is classCount-bounded
-            // but indexes the full spots array). Preserved (porting-rules §19).
+            // Oracle returns `spots[selection]` here (g_team.c:1034), not `classSpots[selection]`.
+            // This is a Raven bug: selection is bounded by classCount but indexes the full spots array (porting-rules §19).
             return spots[selection];
         }
     }
@@ -1306,8 +1306,8 @@ pub fn SelectCTFSpawnPoint(
     (*origin)[2] += 9.0;
     crate::q_math::_VectorCopy(s_angles, angles);
 
-    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`; reconstruct
-    // it from the handle at the return boundary (a cast, not a deref).
+    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`.
+    // This reconstructs it from the handle at the return boundary, a cast rather than a deref.
     ctx.world.entity_mut(spot) as *mut gentity_t
 }
 
@@ -1332,8 +1332,8 @@ pub fn SelectSiegeSpawnPoint(
     (*origin)[2] += 9.0;
     crate::q_math::_VectorCopy(s_angles, angles);
 
-    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`; reconstruct
-    // it from the handle at the return boundary (a cast, not a deref).
+    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`.
+    // This reconstructs it from the handle at the return boundary, a cast rather than a deref.
     ctx.world.entity_mut(spot) as *mut gentity_t
 }
 
@@ -1348,8 +1348,8 @@ pub fn SortClients(a: &c_int, b: &c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_team.c:1103-1159`
 pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does. (recipe 2c)
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven.
     let ent_cl = ctx.world.entity(ent).client;
     unsafe {
         if (*ent_cl).pers.teamInfo == 0 {
@@ -1435,8 +1435,8 @@ pub fn CheckTeamStatus(ctx: &mut GameContext) {
 
     ctx.world.level.lastTeamLocationTime = ctx.world.level.time;
 
-    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
-    // Raven does. (recipe 2c)
+    // FLAG: `.client` is read through the safe entity borrow.
+    // It is dereffed raw, the same as Raven.
     let max_clients = ctx.world.cvars.g_maxclients.integer;
     for i in 0..max_clients {
         let eid = EntityId(i as u32);
@@ -1481,25 +1481,29 @@ pub fn CheckTeamStatus(ctx: &mut GameContext) {
 
 /// Raven `SP_team_CTF_redplayer`.
 ///
-/// Raven: empty — spawn markers carry no runtime behavior; classname alone
-/// is read by `SelectRandomTeamSpawnPoint`.
+/// This function is empty.
+/// Spawn markers carry no runtime behavior.
+/// `SelectRandomTeamSpawnPoint` reads only the classname.
 /// Source: `oracle/codemp/game/g_team.c:1209-1210`
 pub fn SP_team_CTF_redplayer(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_blueplayer`.
 ///
-/// Raven: empty — spawn markers carry no runtime behavior.
+/// This function is empty.
+/// Spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1216-1217`
 pub fn SP_team_CTF_blueplayer(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_redspawn`.
 ///
-/// Raven: empty — spawn markers carry no runtime behavior.
+/// This function is empty.
+/// Spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1224-1225`
 pub fn SP_team_CTF_redspawn(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_bluespawn`.
 ///
-/// Raven: empty — spawn markers carry no runtime behavior.
+/// This function is empty.
+/// Spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1231-1232`
 pub fn SP_team_CTF_bluespawn(ent: &gentity_t) {}

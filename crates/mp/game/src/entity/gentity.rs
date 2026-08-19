@@ -38,7 +38,7 @@ pub struct gentity_t {
     /// Ptr to playerstate if applicable (for bg ents).
     /// Raven field source: `oracle/codemp/game/g_local.h:136`
     pub playerState: *mut playerState_t,
-    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// DEC-26 restored the real type, because `gentity_t` now lives in `mp_game`.
     /// Raven field source: `oracle/codemp/game/bg_vehicles.h:477` (via `g_local.h:137`)
     pub m_pVehicle: *mut Vehicle_t,
     /// G2 instance.
@@ -96,10 +96,10 @@ pub struct gentity_t {
     pub next_roff_time: c_int,
     /// DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS THE FIELDS IN THAT ORDER.
     ///
-    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// DEC-26 restored the real type, because `gentity_t` now lives in `mp_game`.
     /// Raven field source: `oracle/codemp/game/g_local.h:173`
     pub client: *mut gclient_t,
-    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// DEC-26 restored the real type, because `gentity_t` now lives in `mp_game`.
     /// Raven field source: `oracle/codemp/game/g_local.h:175` (`b_public.h`)
     pub NPC: *mut gNPC_t,
     /// Makes them look for another enemy on the same team if the one they're after can't be hit.
@@ -119,15 +119,16 @@ pub struct gentity_t {
     /// Damage will be ignored if it comes from this team.
     /// Raven field source: `oracle/codemp/game/g_local.h:186`
     pub teamnodmg: c_int,
-    // Raven `roffname`/`rofftarget` (`g_local.h:188-189`) deleted: `rofftarget`
-    // had zero readers repo-wide and `roffname` only ever fed the resolved
-    // `roffid` int, so both spawn keys became `F_IGNORE` (parse silently) and the
-    // ICARUS `roffname` store dropped. Private tail — no ABI impact.
-    /// Owned copy of the QuakeEd healing-class name; `""` ≡ absent (Raven `char *`,
-    /// distinguished only by `!= 0`, never by NULL-vs-empty).
+    // Raven's `roffname` and `rofftarget` (`g_local.h:188-189`) are gone.
+    // `rofftarget` had zero readers repo-wide.
+    // `roffname` only ever fed the resolved `roffid` int.
+    // So both spawn keys became `F_IGNORE`, parsed and silently discarded, and the ICARUS `roffname` store dropped.
+    // This is a private-tail change with no ABI impact.
+    /// Owned copy of the QuakeEd healing-class name. `""` marks it absent.
+    /// Raven's `char *` distinguished presence only by `!= 0`, never by NULL versus empty.
     /// Raven field source: `oracle/codemp/game/g_local.h:191`
     pub healingclass: String,
-    /// Owned copy of the QuakeEd healing sound name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd healing sound name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:192`
     pub healingsound: String,
     /// Set in QuakeEd.
@@ -136,7 +137,7 @@ pub struct gentity_t {
     /// Debounce for generic object healing.
     /// Raven field source: `oracle/codemp/game/g_local.h:194`
     pub healingDebounce: c_int,
-    /// Owned copy of the QuakeEd owner-tag name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd owner-tag name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:196`
     pub ownername: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:198`
@@ -164,12 +165,11 @@ pub struct gentity_t {
     /// FL_* variables.
     /// Raven field source: `oracle/codemp/game/g_local.h:213`
     pub flags: c_int,
-    /// Owned copy of the QuakeEd model name; `None` ≡ Raven NULL (readers
-    /// distinguish an unset model from an empty one — e.g. the brush-model guard
-    /// in `g_mover`).
+    /// Owned copy of the QuakeEd model name. `None` maps to Raven NULL.
+    /// Readers distinguish an unset model from an empty one, for example the brush-model guard in `g_mover`.
     /// Raven field source: `oracle/codemp/game/g_local.h:215`
     pub model: Option<String>,
-    /// Owned copy of the QuakeEd secondary model name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd secondary model name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:216`
     pub model2: String,
     /// Level.time when the object was freed.
@@ -191,16 +191,16 @@ pub struct gentity_t {
     /// Brushes with this content value will be collided against when moving.
     /// Raven field source: `oracle/codemp/game/g_local.h:226`
     pub clipmask: c_int,
-    /// Owned NPC species name for NPC_spawners; `None` ≡ Raven NULL (the code
-    /// distinguishes a never-set spawner from one whose type resolved to `""`).
+    /// Owned NPC species name for NPC_spawners. `None` maps to Raven NULL.
+    /// The code distinguishes a never-set spawner from one whose type resolved to `""`.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:230`
     pub NPC_type: Option<String>,
-    /// Owned copy of the NPC_spawner's target name; `""` ≡ absent.
+    /// Owned copy of the NPC_spawner's target name. `""` marks it absent.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:231`
     pub NPC_targetname: String,
-    /// Owned copy of the NPC_spawner's target name; `""` ≡ absent.
+    /// Owned copy of the NPC_spawner's target name. `""` marks it absent.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:232`
     pub NPC_target: String,
@@ -229,9 +229,8 @@ pub struct gentity_t {
     /// For NPCs.
     /// Raven field source: `oracle/codemp/game/g_local.h:247`
     pub pos3: vec3_t,
-    /// Owned copy of the QuakeEd message text (`\n` escapes translated to real
-    /// linefeeds on write); `None` ≡ Raven NULL (readers distinguish an unset
-    /// message from an empty one).
+    /// Owned copy of the QuakeEd message text. Writing it translates `\n` escapes to real linefeeds.
+    /// `None` maps to Raven NULL. Readers distinguish an unset message from an empty one.
     /// Raven field source: `oracle/codemp/game/g_local.h:249`
     pub message: Option<String>,
     /// Body queue sinking, etc.
@@ -240,53 +239,53 @@ pub struct gentity_t {
     /// Set in editor, -1 = up, -2 = down.
     /// Raven field source: `oracle/codemp/game/g_local.h:253`
     pub angle: f32,
-    /// Owned copy of the QuakeEd target name; `None` ≡ Raven NULL (readers
-    /// distinguish an unset target from an empty one).
+    /// Owned copy of the QuakeEd target name. `None` maps to Raven NULL.
+    /// Readers distinguish an unset target from an empty one.
     /// Raven field source: `oracle/codemp/game/g_local.h:254`
     pub target: Option<String>,
-    /// Owned copy of the QuakeEd secondary target name; `None` ≡ Raven NULL.
+    /// Owned copy of the QuakeEd secondary target name. `None` maps to Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:255`
     pub target2: Option<String>,
-    /// Owned copy of the QuakeEd tertiary target name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd tertiary target name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:256`
     pub target3: String,
-    /// Owned copy of the QuakeEd quaternary target name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd quaternary target name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:257`
     pub target4: String,
-    /// Owned copy of the siege-item target name; `""` ≡ absent.
+    /// Owned copy of the siege-item target name. `""` marks it absent.
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:258`
     pub target5: String,
-    /// Owned copy of the siege-item target name; `""` ≡ absent.
+    /// Owned copy of the siege-item target name. `""` marks it absent.
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:259`
     pub target6: String,
-    /// Owned copy of the QuakeEd team tag; `None` ≡ Raven NULL (readers
-    /// distinguish an unset team from an empty one).
+    /// Owned copy of the QuakeEd team tag. `None` maps to Raven NULL.
+    /// Readers distinguish an unset team from an empty one.
     /// Raven field source: `oracle/codemp/game/g_local.h:261`
     pub team: Option<String>,
-    /// Owned copy of the shader-remap source name; `""` ≡ absent.
+    /// Owned copy of the shader-remap source name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:262`
     pub targetShaderName: String,
-    /// Owned copy of the shader-remap destination name; `""` ≡ absent.
+    /// Owned copy of the shader-remap destination name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:263`
     pub targetShaderNewName: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:264`
     pub target_ent: Option<EntityId>,
-    /// Owned copy of the door close-target name; `None` ≡ Raven NULL (readers
-    /// null-check before use).
+    /// Owned copy of the door close-target name. `None` maps to Raven NULL.
+    /// Readers null-check it before use.
     /// Raven field source: `oracle/codemp/game/g_local.h:266`
     pub closetarget: Option<String>,
-    /// Owned copy of the door open-target name; `None` ≡ Raven NULL.
+    /// Owned copy of the door open-target name. `None` maps to Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:267`
     pub opentarget: Option<String>,
-    /// Owned copy of the pain-target name; `None` ≡ Raven NULL.
+    /// Owned copy of the pain-target name. `None` maps to Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:268`
     pub paintarget: Option<String>,
-    /// Owned copy of the siege goal-target name; `""` ≡ absent.
+    /// Owned copy of the siege goal-target name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:270`
     pub goaltarget: String,
-    /// Owned copy of the siege ideal-class name; `""` ≡ absent.
+    /// Owned copy of the siege ideal-class name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:271`
     pub idealclass: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:273`
@@ -411,7 +410,7 @@ pub struct gentity_t {
     pub genericValue14: c_int,
     /// Raven field source: `oracle/codemp/game/g_local.h:346`
     pub genericValue15: c_int,
-    /// Owned copy of the QuakeEd sound-set name; `""` ≡ absent.
+    /// Owned copy of the QuakeEd sound-set name. `""` marks it absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:348`
     pub soundSet: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:350`
@@ -426,31 +425,30 @@ pub struct gentity_t {
     pub epVelocity: vec3_t,
     /// Raven field source: `oracle/codemp/game/g_local.h:356`
     pub epGravFactor: f32,
-    /// For bonus items. Raven `gitem_t *item` — only the table index is ever
-    /// needed, so this holds the [`ItemId`] (`Option` for the C NULL), following
-    /// the `FnId<EntThink>` precedent (private tail, no ABI pin).
+    /// For bonus items.
+    /// Raven's `gitem_t *item` only ever needs the table index, so this field holds the [`ItemId`],
+    /// with `Option` for the C NULL, following the `FnId<EntThink>` precedent (private tail, no ABI pin).
     /// Raven field source: `oracle/codemp/game/g_local.h:358`
     pub item: Option<ItemId>,
 }
 
-// Layout parity contract. `gentity_t` carries pointers, so its layout is
-// arch-dependent; the literal offsets are pinned to the host-64-bit build (only
-// `offset_of(s) == 0` is arch-independent). `m_pVehicle`/`client`/`NPC` carry
-// their real pointee types (`Vehicle_t`/`gclient_t`/`gNPC_t`, restored per
-// DEC-26); each is one pointer wide, so these offsets are unchanged from the
-// earlier `*mut c_void` form.
+// Layout parity contract.
+// `gentity_t` carries pointers, so its layout is arch-dependent.
+// The literal offsets are pinned to the host-64-bit build.
+// Only `offset_of(s) == 0` is arch-independent.
+// `m_pVehicle`, `client`, and `NPC` carry their real pointee types (`Vehicle_t`, `gclient_t`, `gNPC_t`), restored per DEC-26.
+// Each is one pointer wide, so these offsets stay unchanged from the earlier `*mut c_void` form.
 // Source: `oracle/codemp/game/g_local.h:133-359`
 //
-// The engine only pins the SHARED PREFIX (`s`, then `r`/`entityShared_t`, up
-// through `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment)
-// and learns the full stride at runtime via `trap_LocateGameData`, so the
-// private tail is free. Several tail fields have since diverged from Raven
-// layout: the 10 stored `gentity_t*` (`parent`..`teammaster`) became
-// `Option<EntityId>`, and the owned-`String` migration flipped tail string
-// fields to `String` (and deleted `roffname`/`rofftarget`) — all past
-// `next_roff_time`. Only the fixed-prefix asserts below (every one BEFORE the
-// first diverged field) are kept; `client` still sits immediately after the
-// prefix, so its offset is unchanged.
+// The engine pins only the SHARED PREFIX: `s`, then `r` (`entityShared_t`), up through `next_roff_time`,
+// per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment.
+// The engine learns the full stride at runtime through `trap_LocateGameData`, so the private tail is free.
+// Several tail fields have since diverged from Raven layout.
+// The 10 stored `gentity_t*` fields (`parent` through `teammaster`) became `Option<EntityId>`.
+// The owned-`String` migration flipped tail string fields to `String` and deleted `roffname` and `rofftarget`,
+// all past `next_roff_time`.
+// The asserts below keep only the fixed-prefix fields, each one before the first diverged field.
+// `client` still sits immediately after the prefix, so its offset stays unchanged.
 const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
@@ -459,31 +457,36 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
 
-/// Write payload for [`GameContext::ent_set`] — one variant per writable prefix
-/// string slot, so a single choke point owns the slot-pointer transaction for
-/// every prefix write in game code. `Option` payloads carry Raven's NULL (`None`
-/// → NULL slot); `str` payloads are copied into the level-lifetime prefix-string
-/// arena ([`GameWorld::prefixStrings`]) with the `\n` translation Raven's
-/// `x = G_NewString(...)` performed.
+/// Write payload for [`GameContext::ent_set`].
+/// One variant exists per writable prefix string slot, so a single choke point owns the slot-pointer
+/// transaction for every prefix write in game code.
+/// An `Option` payload carries Raven's NULL: `None` maps to a NULL slot.
+/// A `str` payload is copied into the level-lifetime prefix-string arena ([`GameWorld::prefixStrings`])
+/// with the same `\n` translation Raven's `x = G_NewString(...)` performed.
 pub enum PrefixSet<'a> {
-    /// `classname` slot. Always present in Raven (`x = G_NewString(...)`).
+    /// `classname` slot.
+    /// Always present in Raven, through `x = G_NewString(...)`.
     Classname(&'a str),
-    /// `targetname` slot; `None` ≡ Raven NULL.
+    /// `targetname` slot.
+    /// `None` maps to Raven NULL.
     Targetname(Option<&'a str>),
-    /// `fullName` slot; `None` ≡ Raven NULL.
+    /// `fullName` slot.
+    /// `None` maps to Raven NULL.
     FullName(Option<&'a str>),
-    /// `script_targetname` slot; `None` ≡ Raven NULL.
+    /// `script_targetname` slot.
+    /// `None` maps to Raven NULL.
     ScriptTargetname(Option<&'a str>),
-    /// `behaviorSet[i]` slot; `None` ≡ Raven NULL.
+    /// `behaviorSet[i]` slot.
+    /// `None` maps to Raven NULL.
     BehaviorSet(usize, Option<&'a str>),
-    /// `classname` slot written straight from a `'static` C literal (Raven's
-    /// `x = "noclass"` / `"freed"` path), bypassing the prefix-string arena.
+    /// `classname` slot written straight from a `'static` C literal, bypassing the prefix-string arena.
+    /// This is Raven's `x = "noclass"` / `"freed"` path.
     ClassnameStatic(&'static CStr),
 }
 
-/// Selects a prefix pool-pointer slot for [`gentity_t::alias_from`] — the sites
-/// that faithfully copy Raven's shared allocation (one pool buffer reachable
-/// from two entities' slots) rather than materializing a fresh copy.
+/// Selects a prefix pool-pointer slot for [`gentity_t::alias_from`].
+/// These are the sites that copy Raven's shared allocation, one pool buffer reachable
+/// from two entities' slots, instead of making a fresh copy.
 pub enum PrefixSlot {
     /// `targetname` slot.
     Targetname,
@@ -494,19 +497,18 @@ pub enum PrefixSlot {
 }
 
 impl gentity_t {
-    /// Aliases a prefix pool pointer from `src`'s slot into `self`'s same slot —
-    /// a raw pointer copy preserving Raven's shared-allocation semantics (the C
-    /// `dst->x = src->x` left both slots pointing at the one `G_Alloc` buffer).
-    /// Prefix slots stay `*mut c_char` (drop-in ABI), so a pointer copy is the
-    /// faithful port. Used by `G_FindTeams` (master inherits the slave's
-    /// `targetname`) and `NPC_Spawn_Do` (spawner clones its template's slots).
+    /// Aliases a prefix pool pointer from `src`'s slot into `self`'s same slot.
+    /// This is a raw pointer copy that matches Raven's shared-allocation semantics.
+    /// The C `dst->x = src->x` left both slots pointing at the one `G_Alloc` buffer.
+    /// Prefix slots stay `*mut c_char` (drop-in ABI), so this uses a pointer copy.
+    /// `G_FindTeams` uses this: the master inherits the slave's `targetname`.
+    /// `NPC_Spawn_Do` also uses this: the spawner clones its template's slots.
     ///
     /// # Safety
-    /// The aliased pointer stays valid regardless of either entity's lifetime:
-    /// the pointed-at bytes are owned by the level-lifetime, append-only prefix
-    /// arena ([`GameWorld::prefixStrings`]), which never drops an entry on entity
-    /// free (byte-faithful to Raven's never-freed `G_Alloc` pool), so the copy is
-    /// sound until level teardown.
+    /// The aliased pointer stays valid regardless of either entity's lifetime.
+    /// The pointed-at bytes are owned by the level-lifetime, append-only prefix arena ([`GameWorld::prefixStrings`]).
+    /// This arena never drops an entry on entity free, matching Raven's never-freed `G_Alloc` pool.
+    /// So the copy is sound until level teardown.
     pub unsafe fn alias_from(&mut self, src: &gentity_t, slot: PrefixSlot) {
         match slot {
             PrefixSlot::Targetname => self.targetname = src.targetname,
@@ -515,9 +517,8 @@ impl gentity_t {
         }
     }
 
-    /// Decodes the live `classname` slot (NULL → `""`). The slot is the truth —
-    /// the engine (ICARUS) writes it — so it is decoded fresh every call, never
-    /// cached.
+    /// Decodes the live `classname` slot. NULL maps to `""`.
+    /// The engine (ICARUS) writes the slot, so the code decodes it fresh every call and never caches it.
     pub fn classname_str(&self) -> String {
         if self.classname.is_null() {
             String::new()
@@ -526,32 +527,32 @@ impl gentity_t {
         }
     }
 
-    /// Decodes the live `targetname` slot; `None` ≡ Raven NULL.
+    /// Decodes the live `targetname` slot. `None` maps to Raven NULL.
     pub fn targetname_str(&self) -> Option<String> {
         prefix_slot_str(self.targetname)
     }
 
-    /// Decodes the live `fullName` slot; `None` ≡ Raven NULL.
+    /// Decodes the live `fullName` slot. `None` maps to Raven NULL.
     pub fn fullname_str(&self) -> Option<String> {
         prefix_slot_str(self.fullName)
     }
 
-    /// Decodes the live `script_targetname` slot; `None` ≡ Raven NULL.
+    /// Decodes the live `script_targetname` slot. `None` maps to Raven NULL.
     pub fn script_targetname_str(&self) -> Option<String> {
         prefix_slot_str(self.script_targetname)
     }
 
-    /// Decodes the live `behaviorSet[i]` slot; `None` ≡ Raven NULL.
+    /// Decodes the live `behaviorSet[i]` slot. `None` maps to Raven NULL.
     pub fn behavior_set_str(&self, i: usize) -> Option<String> {
         prefix_slot_str(self.behaviorSet[i])
     }
 
-    /// Drops every owned-`String` tail field (`mem::take` → empty `String`),
-    /// leaving the byte image safe to wholesale-zero. Paired with
-    /// [`Self::seat_owned_strings`] to bracket the `memset`-equivalent
-    /// `write_bytes` in `G_FreeEntity` — later batches EXTEND this set as more
-    /// tail fields migrate to owned strings. No Raven counterpart (Raven's fields
-    /// were pool pointers, cleared by the `memset` itself).
+    /// Drops every owned-`String` tail field with `mem::take`, so each becomes an empty `String`.
+    /// This leaves the byte image safe to zero wholesale.
+    /// [`Self::seat_owned_strings`] pairs with this method to bracket the `memset`-equivalent
+    /// `write_bytes` in `G_FreeEntity`.
+    /// Later batches extend this set as more tail fields migrate to owned strings.
+    /// Raven has no counterpart here: Raven's fields were pool pointers, cleared by the `memset` itself.
     pub fn take_owned_strings(&mut self) {
         let _ = core::mem::take(&mut self.healingclass);
         let _ = core::mem::take(&mut self.healingsound);
@@ -579,16 +580,15 @@ impl gentity_t {
         let _ = core::mem::take(&mut self.paintarget);
     }
 
-    /// Seats a fresh empty `String` into every owned-`String` tail field of a
-    /// freshly-zeroed entity image, overwriting the invalid all-zero `String`
-    /// bytes WITHOUT dropping them (`ptr::write`). Mirrors `zeroed_clients`'s
-    /// per-slot `String` install; the arena constructor and the `G_FreeEntity`
-    /// zero dance both call it. `p` must point at a live (possibly zeroed)
-    /// allocation for one `gentity_t`.
+    /// Seats a fresh empty `String` into every owned-`String` tail field of a freshly-zeroed entity image.
+    /// This overwrites the invalid all-zero `String` bytes without dropping them, through `ptr::write`.
+    /// This mirrors `zeroed_clients`'s per-slot `String` install.
+    /// The arena constructor and the `G_FreeEntity` zero dance both call it.
+    /// `p` must point at a live, possibly zeroed, allocation for one `gentity_t`.
     ///
     /// # Safety
-    /// `p` is a valid, aligned, writable pointer to one `gentity_t` whose owned
-    /// `String` slots may hold invalid (zeroed) bytes that must not be dropped.
+    /// `p` is a valid, aligned, writable pointer to one `gentity_t`.
+    /// Its owned `String` slots may hold invalid, zeroed bytes that must not be dropped.
     pub unsafe fn seat_owned_strings(p: *mut Self) {
         core::ptr::write(core::ptr::addr_of_mut!((*p).healingclass), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).healingsound), String::new());
@@ -618,15 +618,15 @@ impl gentity_t {
 }
 
 impl GameContext<'_> {
-    /// Stores `s` into the level-lifetime prefix-string arena
-    /// ([`GameWorld::prefixStrings`]) — reproducing Raven `G_NewString`'s
-    /// `\n`-escape translation — and returns a `*mut c_char` into that owned
-    /// `CString`'s stable heap buffer for a prefix slot. Replaces `G_NewString`:
-    /// the copy is owned for the level's lifetime and never freed on entity free
-    /// (byte-faithful to Raven's never-freed `G_Alloc` pool). Taking the pointer
-    /// before moving the `CString` into the `Vec` is sound — the move relocates
-    /// only the `CString` struct, not its heap buffer, so the pointer stays
-    /// valid across this and every later push.
+    /// Stores `s` into the level-lifetime prefix-string arena ([`GameWorld::prefixStrings`]).
+    /// This reproduces Raven `G_NewString`'s `\n`-escape translation and returns a `*mut c_char` into
+    /// that owned `CString`'s stable heap buffer for a prefix slot.
+    /// This method replaces `G_NewString`.
+    /// The copy is owned for the level's lifetime and is never freed on entity free, matching
+    /// Raven's never-freed `G_Alloc` pool.
+    /// Taking the pointer before moving the `CString` into the `Vec` is sound.
+    /// The move relocates only the `CString` struct, not its heap buffer, so the pointer stays valid
+    /// across this call and every later push.
     /// Source: replaces `oracle/codemp/game/g_spawn.c:724-749` (`G_NewString`).
     pub fn prefix_string(&mut self, s: &str) -> *mut c_char {
         let s_c = cstr(&translate_newlines(s));
@@ -635,11 +635,12 @@ impl GameContext<'_> {
         ptr
     }
 
-    /// The single prefix-slot write choke point (design §4d-bis). One borrow at
-    /// a time: the arena copy is made first ([`Self::prefix_string`] — no trap),
-    /// then the slot is written through a fresh entity borrow, so the slot is
-    /// never observable in a partial state at any trap boundary and no `&mut`
-    /// into the arena coexists with the world borrow.
+    /// The single prefix-slot write choke point (design §4d-bis).
+    /// Only one borrow exists at a time.
+    /// The arena copy happens first, through [`Self::prefix_string`], with no trap.
+    /// The slot write then happens through a fresh entity borrow.
+    /// So the slot is never observable in a partial state at any trap boundary, and no `&mut` into
+    /// the arena coexists with the world borrow.
     pub fn ent_set(&mut self, id: EntityId, field: PrefixSet) {
         match field {
             PrefixSet::Classname(name) => {
@@ -669,9 +670,9 @@ impl GameContext<'_> {
     }
 }
 
-/// Arena copy of `name` (via [`GameContext::prefix_string`]: `\n` translation)
-/// when present, or a NULL slot when absent — the shared body behind
-/// [`PrefixSet`]'s `Option` arms, mirroring Raven's
+/// Returns an arena copy of `name` when present, through [`GameContext::prefix_string`] with its
+/// `\n` translation, or a NULL slot when absent.
+/// This is the shared body behind [`PrefixSet`]'s `Option` arms, mirroring Raven's
 /// `x = value ? G_NewString(value) : NULL`.
 fn new_string_or_null(ctx: &mut GameContext, name: Option<&str>) -> *mut c_char {
     match name {
@@ -680,9 +681,9 @@ fn new_string_or_null(ctx: &mut GameContext, name: Option<&str>) -> *mut c_char 
     }
 }
 
-/// Decodes a live prefix `*mut c_char` slot into an owned `String`; NULL → `None`
-/// (Raven distinguishes an unset slot from an empty one). Shared by the
-/// `Option`-returning `_str` readers.
+/// Decodes a live prefix `*mut c_char` slot into an owned `String`. NULL maps to `None`.
+/// Raven distinguishes an unset slot from an empty one.
+/// The `Option`-returning `_str` readers share this function.
 fn prefix_slot_str(slot: *mut c_char) -> Option<String> {
     if slot.is_null() {
         None
@@ -691,24 +692,24 @@ fn prefix_slot_str(slot: *mut c_char) -> Option<String> {
     }
 }
 
-// `gentity_t` is no longer `ZeroValid`: the owned-`String` tail fields make an
-// all-zero image an invalid value (a zeroed `String` has a null data pointer).
-// Wholesale-zero construction now goes through `zeroed_entities()` (arena) and
-// the `take`/`seat_owned_strings` dance (`G_FreeEntity`), which install valid
-// empty `String`s into those slots. The seven fn-ID dispatch fields (`think`..
-// `die`) are still `FnId<EntXxx>` — a `#[repr(transparent)]` wrapper over
-// `Option<NonZeroU8>` whose zeroed bytes decode as `None` ("no handler") by
-// construction, matching Raven's NULL fn pointers; `fn_id_niche_tests` is the
-// regression lock.
+// `gentity_t` is no longer `ZeroValid`.
+// The owned-`String` tail fields make an all-zero image an invalid value, because a zeroed `String`
+// has a null data pointer.
+// Wholesale-zero construction now goes through `zeroed_entities()` (arena) and the
+// `take`/`seat_owned_strings` dance in `G_FreeEntity`, which install valid empty `String`s into those slots.
+// The seven fn-ID dispatch fields (`think` through `die`) are still `FnId<EntXxx>`, a
+// `#[repr(transparent)]` wrapper over `Option<NonZeroU8>`.
+// Its zeroed bytes decode as `None`, meaning no handler, by construction, matching Raven's NULL fn pointers.
+// `fn_id_niche_tests` is the regression lock.
 
 #[cfg(test)]
 mod fn_id_niche_tests {
     use super::*;
     use core::mem::{align_of, size_of, MaybeUninit};
 
-    /// The `FnId<EntXxx>` handler fields must stay 1 byte / align 1 — the same
-    /// size the legacy `Option<EntThink>` fields had — so `gentity_t`'s layout
-    /// is unchanged. (`Option<NonZeroU8>` is 1 byte via the niche.)
+    /// The `FnId<EntXxx>` handler fields must stay 1 byte, with align 1.
+    /// This is the same size the legacy `Option<EntThink>` fields had, so `gentity_t`'s layout is unchanged.
+    /// `Option<NonZeroU8>` is 1 byte through the niche optimization.
     #[test]
     fn handler_field_size_matches_legacy_one_byte() {
         assert_eq!(size_of::<FnId<EntThink>>(), 1);
@@ -721,22 +722,22 @@ mod fn_id_niche_tests {
         assert_eq!(size_of::<FnId<EntDie>>(), 1);
     }
 
-    /// The whole-bug-class regression lock: in a fully byte-zeroed `gentity_t`
-    /// image, all seven handler fields read as `None`. Before the `FnId` refactor
-    /// this decoded as `Some(variant 0)` (e.g. `touch == HolocronTouch`).
+    /// The whole-bug-class regression lock.
+    /// In a fully byte-zeroed `gentity_t` image, all seven handler fields read as `None`.
+    /// Before the `FnId` refactor, this decoded as `Some(variant 0)`, for example `touch == HolocronTouch`.
     ///
-    /// `gentity_t` is no longer `ZeroValid` (its owned `String` tail makes an
-    /// all-zero image an invalid value), so the handler bytes are read off a
-    /// zeroed `MaybeUninit` through raw pointers — never materializing a
-    /// `gentity_t` value, which would be UB on the zeroed `String` slots.
+    /// `gentity_t` is no longer `ZeroValid`, because its owned `String` tail makes an all-zero image
+    /// an invalid value.
+    /// So the handler bytes are read off a zeroed `MaybeUninit` through raw pointers.
+    /// The code never materializes a `gentity_t` value, which would be UB on the zeroed `String` slots.
     #[test]
     fn zeroed_gentity_reads_all_handlers_none() {
         use core::ptr::addr_of;
         let z = MaybeUninit::<gentity_t>::zeroed();
         let p = z.as_ptr();
-        // SAFETY: `p` points at zeroed, correctly-aligned storage; each
-        // `FnId<EntXxx>` field is one byte whose all-zero pattern is the valid
-        // `None` encoding, so reading it out is sound (no `String` slot touched).
+        // SAFETY: `p` points at zeroed, aligned storage.
+        // Each `FnId<EntXxx>` field is one byte, and its all-zero pattern is the valid `None` encoding.
+        // So reading it out is sound, because no `String` slot is touched.
         unsafe {
             assert!(addr_of!((*p).think).read().is_none());
             assert!(addr_of!((*p).reached).read().is_none());

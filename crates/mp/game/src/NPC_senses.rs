@@ -1,20 +1,8 @@
-// PORT-COMPLETE: NPC_senses.c
-//! FAITHFUL signature skeleton for `oracle/codemp/game/NPC_senses.c`.
+//! Port of `oracle/codemp/game/NPC_senses.c`.
 //!
-//! Filled by the jampgame mega-pass. Most of this file reaches file-scope game state
-//! (`level`, the current-NPC `NPC`/`NPCInfo` globals, `g_entities`,
-//! `vec3_origin`) or calls `trap_Trace`/`trap_InPVS` (whose resolved
-//! wrappers take `&Engine`, which this faithful raw-pointer signature set
-//! carries none of) or `CalcEntitySpot`/`vectoangles`/`AngleVectors`/
-//! `VectorNormalize` (whose resolved signatures take `vec3_t` out-params
-//! by value, so they cannot write results back — see `g_combat.rs`'s
-//! established `vec3-outparam-seam` park reason).
-//!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! Functions reach file-scope game state through the threaded `GameContext`/`GameWorld` handle.
+//! This state is `level`, the current-NPC `NPC`/`NPCInfo` globals, `g_entities`, and `vec3_origin`.
+//! Entity-pointer params are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_public_consts::SVF_GLASS_BRUSH;
@@ -96,9 +84,9 @@ pub fn G_ClearLineOfSight(
 
 /// Raven `CanSee`.
 ///
-/// Raven: determine if NPC can see an entity. This is a straight line trace
-/// check. This function does not look at PVS or FOV, or take any AI related
-/// factors (for example, the NPC's reaction time) into account.
+/// Raven: determine if NPC can see an entity.
+/// This is a straight line trace check.
+/// This function does not look at PVS or FOV, or take any AI related factors (for example, the NPC's reaction time) into account.
 /// Source: `oracle/codemp/game/NPC_senses.c:47-80`
 pub fn CanSee(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
@@ -195,9 +183,8 @@ pub fn InFront(spot: vec3_t, from: vec3_t, fromAngles: vec3_t, threshHold: f32) 
 
 /// Raven `InFOV3`.
 ///
-/// Raven: IDEA: further off to side of FOV range, higher chance of failing
-/// even if technically in FOV, keep core of 50% to sides as always
-/// succeeding.
+/// Raven: IDEA: further off to side of FOV range, higher chance of failing even if technically in FOV,
+/// keep core of 50% to sides as always succeeding.
 /// Source: `oracle/codemp/game/NPC_senses.c:109-125`
 pub fn InFOV3(
     spot: vec3_t,
@@ -239,8 +226,8 @@ pub fn InFOV2(
 
     let client = ctx.entity(from).client;
     if !client.is_null() {
-        // §2b: NPC/vehicle entities carry BG_Alloc'd pool clients, not
-        // level.clients; deref the entity's own client pointer raw, as Raven does.
+        // The entity's client may be an NPC or vehicle pool client (BG_Alloc'd), not `level.clients`.
+        // The deref reads the entity's own client pointer raw, as Raven does.
         _VectorCopy(unsafe { (*client).ps.viewangles }, &mut fromAngles);
     } else {
         _VectorCopy(ctx.entity(from).s.angles, &mut fromAngles);
@@ -271,8 +258,7 @@ pub fn InFOV(
 
     let client = ctx.entity(from).client;
     if !client.is_null() {
-        // §2b: pool client (may be an NPC), deref raw as Raven does.
-        // Check if renderInfo.eyeAngles is not zero
+        // The client may be an NPC pool client, so the deref stays raw, as Raven does.
         if !VectorCompare(unsafe { (*client).renderInfo.eyeAngles }, vec3_origin) {
             // Actual facing of tag_head!
             _VectorCopy(unsafe { (*client).renderInfo.eyeAngles }, &mut fromAngles);
@@ -318,9 +304,8 @@ pub fn InFOV(
 
 /// Raven `InVisrange`.
 ///
-/// Raven: FIXME: make a calculate visibility for ents that takes into
-/// account lighting, movement, turning, crouch/stand up, other anims, hide
-/// brushes, etc.
+/// Raven: FIXME: make a calculate visibility for ents that takes into account
+/// lighting, movement, turning, crouch/stand up, other anims, hide brushes, etc.
 /// Source: `oracle/codemp/game/NPC_senses.c:210-251`
 pub fn InVisrange(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let mut eyes = [0.0; 3];
@@ -339,7 +324,7 @@ pub fn InVisrange(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
     _VectorSubtract(spot, eyes, &mut deltaVector);
 
-    // §2c: NPCInfo (gNPC_t) has no accessor; deref stays raw.
+    // `NPCInfo` (gNPC_t) has no accessor, so the deref stays raw.
     let visrange = unsafe { (*npcinfo).stats.visrange * (*npcinfo).stats.visrange };
 
     if VectorLengthSquared(deltaVector) > visrange {
@@ -402,7 +387,7 @@ pub fn NPC_CheckVisibility(
 
     // check FOV
     if (flags & CHECK_FOV) != 0 {
-        // §2c: NPCInfo (gNPC_t) has no accessor; deref stays raw.
+        // `NPCInfo` (gNPC_t) has no accessor, so the deref stays raw.
         if InFOV(ctx, ent, npc_id, unsafe { (*npcinfo).stats.hfov }, unsafe {
             (*npcinfo).stats.vfov
         }) == 0
@@ -497,14 +482,13 @@ pub fn G_CheckSoundEvents(
 
 /// Raven `G_GetLightLevel`.
 ///
-/// Raven: rwwFIXMEFIXME: ...this is evil. We can possibly read from the
-/// server BSP data, or load the lightmap along with collision data and
-/// whatnot, but is it worth it? Presently a stub returning full brightness.
+/// Raven: rwwFIXMEFIXME: ...this is evil.
+/// We can possibly read from the server BSP data, or load the lightmap along with collision data and whatnot, but is it worth it?
+/// This is presently a stub that returns full brightness.
 /// Source: `oracle/codemp/game/NPC_senses.c:388-402`
 pub fn G_GetLightLevel(pos: vec3_t, fromDir: vec3_t) -> f32 {
-    // rwwFIXMEFIXME: ...this is evil. We can possibly read from the server BSP
-    // data, or load the lightmap along with collision data and whatnot, but is
-    // it worth it?
+    // rwwFIXMEFIXME: ...this is evil.
+    // We can possibly read from the server BSP data, or load the lightmap along with collision data and whatnot, but is it worth it?
     255.0
 }
 
@@ -591,8 +575,7 @@ pub fn G_CheckSightEvents(
 
 /// Raven `G_CheckAlertEvents`.
 ///
-/// Raven: NPC_CheckAlertEvents. NOTE: Should all NPCs create alertEvents too
-/// so they can detect each other?
+/// Raven: NPC_CheckAlertEvents. NOTE: Should all NPCs create alertEvents too so they can detect each other?
 /// Source: `oracle/codemp/game/NPC_senses.c:478-530`
 pub fn G_CheckAlertEvents(
     ctx: &mut GameContext,
@@ -632,7 +615,7 @@ pub fn G_CheckAlertEvents(
     // get sight event
     let self_npc = ctx.entity(self_).NPC;
     if !self_npc.is_null() {
-        // §2c: gNPC_t has no accessor; deref stays raw.
+        // `gNPC_t` has no accessor, so the deref stays raw.
         bestSightEvent = G_CheckSightEvents(
             ctx,
             self_,
@@ -701,7 +684,7 @@ pub fn NPC_CheckAlertEvents(
     let npcinfo = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
-    // §2c: NPCInfo (gNPC_t) has no accessor; deref stays raw.
+    // `NPCInfo` (gNPC_t) has no accessor, so the deref stays raw.
     G_CheckAlertEvents(
         ctx,
         npc_id,
@@ -728,8 +711,7 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
         // run away!
         let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
         let owner_id = ctx.entity_id_of(owner);
-        // §2b: owner may be an NPC (pool client); read its client pointer via the
-        // entity borrow, then deref raw as Raven does.
+        // The owner may be an NPC pool client, so its client pointer is read via the entity borrow, then dereffed raw, as Raven does.
         let owner_team = if let Some(oid) = owner_id {
             let oc = ctx.entity(oid).client;
             if !oc.is_null() {
@@ -743,22 +725,22 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
 
         let self_client = ctx.entity(self_).client;
         let should_flee = if let Some(team) = owner_team {
-            // §19: Raven derefs `self->client->playerTeam` unconditionally here; the
-            // `self->client` null guard is defensive. Source: NPC_senses.c:546.
+            // §19: Raven derefs `self->client->playerTeam` unconditionally here.
+            // The `self->client` null guard is defensive.
+            // Source: NPC_senses.c:546.
             owner_id.is_some()
                 && owner_id != Some(self_)
                 && !self_client.is_null()
                 && team != unsafe { (*self_client).playerTeam }
         } else {
-            // Reaching here means `!owner || !owner->client`, either of which makes
-            // the C `if` condition true.
+            // Reaching here means `!owner || !owner->client`, either of which makes the C `if` condition true.
             true
         };
 
         if should_flee {
             let self_npc = ctx.entity(self_).NPC;
             if !self_npc.is_null() {
-                // §2c: gNPC_t has no accessor; deref stays raw.
+                // `gNPC_t` has no accessor, so the deref stays raw.
                 if (unsafe { (*self_npc).scriptFlags } & SCF_DONT_FLEE) != 0 {
                     // can't flee
                     return 0;
@@ -801,8 +783,8 @@ pub fn AddSoundEvent(
     alertLevel: alertEventLevel_e,
     needLOS: qboolean,
 ) {
-    // `alertEvent_t.owner` is still a raw `*mut gentity_t` field, so the handle is
-    // materialized back to a pointer for storage (id→pointer seam bridge).
+    // `alertEvent_t.owner` is still a raw `*mut gentity_t` field.
+    // The handle turns back into a pointer for storage.
     let owner: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 
@@ -855,8 +837,8 @@ pub fn AddSightEvent(
     alertLevel: alertEventLevel_e,
     addLight: f32,
 ) {
-    // `alertEvent_t.owner` is still a raw `*mut gentity_t` field, so the handle is
-    // materialized back to a pointer for storage (id→pointer seam bridge).
+    // `alertEvent_t.owner` is still a raw `*mut gentity_t` field.
+    // The handle turns back into a pointer for storage.
     let owner: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 
@@ -897,8 +879,8 @@ pub fn AddSightEvent(
 ///
 /// Source: `oracle/codemp/game/NPC_senses.c:660-693`
 pub fn ClearPlayerAlertEvents(ctx: &mut GameContext) {
-    // Raven `ALERT_CLEAR_TIME` — single-owner header, deliberately kept local
-    // (not consolidated; fn-local, not importable from here).
+    // Raven's `ALERT_CLEAR_TIME` has one owning header, so this constant is deliberately kept local.
+    // It stays fn-local rather than joining the consolidated consts, because b_local.h is not an importable Rust module here.
     // Source: `oracle/codemp/game/b_local.h:164`
     pub const ALERT_CLEAR_TIME: c_int = 200;
 
@@ -918,8 +900,8 @@ pub fn ClearPlayerAlertEvents(ctx: &mut GameContext) {
             if ctx.world.level.numAlertEvents > 0 {
                 // still have more in the array
                 if (i + 1) < MAX_ALERT_EVENTS as c_int {
-                    // memmove shifts [i+1..MAX) down into [i..MAX-1); the final
-                    // slot MAX-1 is left untouched (stale), not zeroed.
+                    // memmove shifts [i+1..MAX) down into [i..MAX-1).
+                    // The final slot MAX-1 is left untouched (stale), not zeroed.
                     for j in i as usize..(MAX_ALERT_EVENTS - 1) {
                         ctx.world.level.alertEvents[j] = ctx.world.level.alertEvents[j + 1];
                     }
@@ -965,8 +947,8 @@ pub fn RemoveOldestAlert(ctx: &mut GameContext) -> qboolean {
         if ctx.world.level.numAlertEvents > 0 {
             // still have more in the array
             if (oldest_event + 1) < MAX_ALERT_EVENTS as c_int {
-                // memmove shifts [oldest+1..MAX) down into [oldest..MAX-1); the
-                // final slot MAX-1 is left untouched (stale), not zeroed.
+                // memmove shifts [oldest+1..MAX) down into [oldest..MAX-1).
+                // The final slot MAX-1 is left untouched (stale), not zeroed.
                 for j in (oldest_event as usize)..(MAX_ALERT_EVENTS - 1) {
                     ctx.world.level.alertEvents[j] = ctx.world.level.alertEvents[j + 1];
                 }
@@ -978,7 +960,7 @@ pub fn RemoveOldestAlert(ctx: &mut GameContext) -> qboolean {
     }
     // make sure this never drops below zero... if it does, something very very bad happened
     assert!(ctx.world.level.numAlertEvents >= 0);
-    // return true if have room for one now
+    // return true is have room for one now
     if ctx.world.level.numAlertEvents < MAX_ALERT_EVENTS as c_int {
         1
     } else {
@@ -1064,7 +1046,7 @@ pub fn G_ClearLOS2(
 
 /// Raven `G_ClearLOS3`.
 ///
-/// Raven: Position to entity. Look for the chest first, then the head.
+/// Raven: Position to entity.
 /// Source: `oracle/codemp/game/NPC_senses.c:777-794`
 pub fn G_ClearLOS3(
     ctx: &mut GameContext,
@@ -1185,9 +1167,9 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
                 eyes,
                 &mut diff_vec,
             );
-            // C's `fabs` is the double libm function: the magnitude sum and the
-            // `/2` divide evaluate in f64, so the two boundary comparisons are
-            // f64. f32-throughout would diverge at the `< 48` / up-down cutoff.
+            // C's `fabs` is the double libm function.
+            // The magnitude sum and the `/2` divide evaluate in f64, so the two boundary comparisons are also f64.
+            // f32-throughout would diverge at the `< 48` / up-down cutoff.
             if ((diff_vec[0].abs() as f64 + diff_vec[1].abs() as f64) / 2.0) < 48.0
                 && (diff_vec[2].abs() as f64)
                     > ((diff_vec[0].abs() as f64 + diff_vec[1].abs() as f64) / 2.0)
@@ -1228,13 +1210,15 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
 
 /// Raven `SP_target_interest`.
 ///
-/// Raven: `//QUAKED target_interest (1 0.8 0.5) (-4 -4 -4) (4 4 4)` — a
-/// point that a squadmate will look at if standing still. `target` fires
-/// when someone looks at this thing. FIXME: rename point_interest.
+/// Raven: `/*QUAKED target_interest (1 0.8 0.5) (-4 -4 -4) (4 4 4)`
+/// A point that a squadmate will look at if standing still
+///
+/// target - thing to fire when someone looks at this thing
+///
+/// Raven: FIXME: rename point_interest.
 /// Source: `oracle/codemp/game/NPC_senses.c:915-934`
 pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
-        // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS
         Com_Printf(&format!(
             "ERROR:  Too many interest points, limit is {}\n",
             MAX_INTEREST_POINTS as c_int
@@ -1249,10 +1233,9 @@ pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
         &mut ctx.world.level.interestPoints[ctx.world.level.numInterestPoints as usize].origin,
     );
 
-    // `self->target` is now an owned `Option<String>`; the interest point's
-    // `target` slot stays a `*mut c_char`, now filled from the level-lifetime
-    // prefix arena via `prefix_string` (which reproduced `G_NewString`'s copy)
-    // under Raven's `if (self->target && self->target[0])` non-empty guard.
+    // `self->target` is now an owned `Option<String>`.
+    // The interest point's `target` slot stays a `*mut c_char`, filled from the level-lifetime prefix arena via `prefix_string`.
+    // `prefix_string` reproduces `G_NewString`'s copy, under Raven's `if (self->target && self->target[0])` non-empty guard.
     let target = ctx.entity(self_).target.clone();
     if target.as_deref().is_some_and(|s| !s.is_empty()) {
         let idx = ctx.world.level.numInterestPoints as usize;

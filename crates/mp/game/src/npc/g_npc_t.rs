@@ -29,7 +29,7 @@ pub const ENEMY_POS_LAG_INTERVAL: i32 = 100;
 /// Definition source: `oracle/codemp/game/b_public.h:115`
 pub const ENEMY_POS_LAG_STEPS: usize = (MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL) as usize;
 
-/// Raven `gNPC_t` — per-entity NPC/behavior state.
+/// Raven `gNPC_t`: per-entity NPC/behavior state.
 ///
 /// Type definition source: `oracle/codemp/game/b_public.h:116-264`
 #[repr(C)]
@@ -75,7 +75,6 @@ pub struct gNPC_t {
     //extra character info
     /// for pips
     ///
-    /// Raven `rank_t rank`.
     /// Source: `oracle/codemp/game/b_public.h:182`
     pub rank: rank_t,
 
@@ -216,9 +215,8 @@ pub struct gNPC_t {
 }
 
 const _: () = assert!(core::mem::offset_of!(gNPC_t, timeOfDeath) == 0);
-// This struct's stored `gentity_t*` fields became `Option<EntityId>` (align 4 vs a
-// pointer's align 8), so the private tail's byte offsets shift. This struct is
-// game-internal / not ABI-fixed beyond its prefix — the engine learns the full
-// stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
-// `offset_of` assert at/after the first flipped field are therefore dropped;
-// only the fixed-prefix asserts above (declared before the first flip) remain.
+// This struct's stored `gentity_t*` fields became `Option<EntityId>` (align 4 vs a pointer's align 8), so the private tail's byte offsets shift.
+// This struct is game-internal and not ABI-fixed beyond its prefix.
+// The engine learns the full stride at runtime through `trap_LocateGameData`.
+// The `size_of` assert and every `offset_of` assert at or after the first flipped field are therefore dropped.
+// Only the fixed-prefix asserts above, declared before the first flip, remain.

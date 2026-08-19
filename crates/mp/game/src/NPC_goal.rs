@@ -1,32 +1,22 @@
-// PORT-COMPLETE: NPC_goal.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_goal.c`.
+//! This is a port of `oracle/codemp/game/NPC_goal.c`.
 //!
-//! Filled by the jampgame mega-pass. Functions that reach file-scope AI globals (`NPC`,
-//! `NPCInfo`, `level`) or engine traps (`trap_ICARUS_TaskIDComplete`)
-//! without a `GameWorld`/engine handle on the staged raw-pointer skeleton
-//! are parked; only the pure-logic bounds-overlap checker is ported.
-//!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer params are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! `ReachedGoal` re-derives a raw `gentity_t` pointer from the goal handle at the top of its body.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ent_id;
 use crate::prelude::*;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`. Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:10-24`
 pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
-    // SAFETY: `NPCInfo` is Raven's ambient AI global (`gNPC_t *`); its raw deref is
-    // the still-open ambient-globals seam (2c task #7), not an entity deref. The
-    // Stage-1 `ent_id_opt(base, ent_id::resolve(base, goal))` round-trip is the identity on
-    // `Option<EntityId>`, so the goal handle assigns directly.
+    // SAFETY: `NPCInfo` is Raven's ambient AI global (`gNPC_t *`).
+    // Its raw deref has no accessor yet, and it is not an entity deref.
+    // `goalEntity` is already `Option<EntityId>`, so the goal handle assigns directly.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     let goal_time = ctx.world.level.time;
     unsafe {
@@ -39,8 +29,8 @@ pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:31-58`
 pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
-    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
-    // reached through the safe `ctx.world.entity` accessor.
+    // SAFETY: `NPCInfo` is an ambient global with a raw deref and no accessor yet.
+    // The goal entity is reached through the safe `ctx.world.entity` accessor.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
         if goal == (*npc_info).goalEntity {
@@ -67,8 +57,8 @@ pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:65-86`
 pub fn NPC_ClearGoal(ctx: &mut GameContext) {
-    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
-    // reached through the safe `ctx.world.entity` accessor.
+    // SAFETY: `NPCInfo` is an ambient global with a raw deref and no accessor yet.
+    // The goal entity is reached through the safe `ctx.world.entity` accessor.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
         if (*npc_info).lastGoalEntity.is_none() {
@@ -94,13 +84,11 @@ pub fn NPC_ClearGoal(ctx: &mut GameContext) {
 
 /// Raven `G_BoundsOverlap`.
 ///
-/// Pure logic: checks if two 3D bounds overlap by comparing component-wise
-/// min/max values. NOTE: flush up against counts as overlapping (equality
-/// compares use `<=`/`>=`).
+/// This checks whether two 3D bounds overlap by comparing bounds on each axis.
+/// NOTE: flush up against counts as overlapping
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:94-115`
 pub fn G_BoundsOverlap(mins1: vec3_t, maxs1: vec3_t, mins2: vec3_t, maxs2: vec3_t) -> qboolean {
-    // Check if mins1 is beyond maxs2 on any axis
     if mins1[0] > maxs2[0] {
         return qfalse;
     }
@@ -111,7 +99,6 @@ pub fn G_BoundsOverlap(mins1: vec3_t, maxs1: vec3_t, mins2: vec3_t, maxs2: vec3_
         return qfalse;
     }
 
-    // Check if maxs1 is before mins2 on any axis
     if maxs1[0] < mins2[0] {
         return qfalse;
     }
@@ -152,13 +139,13 @@ pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
 
 /// Raven `ReachedGoal`.
 ///
-/// Checks if an NPC has reached its goal entity by comparing the NPC's position
-/// and bounds against the goal's location. Most of the original complex waypoint
-/// logic is commented out; only the final nav-system check is active.
+/// This checks whether the NPC reached its goal entity by comparing the NPC position
+/// and bounds against the goal location.
+/// Most of the original waypoint logic is commented out in Raven, and only the final
+/// nav-system check is ported.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:136-231`
 pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let goal: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), goal) };
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
@@ -184,15 +171,15 @@ pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
 
 /// Raven `UpdateGoal`.
 ///
-/// Updates the NPC's goal state: returns the current goal entity if it's valid,
-/// or clears the goal and returns NULL if it's no longer in use or has been
-/// reached.
+/// This updates the NPC goal state.
+/// It returns the current goal entity when the entity is valid.
+/// It clears the goal and returns null when the goal is no longer in use or already reached.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:243-267`
 pub fn UpdateGoal(ctx: &mut GameContext) -> *mut gentity_t {
-    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
-    // reached through the safe accessor, then re-derived as a raw pointer at the
-    // return boundary for the still-raw caller.
+    // SAFETY: `NPCInfo` is an ambient global with a raw deref and no accessor yet.
+    // The goal entity is reached through the safe accessor, then re-derived as a raw pointer
+    // at the return boundary for the still-raw caller.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
         if (*npc_info).goalEntity.is_none() {

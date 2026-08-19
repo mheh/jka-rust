@@ -1,45 +1,39 @@
 //! C `printf`-subset formatter for the variadic seam of `va` / `Com_sprintf`.
 //!
-//! Rust cannot express C varargs on stable, so the native jampgame DLL's
-//! `va`/`Com_sprintf` (which in Raven call the C library's `vsprintf`) take an
-//! explicit `&[FmtArg]` argument channel and format through [`c_vsprintf`] here.
-//! The target is **native libc `printf` parity** — Raven's DLL build links the
-//! real `vsprintf`, not the QVM bytecode fallback in
-//! `oracle/codemp/game/bg_lib.c`. That bytecode `vsprintf` is only the
-//! reference for *which* directives game code relies on (`%d %i %u %o %x %X %c
-//! %s %f %%` with `-`/`0`/`+`/` `/`#` flags, width and precision); its float
-//! digit-truncation and unsigned fallbacks are not reproduced here because the
-//! shipped DLL never used them.
-//! Source: `oracle/codemp/game/bg_lib.c:1183-1288` (directive set);
-//! `oracle/codemp/game/q_shared.c:985-1032` (the `vsprintf` callers).
+//! Rust cannot express C varargs on stable.
+//! So the native jampgame DLL's `va`/`Com_sprintf` functions take an explicit `&[FmtArg]` argument channel and format through [`c_vsprintf`] here.
+//! Raven's DLL build links the real `vsprintf`, not the QVM bytecode fallback in `oracle/codemp/game/bg_lib.c`.
+//! So the target here is native libc `printf` parity.
+//! That bytecode `vsprintf` is only the reference for which directives game code relies on:
+//! `%d %i %u %o %x %X %c %s %f %%` with `-`/`0`/`+`/` `/`#` flags, width and precision.
+//! Its float digit-truncation and unsigned fallbacks are not reproduced here, because the shipped DLL never used them.
+//! Source: `oracle/codemp/game/bg_lib.c:1183-1288` (directive set) and `oracle/codemp/game/q_shared.c:985-1032` (the `vsprintf` callers).
 
 use core::ffi::{c_char, c_int, c_uint};
 use std::ffi::CStr;
 
-/// One positional argument for [`c_vsprintf`], typed to the C promotion it
-/// stands in for (`int` for `%d %i %c`, `unsigned` for `%u %o %x %X`, `double`
-/// for `%f`, `char *` for `%s`).
+/// One positional argument for [`c_vsprintf`], typed to the C promotion it stands in for:
+/// `int` for `%d %i %c`, `unsigned` for `%u %o %x %X`, `double` for `%f`, `char *` for `%s`.
 ///
-/// Divergence: C reads the argument's type from the directive; the port carries
-/// the type on the value so the seam is safe Rust. Callers pass the value they
-/// would have pushed on the C stack.
+/// Divergence: C reads the argument's type from the directive.
+/// The port carries the type on the value instead, so the seam stays safe Rust.
+/// Callers pass the value they would have pushed on the C stack.
 pub enum FmtArg<'a> {
-    /// `int` argument for `%d`, `%i`; `%c` uses its low byte.
+    /// `int` argument for `%d`, `%i`, and `%c` (which uses its low byte).
     Int(c_int),
     /// `unsigned int` argument for `%u`, `%o`, `%x`, `%X`.
     UInt(c_uint),
     /// `double` argument for `%f`.
     Float(f64),
-    /// `char *` argument for `%s`. `None` reproduces glibc's `(null)`.
+    /// `char *` argument for `%s`.
+    /// `None` reproduces glibc's `(null)`.
     Str(Option<&'a [u8]>),
 }
 
 impl<'a> FmtArg<'a> {
-    /// Build a `%s` argument from a NUL-terminated C string pointer, matching
-    /// glibc's `(null)` when the pointer is null. The borrow is bounded by the
-    /// caller-supplied lifetime; the pointed-to bytes must outlive the format
-    /// call (they always do at the `va`/`Com_sprintf` seam — the string is a
-    /// live argument).
+    /// Build a `%s` argument from a NUL-terminated C string pointer, matching glibc's `(null)` when the pointer is null.
+    /// The borrow is bounded by the caller-supplied lifetime.
+    /// The pointed-to bytes must outlive the format call, and they always do at the `va`/`Com_sprintf` seam because the string is a live argument.
     ///
     /// # Safety
     /// `p` must be null or point to a valid NUL-terminated string live for `'a`.
@@ -66,15 +60,13 @@ struct Spec {
 
 /// Raven's native `vsprintf` (libc) over the directive subset game code uses.
 ///
-/// Formats `fmt` against `args` into a fresh byte buffer and returns it (the
-/// caller applies buffer/truncation semantics). Byte-for-byte parity with glibc
-/// `printf` for `%d %i %u %o %x %X %c %s %f %%` plus the `-`/`0`/`+`/` `/`#`
-/// flags, field width, and precision.
+/// Formats `fmt` against `args` into a fresh byte buffer and returns it.
+/// The caller applies buffer/truncation semantics.
+/// Byte-for-byte parity with glibc `printf` for `%d %i %u %o %x %X %c %s %f %%` plus the `-`/`0`/`+`/` `/`#` flags, field width, and precision.
 ///
-/// Any directive outside that subset (`%e %g %p %n`, `*` width/precision, …)
-/// panics naming the directive rather than echoing it — the survey of live
-/// `va`/`Com_sprintf` format strings finds none, and a silent echo would hide a
-/// real mismatch. Argument shortfall/type-mismatch likewise panics.
+/// Any directive outside that subset (`%e %g %p %n`, `*` width/precision, and so on) panics and names the directive instead of echoing it.
+/// No live `va`/`Com_sprintf` format string uses one, and a silent echo would hide a real mismatch.
+/// An argument shortfall or a type mismatch panics the same way.
 /// Source: `oracle/codemp/game/bg_lib.c:1183-1288`.
 pub fn c_vsprintf(fmt: &[u8], args: &[FmtArg]) -> Vec<u8> {
     let mut out = Vec::with_capacity(fmt.len() + 16);
@@ -178,8 +170,8 @@ pub fn c_vsprintf(fmt: &[u8], args: &[FmtArg]) -> Vec<u8> {
     out
 }
 
-/// Parse `[flags][width][.prec][length]conv` after the leading `%`. `i` points
-/// just past the `%`; on return it points just past the conversion char.
+/// Parse `[flags][width][.prec][length]conv` after the leading `%`.
+/// `i` points just past the `%`, and on return it points just past the conversion char.
 fn parse_spec(fmt: &[u8], i: &mut usize) -> Spec {
     let mut s = Spec {
         minus: false,
@@ -224,8 +216,7 @@ fn parse_spec(fmt: &[u8], i: &mut usize) -> Spec {
         }
         s.prec = Some(p);
     }
-    // Length modifiers (`l`, `h`, `L`, `z`, `j`, `t`, `q`) — the typed FmtArg
-    // already carries the value width, so these are parsed and ignored.
+    // The typed FmtArg already carries the value width, so length modifiers (`l`, `h`, `L`, `z`, `j`, `t`, `q`) are parsed and ignored.
     while *i < fmt.len() && matches!(fmt[*i], b'l' | b'h' | b'L' | b'z' | b'j' | b't' | b'q') {
         *i += 1;
     }
@@ -237,8 +228,8 @@ fn parse_spec(fmt: &[u8], i: &mut usize) -> Spec {
     s
 }
 
-/// Emit an integer magnitude `mag` (already sign-stripped) in `base`, applying
-/// sign/prefix, precision (minimum digit count), zero/space padding and width.
+/// Emit an integer magnitude `mag` (already sign-stripped) in `base`.
+/// Apply sign/prefix, precision (minimum digit count), zero/space padding and width.
 fn emit_int(
     out: &mut Vec<u8>,
     mut mag: u64,
@@ -272,8 +263,8 @@ fn emit_int(
             num.insert(0, b'0');
         }
     }
-    // Sign: `-` only for negatives; `+`/` ` apply to signed conversions only
-    // (glibc ignores them for %u/%o/%x/%X).
+    // Sign: `-` only for negatives.
+    // `+`/` ` apply to signed conversions only, since glibc ignores them for %u/%o/%x/%X.
     let sign: &[u8] = if neg {
         b"-"
     } else if signed && spec.plus {
@@ -283,7 +274,7 @@ fn emit_int(
     } else {
         b""
     };
-    // `#` prefix: `0x`/`0X` for nonzero hex; leading `0` for octal.
+    // `#` prefix: `0x`/`0X` for nonzero hex, leading `0` for octal.
     let mut prefix: Vec<u8> = Vec::new();
     if spec.alt {
         if base == 16 && !num.is_empty() && !(num.len() == 1 && num[0] == b'0') {
@@ -320,8 +311,8 @@ fn emit_int(
     }
 }
 
-/// Emit raw bytes (`%c` / `%s` body, already precision-truncated) with width
-/// padding. `0` flag has no effect on string/char conversions in glibc.
+/// Emit raw bytes (`%c` / `%s` body, already precision-truncated) with width padding.
+/// `0` flag has no effect on string/char conversions in glibc.
 fn emit_bytes(out: &mut Vec<u8>, body: &[u8], spec: &Spec) {
     if spec.width > body.len() {
         let pad = spec.width - body.len();
@@ -337,9 +328,9 @@ fn emit_bytes(out: &mut Vec<u8>, body: &[u8], spec: &Spec) {
     }
 }
 
-/// Emit a `%f` value. Magnitude is rendered by Rust's fixed-precision formatter
-/// (correctly rounded, round-half-to-even — the same default as glibc); sign,
-/// zero/space padding and width are applied here.
+/// Emit a `%f` value.
+/// Rust's fixed-precision formatter renders the magnitude, correctly rounded and round-half-to-even, matching glibc's default.
+/// Sign, zero/space padding and width are applied here.
 fn emit_float(out: &mut Vec<u8>, v: f64, spec: &Spec) {
     let prec = spec.prec.unwrap_or(6);
     let neg = v.is_sign_negative() && !v.is_nan();
@@ -397,8 +388,7 @@ fn type_mismatch(conv: &str, expected: &str, got: &FmtArg) -> ! {
 mod tests {
     use super::{c_vsprintf, FmtArg};
 
-    // Every expected string below is exactly what glibc `printf` produces for
-    // the same format+args (cross-checked against a throwaway C program).
+    // Every expected string below is exactly what glibc `printf` produces for the same format+args (cross-checked against a throwaway C program).
     fn f(fmt: &str, args: &[FmtArg]) -> String {
         String::from_utf8(c_vsprintf(fmt.as_bytes(), args)).unwrap()
     }

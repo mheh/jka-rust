@@ -1,11 +1,8 @@
-// PORT-COMPLETE: SpeederNPC.c
 //! Game-only half of `oracle/codemp/game/SpeederNPC.c`.
 //!
-//! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` and
-//! the `VEH_StartStrafeRam` stub moved to `mp_bg::vehicles::speeder_npc` (a cgame
-//! TU in `JK2_cgame.vcproj`) so the cgame vehicle `Pmove` can steer speeders
-//! during prediction. What stays here is `#ifdef QAGAME`-only: `Update`,
-//! `AnimateVehicle`, `AnimateRiders`, `G_CreateSpeederNPC`.
+//! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` and the `VEH_StartStrafeRam` stub moved to `mp_bg::vehicles::speeder_npc`
+//! (a cgame TU in `JK2_cgame.vcproj`), so the cgame vehicle `Pmove` can steer speeders during prediction.
+//! What stays here is `#ifdef QAGAME`-only: `Update`, `AnimateVehicle`, `AnimateRiders`, `G_CreateSpeederNPC`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_vehicles::{VEH_MOUNT_THROW_LEFT, VEH_MOUNT_THROW_RIGHT};
@@ -13,10 +10,9 @@ use crate::prelude::*;
 
 /// Raven `Update`.
 ///
-/// Raven: the `_JK2MP` build of this function is essentially a thin wrapper
-/// around the base vehicle's Update method; the movement-direction, strafe-ram,
-/// exhaust, and armor-effects code (lines 163-264) is guarded by `#ifndef _JK2MP`
-/// and is SP-only dead code, dropped per porting-rules §10.
+/// Raven: the `_JK2MP` build of this function is a thin wrapper around the base vehicle's Update method.
+/// The movement-direction, strafe-ram, exhaust, and armor-effects code (lines 163-264) is guarded by `#ifndef _JK2MP`.
+/// That code is SP-only dead code, dropped per porting-rules §10.
 /// Source: `oracle/codemp/game/SpeederNPC.c:149-268`
 pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
@@ -27,13 +23,10 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
 
         // See whether this vehicle should be exploding.
         if (*pVeh).m_iDieTime != 0 {
-            // `pVeh->m_pVehicleInfo->DeathUpdate(pVeh)` — Speeder's DeathUpdate slot is
-            // commented in oracle setup, so this resolves to the base DeathUpdate.
+            // `pVeh->m_pVehicleInfo->DeathUpdate(pVeh)` resolves to the base DeathUpdate.
+            // The Speeder DeathUpdate slot is commented out in the oracle setup.
             crate::veh_dispatch::death_update(ctx, pVeh);
         }
-
-        // The rest of the function (movement direction, strafe ram, exhaust, armor effects)
-        // is guarded by #ifndef _JK2MP and is SP-only code, dead in the MP build.
 
         qtrue
     }
@@ -49,19 +42,18 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {}
 /// Raven `AnimateRiders`.
 ///
 /// Raven: "This function makes sure that the rider's in this vehicle are properly animated."
-/// Raven: the `_JK2MP` build of this function only handles the boarding animation branch
-/// (m_iBoarding != 0); the pilot-animation state machine (lines 744-1037) is guarded by
-/// `#ifdef _JK2MP` with `if (1) return;` at line 741, making it dead code, dropped per
-/// porting-rules §10.
+/// Raven: the `_JK2MP` build of this function only handles the boarding animation branch (`m_iBoarding != 0`).
+/// The pilot-animation state machine (lines 744-1037) is guarded by `#ifdef _JK2MP` with `if (1) return;` at line 741.
+/// It is dead code there, dropped per porting-rules §10.
 /// Source: `oracle/codemp/game/SpeederNPC.c:630-1038`
 pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
-        // Only handle boarding animation in MP build; pilot animation is dead code
+        // Only the boarding branch runs in the MP build.
         if (*pVeh).m_iBoarding == 0 {
             return;
         }
 
-        // We've just started boarding, set the amount of time it will take to finish boarding
+        // We've just started moarding, set the amount of time it will take to finish moarding.
         if (*pVeh).m_iBoarding < 0 {
             let iAnimLen: c_int;
             let mut Anim: animNumber_t = BOTH_VS_IDLE;
@@ -83,7 +75,8 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 Anim = BOTH_VS_MOUNTTHROW_L;
             }
 
-            // Set the delay time (40% of animation time).
+            // Set the delay time (which happens to be the time it takes for the animation to complete).
+            // NOTE: Here I made it so the delay is actually 40% (0.4f) of the animation time.
             iAnimLen = (mp_bg::bg_panimate::BG_AnimLength(
                 &ctx.world.bg_state,
                 (*(*pVeh).m_pPilot).localAnimIndex,
@@ -93,13 +86,15 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             // MP `BG_GetTime()` is `level.time`, reachable through `ctx`.
             (*pVeh).m_iBoarding = ctx.world.level.time + iAnimLen;
 
-            // Set the animation which won't be interrupted until completed.
+            // Set the animation, which won't be interrupted until it's completed.
             let ps = (*(*pVeh).m_pPilot).playerState;
             let anims =
                 (&ctx.world.bg_state.bgAllAnims)[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -115,15 +110,14 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-// `G_SetSpeederVehicleFunctions` retired (2026-07-03) — it only assigned the now-removed
-// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
-// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
+// `G_SetSpeederVehicleFunctions` is gone. It only assigned the removed `vehicleInfo_t` function-pointer slots.
+// Vehicle dispatch is `vehicleType_t`-keyed in `crate::veh_dispatch`.
 
 /// Raven `G_CreateSpeederNPC`.
 ///
 /// Raven: "Create/Allocate a new Animal Vehicle (initializing it as well)."
-/// The `_JK2MP` build uses `G_AllocateVehicleObject` on the game side (QAGAME branch);
-/// the cgame branch would use `BG_Alloc` (dead code here, dropped).
+/// The `_JK2MP` build uses `G_AllocateVehicleObject` on the game side, the QAGAME branch.
+/// The cgame branch would use `BG_Alloc`, dropped here as dead code.
 /// Source: `oracle/codemp/game/SpeederNPC.c:1092-1113`
 pub fn G_CreateSpeederNPC(
     ctx: &mut GameContext,
@@ -131,8 +125,6 @@ pub fn G_CreateSpeederNPC(
     strType: *const c_char,
 ) {
     unsafe {
-        // Allocate the Vehicle object
-        // QAGAME branch (_JK2MP with QAGAME compile flag)
         crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
 
         // Zero-initialize the vehicle
@@ -140,8 +132,9 @@ pub fn G_CreateSpeederNPC(
 
         // Set the vehicle info pointer based on vehicle type name.
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };

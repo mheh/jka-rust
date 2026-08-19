@@ -1,12 +1,11 @@
-//! `GameGlobals` — the remaining game-tier mutable file-scope globals
-//! and file-statics as one owned GameWorld sub-struct: file-scope mutable
-//! globals become GameWorld fields, grouped by owning `.c` file. Pass-2
-//! porters read/write these through `ctx.world`; they
-//! never add a field. Scalar decls carry their Rust type; non-scalar
-//! decls (pointers/structs/arrays) are `()` placeholders with a
-//! `//TODO: Port <type>` marker — the porter fills the real type when
-//! porting that body (bg/qshared-owned globals and const tables are
-//! intentionally excluded — not GameWorld state).
+//! `GameGlobals` holds the remaining game-tier mutable file-scope globals and file-statics as one owned GameWorld sub-struct.
+//! File-scope mutable globals become GameWorld fields, grouped by owning `.c` file.
+//! Porters read and write these fields through `ctx.world`.
+//! Porters never add a field.
+//! Scalar declarations carry their Rust type.
+//! Non-scalar declarations (pointers, structs, arrays) are `()` placeholders with a `//TODO: Port <type>` marker.
+//! The porter fills in the real type when it ports that body.
+//! bg- and qshared-owned globals and const tables are intentionally excluded, because they are not GameWorld state.
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
 use core::ops::{Deref, DerefMut, Index, IndexMut};
@@ -25,13 +24,10 @@ use crate::game_cvars::GAME_CVAR_TABLE_LEN;
 use crate::prelude::*;
 use mp_qshared::shared::MAX_GENTITIES;
 
-/// Generates the array-wrapper newtypes `GameGlobals` needs for arrays larger
-/// than stable Rust's 32-element `Default` limit. Each arm emits the `pub`
-/// tuple struct (with the forwarded attributes/doc comments) plus a `Default`
-/// impl for one initialization strategy, and optionally `Index`/`IndexMut` or
-/// `Deref`/`DerefMut`. Modes: `null` (raw-pointer arrays), `zero` (integer/char
-/// arrays), `zero2d` (rectangular integer arrays), `elem` (element-`Default`
-/// arrays), `boxed` (heap-`zeroed_box` arrays).
+/// This macro generates the array-wrapper newtypes that `GameGlobals` needs for arrays larger than stable Rust's 32-element `Default` limit.
+/// Each arm emits the `pub` tuple struct, with the forwarded attributes and doc comments, plus a `Default` impl for one initialization strategy.
+/// Some arms also add `Index`/`IndexMut` or `Deref`/`DerefMut`.
+/// Modes: `null` for raw-pointer arrays, `zero` for integer/char arrays, `zero2d` for rectangular integer arrays, `elem` for element-`Default` arrays, `boxed` for heap-`zeroed_box` arrays.
 macro_rules! array_newtype {
     // Raw-pointer array, null-initialized.
     (null; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
@@ -125,9 +121,9 @@ macro_rules! array_newtype {
     };
 }
 
-/// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`). Newtype because a
-/// 1024-element array has no library `Default` impl (only arrays up to 32
-/// elements do in stable Rust).
+/// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`).
+/// This is a newtype because a 1024-element array has no library `Default` impl.
+/// Only arrays up to 32 elements have one in stable Rust.
 #[derive(Clone, Copy)]
 pub struct IpFilters(pub [ipFilter_t; MAX_IPFILTERS]);
 
@@ -155,14 +151,14 @@ impl core::ops::IndexMut<usize> for IpFilters {
     }
 }
 
-// Canonical home moved to `mp_bg` (DEC-32) — cgame needs it too and cannot
-// reach this crate.
+// Canonical home moved to `mp_bg` (DEC-32).
+// cgame needs it too and cannot reach this crate.
 pub use mp_bg::public::max_items::MAX_ITEMS;
 
-// Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes. `MAX_WPARRAY_SIZE`
-// canonical in `mp_qshared::shared::limits` (`c_int`, cast here);
-// `MAX_NODETABLE_SIZE` canonical in `ai_wpnav` (`c_int`, cast here);
-// `MAX_SPAWNPOINT_ARRAY` canonical in `ai_wpnav` (already `usize`, plain import).
+// Raven `ai_wpnav.c`/`q_shared.h` waypoint-arena sizes.
+// `MAX_WPARRAY_SIZE` is canonical in `mp_qshared::shared::limits` (`c_int`, cast here).
+// `MAX_NODETABLE_SIZE` is canonical in `ai_wpnav` (`c_int`, cast here).
+// `MAX_SPAWNPOINT_ARRAY` is canonical in `ai_wpnav` (already `usize`, plain import).
 // Source: `oracle/codemp/game/q_shared.h:993`,
 //         `oracle/codemp/game/ai_main.h:15`,
 //         `oracle/codemp/game/ai_wpnav.c:2505`
@@ -170,39 +166,37 @@ use crate::ai_wpnav::MAX_SPAWNPOINT_ARRAY;
 const MAX_WPARRAY_SIZE: usize = mp_qshared::shared::limits::MAX_WPARRAY_SIZE as usize;
 const MAX_NODETABLE_SIZE: usize = crate::ai_wpnav::MAX_NODETABLE_SIZE as usize;
 
-// Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` /
-// `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`). Pass-2 backfill of
-// the `()` placeholders these fields carried (allowed: "replace a
-// ()-placeholder field's type with the real one if your packet cites it").
+// Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` / `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`).
+// The porting rules allow replacing a ()-placeholder field's type with the real one once a live call needs it.
 pub(crate) const MAX_SHADER_REMAPS: usize = 128;
 pub(crate) const MAX_G2_KILL_QUEUE: usize = 256;
 pub(crate) const MAX_VEHICLES_AT_A_TIME: usize = 128;
 
-// Raven `#define MAX_CHAT_BUFFER_SIZE 8192` (unless `_XBOX` is defined; MP
-// uses the full 8192). `ai_main.h:19`.
+// Raven `#define MAX_CHAT_BUFFER_SIZE 8192` (unless `_XBOX` is defined).
+// MP uses the full 8192.
+// `ai_main.h:19`.
 // Source: `oracle/codemp/game/ai_main.h:15-18`
 pub(crate) const MAX_CHAT_BUFFER_SIZE: usize = 8192;
 
-// Raven `#define MAX_ARENAS 1024` / `MAX_BOTS 1024` / `BOT_SPAWN_QUEUE_DEPTH 16`
-// (`g_bot.c:9,13,19`).
+// Raven `#define MAX_ARENAS 1024` / `MAX_BOTS 1024` / `BOT_SPAWN_QUEUE_DEPTH 16` (`g_bot.c:9,13,19`).
 // Source: `oracle/codemp/game/bg_public.h:1022,1024`
 //         `oracle/codemp/game/g_bot.c:19`
 const MAX_ARENAS: usize = 1024;
 const MAX_BOTS: usize = 1024;
 const BOT_SPAWN_QUEUE_DEPTH: usize = 16;
 
-// Raven `#define MAX_SABER_VICTIMS 16` (`w_saber.c:3503`) — the per-swing
-// victim-tracking array bound shared by the `w_saber.c` file-statics.
+// Raven `#define MAX_SABER_VICTIMS 16` (`w_saber.c:3503`).
+// This is the per-swing victim-tracking array bound shared by the `w_saber.c` file-statics.
 // Source: `oracle/codemp/game/w_saber.c:3503`
 const MAX_SABER_VICTIMS: usize = 16;
 
-// Raven `#define MAX_SIEGE_INFO_SIZE 16384` (`bg_saga.h:1`) — sizes the
-// `gParseObjectives` siege-config parse buffer. Canonical in
-// `mp_bg::saga::siege_team_t` (`i32`, cast here).
+// Raven `#define MAX_SIEGE_INFO_SIZE 16384` (`bg_saga.h:1`).
+// This sizes the `gParseObjectives` siege-config parse buffer.
+// It is canonical in `mp_bg::saga::siege_team_t` (`i32`, cast here).
 // Source: `oracle/codemp/game/bg_saga.h:1`
 const MAX_SIEGE_INFO_SIZE: usize = mp_bg::saga::siege_team_t::MAX_SIEGE_INFO_SIZE as usize;
 
-/// `botSpawnQueue_t` — bot spawn queue entry (`g_bot.c:21-24`).
+/// `botSpawnQueue_t` is a bot spawn queue entry (`g_bot.c:21-24`).
 ///
 /// Source: `oracle/codemp/game/g_bot.c:21-24`
 #[repr(C)]
@@ -212,11 +206,10 @@ pub struct botSpawnQueue_t {
     pub spawnTime: c_int,
 }
 
-/// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state, now owned:
-/// each slot is an `Option<Box<bot_state_t>>` (`None` ≡ Raven's null slot).
-/// Raven allocated these off the `B_Alloc` bump pool; here the game owns them,
-/// and the `Box`'s stable heap address feeds the raw-pointer body code in
-/// `ai_main.c` unchanged via [`BotStates::ptr`].
+/// `bot_state_t *botstates[MAX_CLIENTS]` holds per-client bot AI state, now owned.
+/// Each slot is an `Option<Box<bot_state_t>>`. `None` matches Raven's null slot.
+/// Raven allocated these off the `B_Alloc` bump pool.
+/// Here the game owns them, and the `Box`'s stable heap address feeds the raw-pointer body code in `ai_main.c` unchanged, via [`BotStates::ptr`].
 /// Source: `oracle/codemp/game/ai_main.c:46`
 pub struct BotStates(pub [Option<Box<bot_state_t>>; MAX_CLIENTS]);
 
@@ -227,11 +220,11 @@ impl Default for BotStates {
 }
 
 impl BotStates {
-    /// Raw `*mut bot_state_t` for slot `i` — the `Box`'s stable heap address, or
-    /// null when the slot is `None`. `ai_main.c`'s body code reads bot state
-    /// across `ctx`-mutating calls (STAGE-2b irreducible aliasing), so it takes
-    /// this raw pointer rather than a checked borrow; `ptr(i).is_null()` is the
-    /// faithful equivalent of Raven's `botstates[i] == NULL`.
+    /// Raw `*mut bot_state_t` for slot `i`.
+    /// This is the `Box`'s stable heap address, or null when the slot is `None`.
+    /// `ai_main.c`'s body code reads bot state across `ctx`-mutating calls, which is irreducible aliasing.
+    /// It takes this raw pointer rather than a checked borrow.
+    /// `ptr(i).is_null()` is the equivalent of Raven's `botstates[i] == NULL`.
     #[inline]
     pub fn ptr(&self, i: usize) -> *mut bot_state_t {
         match &self.0[i] {
@@ -241,19 +234,14 @@ impl BotStates {
     }
 }
 
-/// A fresh zeroed `bot_state_t` on the heap, mirroring Raven's
-/// `memset(B_Alloc(sizeof(bot_state_t)), 0, ...)` in `BotAISetupClient`.
-/// `bot_state_t` stopped being zero-valid when its `settings` field grew owned
-/// `String`s, so this zeroes the POD bulk (`alloc_zeroed`) and then seats a
-/// valid empty `settings` into the one owned slot — the codebase's
-/// zeroed-then-seat convention (`zeroed_clients`).
+/// A fresh zeroed `bot_state_t` on the heap, mirroring Raven's `memset(B_Alloc(sizeof(bot_state_t)), 0, ...)` in `BotAISetupClient`.
+/// `bot_state_t` stopped being zero-valid when its `settings` field grew owned `String`s, so this zeroes the POD bulk (`alloc_zeroed`) and then seats a valid empty `settings` into the one owned slot.
+/// This is the codebase's zeroed-then-seat convention (`zeroed_clients`).
 /// Source: `oracle/codemp/game/ai_main.c:824-831`
 pub fn zeroed_bot_state() -> Box<bot_state_t> {
     let layout = Layout::new::<bot_state_t>();
-    // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
-    // `bot_state_t` field except the `String`-bearing `settings`; the `ptr::write`
-    // seats a valid empty `settings` (its zeroed bytes never dropped) before
-    // ownership passes to the `Box`, so the whole state is initialized.
+    // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every `bot_state_t` field except the `String`-bearing `settings`.
+    // The `ptr::write` seats a valid empty `settings` (its zeroed bytes never dropped) before ownership passes to the `Box`, so the whole state is initialized.
     unsafe {
         let p = alloc_zeroed(layout) as *mut bot_state_t;
         if p.is_null() {
@@ -268,9 +256,8 @@ pub fn zeroed_bot_state() -> Box<bot_state_t> {
 }
 
 array_newtype!(null, index;
-    /// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` — per-entity NPC state pointers
-    /// (`NPC_spawn.c` file-scope global). Newtype because a raw-pointer array has
-    /// no library `Default` impl.
+    /// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` holds per-entity NPC state pointers (`NPC_spawn.c` file-scope global).
+    /// This is a newtype because a raw-pointer array has no library `Default` impl.
     /// Source: `oracle/codemp/game/NPC_spawn.c:1276`
     pub GNpcPtrs, *mut gNPC_t, MAX_GENTITIES);
 
@@ -278,42 +265,37 @@ array_newtype!(null, index;
 pub const MAX_NPC_DATA_SIZE: usize = 0x20000;
 
 array_newtype!(zero;
-    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` / `char npcParseBuffer[MAX_NPC_DATA_SIZE]`
-    /// (`NPC_stats.c:237-3238`) — a fixed 128 KB NPC-config parse buffer. Newtype so
-    /// `GameGlobals` keeps a derive-shaped `Default` (arrays > 32 have no library `Default`);
-    /// `#[repr(transparent)]` keeps the `&globals.NPCParms as *const _ as *const c_char`
-    /// porter idiom valid — the wrapper's address is the buffer's first byte.
+    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` / `char npcParseBuffer[MAX_NPC_DATA_SIZE]` (`NPC_stats.c:237-3238`) is a fixed 128 KB NPC-config parse buffer.
+    /// This is a newtype so `GameGlobals` keeps a derive-shaped `Default` (arrays over 32 elements have no library `Default`).
+    /// `#[repr(transparent)]` keeps the `&globals.NPCParms as *const _ as *const c_char` porter idiom valid, because the wrapper's address is the buffer's first byte.
     /// Source: `oracle/codemp/game/NPC_stats.c:236-238`
     #[repr(transparent)]
     pub NpcDataBuffer, c_char, MAX_NPC_DATA_SIZE);
 
 array_newtype!(elem, index;
-    /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` — spawn queue array (`g_bot.c:27`).
-    /// Newtype for consistent interface with other large arrays.
+    /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` is the spawn queue array (`g_bot.c:27`).
+    /// This is a newtype for a consistent interface with the other large arrays.
     /// Source: `oracle/codemp/game/g_bot.c:27`
     #[derive(Clone, Copy)]
     pub BotSpawnQueue, botSpawnQueue_t, BOT_SPAWN_QUEUE_DEPTH);
 
 array_newtype!(zero;
-    /// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
-    /// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
-    /// elements do in stable Rust).
+    /// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`).
+    /// This is a thin wrapper because `[qboolean; 256]` has no library `Default` impl.
+    /// Only arrays up to 32 elements have one in stable Rust.
     #[derive(Clone, Copy)]
     pub ItemRegistered, qboolean, MAX_ITEMS);
 
 array_newtype!(boxed;
-    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot personality
-    /// chat message buffers, one per client. Boxed so the ~256 KB of bytes lives on
-    /// the heap (not the `GameGlobals` stack image, which the engine's
-    /// `vmMain(GAME_INIT)` builds on a constrained stack).
+    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` holds bot personality chat message buffers, one per client.
+    /// This is boxed so the ~256 KB of bytes lives on the heap, not the `GameGlobals` stack image, which the engine's `vmMain(GAME_INIT)` builds on a constrained stack.
     /// Source: `oracle/codemp/game/ai_util.c:12`
     pub BotChatBuffer, [c_char; MAX_CHAT_BUFFER_SIZE], MAX_CLIENTS);
 
 array_newtype!(null;
-    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` — the waypoint arena, faithfully a
-    /// fixed array of raw pointers into the `B_Alloc` bump arena (individually
-    /// allocated, never freed). Newtype because a 4096-element array has no
-    /// library `Default` (>32) and the entries are raw pointers (null-init).
+    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` is the waypoint arena, a fixed array of raw pointers into the
+    /// `B_Alloc` bump arena (individually allocated, never freed).
+    /// This is a newtype because a 4096-element array has no library `Default` (over 32 elements) and the entries are raw pointers (null-init).
     /// Source: `oracle/codemp/game/ai_main.h:398`
     pub WpArray, *mut wpobject_t, MAX_WPARRAY_SIZE);
 
@@ -323,31 +305,28 @@ array_newtype!(null;
     pub SpawnPointArray, *mut gentity_t, MAX_SPAWNPOINT_ARRAY);
 
 array_newtype!(zero2d;
-    /// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]` (`g_log.c:21`). Newtype
-    /// because the inner `[c_int; MOD_MAX]` (45 elements) has no library
-    /// `Default` impl (only arrays up to 32 elements do in stable Rust).
+    /// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]` (`g_log.c:21`).
+    /// This is a newtype because the inner `[c_int; MOD_MAX]` (45 elements) has no library `Default` impl.
+    /// Only arrays up to 32 elements have one in stable Rust.
     #[derive(Clone, Copy)]
     pub WeaponLogDamage, c_int, meansOfDeath_t::MOD_MAX as usize, MAX_CLIENTS);
 
 array_newtype!(zero2d;
-    /// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]` (`g_log.c:22`). Same
-    /// >32-inner-array `Default` gap as `WeaponLogDamage`.
+    /// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]` (`g_log.c:22`).
+    /// This has the same over-32-inner-array `Default` gap as `WeaponLogDamage`.
     #[derive(Clone, Copy)]
     pub WeaponLogKills, c_int, meansOfDeath_t::MOD_MAX as usize, MAX_CLIENTS);
 
 array_newtype!(boxed;
-    /// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` — the 16384-entry node-graph
-    /// scratch table. Boxed so the ~458 KB of POD lives on the heap (not the
-    /// `GameWorld` stack image) and default-zeroed (`nodeobject_t` is `#[repr(C)]`
-    /// POD, so an all-zero image is valid).
+    /// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` is the 16384-entry node-graph scratch table.
+    /// This is boxed so the ~458 KB of POD lives on the heap, not the `GameWorld` stack image, and default-zeroed.
+    /// `nodeobject_t` is `#[repr(C)]` POD, so an all-zero image is valid.
     /// Source: `oracle/codemp/game/ai_wpnav.c:19`
     pub NodeTable, nodeobject_t, MAX_NODETABLE_SIZE);
 
 /// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
-/// Boxed so the array lives on the heap (not the `GameGlobals` stack image,
-/// which the engine's `vmMain(GAME_INIT)` builds on a constrained stack); the
-/// element owns `String`s (non-`Copy`, no zero image), so it is built
-/// element-by-element on the heap via a `Vec`.
+/// This is boxed so the array lives on the heap, not the `GameGlobals` stack image, which the engine's `vmMain(GAME_INIT)` builds on a constrained stack.
+/// The element owns `String`s (non-`Copy`, no zero image), so it is built element-by-element on the heap via a `Vec`.
 /// Source: `oracle/codemp/game/g_nav.c:1660`
 pub struct TempWaypointList(pub Box<[waypointData_t; MAX_STORED_WAYPOINTS]>);
 
@@ -375,10 +354,9 @@ impl IndexMut<usize> for TempWaypointList {
     }
 }
 
-/// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
-/// char newShader[MAX_QPATH]; float timeOffset; }`. `oldShader`/`newShader` are
-/// owned `String`s (the `MAX_QPATH` byte bound is applied at the write sites in
-/// `AddRemap`); the struct is game-internal, so layout is free.
+/// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH]; char newShader[MAX_QPATH]; float timeOffset; }`.
+/// `oldShader`/`newShader` are owned `String`s. The `MAX_QPATH` byte bound is applied at the write sites in `AddRemap`.
+/// The struct is game-internal, so layout is free.
 /// Source: `oracle/codemp/game/g_utils.c:8-13`
 #[derive(Clone, Default)]
 pub struct shaderRemap_t {
@@ -387,10 +365,9 @@ pub struct shaderRemap_t {
     pub timeOffset: f32,
 }
 
-/// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`). Newtype
-/// because a 128-element array has no library `Default` (>32); the non-`Copy`
-/// element (owns `String`s) rules out the `[x; N]` repeat form, so it is built
-/// element-by-element via `core::array::from_fn`.
+/// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`).
+/// This is a newtype because a 128-element array has no library `Default` (over 32 elements).
+/// The non-`Copy` element (owns `String`s) rules out the `[x; N]` repeat form, so it is built element-by-element via `core::array::from_fn`.
 pub struct RemappedShaders(pub [shaderRemap_t; MAX_SHADER_REMAPS]);
 
 impl Default for RemappedShaders {
@@ -400,8 +377,7 @@ impl Default for RemappedShaders {
 }
 
 array_newtype!(null;
-    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically
-    /// allocated NPC `gclient_t` backing store, indexed by entity number.
+    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) is the dynamically allocated NPC `gclient_t` backing store, indexed by entity number.
     /// Source: `oracle/codemp/game/g_utils.c:428`
     pub GClPtrs, *mut gclient_t, MAX_GENTITIES);
 
@@ -414,50 +390,41 @@ array_newtype!(zero;
     pub VehiclePoolOccupied, qboolean, MAX_VEHICLES_AT_A_TIME);
 
 array_newtype!(boxed;
-    /// `static Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:385`) —
-    /// the fixed pool `G_AllocateVehicleObject` hands out slots from. Boxed so the
-    /// ~122 KB slab (`976 * 128`) lives on the heap, not in the `GameGlobals` stack
-    /// image the engine builds during `vmMain(GAME_INIT)`; the all-zero start
-    /// matches Raven's zero-initialized `static`.
+    /// `static Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:385`) is the fixed pool `G_AllocateVehicleObject` hands out slots from.
+    /// This is boxed so the ~122 KB slab (`976 * 128`) lives on the heap, not in the `GameGlobals` stack image the engine builds during `vmMain(GAME_INIT)`.
+    /// The all-zero start matches Raven's zero-initialized `static`.
     pub VehiclePool, Vehicle_t, MAX_VEHICLES_AT_A_TIME);
 
 array_newtype!(boxed;
-    /// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
-    /// intrusively linked into a free list. Boxed so the ~384 KB pool lives on the
-    /// heap (not the `GameGlobals` stack image, which the engine's
-    /// `vmMain(GAME_INIT)` builds on a constrained stack); the all-null/zero start
-    /// matches Raven's zero-initialized pool.
+    /// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) is the fixed timer pool, intrusively linked into a free list.
+    /// This is boxed so the ~384 KB pool lives on the heap, not the `GameGlobals` stack image, which the engine's `vmMain(GAME_INIT)` builds on a constrained stack.
+    /// The all-null/zero start matches Raven's zero-initialized pool.
     pub GTimerPool, gtimer_t, MAX_GTIMERS);
 
 array_newtype!(null;
-    /// `gtimer_t *g_timers[MAX_GENTITIES]` (`g_timer.c:18`) — per-entity timer
-    /// list heads, indexed by entity number.
+    /// `gtimer_t *g_timers[MAX_GENTITIES]` (`g_timer.c:18`) holds per-entity timer list heads, indexed by entity number.
     pub GTimers, *mut gtimer_t, MAX_GENTITIES);
 
-/// `navInfo_t frameNavInfo` (`NPC_move.c:14`) — per-frame NPC nav-move
-/// scratch state. Newtype because `navInfo_t` embeds `trace_t`/raw pointers
-/// with no library `Default` impl.
+/// `navInfo_t frameNavInfo` (`NPC_move.c:14`) is per-frame NPC nav-move scratch state.
+/// This is a newtype because `navInfo_t` embeds `trace_t`/raw pointers with no library `Default` impl.
 pub struct FrameNavInfo(pub navInfo_t);
 
 impl Default for FrameNavInfo {
     fn default() -> Self {
-        // Matches the oracle's static zero-initialization of `frameNavInfo`
-        // and every runtime `memset(&frameNavInfo, 0, sizeof(frameNavInfo))`.
+        // Matches the oracle's static zero-initialization of `frameNavInfo` and every runtime `memset(&frameNavInfo, 0, sizeof(frameNavInfo))`.
         FrameNavInfo(unsafe { core::mem::zeroed() })
     }
 }
 
 array_newtype!(zero;
-    /// Per-row `cvarTable_t.modificationCount` cache (`g_main.c:22`). Raven
-    /// stores this inline on each `gameCvarTable` row; this crate's
-    /// `GAME_CVAR_TABLE` is a `const`, so the per-call-spanning cache lives here
-    /// instead, indexed identically to `GAME_CVAR_TABLE`.
+    /// Per-row `cvarTable_t.modificationCount` cache (`g_main.c:22`).
+    /// Raven stores this inline on each `gameCvarTable` row.
+    /// This crate's `GAME_CVAR_TABLE` is a `const`, so the per-call-spanning cache lives here instead, indexed identically to `GAME_CVAR_TABLE`.
     pub GameCvarModCounts, c_int, GAME_CVAR_TABLE_LEN);
 
-/// `CheckCvars`' function-scope `static int lastMod = -1` (`g_main.c:3456`) —
-/// a genuine cross-frame static, homed here. Newtype so `GameGlobals` keeps
-/// `#[derive(Default)]` while this field seeds to `-1` (not 0), matching Raven's
-/// initializer so the first `CheckCvars` call always fires.
+/// `CheckCvars`' function-scope `static int lastMod = -1` (`g_main.c:3456`) is a genuine cross-frame static, homed here.
+/// This is a newtype so `GameGlobals` keeps `#[derive(Default)]` while this field seeds to `-1` (not 0), matching Raven's initializer.
+/// The first `CheckCvars` call always fires as a result.
 pub struct CheckCvarsLastMod(pub c_int);
 
 impl Default for CheckCvarsLastMod {
@@ -466,7 +433,7 @@ impl Default for CheckCvarsLastMod {
     }
 }
 
-/// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
+/// `teamgame_t` is the CTF flag-state file global (`g_team.c:18`).
 ///
 /// Source: `oracle/codemp/game/g_team.c:18`
 #[derive(Clone, Copy, Default)]
@@ -483,10 +450,9 @@ pub struct teamgame_t {
 /// Raven game-tier mutable file-scope globals, grouped into GameWorld fields.
 pub struct GameGlobals {
     // --- `NPC.c` file-scope globals ---
-    // Pass-2 backfill: `gentity_t *NPC;`/`gNPC_t *NPCInfo;`/`gclient_t *client;`
-    // are single-pointer file statics (not `**` — the placeholder comment
-    // mis-described the level of indirection), null-init like the other raw
-    // pointer fields above.
+    // `gentity_t *NPC;`/`gNPC_t *NPCInfo;`/`gclient_t *client;` are single-pointer file statics, not `**`.
+    // The placeholder comment mis-described the level of indirection.
+    // These are null-init, like the other raw pointer fields above.
     /// `NPC`. Source: `oracle/codemp/game/NPC.c:33`
     pub NPC: *mut gentity_t,
     /// `NPCInfo`. Source: `oracle/codemp/game/NPC.c:34`
@@ -499,15 +465,12 @@ pub struct GameGlobals {
     pub _saved_client: *mut gclient_t,
     /// `client`. Source: `oracle/codemp/game/NPC.c:35`
     pub client: *mut gclient_t,
-    /// `enemyVisibility` (pass-2 backfill of the `()` placeholder — porting-rules
-    /// §E13: "replace a ()-placeholder field's type with the real one if your
-    /// packet cites it").
+    /// Porting rules §E13 allow replacing a ()-placeholder field's type with the real one once a live call needs it.
     /// Source: `oracle/codemp/game/NPC.c:38`
     pub enemyVisibility: crate::npc::visibility_t::visibility_t,
     /// `ucmd`. Source: `oracle/codemp/game/NPC.c:36`
     pub ucmd: usercmd_t,
-    /// `_saved_ucmd` — the `SaveNPCGlobals`/`RestoreNPCGlobals` shadow copy of
-    /// `ucmd` (genuine cross-frame state).
+    /// `_saved_ucmd` is the `SaveNPCGlobals`/`RestoreNPCGlobals` shadow copy of `ucmd` (genuine cross-frame state).
     /// Source: `oracle/codemp/game/NPC.c:628`
     pub _saved_ucmd: usercmd_t,
     // --- `NPC_AI_GalakMech.c` file-scope globals ---
@@ -540,9 +503,9 @@ pub struct GameGlobals {
     pub shoot3: qboolean,
     // --- `NPC_AI_Jedi.c` file-scope globals ---
     /// `jediSpeechDebounceTime`. Source: `oracle/codemp/game/NPC_AI_Jedi.c:94`
-    // §19: every .npc-parsed NPC has playerTeam == -1 (Raven's "NPC%s" sprintf
-    // bug), so Raven indexes [-1] here — OOB read/write. Consumers use
-    // .get()/.get_mut(): out-of-range reads pass the debounce, writes are skipped.
+    // §19: every .npc-parsed NPC has playerTeam == -1 (Raven's "NPC%s" sprintf bug), so Raven indexes [-1] here.
+    // This is an out-of-bounds read/write.
+    // Consumers use `.get()`/`.get_mut()`. Out-of-range reads pass the debounce, and writes are skipped.
     pub jediSpeechDebounceTime: [c_int; TEAM_NUM_TEAMS as usize],
     // --- `NPC_AI_Sniper.c` file-scope globals ---
     /// `enemyCS2`. Source: `oracle/codemp/game/NPC_AI_Sniper.c:30`
@@ -568,8 +531,7 @@ pub struct GameGlobals {
     pub enemyLOS: qboolean,
     /// `faceEnemy`. Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:44`
     pub faceEnemy: qboolean,
-    /// `groupSpeechDebounceTime[TEAM_NUM_TEAMS]` — stops several group AI from
-    /// speaking all at once.
+    /// `groupSpeechDebounceTime[TEAM_NUM_TEAMS]` stops several group AI from speaking all at once.
     /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:50`
     pub groupSpeechDebounceTime: [c_int; mp_bg::public::team::TEAM_NUM_TEAMS as usize],
     /// `hitAlly`. Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:43`
@@ -578,37 +540,35 @@ pub struct GameGlobals {
     pub r#move: qboolean,
     /// `shoot`. Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:46`
     pub shoot: qboolean,
-    /// `static vec3_t impactPos` — last shot impact point (Stormtrooper aim).
+    /// `static vec3_t impactPos` is the last shot impact point (Stormtrooper aim).
     /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:48`
     pub impactPos: vec3_t,
     // --- `NPC_move.c` file-scope globals ---
-    /// `navInfo_t frameNavInfo` — per-frame NPC nav-move scratch state,
-    /// reused across calls within a frame.
+    /// `navInfo_t frameNavInfo` is per-frame NPC nav-move scratch state, reused across calls within a frame.
     /// Source: `oracle/codemp/game/NPC_move.c:14`
     pub frameNavInfo: FrameNavInfo,
     // --- `NPC_spawn.c` file-scope globals ---
-    /// `gNPCPtrs` (`gNPC_t *[MAX_GENTITIES]`; null-init raw pointers).
+    /// `gNPCPtrs` (`gNPC_t *[MAX_GENTITIES]`, null-init raw pointers).
     /// Source: `oracle/codemp/game/NPC_spawn.c:1276`
     pub gNPCPtrs: GNpcPtrs,
     /// `showBBoxes`. Source: `oracle/codemp/game/NPC_spawn.c:4182`
     pub showBBoxes: qboolean,
     // --- `NPC_stats.c` file-scope globals ---
-    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` — the loaded NPC-config text.
+    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` is the loaded NPC-config text.
     /// Source: `oracle/codemp/game/NPC_stats.c:237`
     pub NPCParms: NpcDataBuffer,
-    /// Raven `char npcParseBuffer[MAX_NPC_DATA_SIZE]` — scratch parse buffer.
+    /// Raven `char npcParseBuffer[MAX_NPC_DATA_SIZE]` is the scratch parse buffer.
     /// Source: `oracle/codemp/game/NPC_stats.c:3238`
     pub npcParseBuffer: NpcDataBuffer,
-    /// Raven `char NPCFile[MAX_QPATH]` — the currently-loading NPC-config file
-    /// name (parse-error text only; never written in MP, so an owned `String`).
+    /// Raven `char NPCFile[MAX_QPATH]` is the currently-loading NPC-config file name.
+    /// It is parse-error text only, never written in MP, so it is an owned `String`.
     /// Source: `oracle/codemp/game/NPC_stats.c:238`
     pub NPCFile: String,
     // --- `ai_main.c` file-scope globals ---
-    /// `botstates` (`bot_state_t *[MAX_CLIENTS]`; owned `Option<Box<_>>` slots).
+    /// `botstates` (`bot_state_t *[MAX_CLIENTS]`, owned `Option<Box<_>>` slots).
     /// Source: `oracle/codemp/game/ai_main.c:46`
     pub botstates: BotStates,
-    /// `droppedBlueFlag` (`gentity_t *`; raw pointer, matches the
-    /// raw-pointer entity signatures used throughout the pass-2 shards).
+    /// `droppedBlueFlag` (`gentity_t *`, raw pointer, matching this file's other raw-pointer entity fields).
     /// Source: `oracle/codemp/game/ai_main.c:94`
     pub droppedBlueFlag: *mut gentity_t,
     /// `droppedRedFlag` (`gentity_t *`).
@@ -618,10 +578,10 @@ pub struct GameGlobals {
     pub eFlagBlue: *mut gentity_t,
     /// `eFlagRed` (`gentity_t *`). Source: `oracle/codemp/game/ai_main.c:91`
     pub eFlagRed: *mut gentity_t,
-    /// `flagBlue` (`wpobject_t *`; points into `gWPArray`).
+    /// `flagBlue` (`wpobject_t *`, points into `gWPArray`).
     /// Source: `oracle/codemp/game/ai_main.c:88`
     pub flagBlue: *mut wpobject_t,
-    /// `flagRed` (`wpobject_t *`; points into `gWPArray`).
+    /// `flagRed` (`wpobject_t *`, points into `gWPArray`).
     /// Source: `oracle/codemp/game/ai_main.c:86`
     pub flagRed: *mut wpobject_t,
     /// `boteventtracker_t gBotEventTracker[MAX_CLIENTS]`.
@@ -632,12 +592,12 @@ pub struct GameGlobals {
     pub gUpdateVars: c_int,
     /// `CheckCvars`' `static int lastMod = -1` (`g_main.c:3456`).
     pub checkCvarsLastMod: CheckCvarsLastMod,
-    /// `static int lastbotthink_time` — bot-think cadence latch (function-scope
-    /// static in `BotAIStartFrame`; genuine cross-frame state).
+    /// `static int lastbotthink_time` is the bot-think cadence latch.
+    /// This is a function-scope static in `BotAIStartFrame`, genuine cross-frame state.
     /// Source: `oracle/codemp/game/ai_main.c:7497`
     pub lastbotthink_time: c_int,
-    /// `static int local_time` — bot-frame elapsed-time cursor (function-scope
-    /// static in `BotAIStartFrame`; genuine cross-frame state).
+    /// `static int local_time` is the bot-frame elapsed-time cursor.
+    /// This is a function-scope static in `BotAIStartFrame`, genuine cross-frame state.
     /// Source: `oracle/codemp/game/ai_main.c:7495`
     pub local_time: c_int,
     /// `numbots`. Source: `oracle/codemp/game/ai_main.c:48`
@@ -653,9 +613,9 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/ai_main.h:398`
     pub gWPArray: WpArray,
     // --- `ai_util.c` file-scope globals ---
-    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot chat message
-    /// buffers, one per client. Newtype because a 32×8192 array has no library
-    /// `Default` impl (only arrays up to 32 elements do in stable Rust).
+    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` holds bot chat message buffers, one per client.
+    /// This is a newtype because a 32x8192 array has no library `Default` impl.
+    /// Only arrays up to 32 elements have one in stable Rust.
     /// Source: `oracle/codemp/game/ai_util.c:12`
     pub gBotChatBuffer: BotChatBuffer,
     // --- `ai_wpnav.c` file-scope globals ---
@@ -687,34 +647,32 @@ pub struct GameGlobals {
     /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]`.
     /// Source: `oracle/codemp/game/g_bot.c:27`
     pub botSpawnQueue: BotSpawnQueue,
-    /// `char *g_botInfos[MAX_BOTS]` — bot info strings, owned.
+    /// `char *g_botInfos[MAX_BOTS]` holds bot info strings, owned.
     /// Source: `oracle/codemp/game/g_bot.c:9`
     pub g_botInfos: Vec<String>,
-    /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings, owned.
+    /// `char *g_arenaInfos[MAX_ARENAS]` holds arena info strings, owned.
     /// Source: `oracle/codemp/game/g_bot.c:13`
     pub g_arenaInfos: Vec<String>,
     /// `g_numArenas`. Source: `oracle/codemp/game/g_bot.c:12`
     pub g_numArenas: c_int,
     /// `g_numBots`. Source: `oracle/codemp/game/g_bot.c:8`
     pub g_numBots: c_int,
-    /// `vmCvar_t bot_minplayers` — minimum players cvar.
+    /// `vmCvar_t bot_minplayers` is the minimum players cvar.
     /// Source: `oracle/codemp/game/g_bot.c:1226`
     pub bot_minplayers: vmCvar_t,
-    /// `static int checkminimumplayers_time` — function-static debounce timer
-    /// (folded into GameGlobals per threading pattern).
+    /// `static int checkminimumplayers_time` is a function-static debounce timer, folded into GameGlobals per the threading pattern.
     /// Source: `oracle/codemp/game/g_bot.c:572`
     pub checkminimumplayers_time: c_int,
     // --- `g_client.c` file-scope globals ---
-    /// `void *g2SaberInstance` — the server's shared template ghoul2 saber instance handle.
+    /// `void *g2SaberInstance` is the server's shared template ghoul2 saber instance handle.
     /// Source: `oracle/codemp/game/g_client.c:1414`
     pub g2SaberInstance: *mut c_void,
-    /// Raven `gentity_t *gJMSaberEnt` — the current Jedi-Master saber entity.
+    /// Raven `gentity_t *gJMSaberEnt` is the current Jedi-Master saber entity.
     /// Source: `oracle/codemp/game/g_client.c:471`
     //
-    // The general rule stores `gentity_t*` as `EntityId`, but g_client.rs transcribes
-    // entities as raw `*mut gentity_t` throughout (its resolved signatures keep
-    // raw pointers); `Option<_>` gives the nullable-pointer semantics a Default
-    // (`None`) that a bare `*mut` lacks under this struct's `#[derive(Default)]`.
+    // The general rule stores `gentity_t*` as `EntityId`, but g_client.rs transcribes entities as raw `*mut gentity_t` throughout.
+    // Its resolved signatures keep raw pointers.
+    // `Option<_>` gives the nullable-pointer semantics a Default (`None`) that a bare `*mut` lacks under this struct's `#[derive(Default)]`.
     pub gJMSaberEnt: Option<*mut gentity_t>,
     // --- `g_cmds.c` file-scope globals ---
     /// `g_dontPenalizeTeam`. Source: `oracle/codemp/game/g_cmds.c:750`
@@ -722,8 +680,8 @@ pub struct GameGlobals {
     /// `g_preventTeamBegin`. Source: `oracle/codemp/game/g_cmds.c:751`
     pub g_preventTeamBegin: qboolean,
     // --- `g_combat.c` file-scope globals ---
-    /// `static int i` in `player_die` — rotates the EV_DEATH1..3 anim pick
-    /// across deaths (function-scope static; genuine cross-frame state).
+    /// `static int i` in `player_die` rotates the EV_DEATH1..3 anim pick across deaths.
+    /// This is a function-scope static, genuine cross-frame state.
     /// Source: `oracle/codemp/game/g_combat.c:2858`
     pub death_anim_i: c_int,
     /// `gGAvoidDismember`. Source: `oracle/codemp/game/g_combat.c:3753`
@@ -732,13 +690,12 @@ pub struct GameGlobals {
     pub gPainHitLoc: c_int,
     /// `gPainMOD`. Source: `oracle/codemp/game/g_combat.c:4573`
     pub gPainMOD: c_int,
-    /// `vec3_t gPainPoint` — location of the last registered pain hit.
+    /// `vec3_t gPainPoint` is the location of the last registered pain hit.
     /// Source: `oracle/codemp/game/g_combat.c:4575`
     pub gPainPoint: vec3_t,
     // --- `g_items.c` file-scope globals ---
     /// `itemRegistered[MAX_ITEMS]` (`MAX_ITEMS` = 256, `bg_public.h:31`).
-    /// Array `Default` isn't derivable past 32 elements in stable Rust, so
-    /// this is a thin newtype with its own `Default` impl (below).
+    /// Array `Default` is not derivable past 32 elements in stable Rust, so this is a thin newtype with its own `Default` impl (below).
     /// Source: `oracle/codemp/game/g_items.c:2966`
     pub itemRegistered: ItemRegistered,
     /// `shieldActivateSound` (`qhandle_t` = `c_int`).
@@ -757,10 +714,8 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/g_items.c:101`
     pub shieldLoopSound: qhandle_t,
     // --- `g_log.c` file-scope globals ---
-    // Pass-2 backfill of the `()` placeholders (allowed: "replace a
-    // ()-placeholder field's type with the real one if your packet cites
-    // it"); shapes are exactly what the `g_log.md` packet's TODO comments
-    // spelled out.
+    // The porting rules allow replacing a ()-placeholder field's type with the real one once a live call needs it.
+    // The shapes match what the `g_log.md` TODO comments spelled out.
     /// `qboolean G_WeaponLogClientTouch[MAX_CLIENTS]`.
     /// Source: `oracle/codemp/game/g_log.c:27`
     pub G_WeaponLogClientTouch: [qboolean; MAX_CLIENTS],
@@ -841,12 +796,10 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/g_misc.c:3351`
     pub g_shooterClients: [crate::g_misc::shooterClient_t; crate::g_misc::MAX_SHOOTERS as usize],
     // --- `g_mover.c` file-scope globals ---
-    /// `pushed_t pushed[MAX_GENTITIES]` / `pushed_p` save-stack
-    /// (`g_mover.c:19-24`) — one saved position/angle/deltayaw snapshot per
-    /// moved entity, so a blocked mover push can roll everything back.
-    /// Modeled as an owned `Vec` + cursor index rather than a raw pointer
-    /// pair into a fixed array (porting-rules B3/B5); `pushed_p` (Raven:
-    /// `pushed_t *pushed_p`) becomes an index into `pushed`.
+    /// `pushed_t pushed[MAX_GENTITIES]` / `pushed_p` save-stack (`g_mover.c:19-24`).
+    /// This holds one saved position/angle/deltayaw snapshot per moved entity, so a blocked mover push can roll everything back.
+    /// It is modeled as an owned `Vec` plus a cursor index, rather than a raw pointer pair into a fixed array (porting-rules B3/B5).
+    /// `pushed_p` (Raven: `pushed_t *pushed_p`) becomes an index into `pushed`.
     /// Source: `oracle/codemp/game/g_mover.c:19-24`
     pub pushed: Vec<crate::g_mover::PushedEntry>,
     pub pushed_p: usize,
@@ -869,16 +822,13 @@ pub struct GameGlobals {
     pub NAVDEBUG_showRadius: qboolean,
     /// `NAVDEBUG_showTestPath`. Source: `oracle/codemp/game/g_nav.c:1602`
     pub NAVDEBUG_showTestPath: qboolean,
-    /// Raven `char *fatalErrorPointer` — rolling write cursor into
-    /// `fatalErrorString`. Modeled as a byte offset (not a raw pointer) per
-    /// the no-aliasing-pointers-into-owned-arrays convention (porting-rules
-    /// §B5); `fatalErrorPointer - fatalErrorString` in the oracle is this
-    /// value directly.
+    /// Raven `char *fatalErrorPointer` is a rolling write cursor into `fatalErrorString`.
+    /// It is modeled as a byte offset, not a raw pointer, per the no-aliasing-pointers-into-owned-arrays convention (porting-rules §B5).
+    /// `fatalErrorPointer - fatalErrorString` in the oracle is this value directly.
     /// Source: `oracle/codemp/game/g_nav.c:1616`
     pub fatalErrorPointer: usize,
-    /// Raven `char fatalErrorString[4096]` — the rolling nav-error log, appended
-    /// to at `fatalErrorPointer` (an owned `String`; the 4096-byte cap is a
-    /// load-time guard in `NAV_WaypointsTooFar`).
+    /// Raven `char fatalErrorString[4096]` is the rolling nav-error log, appended to at `fatalErrorPointer`.
+    /// This is an owned `String`. The 4096-byte cap is a load-time guard in `NAV_WaypointsTooFar`.
     /// Source: `oracle/codemp/game/g_nav.c:1617`
     pub fatalErrorString: String,
     /// `fatalErrors`. Source: `oracle/codemp/game/g_nav.c:1615`
@@ -893,21 +843,20 @@ pub struct GameGlobals {
     // --- `g_saga.c` file-scope globals ---
     /// `gImperialCountdown`. Source: `oracle/codemp/game/g_saga.c:30`
     pub gImperialCountdown: c_int,
-    /// `static char team1[512]` — theme text for siege team 1 (an owned
-    /// `String`; the 511-byte bound is applied at the write sites in `G_SiegeInit`).
+    /// `static char team1[512]` is theme text for siege team 1.
+    /// This is an owned `String`. The 511-byte bound is applied at the write sites in `G_SiegeInit`.
     /// Source: `oracle/codemp/game/g_saga.c:17`
     pub team1: String,
-    /// `static char team2[512]` — theme text for siege team 2 (an owned
-    /// `String`; the 511-byte bound is applied at the write sites in `G_SiegeInit`).
+    /// `static char team2[512]` is theme text for siege team 2.
+    /// This is an owned `String`. The 511-byte bound is applied at the write sites in `G_SiegeInit`.
     /// Source: `oracle/codemp/game/g_saga.c:18`
     pub team2: String,
-    /// `static char gObjectiveCfgStr[1024]` — assembled objective config string
-    /// (an owned `String`; the 1024-byte bound is applied at the write site in
-    /// `G_SiegeCompleteObjective`).
+    /// `static char gObjectiveCfgStr[1024]` is the assembled objective config string.
+    /// This is an owned `String`. The 1024-byte bound is applied at the write site in `G_SiegeCompleteObjective`.
     /// Source: `oracle/codemp/game/g_saga.c:47`
     pub gObjectiveCfgStr: String,
-    /// `static char gParseObjectives[MAX_SIEGE_INFO_SIZE]` — siege-config parse
-    /// buffer (an owned `String`; the parse fns produce owned values).
+    /// `static char gParseObjectives[MAX_SIEGE_INFO_SIZE]` is the siege-config parse buffer.
+    /// This is an owned `String`. The parse functions produce owned values.
     /// Source: `oracle/codemp/game/g_saga.c:46`
     pub gParseObjectives: String,
     /// `gRebelCountdown`. Source: `oracle/codemp/game/g_saga.c:31`
@@ -922,8 +871,7 @@ pub struct GameGlobals {
     pub gSiegeRoundWinningTeam: qboolean,
     /// `g_preroundState`. Source: `oracle/codemp/game/g_saga.c:41`
     pub g_preroundState: c_int,
-    /// `g_siegePersistant` (`siegePers_t`) — cross-round siege team-switch
-    /// persistence, mirrored to the engine via `trap_SiegePersGet`/`Set`.
+    /// `g_siegePersistant` (`siegePers_t`) is cross-round siege team-switch persistence, mirrored to the engine via `trap_SiegePersGet`/`Set`.
     /// Source: `oracle/codemp/game/g_saga.c:20`
     pub g_siegePersistant: siegePers_t,
     /// `imperial_attackers`. Source: `oracle/codemp/game/g_saga.c:34`
@@ -943,11 +891,10 @@ pub struct GameGlobals {
     /// `rebel_time_limit`. Source: `oracle/codemp/game/g_saga.c:28`
     pub rebel_time_limit: c_int,
     // --- `g_spawn.c` file-scope globals ---
-    /// `void *precachedKyle` — the server's precached Kyle template ghoul2 instance handle.
+    /// `void *precachedKyle` is the server's precached Kyle template ghoul2 instance handle.
     /// Source: `oracle/codemp/game/g_spawn.c:1226`
     pub precachedKyle: *mut c_void,
-    /// `float g_cullDistance` — server-cull distance, set once from the
-    /// `worldspawn` `distanceCull` key and read by vehicle crosshair tracing.
+    /// `float g_cullDistance` is the server-cull distance, set once from the `worldspawn` `distanceCull` key and read by vehicle crosshair tracing.
     /// Source: `oracle/codemp/game/g_spawn.c:1258`
     pub g_cullDistance: f32,
     // --- `g_svcmds.c` file-scope globals ---
@@ -960,25 +907,25 @@ pub struct GameGlobals {
     /// `numNewICARUSEnts`. Source: `oracle/codemp/game/g_target.c:753`
     pub numNewICARUSEnts: c_int,
     // --- `g_team.c` file-scope globals ---
-    /// `teamgame` — CTF flag state.
+    /// `teamgame` is the CTF flag state.
     /// Source: oracle/codemp/game/g_team.c:18
     pub teamgame: teamgame_t,
     // --- `g_timer.c` file-scope globals ---
-    /// `gtimer_t *g_timerFreeList` — head of the free-list of unused pool slots.
+    /// `gtimer_t *g_timerFreeList` is the head of the free-list of unused pool slots.
     /// Source: `oracle/codemp/game/g_timer.c:19`
     pub g_timerFreeList: *mut crate::g_timer::gtimer_t,
-    /// `gtimer_t g_timerPool[MAX_GTIMERS]` — the fixed timer pool.
+    /// `gtimer_t g_timerPool[MAX_GTIMERS]` is the fixed timer pool.
     /// Source: `oracle/codemp/game/g_timer.c:17`
     pub g_timerPool: GTimerPool,
-    /// `gtimer_t *g_timers[MAX_GENTITIES]` — per-entity timer list heads.
+    /// `gtimer_t *g_timers[MAX_GENTITIES]` holds per-entity timer list heads.
     /// Source: `oracle/codemp/game/g_timer.c:18`
     pub g_timers: GTimers,
     // --- `g_trigger.c` file-scope globals ---
     /// `gTrigFallSound`. Source: `oracle/codemp/game/g_trigger.c:6`
     pub gTrigFallSound: c_int,
     // --- `g_utils.c` file-scope globals ---
-    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`). Restored to Raven's
-    /// `gclient_t*` element typing (safe-state Stage 4); reads no longer cast.
+    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`).
+    /// This is restored to Raven's `gclient_t*` element typing. Reads no longer cast.
     /// Source: `oracle/codemp/game/g_utils.c:428`
     pub gClPtrs: GClPtrs,
     /// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (see `GG2KillIndex`).
@@ -1004,39 +951,36 @@ pub struct GameGlobals {
     // --- `g_weapon.c` file-scope globals ---
     /// `s_quadFactor`. Source: `oracle/codemp/game/g_weapon.c:12`
     pub s_quadFactor: f32,
-    /// `static vec3_t forward` — fire-time forward axis shared across
-    /// `WP_Fire*`/`CalcMuzzlePoint`.
+    /// `static vec3_t forward` is the fire-time forward axis shared across `WP_Fire*`/`CalcMuzzlePoint`.
     /// Source: `oracle/codemp/game/g_weapon.c:13`
     pub forward: vec3_t,
-    /// `static vec3_t vright` — fire-time right axis.
+    /// `static vec3_t vright` is the fire-time right axis.
     /// Source: `oracle/codemp/game/g_weapon.c:13`
     pub vright: vec3_t,
-    /// `static vec3_t up` — fire-time up axis.
+    /// `static vec3_t up` is the fire-time up axis.
     /// Source: `oracle/codemp/game/g_weapon.c:13`
     pub up: vec3_t,
-    /// `static vec3_t muzzle` — fire-time muzzle point.
+    /// `static vec3_t muzzle` is the fire-time muzzle point.
     /// Source: `oracle/codemp/game/g_weapon.c:14`
     pub muzzle: vec3_t,
     // --- `w_saber.c` file-scope globals ---
-    /// `static vec3_t dmgDir[MAX_SABER_VICTIMS]` — per-victim saber damage
-    /// direction.
+    /// `static vec3_t dmgDir[MAX_SABER_VICTIMS]` holds the per-victim saber damage direction.
     /// Source: `oracle/codemp/game/w_saber.c:3507`
     pub dmgDir: [vec3_t; MAX_SABER_VICTIMS],
-    /// `static vec3_t dmgSpot[MAX_SABER_VICTIMS]` — per-victim saber impact
-    /// point.
+    /// `static vec3_t dmgSpot[MAX_SABER_VICTIMS]` holds the per-victim saber impact point.
     /// Source: `oracle/codemp/game/w_saber.c:3508`
     pub dmgSpot: [vec3_t; MAX_SABER_VICTIMS],
-    /// `static qboolean dismemberDmg[MAX_SABER_VICTIMS]` — per-victim dismember flag.
+    /// `static qboolean dismemberDmg[MAX_SABER_VICTIMS]` holds the per-victim dismember flag.
     /// Source: oracle/codemp/game/w_saber.c:3509
     pub dismemberDmg: [qboolean; MAX_SABER_VICTIMS],
     /// `numVictims`. Source: `oracle/codemp/game/w_saber.c:3511`
     pub numVictims: c_int,
     /// `saberClashEventParm`. Source: `oracle/codemp/game/w_saber.c:3797`
     pub saberClashEventParm: c_int,
-    /// `static vec3_t saberClashNorm` — surface normal at the last saber clash.
+    /// `static vec3_t saberClashNorm` is the surface normal at the last saber clash.
     /// Source: `oracle/codemp/game/w_saber.c:3796`
     pub saberClashNorm: vec3_t,
-    /// `static vec3_t saberClashPos` — world position of the last saber clash.
+    /// `static vec3_t saberClashPos` is the world position of the last saber clash.
     /// Source: `oracle/codemp/game/w_saber.c:3795`
     pub saberClashPos: vec3_t,
     /// `saberDoClashEffect`. Source: `oracle/codemp/game/w_saber.c:3794`
@@ -1047,30 +991,29 @@ pub struct GameGlobals {
     pub saberHitSaber: qboolean,
     /// `saberHitWall`. Source: `oracle/codemp/game/w_saber.c:3846`
     pub saberHitWall: qboolean,
-    /// `static int saberKnockbackFlags[MAX_SABER_VICTIMS]` — per-victim knockback flags.
+    /// `static int saberKnockbackFlags[MAX_SABER_VICTIMS]` holds per-victim knockback flags.
     /// Source: oracle/codemp/game/w_saber.c:3510
     pub saberKnockbackFlags: [c_int; MAX_SABER_VICTIMS],
     /// `saberSpinSound`. Source: `oracle/codemp/game/w_saber.c:18`
     pub saberSpinSound: c_int,
-    /// `static float totalDmg[MAX_SABER_VICTIMS]` — per-victim accumulated damage.
-    /// `f32` to match the oracle: accumulation, the wall-scale multiply, and the
-    /// magnitude comparisons all run in float; only the `G_Damage` `int damage`
-    /// argument truncates, at that call site.
+    /// `static float totalDmg[MAX_SABER_VICTIMS]` holds per-victim accumulated damage.
+    /// This is `f32` to match the oracle: accumulation, the wall-scale multiply, and the magnitude comparisons all run in float.
+    /// Only the `G_Damage` `int damage` argument truncates, at that call site.
     /// Source: oracle/codemp/game/w_saber.c:3506
     pub totalDmg: [f32; MAX_SABER_VICTIMS],
-    /// `static int victimEntityNum[MAX_SABER_VICTIMS]` — per-victim entity number.
+    /// `static int victimEntityNum[MAX_SABER_VICTIMS]` holds the per-victim entity number.
     /// Source: oracle/codemp/game/w_saber.c:3504
     pub victimEntityNum: [c_int; MAX_SABER_VICTIMS],
-    /// `static qboolean victimHitEffectDone[MAX_SABER_VICTIMS]` — per-victim hit-effect flag.
+    /// `static qboolean victimHitEffectDone[MAX_SABER_VICTIMS]` holds the per-victim hit-effect flag.
     /// Source: oracle/codemp/game/w_saber.c:3505
     pub victimHitEffectDone: [qboolean; MAX_SABER_VICTIMS],
 }
 
 impl Default for GameGlobals {
     fn default() -> Self {
-        // Manual impl (not `#[derive(Default)]`): Raven's file-scope
-        // `int gSiegeBeginTime = Q3_INFINITE;` seeds that one field non-zero at
-        // load time; every other field keeps the derived zero default.
+        // This is a manual impl, not `#[derive(Default)]`.
+        // Raven's file-scope `int gSiegeBeginTime = Q3_INFINITE;` seeds that one field non-zero at load time.
+        // Every other field keeps the derived zero default.
         // Source: `oracle/codemp/game/g_saga.c:39`
         Self {
             NPC: Default::default(),

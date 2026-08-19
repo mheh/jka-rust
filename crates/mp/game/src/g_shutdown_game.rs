@@ -1,5 +1,3 @@
-//! `g_shutdown_game` — Raven `G_ShutdownGame`.
-
 use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
 use mp_abi::game::syscalls::G_G2_HAVEWEGHOULMODELS::GG2HaveweghoulmodelsArgs;
 use mp_abi::game::syscalls::G_ICARUS_SHUTDOWN::GIcarusShutdownArgs;
@@ -29,17 +27,17 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
     let restart = args.restart();
 
     G_SaveBanIP(ctx);
-    // get rid of dynamically allocated fake client structs.
+    //get rid of dynamically allocated fake client structs.
     G_CleanAllFakeClients(ctx);
 
-    // free all dynamic allocations made through the engine
+    //free all dynamic allocations made through the engine
     BG_ClearAnimsets();
 
     // Com_Printf("... Gameside GHOUL2 Cleanup\n");
     for i in 0..MAX_GENTITIES {
-        // clean up all the ghoul2 instances. `ghoul2`/`weaponGhoul2[j]` are
-        // `*mut c_void` handle values, not arena pointers — read the value out
-        // and take field addresses through the owned world accessors (§B5).
+        //clean up all the ghoul2 instances
+        // `ghoul2`/`weaponGhoul2[j]` are `*mut c_void` handle values, not arena pointers.
+        // Read the value out and take field addresses through the owned world accessors (§B5).
         let ghoul2 = ctx.world.g_entities[i].ghoul2;
         if !ghoul2.is_null()
             && trap::G2_HaveWeGhoul2Models(ctx.engine, GG2HaveweghoulmodelsArgs::new(ghoul2))
@@ -51,11 +49,9 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
             );
             ctx.world.g_entities[i].ghoul2 = core::ptr::null_mut();
         }
-        // `ent->client` is non-null for player slots (arena `clients[i]`) AND
-        // for NPCs at i >= MAX_CLIENTS, whose clients are BG_Alloc'd pool
-        // structs (`gClPtrs`) that `G_FreeFakeClient` never frees or nulls —
-        // so the weaponGhoul2 reads must go through the entity's client
-        // pointer (gclient deref regime, task #7), not `clients[i]`.
+        // `ent->client` is non-null for player slots (arena `clients[i]`) and for NPCs at i >= MAX_CLIENTS,
+        // whose clients are BG_Alloc'd pool structs (`gClPtrs`) that `G_FreeFakeClient` never frees or nulls.
+        // The weaponGhoul2 reads must go through the entity's client pointer (gclient deref regime, DEC-29), not `clients[i]`.
         let client = ctx.world.g_entities[i].client;
         if !client.is_null() {
             for j in 0..MAX_SABERS {
@@ -102,10 +98,10 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
     }
 
     // Com_Printf ("... ICARUS_Shutdown\n");
-    trap::ICARUS_Shutdown(ctx.engine, GIcarusShutdownArgs::new()); // Shut ICARUS down
+    trap::ICARUS_Shutdown(ctx.engine, GIcarusShutdownArgs::new()); //Shut ICARUS down
 
     // Com_Printf ("... Reference Tags Cleared\n");
-    TAG_Init(ctx); // Clear the reference tags
+    TAG_Init(ctx); //Clear the reference tags
 
     G_LogWeaponOutput(ctx);
 
@@ -127,6 +123,6 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
         BotAIShutdown(ctx, restart);
     }
 
-    // clean up all allocations made with B_Alloc
+    //clean up all allocations made with B_Alloc
     B_CleanupAlloc();
 }

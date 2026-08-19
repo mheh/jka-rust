@@ -1,7 +1,8 @@
-// PORT-COMPLETE: g_items.c
-//! FAITHFUL port of `oracle/codemp/game/g_items.c`.
+//! Port of `oracle/codemp/game/g_items.c`.
 //!
-//! Filled by the jampgame mega-pass.
+//! Client, NPC, and vehicle pointers stay raw throughout this file.
+//! An item, turret, or e-web callback may receive an NPC pool `gclient_t`, `gNPC_t`, or `Vehicle_t`, not a `level.clients` slot.
+//! These types have no accessor, so each site reads the pointer through the safe entity borrow, then dereferences it raw, exactly as Raven does.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -63,22 +64,21 @@ use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::shared::mdxaBone_t;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Canonical
-// in `crate::q_math`. Source: `oracle/codemp/game/q_shared.h:374-376`
+// Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2.
+// Canonical in `crate::q_math`.
+// Source: `oracle/codemp/game/q_shared.h:374-376`
 use crate::q_math::{PITCH, ROLL, YAW};
-
-// `ITMSF_ALLOWNPC` — item spawnflag defined above with the other `ITMSF_*`
-// spawnflags (g_items.c:32); duplicate file-scope const removed at integration.
 
 // Raven `g_items.c:42-44` medpack heal caps.
 pub const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
 pub const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
 
-// Raven `g_items.c:20-26` respawn-time-by-item-class `#define`s, consumed by
-// `adjustRespawnTime(float preRespawnTime, ...)` — hence `f32`, not `c_int`.
+// Raven `g_items.c:20-26` respawn-time-by-item-class `#define`s.
+// `adjustRespawnTime(float preRespawnTime, ...)` consumes them, so they are `f32`, not `c_int`.
 // Source: `oracle/codemp/game/g_items.c:20-26`
 pub const RESPAWN_ARMOR: f32 = 20.0;
 pub const RESPAWN_TEAM_WEAPON: f32 = 30.0;
@@ -96,27 +96,26 @@ pub const TOSSED_ITEM_OWNER_NOTOUCH_DUR: c_int = 1000;
 // Raven `g_items.c:1333-1334` dispenser item classnames.
 // (referenced from `G_PrecacheDispensers`)
 
-// Raven `surfaceflags.h`/`bg_public.h` CONTENTS_*/MASK_* #defines, canonical in
-// `mp_qshared::shared::surface_flags`. Imported explicitly (they also reach here
-// via the prelude glob); the former local transcriptions were redundant.
+// Raven `surfaceflags.h`/`bg_public.h` CONTENTS_*/MASK_* #defines are canonical in `mp_qshared::shared::surface_flags`.
+// This file imports them explicitly, even though they also reach here through the prelude glob.
+// The former local transcriptions were redundant.
 // Source: `oracle/codemp/game/surfaceflags.h:10-36`, `bg_public.h:1172-1177`
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LIGHTSABER, CONTENTS_NODROP, CONTENTS_PLAYERCLIP, CONTENTS_SHOTCLIP, CONTENTS_TRIGGER,
     CONTENTS_WATER, MASK_PLAYERSOLID, MASK_SHOT,
 };
 
-// Raven `g_public.h` svflags #defines, canonical in `g_public_consts`.
-// SVF_SINGLECLIENT was wrongly transcribed locally as 0x40 (that is SVF_PORTAL);
-// the correct value is 0x100, so temp-entity item pickups were tagged with the
-// wrong svFlag bit. Import fixes it.
+// Raven `g_public.h` svflags #defines are canonical in `g_public_consts`.
+// A prior pass wrongly transcribed `SVF_SINGLECLIENT` locally as `0x40`, which is `SVF_PORTAL`.
+// The correct value is `0x100`, so temp-entity item pickups carried the wrong svFlag bit.
+// This import fixes it.
 // Source: `oracle/codemp/game/g_public.h:22,25`
 use crate::g_public_consts::{SVF_BROADCAST, SVF_NOCLIENT, SVF_SINGLECLIENT};
 
-// Raven `bg_public.h:82` `CS_ITEMS` — canonical in `mp_bg::public::configstring`,
-// reaches this file via the crate prelude glob (`crate::prelude::*`).
+// Raven `bg_public.h:82` `CS_ITEMS` is canonical in `mp_bg::public::configstring`.
+// It reaches this file through the crate prelude glob (`crate::prelude::*`).
 
-// Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`,
-// canonical in `mp_bg::public::entity_flags`.
+// Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING` are canonical in `mp_bg::public::entity_flags`.
 // Source: `oracle/codemp/game/bg_public.h:560,601,607`
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_flags::{EF_CLIENTSMOOTH, EF_G2ANIMATING, EF_ITEMPLACEHOLDER};
@@ -124,10 +123,9 @@ use mp_bg::public::entity_flags::{EF_CLIENTSMOOTH, EF_G2ANIMATING, EF_ITEMPLACEH
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
 pub const ITEM_RADIUS: f32 = 15.0;
 
-// Raven `FRAMETIME` (`g_local.h:37`). `pub` + prelude re-export (pass-3
-// symbol backfill) — sibling files (`NPC_AI_GalakMech.rs`, `g_mover.rs`, …)
-// carry their own private copy of this same value; this is the one exported
-// for bare-use sites without a local copy.
+// Raven `FRAMETIME` (`g_local.h:37`) is `pub` and re-exported from the prelude.
+// Sibling files (`NPC_AI_GalakMech.rs`, `g_mover.rs`, and others) carry their own private copy of this same value.
+// This copy is the one exported for bare-use sites that have no local copy.
 pub const FRAMETIME: c_int = 100;
 
 // Raven `#define REWARD_SPRITE_TIME 2000` (`g_local.h:39`).
@@ -153,7 +151,7 @@ pub fn adjustRespawnTime(ctx: &mut GameContext, preRespawnTime: f32, kind: ItemK
         kind,
         ItemKind::Weapon(WP_THERMAL | WP_TRIP_MINE | WP_DET_PACK)
     ) {
-        // special case for these, use ammo respawn rate
+        //special case for these, use ammo respawn rate
         respawnTime = RESPAWN_AMMO;
     }
 
@@ -169,15 +167,16 @@ pub fn adjustRespawnTime(ctx: &mut GameContext, preRespawnTime: f32, kind: ItemK
             respawnTime *= 0.25;
         } else if numPlayingClients > 12 {
             // From 12-32, scale from 0.5 to 0.25;
-            // C: `respawnTime *= 20.0 / (float)(n+8)` — 20.0 is a double, so the
-            // divide and the `*=` both run in f64, narrowing once at the store;
-            // the int cast to (float) happens first.
+            // C: `respawnTime *= 20.0 / (float)(n+8)`.
+            // `20.0` is a double, so the divide and the `*=` both run in f64, narrowing once at the store.
+            // The int cast to `(float)` happens first.
             // Source: `oracle/codemp/game/g_items.c:74`
             respawnTime =
                 (respawnTime as f64 * (20.0f64 / (numPlayingClients + 8) as f32 as f64)) as f32;
         } else {
             // From 4-12, scale from 1.0 to 0.5;
-            // C: `respawnTime *= 8.0 / (float)(n+4)` — same f64 divide/`*=` shape.
+            // C: `respawnTime *= 8.0 / (float)(n+4)`.
+            // This has the same f64 divide/`*=` shape as the branch above.
             // Source: `oracle/codemp/game/g_items.c:78`
             respawnTime =
                 (respawnTime as f64 * (8.0f64 / (numPlayingClients + 4) as f32 as f64)) as f32;
@@ -376,8 +375,8 @@ pub fn ShieldTouch(
     if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
         // let teammates through
         // compare the parent's team to the "other's" team
-        // Raven: parent && parent->client && other->client (short-circuit order
-        // preserved; the `other` deref runs only after the parent checks pass).
+        // Raven: `parent && parent->client && other->client`.
+        // This port preserves that short-circuit order, so the `other` deref runs only after the parent checks pass.
         if parent.is_some_and(|p| !ctx.entity(p).client.is_null())
             && other.is_some_and(|o| !ctx.entity(o).client.is_null())
         {
@@ -386,7 +385,7 @@ pub fn ShieldTouch(
             }
         }
     } else {
-        // let the person who dropped the shield through
+        //let the person who dropped the shield through
         if let (Some(p), Some(o)) = (parent, other) {
             if ctx.entity(p).s.number == ctx.entity(o).s.number {
                 ShieldGoNotSolid(ctx, self_);
@@ -600,14 +599,14 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
         ctx.world.globals.shieldDeactivateSound =
             G_SoundIndex(ctx, "sound/movers/doors/forcefield_off.wav");
         ctx.world.globals.shieldDamageSound = G_SoundIndex(ctx, "sound/effects/bumpfield.wav");
-        // `shieldItem` (`static const gitem_t *`) is a function-scope
-        // cache; recomputed each call here since the fn-scope caching
-        // scheme isn't threaded through GameWorld for this local.
+        // Raven's `shieldItem` (`static const gitem_t *`) is a function-scope cache.
+        // This port recomputes it on each call, because the fn-scope caching scheme is not threaded through
+        // `GameWorld` for this local.
     }
     let shieldItem = BG_FindItemForHoldable(HI_SHIELD);
 
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let client = ctx.entity(playerent).client;
 
     // can we place this in front of us?
@@ -632,7 +631,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
         ),
     );
     if tr.fraction > 0.9 {
-        // room in front
+        //room in front
         pos = tr.endpos;
         // drop to floor
         dest = [pos[0], pos[1], pos[2] - 4096.0];
@@ -723,8 +722,8 @@ pub fn ItemUse_Binoculars(ctx: &mut GameContext, ent: Option<EntityId>) {
     let Some(ent) = ent else {
         return;
     };
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let client = ctx.entity(ent).client;
     if client.is_null() {
         return;
@@ -769,11 +768,11 @@ pub fn pas_fire(ctx: &mut GameContext, ent: EntityId) {
     let mut myOrg = ctx.entity(ent).r.currentOrigin;
     myOrg[2] += 24.0;
 
-    // Raven derefs `ent->enemy` unconditionally; callers only invoke
-    // `pas_fire` when `ent->enemy` is non-null (see `pas_think`).
+    // Raven derefs `ent->enemy` unconditionally.
+    // Callers only invoke `pas_fire` when `ent->enemy` is non-null (see `pas_think`).
     let enemy = ctx.entity(ent).enemy.unwrap();
-    // FLAG: enemy client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2b — the enemy may be any entity).
+    // FLAG: This is the enemy client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, because the enemy may be any entity.
     let enemy_client = ctx.entity(enemy).client;
     let mut enOrg = unsafe { (*enemy_client).ps.origin };
     enOrg[2] += 24.0;
@@ -840,8 +839,8 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     for i in 0..count {
         let target = ctx.entity_id_of(entity_list[i as usize]).unwrap();
 
-        // FLAG: target client pointer (`gclient_t*`); deref stays raw through the
-        // copied pointer value (recipe 2b — the target may be any entity).
+        // FLAG: This is the target client pointer (`gclient_t*`).
+        // The deref stays raw through the copied pointer value, because the target may be any entity.
         let target_client = ctx.entity(target).client;
         if target_client.is_null() {
             continue;
@@ -875,7 +874,7 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
         if ctx.entity(target).s.eType == ET_NPC as c_int
             && ctx.entity(target).s.NPC_class == CLASS_VEHICLE as c_int
         {
-            // don't get mad at vehicles, silly.
+            //don't get mad at vehicles, silly.
             continue;
         }
 
@@ -919,8 +918,8 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                     G_Sound(ctx, Some(self_), CHAN_BODY, sound);
 
                     // Wind up turrets for a bit
-                    // C: `level.time + 900 + random()*200` — the int sum promotes
-                    // to f32 against `random()*200`, truncating once at the store.
+                    // C: `level.time + 900 + random()*200`.
+                    // The int sum promotes to f32 against `random()*200`, truncating once at the store.
                     // Source: `oracle/codemp/game/g_items.c:628`
                     ctx.entity_mut(self_).attackDebounceTime = ((ctx.world.level.time + 900) as f32
                         + ctx.world.bg_state.rng.random() * 200.0)
@@ -942,16 +941,16 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/g_items.c:642-695`
 pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
     let mut keep = qtrue;
-    // Raven derefs `ent->enemy` unconditionally here; callers only invoke
-    // `pas_adjust_enemy` when `ent->enemy` is non-null (see `pas_think`).
+    // Raven derefs `ent->enemy` unconditionally here.
+    // Callers only invoke `pas_adjust_enemy` when `ent->enemy` is non-null (see `pas_think`).
     let enemy = ctx.entity(ent).enemy.unwrap();
 
     if ctx.entity(enemy).health <= 0 {
         keep = qfalse;
     } else {
         let org2 = ctx.entity(ent).s.pos.trBase;
-        // FLAG: enemy client pointer (`gclient_t*`); deref stays raw through the
-        // copied pointer value (recipe 2b — the enemy may be any entity).
+        // FLAG: This is the enemy client pointer (`gclient_t*`).
+        // The deref stays raw through the copied pointer value, because the enemy may be any entity.
         let enemy_client = ctx.entity(enemy).client;
         let org = if !enemy_client.is_null() {
             let mut o = unsafe { (*enemy_client).ps.origin };
@@ -997,8 +996,9 @@ pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
         let sound = G_SoundIndex(ctx, "sound/chars/turret/shutdown.wav");
         G_Sound(ctx, Some(ent), CHAN_BODY, sound);
 
-        // C: `level.time + 500 + random()*150` — single truncation of the
-        // promoted-to-f32 sum. Source: `oracle/codemp/game/g_items.c:690`
+        // C: `level.time + 500 + random()*150`.
+        // This is a single truncation of the promoted-to-f32 sum.
+        // Source: `oracle/codemp/game/g_items.c:690`
         ctx.entity_mut(ent).bounceCount = ((ctx.world.level.time + 500) as f32
             + ctx.world.bg_state.rng.random() * 150.0)
             as c_int;
@@ -1054,7 +1054,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     let mut clTrapped = qfalse;
     while i < numListedEntities {
         if iEntityList[i as usize] < mp_qshared::shared::MAX_CLIENTS as c_int {
-            // client stuck inside me. go nonsolid.
+            //client stuck inside me. go nonsolid.
             let clNum = iEntityList[i as usize];
 
             numListedEntities = trap::EntitiesInBox(
@@ -1091,9 +1091,9 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     }
 
     let ownerIdx = ctx.entity(ent).genericValue3 as usize;
-    // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2b — read exactly what Raven derefs, and
-    // only after the `inuse`/null short-circuit passes).
+    // FLAG: This is the owner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, and reads exactly what Raven derefs.
+    // The deref runs only after the `inuse`/null short-circuit passes.
     let owner_client = ctx.world.g_entities[ownerIdx].client;
     if ctx.world.g_entities[ownerIdx].inuse == 0
         || owner_client.is_null()
@@ -1131,7 +1131,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     }
 
     if let Some(enemy_id) = ctx.entity(ent).enemy {
-        // FLAG: enemy client pointer (`gclient_t*`); deref stays raw (recipe 2b).
+        // FLAG: This is the enemy client pointer (`gclient_t*`). The deref stays raw.
         let enemy_client = ctx.entity(enemy_id).client;
         if enemy_client.is_null() {
             ctx.entity_mut(ent).enemy = None;
@@ -1165,7 +1165,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     if let Some(enemy_id) = ctx.entity(ent).enemy {
         // ...then we'll calculate what new aim adjustments we should attempt to make this frame
         // Aim at enemy
-        // FLAG: enemy client pointer (`gclient_t*`); deref stays raw (recipe 2b).
+        // FLAG: This is the enemy client pointer (`gclient_t*`). The deref stays raw.
         let enemy_client = ctx.entity(enemy_id).client;
         let org = if !enemy_client.is_null() {
             unsafe { (*enemy_client).ps.origin }
@@ -1268,8 +1268,8 @@ pub fn turret_die(
     }
 
     let owner = EntityId(ctx.entity(self_).genericValue3 as u32);
-    // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2b — read exactly what Raven derefs).
+    // FLAG: This is the owner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let owner_client = ctx.entity(owner).client;
     if ctx.entity(owner).inuse == 0 || owner_client.is_null() {
         G_FreeEntity(ctx, Some(self_));
@@ -1322,7 +1322,7 @@ pub fn SP_PAS(ctx: &mut GameContext, base: EntityId) {
     }
 
     ctx.entity_mut(base).s.bolt1 = 1; // This is a sort of hack to indicate that this model needs special turret things done to it
-    ctx.entity_mut(base).s.bolt2 = ENTITYNUM_NONE; // store our current enemy index
+    ctx.entity_mut(base).s.bolt2 = ENTITYNUM_NONE; //store our current enemy index
 
     ctx.entity_mut(base).damage = 0; // start animation flag
 
@@ -1354,8 +1354,8 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
     let Some(ent) = ent else {
         return;
     };
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let client = ctx.entity(ent).client;
     if client.is_null() {
         return;
@@ -1441,8 +1441,8 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:1096-1125`
 pub fn ItemUse_Seeker(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let ent_client = ctx.entity(ent).client;
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE
         && ctx.world.cvars.d_siegeSeekerNPC.integer != 0
@@ -1451,7 +1451,7 @@ pub fn ItemUse_Seeker(ctx: &mut GameContext, ent: EntityId) {
         let remote = NPC_SpawnType(ctx, Some(ent), "remote", None, qfalse);
         if !remote.is_null() {
             let remote_id = ctx.entity_id_of(remote).unwrap();
-            // FLAG: NPC client pointer; deref stays raw (recipe 2b — remote is an NPC).
+            // FLAG: This is the NPC client pointer. The deref stays raw, because the remote is an NPC.
             let remote_client = ctx.entity(remote_id).client;
             if !remote_client.is_null() {
                 // set it to my team
@@ -1487,9 +1487,9 @@ pub fn ItemUse_Seeker(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:1127-1152`
 pub fn MedPackGive(ent: &mut gentity_t, amount: c_int) {
-    // FLAG: client pointer (`gclient_t*`); deref stays raw (recipe 2 — ctx-free
-    // leaf has no accessor). The `ent.is_null()` arm is vacuous (a live borrow is
-    // never null) and dropped.
+    // FLAG: This is the client pointer (`gclient_t*`). The deref stays raw, because this ctx-free leaf has no accessor.
+    // This ctx-free leaf takes `&mut gentity_t`, so a live borrow is never null.
+    // Raven checks `ent.is_null()` here, but that check is vacuous, so this port drops it.
     let cl = ent.client;
     if cl.is_null() {
         return;
@@ -1533,8 +1533,7 @@ pub fn ItemUse_MedPack(ent: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:1165-1175`
 pub fn Jetpack_Off(ent: &mut gentity_t) {
-    // FLAG: client pointer (`gclient_t*`); deref stays raw (recipe 2 — ctx-free
-    // leaf has no accessor).
+    // FLAG: This is the client pointer (`gclient_t*`). The deref stays raw, because this ctx-free leaf has no accessor.
     let cl = ent.client;
     debug_assert!(!cl.is_null());
 
@@ -1552,8 +1551,8 @@ pub fn Jetpack_Off(ent: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:1177-1199`
 pub fn Jetpack_On(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let cl = ctx.entity(ent).client;
     debug_assert!(!cl.is_null());
 
@@ -1589,8 +1588,8 @@ pub fn ItemUse_Jetpack(ctx: &mut GameContext, ent: EntityId) {
     // Raven `#define JETPACK_TOGGLE_TIME` (`g_items.c`).
     pub const JETPACK_TOGGLE_TIME: c_int = 1000;
 
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let cl = ctx.entity(ent).client;
     debug_assert!(!cl.is_null());
 
@@ -1632,8 +1631,8 @@ pub fn ItemUse_UseCloak(ctx: &mut GameContext, ent: EntityId) {
     // Raven `#define CLOAK_TOGGLE_TIME` (`g_items.c`).
     pub const CLOAK_TOGGLE_TIME: c_int = 1000;
 
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let cl = ctx.entity(ent).client;
     debug_assert!(!cl.is_null());
 
@@ -1761,8 +1760,8 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     // Raven `#define TOSS_DEBOUNCE_TIME 5000` (`bg_public.h:181`).
     pub const TOSS_DEBOUNCE_TIME: c_int = 5000;
 
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let cl = ctx.entity(ent).client;
     if cl.is_null() || unsafe { (*cl).tossableItemDebounce } > ctx.world.level.time {
         // can't use it again yet
@@ -1824,8 +1823,8 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:1417-1431`
 pub fn EWebDisattach(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
-    // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the owner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let owner_client = ctx.entity(owner).client;
     unsafe {
         (*owner_client).ewebIndex = 0;
@@ -1890,7 +1889,7 @@ pub fn EWebDie(
 
     if ctx.entity(self_).r.ownerNum != ENTITYNUM_NONE {
         let owner = EntityId(ctx.entity(self_).r.ownerNum as u32);
-        // FLAG: owner client pointer (`gclient_t*`); deref stays raw (recipe 2b).
+        // FLAG: This is the owner client pointer (`gclient_t*`). The deref stays raw.
         let owner_client = ctx.entity(owner).client;
 
         if ctx.entity(owner).inuse != 0 && !owner_client.is_null() {
@@ -1923,7 +1922,7 @@ pub fn EWebPain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     // update the owner's health status of me
     if ctx.entity(self_).r.ownerNum != ENTITYNUM_NONE {
         let owner = EntityId(ctx.entity(self_).r.ownerNum as u32);
-        // FLAG: owner client pointer (`gclient_t*`); deref stays raw (recipe 2b).
+        // FLAG: This is the owner client pointer (`gclient_t*`). The deref stays raw.
         let owner_client = ctx.entity(owner).client;
 
         if ctx.entity(owner).inuse != 0 && !owner_client.is_null() {
@@ -1944,7 +1943,7 @@ pub fn EWeb_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_cha
     // Orientations (`POSITIVE_Y`/`NEGATIVE_Z`/`NEGATIVE_X`) come from the
     // already-ported `Eorientations` enum (prelude glob import).
 
-    // `bone` is a `char*` — stays raw.
+    // `bone` is a `char*`, so it stays raw.
     let boneIndex = G_BoneIndex(ctx, &(unsafe { cstr_to_str(bone) }));
 
     // Walk the 4 fixed bone-index/bone-angle slot pairs looking for an
@@ -2007,7 +2006,7 @@ pub fn EWeb_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_cha
     // first 3 bits is forward, second 3 bits is right, third 3 bits is up
     ctx.entity_mut(ent).s.boneOrient = forward | (right << 3) | (up << 6);
 
-    // FLAG: `bone` is a raw `char*`; `cstr_to_str` deref stays unsafe.
+    // FLAG: `bone` is a raw `char*`, so the `cstr_to_str` deref stays unsafe.
     let boneName = unsafe { cstr_to_str(bone as *const c_char) };
     trap::G2API_SetBoneAngles(
         ctx.engine,
@@ -2171,8 +2170,8 @@ pub fn EWebPositionUser(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) 
 
     p[2] += 4.0;
 
-    // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the owner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let owner_client = ctx.entity(owner).client;
     let owner_origin = unsafe { (*owner_client).ps.origin };
 
@@ -2278,8 +2277,8 @@ pub fn EWebPositionUser(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) 
 pub fn EWebUpdateBoneAngles(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
     let turnCap: f32 = 4.0;
 
-    // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the owner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let owner_client = ctx.entity(owner).client;
 
     let mut yAng: vec3_t = [0.0, 0.0, 0.0];
@@ -2327,9 +2326,9 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
         killMe = qtrue;
     } else {
         let owner = EntityId(ctx.entity(self_).r.ownerNum as u32);
-        // FLAG: owner client pointer (`gclient_t*`); deref stays raw through the
-        // copied pointer value (recipe 2/2b — read exactly what Raven derefs, and
-        // only after the `inuse`/null short-circuit passes).
+        // FLAG: This is the owner client pointer (`gclient_t*`).
+        // The deref stays raw through the copied pointer value, and reads exactly what Raven derefs.
+        // The deref runs only after the `inuse`/null short-circuit passes.
         let owner_client = ctx.entity(owner).client;
 
         if ctx.entity(owner).inuse == 0
@@ -2436,8 +2435,8 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
     let mins: vec3_t = [-32.0, -32.0, -24.0];
     let maxs: vec3_t = [32.0, 32.0, 24.0];
 
-    // FLAG: spawner client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the spawner client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let spawner_client = ctx.entity(spawner).client;
 
     let fAng: vec3_t = [0.0, unsafe { (*spawner_client).ps.viewangles[1] }, 0.0];
@@ -2564,8 +2563,8 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         return core::ptr::null_mut();
     }
 
-    // initialize bone angles (Raven `vec3_origin` — now resolved via the
-    // crate prelude, pass-3 symbol backfill).
+    // initialize bone angles
+    // Raven `vec3_origin` now resolves through the crate prelude.
     EWeb_SetBoneAngles(
         ctx,
         ent,
@@ -2620,8 +2619,8 @@ pub fn ItemUse_UseEWeb(ctx: &mut GameContext, ent: EntityId) {
     // Raven `#define EWEB_USE_DEBOUNCE 1000` (`g_items.c:1982`).
     pub const EWEB_USE_DEBOUNCE: c_int = 1000;
 
-    // FLAG: player client pointer (`gclient_t*`); deref stays raw through the
-    // copied pointer value (recipe 2/2b — read exactly what Raven derefs).
+    // FLAG: This is the player client pointer (`gclient_t*`).
+    // The deref stays raw through the copied pointer value, exactly as Raven derefs it.
     let ent_client = ctx.entity(ent).client;
     if unsafe { (*ent_client).ewebTime } > ctx.world.level.time {
         // can't use again yet
@@ -2671,7 +2670,7 @@ pub fn ItemUse_UseEWeb(ctx: &mut GameContext, ent: EntityId) {
 pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_int {
     // Raven `#define RESPAWN_POWERUP 120` (`g_items.c:27`).
     pub const RESPAWN_POWERUP: c_int = 120;
-    // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) — not yet ported; transcribed locally.
+    // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) is not yet ported, so it is transcribed locally.
     pub const PLAYEREVENT_DENIEDREWARD: c_int = 0x0001;
 
     let it = ctx.entity(ent).item.unwrap().item();
@@ -2679,8 +2678,8 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
     let ItemKind::Powerup(tag) = it.kind else {
         unreachable!("Pickup_Powerup on non-powerup item {}", it.classname);
     };
-    // FLAG: picker-upper client pointer (`gclient_t*`); the toucher may be an NPC
-    // with a pool client, so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`).
+    // The toucher may be an NPC with a pool client, so the deref stays raw.
     let other_client = ctx.entity(other).client;
     if unsafe { (*other_client).ps.powerups[tag as usize] } == 0 {
         // round timing to seconds to make multiple powerup timers
@@ -2794,8 +2793,7 @@ pub fn Pickup_Holdable(ctx: &mut GameContext, ent: EntityId, other: EntityId) ->
     let ItemKind::Holdable(tag) = it.kind else {
         unreachable!("Pickup_Holdable on non-holdable item {}", it.classname);
     };
-    // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
-    // so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     let other_client = ctx.entity(other).client;
     unsafe {
         (*other_client).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] = item.modelindex();
@@ -2813,8 +2811,7 @@ pub fn Pickup_Holdable(ctx: &mut GameContext, ent: EntityId, other: EntityId) ->
 ///
 /// Source: `oracle/codemp/game/g_items.c:2118-2128`
 pub fn Add_Ammo(ctx: &mut GameContext, ent: EntityId, weapon: c_int, count: c_int) {
-    // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
-    // so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     let cl = ctx.entity(ent).client;
     unsafe {
         if (*cl).ps.ammo[weapon as usize] < ammoData[weapon as usize].max {
@@ -2848,8 +2845,8 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
     if tag == -1 {
         // an ammo_all, give them a bit of everything
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-            // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool
-            // client, so deref stays raw (recipe 2b).
+            // FLAG: This is the picker-upper client pointer (`gclient_t*`).
+            // It may be an NPC pool client, so the deref stays raw.
             let other_client = ctx.entity(other).client;
             // complaints that siege tech's not giving enough ammo.  Does anything else use ammo all?
             Add_Ammo(ctx, other, AMMO_BLASTER as c_int, 100);
@@ -2896,8 +2893,7 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     let ItemKind::Weapon(weapon) = it.kind else {
         unreachable!("Pickup_Weapon on non-weapon item {}", it.classname);
     };
-    // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
-    // so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     let other_client = ctx.entity(other).client;
     let mut quantity: c_int;
 
@@ -2956,8 +2952,7 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     pub const RESPAWN_MEGAHEALTH: c_int = 120;
 
     let it = ctx.entity(ent).item.unwrap().item();
-    // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
-    // so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     let other_client = ctx.entity(other).client;
 
     // small and mega healths will go over the max
@@ -3004,8 +2999,7 @@ pub fn Pickup_Armor(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_
     let ItemKind::Armor { rating } = it.kind else {
         unreachable!("Pickup_Armor on non-armor item {}", it.classname);
     };
-    // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
-    // so deref stays raw (recipe 2b).
+    // FLAG: This is the picker-upper client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     let cl = ctx.entity(other).client;
 
     unsafe {
@@ -3094,15 +3088,15 @@ pub fn CheckItemCanBePickedUpByNPC(
     item: EntityId,
     pickerupper: EntityId,
 ) -> qboolean {
-    // Raven `SCF_FORCED_MARCH` (`b_public.h:43`), canonical in
-    // `crate::npc::script_flags`. Source: `oracle/codemp/game/b_public.h:43`
+    // Raven `SCF_FORCED_MARCH` (`b_public.h:43`) is canonical in `crate::npc::script_flags`.
+    // Source: `oracle/codemp/game/b_public.h:43`
     use crate::npc::script_flags::SCF_FORCED_MARCH;
 
-    // `item` is the item *entity* (not a `gitem_t`). FLAG: `pickerupper.NPC`
-    // (`gNPC_t*`) has no accessor; deref stays raw (recipe 2c).
+    // `item` is the item entity, not a `gitem_t`.
+    // FLAG: `pickerupper.NPC` (`gNPC_t*`) has no accessor, so the deref stays raw.
     let npc = ctx.entity(pickerupper).NPC;
-    // Raven's `resolve(g_entities, item->activator) != &g_entities[0]` is exactly
-    // "activator is not entity 0" — expressed directly on the handle.
+    // Raven's `resolve(g_entities, item->activator) != &g_entities[0]` is exactly "activator is not entity 0".
+    // This expresses that check directly on the handle.
     if (ctx.entity(item).flags & FL_DROPPED_ITEM) != 0
         && ctx.entity(item).activator != Some(EntityId(0))
         && ctx.entity(pickerupper).s.number != 0
@@ -3133,9 +3127,10 @@ pub fn Touch_Item(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // `ent` is the item entity (never NULL); `other` is the toucher. Raven hard-
-    // derefs `other` past the first guard, so the touch dispatch always passes a
-    // live entity — resolve it once here.
+    // `ent` is the item entity and is never null.
+    // `other` is the toucher.
+    // Raven hard-derefs `other` past the first guard, so the touch dispatch always passes a live entity.
+    // This resolves it once here.
     if ctx.entity(ent).genericValue10 > ctx.world.level.time
         && other.is_some_and(|o| ctx.entity(o).s.number == ctx.entity(ent).genericValue11)
     {
@@ -3162,8 +3157,7 @@ pub fn Touch_Item(
     }
 
     let other = other.unwrap();
-    // FLAG: toucher client pointer (`gclient_t*`); may be an NPC pool client, so
-    // deref stays raw (recipe 2b).
+    // FLAG: This is the toucher client pointer (`gclient_t*`). It may be an NPC pool client, so the deref stays raw.
     if ctx.entity(other).client.is_null() {
         return;
     }
@@ -3218,7 +3212,7 @@ pub fn Touch_Item(
     }
 
     if CheckItemCanBePickedUpByNPC(ctx, ent, other) != 0 {
-        // FLAG: `other.NPC` (`gNPC_t*`) has no accessor; deref stays raw (recipe 2c).
+        // FLAG: `other.NPC` (`gNPC_t*`) has no accessor, so the deref stays raw.
         let npc = ctx.entity(other).NPC;
         if !npc.is_null() {
             if let Some(goal_id) = unsafe { (*npc).goalEntity } {
@@ -3236,8 +3230,8 @@ pub fn Touch_Item(
         if ctx.entity(other).s.eType == ET_NPC as c_int {
             // Not the player?
             let mut dontGo = qfalse;
-            // FLAG: `other.m_pVehicle` (`Vehicle_t*`)/`m_pVehicleInfo` derefs stay
-            // raw (recipe 2b — vehicle structs have no accessor).
+            // FLAG: `other.m_pVehicle` (`Vehicle_t*`) and its `m_pVehicleInfo` deref stay raw.
+            // Vehicle structs have no accessor.
             let veh = ctx.entity(other).m_pVehicle;
             if it.kind == ItemKind::Ammo(-1)
                 && ctx.entity(other).s.NPC_class == CLASS_VEHICLE as c_int
@@ -3493,8 +3487,8 @@ pub fn LaunchItem(
         e.nextthink = level_time + 30000;
         Team_CheckDroppedItem(ctx, dropped);
 
-        // rww - so bots know (`droppedRedFlag`/`droppedBlueFlag` are raw seam
-        // globals; derive the pointer at the write).
+        // rww - so bots know
+        // `droppedRedFlag`/`droppedBlueFlag` are raw pointer globals, so this port derives the pointer at each write.
         if it.classname == "team_CTF_redflag" {
             ctx.world.globals.droppedRedFlag = ctx.entity_mut(dropped) as *mut gentity_t;
         } else if it.classname == "team_CTF_blueflag" {
@@ -3517,9 +3511,9 @@ pub fn LaunchItem(
     vectoangles(velocity, &mut e.s.angles);
     e.s.angles[PITCH] = 0.0;
 
-    // Raven compares the raw giTag with NO giType check, so the WP_* values pun
-    // against every kind's tag space (e.g. ammo_thermal's AMMO_THERMAL == 7 ==
-    // WP_BOWCASTER skips the roll below) — extract the raw tag per that.
+    // Raven compares the raw giTag with no giType check, so the WP_* values pun against every kind's tag space.
+    // For example, ammo_thermal's `AMMO_THERMAL == 7 == WP_BOWCASTER` skips the roll below.
+    // This extracts the raw tag to match that.
     let tag = match it.kind {
         ItemKind::Bad | ItemKind::Health => 0,
         ItemKind::Armor { rating } => rating,
@@ -3560,8 +3554,8 @@ pub fn Drop_Item(ctx: &mut GameContext, ent: EntityId, item: ItemId, angle: f32)
     velocity[0] *= 150.0;
     velocity[1] *= 150.0;
     velocity[2] *= 150.0;
-    // C: `200 + crandom() * 50` is `double`; the sum widens `velocity[2]`,
-    // then narrows back to the `float` component.
+    // C: `200 + crandom() * 50` is `double`.
+    // The sum widens `velocity[2]`, then narrows back to the `float` component.
     velocity[2] = (velocity[2] as f64 + (200.0 + ctx.world.bg_state.rng.crandom() * 50.0)) as f32;
 
     let trBase = ctx.entity(ent).s.pos.trBase;
@@ -3654,8 +3648,8 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
         }
     }
 
-    // Raven kills only the three flags here; the IT_TEAM red/blue cubes
-    // (giTag 0) survive outside CTF/CTY.
+    // Raven kills only the three flags here.
+    // The IT_TEAM red/blue cubes (giTag 0) survive outside CTF/CTY.
     if ctx.world.cvars.g_gametype.integer != GT_CTF
         && ctx.world.cvars.g_gametype.integer != GT_CTY
         && matches!(
@@ -3875,10 +3869,10 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:3130-3174`
 pub fn G_BounceItem(ctx: &mut GameContext, ent: EntityId, trace: *mut trace_t) {
-    // `trace` is a raw `trace_t*` — stays raw.
+    // `trace` is a raw `trace_t*`, so it stays raw.
     // reflect the velocity on the trace plane
-    // C: `previousTime + (level.time - previousTime) * trace->fraction` — the
-    // int base promotes to f32 against the float product; one truncation.
+    // C: `previousTime + (level.time - previousTime) * trace->fraction`.
+    // The int base promotes to f32 against the float product, with one truncation.
     // Source: `oracle/codemp/game/g_items.c:3136`
     let fraction = unsafe { (*trace).fraction };
     let hitTime = (ctx.world.level.previousTime as f32

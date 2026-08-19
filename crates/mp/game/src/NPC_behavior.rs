@@ -1,18 +1,11 @@
-// PORT-COMPLETE: NPC_behavior.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_behavior.c`.
+//! Port of `oracle/codemp/game/NPC_behavior.c`.
 //!
-//! Landed from the `fnskel.py` signature skeleton; the pass-3 mega-pass fills
-//! every remaining body against the settled fork rulings (ctx threading,
-//! `Option<EntityId>` stored fields, bg/game state split). File-scope AI
-//! globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`, `enemyVisibility`,
-//! `showBBoxes`) reach through `ctx.world`/`ctx.world.globals` per ruling
-//! 8/12.
+//! File-scope AI globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`, `enemyVisibility`,
+//! `showBBoxes`) reach through `ctx.world`/`ctx.world.globals`.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer parameters are `EntityId`/`Option<EntityId>` handles (§B5), not raw
+//! `gentity_t*`. Callers bridge a raw pointer to a handle at the boundary via
+//! `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ent_fn_enums::EntThink;
@@ -60,7 +53,7 @@ use mp_bg::bg_panimate::PM_InKnockDown;
 use mp_qshared::shared::MASK_SHOT;
 
 // Combat point search flags: `crate::npc::combat_point_flags`
-// (`b_local.h:244-260`).
+// (`oracle/codemp/game/b_local.h:244-260`).
 
 // Raven `MIN_ANGLE_ERROR` (`b_local.h`, the facing gate in `NPC_BSJump`).
 // Source: `oracle/codemp/game/b_local.h:29`
@@ -75,10 +68,10 @@ pub const APEX_HEIGHT: f32 = 200.0;
 pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
-        // Make sure we're still headed where we want to capture.
+        // Make sure we're still headed where we want to capture
         if let Some(captureGoal) = (*NPCInfo).captureGoal {
             let cap_origin = ctx.world.entity(captureGoal).r.currentOrigin;
             NPC_SetMoveGoal(ctx, npc_id, cap_origin, 16, qtrue, -1, None);
@@ -151,7 +144,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                         // (ENTITYNUM_WORLD/NONE are valid slots), so construct the
                         // handle raw rather than via `from_num` (which nulls NONE).
                         let mut trace_id = EntityId(tr.entityNum as u32);
-                        // FLAG: pool/world clients; deref raw via safe borrow (trap 2b).
+                        // FLAG: pool/world clients; deref raw via safe borrow.
                         let npc_client = ctx.world.entity(npc_id).client;
                         let trace_client = ctx.world.entity(trace_id).client;
                         let trace_is_enemy = trace_id == enemy_id;
@@ -160,7 +153,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                                 || (*npc_client).enemyTeam == 0
                                 || (*npc_client).enemyTeam != (*trace_client).playerTeam)
                         {
-                            // No, so shoot for the head.
+                            // no, so shoot for the head
                             attack_scale *= 0.75;
                             let npc_number = ctx.world.entity(npc_id).s.number;
                             trap::Trace(
@@ -193,7 +186,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                             if (*npc_client).playerTeam != 0 {
                                 if !trace_client.is_null() && (*trace_client).playerTeam != 0 {
                                     if (*npc_client).playerTeam == (*trace_client).playerTeam {
-                                        // Don't shoot our own team.
+                                        // Don't shoot our own team
                                         attack_ok = qfalse;
                                     }
                                 }
@@ -201,14 +194,14 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                         }
 
                         if attack_ok != qfalse {
-                            // Adjust pitch aim.
+                            // ok, now adjust pitch aim
                             _VectorSubtract(hitspot, muzzle, &mut delta);
                             vectoangles(delta, &mut angleToEnemy);
                             (*NPCInfo).desiredPitch = angleToEnemy[0]; // PITCH
                             NPC_UpdateShootAngles(ctx, angleToEnemy, qtrue, qfalse);
 
                             if dead_on == qfalse {
-                                // Suppressing fire.
+                                // We're not going to hit him directly, try a suppressing fire
                                 AngleVectors(
                                     (*NPCInfo).shootAngles,
                                     Some(&mut forward),
@@ -244,14 +237,14 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                 }
             }
         } else {
-            // FLAG: pool client; deref raw via safe borrow (trap 2b).
+            // FLAG: pool client; deref raw via safe borrow.
             let client = ctx.world.entity(npc_id).client;
             let viewangles = (*client).ps.viewangles;
             NPC_UpdateShootAngles(ctx, viewangles, qtrue, qtrue);
         }
 
         if ctx.world.globals.ucmd.forwardmove == 0 && ctx.world.globals.ucmd.rightmove == 0 {
-            // We reached our captureGoal.
+            // We reached our captureGoal
             let npc_number = ctx.world.entity(npc_id).s.number;
             if trap::ICARUS_IsInitialized(ctx.engine, GIcarusIsinitializedArgs::new(npc_number))
                 != 0
@@ -269,7 +262,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_behavior.c:185-191`
 pub fn Disappear(self_: &mut gentity_t) {
-    // ClientDisconnect(self); (Raven: commented out)
+    // ClientDisconnect(self);
     self_.s.eFlags |= EF_NODRAW;
     self_.think = FnId::NONE;
     self_.nextthink = -1;
@@ -282,9 +275,9 @@ pub fn BeamOut(ctx: &mut GameContext, self_: EntityId) {
     // fixme: doesn't actually go away!
     let level_time = ctx.world.level.time;
     ctx.world.entity_mut(self_).nextthink = level_time + 1500;
-    // fn-ptr field -> fn-ID enum (shape_mismatch; see the settled rule).
+    // The `think` field is a fn-ID enum, not a function pointer (see `docs/porting/rosetta.md`).
     ctx.world.entity_mut(self_).think = Some(EntThink::Disappear).into();
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let client = ctx.world.entity(self_).client;
     unsafe {
         (*client).squadname = core::ptr::null_mut();
@@ -300,7 +293,7 @@ pub fn BeamOut(ctx: &mut GameContext, self_: EntityId) {
 pub fn NPC_BSCinematic(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         if (*NPCInfo).scriptFlags & SCF_FIRE_WEAPON != 0 {
@@ -308,12 +301,12 @@ pub fn NPC_BSCinematic(ctx: &mut GameContext) {
         }
 
         if !UpdateGoal(ctx).is_null() {
-            // Have a goalEntity.
+            // have a goalEntity
             NPC_MoveToGoal(ctx, qtrue);
         }
 
         if let Some(watch_id) = (*NPCInfo).watchTarget {
-            // Have an entity which we want to keep facing.
+            // have an entity which we want to keep facing
             let mut eyes = [0.0f32; 3];
             let mut viewSpot = [0.0f32; 3];
             let mut viewvec = [0.0f32; 3];
@@ -345,11 +338,12 @@ pub fn NPC_BSWait(ctx: &mut GameContext) {
 
 /// Raven `NPC_BSInvestigate`.
 ///
-/// Raven: entire body is `/* ... */`-commented dead code (kept for reference)
-/// — the live function is a no-op. Ported faithfully as a no-op.
+/// Raven: entire body is `/* ... */`-commented dead code (kept for reference).
+/// The live function is a no-op.
 /// Source: `oracle/codemp/game/NPC_behavior.c:252-407`
 pub fn NPC_BSInvestigate() {
-    // Raven's body is entirely commented out; this is a genuine no-op.
+    // Raven's body is entirely commented out.
+    // This is a genuine no-op.
 }
 
 /// Raven `NPC_CheckInvestigate`.
@@ -358,7 +352,7 @@ pub fn NPC_BSInvestigate() {
 pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboolean {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         let owner = ctx.world.level.alertEvents[alertEventNum as usize].owner;
@@ -372,12 +366,13 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             &mut soundPos,
         );
 
-        // NOTE: Trying to preserve previous investigation behavior.
+        // NOTE: Trying to preserve previous investigation behavior
         if owner.is_null() {
             return qfalse;
         }
 
-        // `owner` is a raw alert-event pointer; recover its handle at the seam.
+        // `owner` is a raw alert-event pointer.
+        // Recover its handle at the seam.
         let owner_id = ctx.entity_id_of(owner);
         let owner_ent = owner_id.unwrap();
         if ctx.world.entity(owner_ent).s.eType != entityType_t::ET_PLAYER as c_int
@@ -405,11 +400,11 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             GInPvsArgs::new(&soundPos as *const _, &npc_origin as *const _),
         ) == 0
         {
-            // Can hear through doors?
+            // can hear through doors?
             return qfalse;
         }
 
-        // FLAG: pool clients; deref raw via safe borrow (trap 2b).
+        // FLAG: pool clients; deref raw via safe borrow.
         let owner_client = ctx.world.entity(owner_ent).client;
         let npc_client = ctx.world.entity(npc_id).client;
         if !owner_client.is_null()
@@ -418,7 +413,7 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             && (*owner_client).playerTeam != (*npc_client).playerTeam
         {
             if (*NPCInfo).investigateCount as f32 >= ((*NPCInfo).stats.vigilance * 200.0) {
-                // If investigateCount == 10, just take it as enemy and go.
+                // If investigateCount == 10, just take it as enemy and go
                 if ValidEnemy(ctx, owner_id) != qfalse {
                     G_SetEnemy(ctx, npc_id, owner_id);
                     (*NPCInfo).goalEntity = ctx.world.entity(npc_id).enemy;
@@ -429,7 +424,7 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             } else {
                 (*NPCInfo).investigateCount += invAdd;
             }
-            // Run awakescript.
+            // run awakescript
             G_ActivateBehavior(ctx, Some(npc_id), BSET_AWAKE as c_int);
 
             (*NPCInfo).eventOwner = owner_id;
@@ -470,14 +465,14 @@ pub fn NPC_BSSleep(ctx: &mut GameContext) {
 pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     unsafe {
         let leader_id = (*npc_client).leader;
         let Some(leader_ent) = leader_id else {
-            // Stand guard until we find an enemy.
+            // ok, stand guard until we find an enemy
             if (*NPCInfo).tempBehavior == BS_HUNT_AND_KILL {
                 (*NPCInfo).tempBehavior = BS_DEFAULT;
             } else {
@@ -488,7 +483,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
         };
 
         if ctx.world.entity(npc_id).enemy.is_none() {
-            // No enemy, find one.
+            // no enemy, find one
             NPC_CheckEnemy(
                 ctx,
                 if (*NPCInfo).confusionTime < ctx.world.level.time {
@@ -513,7 +508,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                         (*NPCInfo).lastAlertID = ctx.world.level.alertEvents[eventID as usize].ID;
                         let ev_owner = ctx.world.level.alertEvents[eventID as usize].owner;
                         let ev_owner_id = ctx.entity_id_of(ev_owner);
-                        // FLAG: pool client; deref raw via safe borrow (trap 2b).
+                        // FLAG: pool client; deref raw via safe borrow.
                         let ev_owner_client = match ev_owner_id {
                             Some(id) => ctx.world.entity(id).client,
                             None => core::ptr::null_mut(),
@@ -523,7 +518,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                             || ctx.world.entity(ev_owner_id.unwrap()).health <= 0
                             || (*ev_owner_client).playerTeam != (*npc_client).enemyTeam
                         {
-                            // Not an enemy.
+                            // not an enemy
                         } else {
                             G_SetEnemy(ctx, npc_id, ev_owner_id);
                             (*NPCInfo).enemyCheckDebounceTime =
@@ -537,12 +532,12 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 }
             }
             if ctx.world.entity(npc_id).enemy.is_none() {
-                // FLAG: pool client (unused, kept faithful); deref raw (trap 2b).
+                // FLAG: pool client (unused, matches Raven); deref raw.
                 let l_client = ctx.world.entity(leader_ent).client;
                 let leader_enemy = ctx.world.entity(leader_ent).enemy;
                 if !leader_id.is_none() && leader_enemy.is_some() && leader_enemy != Some(npc_id) {
                     let l_enemy_id = leader_enemy.unwrap();
-                    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+                    // FLAG: pool client; deref raw via safe borrow.
                     let l_enemy_client = ctx.world.entity(l_enemy_id).client;
                     let allied_ok = !l_enemy_client.is_null()
                         && (*l_enemy_client).playerTeam == (*npc_client).enemyTeam;
@@ -583,7 +578,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
         }
 
         if ctx.world.entity(npc_id).enemy.is_some() && (*npc_client).ps.weapon != 0 {
-            // If have an enemy, face him and fire.
+            // If have an enemy, face him and fire
             let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
             if (*npc_client).ps.weapon == WP_SABER as c_int {
                 if (*NPCInfo).tempBehavior != BS_FOLLOW_LEADER {
@@ -596,7 +591,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             let vis = NPC_CheckVisibility(ctx, Some(enemy_id), CHECK_FOV | CHECK_SHOOT);
             ctx.world.globals.enemyVisibility = vis;
             if (vis as c_int) > (visibility_t::VIS_PVS as c_int) {
-                // Face.
+                // face
                 let mut enemy_org = [0.0f32; 3];
                 let mut muzzle = [0.0f32; 3];
                 let mut delta = [0.0f32; 3];
@@ -658,7 +653,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
         }
 
-        // Leader visible?
+        // leader visible?
         let leaderVis =
             NPC_CheckVisibility(ctx, Some(leader_ent), CHECK_PVS | CHECK_360 | CHECK_SHOOT);
 
@@ -674,9 +669,8 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 followDist = (*NPCInfo).followDist;
             }
             let backupdist = followDist / 2.0;
-            // C's `0.83`/`1.33` are double literals, so each product is formed in
-            // double and narrowed to the f32 local; match that width so the
-            // `walkdist`/`minrundist` boundary comparisons agree.
+            // C's `0.83`/`1.33` are double literals, so each product forms in double and narrows to the f32 local.
+            // Match that width so the `walkdist`/`minrundist` boundary comparisons agree.
             let walkdist = (followDist as f64 * 0.83) as f32;
             let minrundist = (followDist as f64 * 1.33) as f32;
 
@@ -731,9 +725,9 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
 pub fn NPC_BSJump(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     unsafe {
         let Some(goal_id) = (*NPCInfo).goalEntity else {
@@ -741,7 +735,7 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
         };
 
         if (*NPCInfo).jumpState != JS_JUMPING && (*NPCInfo).jumpState != JS_LANDING {
-            // Face navgoal.
+            // Face navgoal
             let mut dir = [0.0f32; 3];
             let mut angles = [0.0f32; 3];
             let goal_origin = ctx.world.entity(goal_id).r.currentOrigin;
@@ -799,9 +793,9 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
 
                 let apexHeight: f32 = APEX_HEIGHT / 2.0;
 
-                // C's `sqrt` is the libm double routine: the f32 `apexHeight + z`
-                // is promoted to double for each sqrt and the result narrowed back
-                // to the f32 local; evaluate through f64 to match.
+                // C's `sqrt` is the libm double routine.
+                // The f32 `apexHeight + z` promotes to double for each sqrt and the result narrows back to the f32 local.
+                // Evaluate through f64 to match.
                 z = (((apexHeight + z) as f64).sqrt() - (apexHeight as f64).sqrt()) as f32;
                 debug_assert!(z >= 0.0);
 
@@ -817,8 +811,8 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
 
                 let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
                 let height = apex[2] - npc_origin[2];
-                // C evaluates `.5 * gravity` and the `height / …` divide in double
-                // (libm `sqrt`), narrowing only into the f32 `time`; match that width.
+                // C evaluates `.5 * gravity` and the `height / …` divide in double (libm `sqrt`), narrowing only into the f32 `time`.
+                // Match that width.
                 let time =
                     ((height as f64) / (0.5 * (*npc_client).ps.gravity as f64)).sqrt() as f32;
                 if time == 0.0 {
@@ -854,7 +848,7 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
                 }
 
                 if ctx.world.entity(npc_id).s.groundEntityNum != ENTITYNUM_NONE {
-                    // Landed, start landing anim.
+                    // Landed, start landing anim
                     (*npc_client).ps.velocity = [0.0; 3];
                     NPC_SetAnim(
                         ctx,
@@ -927,8 +921,8 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
             (*ent).health = 0;
             ctx.ent_set(npc_id, PrefixSet::Targetname(None));
 
-            // Disappear in half a second.
-            // (shape mismatch, see BeamOut note above.)
+            // Disappear in half a second
+            // Fn-ID enum, not a function pointer (see BeamOut above).
             (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = level_time + FRAMETIME;
         }
@@ -941,7 +935,7 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
 pub fn NPC_BSSearch(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
@@ -972,7 +966,7 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
             }
 
             if VectorLengthSquared(vec) < minGoalReachedDistSquared {
-                // Close enough, just got there.
+                // Close enough, just got there
                 let wp = NAV_FindClosestWaypointForEnt(ctx, npc_id, WAYPOINT_NONE);
                 ctx.world.entity_mut(npc_id).waypoint = wp;
 
@@ -1052,7 +1046,7 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
                     }
                 }
             } else {
-                // Just finished waiting.
+                // Just finished waiting
                 let wp = NAV_FindClosestWaypointForEnt(ctx, npc_id, WAYPOINT_NONE);
                 ctx.world.entity_mut(npc_id).waypoint = wp;
 
@@ -1104,7 +1098,7 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
 pub fn NPC_BSSearchStart(ctx: &mut GameContext, homeWp: c_int, bState: bState_t) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         let mut homeWp = homeWp;
@@ -1133,11 +1127,11 @@ pub fn NPC_BSSearchStart(ctx: &mut GameContext, homeWp: c_int, bState: bState_t)
 pub fn NPC_BSNoClip(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         if !UpdateGoal(ctx).is_null() {
-            // Raven's `if (UpdateGoal())` implies `goalEntity` is non-NULL here;
+            // Raven's `if (UpdateGoal())` implies `goalEntity` is non-NULL here.
             // `.expect()` encodes that invariant.
             let goal_id = (*NPCInfo).goalEntity.expect("UpdateGoal() set goalEntity");
             let mut dir = [0.0f32; 3];
@@ -1166,7 +1160,7 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
             ctx.world.globals.ucmd.rightmove = rDot.floor() as i8;
             ctx.world.globals.ucmd.upmove = uDot.floor() as i8;
         } else {
-            // FLAG: pool client; deref raw via safe borrow (trap 2b).
+            // FLAG: pool client; deref raw via safe borrow.
             let npc_client = ctx.world.entity(npc_id).client;
             (*npc_client).ps.velocity = [0.0; 3];
         }
@@ -1181,7 +1175,7 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
 pub fn NPC_BSWander(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         if (*NPCInfo).investigateDebounceTime == 0 {
@@ -1288,7 +1282,7 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
 
                     // Oracle: these three run inside `if waypoint != WAYPOINT_NONE`
                     // but outside `if numEdges != WAYPOINT_NONE`.
-                    // Source: oracle/codemp/game/NPC_behavior.c:1276-1280
+                    // Source: `oracle/codemp/game/NPC_behavior.c:1276-1280`
                     (*NPCInfo).investigateDebounceTime = 0;
                     (*NPCInfo).goalEntity = (*NPCInfo).tempGoal;
                     NPC_MoveToGoal(ctx, qtrue);
@@ -1306,9 +1300,9 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
 pub fn NPC_Surrender(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     unsafe {
         if (*npc_client).ps.weaponTime != 0 || PM_InKnockDown(&mut (*npc_client).ps) != 0 {
@@ -1339,13 +1333,13 @@ pub fn NPC_Surrender(ctx: &mut GameContext) {
 pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     unsafe {
         let Some(enemy_id) = ctx.world.entity(npc_id).enemy else {
             return qfalse;
         };
-        // FLAG: pool client; deref raw via safe borrow (trap 2b).
+        // FLAG: pool client; deref raw via safe borrow.
         let enemy_client = ctx.world.entity(enemy_id).client;
 
         if trap::ICARUS_TaskIDPending(
@@ -1376,7 +1370,7 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
                     if NPC_SomeoneLookingAtMe(ctx, npc_id) != qfalse
                         && ctx.world.entity(npc_id).painDebounceTime > ctx.world.level.time
                     {
-                        // Fall through.
+                        // fall through
                     } else {
                         if InFOV(ctx, Some(enemy_id), npc_id, 60, 30) == qfalse {
                             return qfalse;
@@ -1406,7 +1400,7 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
 pub fn NPC_BSFlee(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         let flee_s = cstr("flee");
@@ -1521,9 +1515,9 @@ pub fn NPC_StartFlee(
 ) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
-    // FLAG: pool client; deref raw via safe borrow (trap 2b).
+    // FLAG: pool client; deref raw via safe borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     unsafe {
         let mut cp: c_int = -1;
@@ -1544,7 +1538,7 @@ pub fn NPC_StartFlee(
         }
 
         let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
-        // FLAG: gNPC_t.group is a raw pool pointer (no accessor); deref raw (recipe 2c).
+        // FLAG: gNPC_t.group is a raw pool pointer (no accessor); deref raw.
         if dangerLevel > AEL_DANGER as c_int
             || ctx.world.entity(npc_id).s.weapon == WP_NONE as c_int
             || (((*NPCInfo).group.is_null() || (*(*NPCInfo).group).numGroup <= 1)
@@ -1639,10 +1633,10 @@ pub fn G_StartFlee(
     fleeTimeMin: c_int,
     fleeTimeMax: c_int,
 ) {
-    // `.NPC` is a raw pool pointer field; reading it and null-checking needs no
-    // deref, so the whole bridge stays safe.
+    // `.NPC` is a raw pool pointer field.
+    // Reading it and null-checking it needs no deref, so the whole bridge stays safe.
     if ctx.world.entity(self_).NPC.is_null() {
-        // Player.
+        // player
         return;
     }
     SaveNPCGlobals(ctx);
@@ -1666,7 +1660,7 @@ pub fn G_StartFlee(
 pub fn NPC_BSEmplaced(ctx: &mut GameContext) {
     let NPC = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         let mut enemyLOS = qfalse;

@@ -1,13 +1,8 @@
-// PORT-COMPLETE: g_cmds.c
-//! FAITHFUL port of `oracle/codemp/game/g_cmds.c`.
+//! Port of `oracle/codemp/game/g_cmds.c`.
 //!
-//! Filled by the jampgame mega-pass, pass-2 retrofitted with `ctx: GameContext`,
-//! and pass-3 blind-transcribed against the settled fork rulings (the
-//! va/printf mapping table, EntityId/fn-enum idioms).
-//!
-//! Pass-3 status: every fn has a real body. `ClientCommand`'s dispatch tail
-//! drops the `#ifdef _DEBUG`/`VM_MEMALLOC_DEBUG` branches as dead surface
-//! (§20 — neither macro is defined in any target build).
+//! Every function has a real body.
+//! `ClientCommand`'s dispatch tail drops the `#ifdef _DEBUG`/`VM_MEMALLOC_DEBUG` branches as dead surface (§20).
+//! Neither macro is defined in any target build.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::client_connected::CON_CONNECTED;
@@ -35,12 +30,12 @@ const SAY_ALL: c_int = 0;
 pub const SAY_TEAM: c_int = 1;
 const SAY_TELL: c_int = 2;
 
-/// Raven `LAST_USEABLE_WEAPON` — `WP_BRYAR_OLD`.
+/// Raven `LAST_USEABLE_WEAPON`: `WP_BRYAR_OLD`.
 ///
 /// Source: `oracle/codemp/game/bg_weapons.h:43`
 const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 
-/// Raven `gc_orders[]` — canned "game command" voice-order strings.
+/// Raven `gc_orders[]`: canned "game command" voice-order strings.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1812-1820`
 static gc_orders: [&core::ffi::CStr; 7] = [
@@ -53,7 +48,7 @@ static gc_orders: [&core::ffi::CStr; 7] = [
     c"report",
 ];
 
-/// Raven `gameNames[]` — display names for each `gametype_t`.
+/// Raven `gameNames[]`: display names for each `gametype_t`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1851-1862`
 static gameNames: [&core::ffi::CStr; 10] = [
@@ -84,7 +79,8 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
     }
 }
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// This keeps the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 /// Raven `DeathmatchScoreboardMessage`.
@@ -157,7 +153,7 @@ pub fn DeathmatchScoreboardMessage(ctx: &mut GameContext, ent: EntityId) {
         stringlength += j;
     }
 
-    // still want to know the total # of clients
+    //still want to know the total # of clients
     let i = ctx.world.level.numConnectedClients;
 
     let cmd = format!(
@@ -172,8 +168,9 @@ pub fn DeathmatchScoreboardMessage(ctx: &mut GameContext, ent: EntityId) {
 
 /// Raven `MAX_CLIENT_SCORE_SEND`.
 ///
-/// No workspace canonical exists yet (belongs in `mp_bg` from `bg_public.h`);
-/// kept local at the oracle value. Consolidation candidate.
+/// No workspace canonical exists yet.
+/// It belongs in `mp_bg`, from `bg_public.h`.
+/// This constant stays local at the oracle value, as a consolidation candidate.
 /// Source: `oracle/codemp/game/bg_public.h:51`
 const MAX_CLIENT_SCORE_SEND: c_int = 20;
 
@@ -214,9 +211,10 @@ pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> String {
     let mut out = String::new();
     for i in start..c {
         let arg = trap::Argv(ctx.engine, i, MAX_STRING_CHARS);
-        // Raven's `strlen(arg)` bound counts wire bytes; under Latin-1 each char
-        // is one wire byte, so `chars().count()` is the wire length (`len()`'s
-        // UTF-8 width would over-count a non-ASCII chat payload). ASCII unchanged.
+        // Raven's `strlen(arg)` bound counts wire bytes.
+        // Under Latin-1 each char is one wire byte, so `chars().count()` gives the wire length.
+        // `len()`'s UTF-8 width would over-count a non-ASCII chat payload.
+        // ASCII stays unchanged.
         let tlen = arg.chars().count();
         if len + tlen >= MAX_STRING_CHARS - 1 {
             break;
@@ -240,10 +238,12 @@ pub fn SanitizeString(r#in: &str) -> String {
     let bytes = r#in.as_bytes();
     let mut out: Vec<u8> = Vec::new();
     let mut i = 0;
-    // Byte-positional per Raven's pointer walk: ESC(27) skips a 2-byte color
-    // code, control bytes (< 32) drop, others lowercase via `tolower` (ASCII
-    // fold, high bytes unchanged). §19: a lone trailing ESC would step Raven's
-    // pointer past the NUL; the length bound stops here instead.
+    // Byte-positional, per Raven's pointer walk.
+    // ESC (27) skips a 2-byte color code.
+    // Control bytes under 32 drop.
+    // Other bytes lowercase via `tolower`, an ASCII fold that leaves high bytes unchanged.
+    // §19: a lone trailing ESC would step Raven's pointer past the NUL.
+    // The length bound stops here instead.
     while i < bytes.len() {
         let c = bytes[i];
         if c == 27 {
@@ -271,7 +271,7 @@ pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_cha
 
         if let Some(c0) = ss.as_bytes().first() {
             if (*c0 as char).is_ascii_digit() {
-                // Source: oracle/codemp/game/g_cmds.c:193 — plain `atoi(s)`.
+                // Source: oracle/codemp/game/g_cmds.c:193, plain `atoi(s)`.
                 let idnum: c_int = atoi(&ss);
                 if idnum < 0 || idnum >= ctx.world.level.maxclients {
                     let msg = format!("print \"Bad client slot: {}\n\"", idnum);
@@ -610,11 +610,9 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.client_mut(cidx).sess.TKCount += 1;
             let tkcount = ctx.world.client(cidx).sess.TKCount;
             if auto_ban > 0 && tkcount >= auto_ban {
-                // Oracle guards with `if ( ent->client->sess.IPstring )`, but
-                // IPstring is a `char[32]` array whose address is never null, so
-                // this ban runs unconditionally. Preserve the always-true quirk.
-                // `IPstring` is a `String`; `AddIP` still takes `char*`, so stage
-                // it in a C buffer (convention 7).
+                // Oracle guards this with `if ( ent->client->sess.IPstring )`.
+                // IPstring is a `char[32]` array, so its address is never null, and this ban runs unconditionally.
+                // `IPstring` is now a `String`, but `AddIP` still takes `char*`, so this stages it in a C buffer.
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
                 AddIP(ctx, ipbuf.as_mut_ptr());
@@ -642,7 +640,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 trap::SendConsoleCommand(ctx.engine, EXEC_INSERT as c_int, &cc);
                 return;
             }
-            // okay, not gone (yet), but warn them...
+            //okay, not gone (yet), but warn them...
             if auto_ban > 0 && (auto_kick <= 0 || auto_ban < auto_kick) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "WARNINGTKBAN");
                 let s = format!("print \"{}\n\"", m);
@@ -692,11 +690,9 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.client_mut(cidx).sess.killCount += 1;
             let killcount = ctx.world.client(cidx).sess.killCount;
             if auto_ban > 0 && killcount >= auto_ban {
-                // Oracle guards with `if ( ent->client->sess.IPstring )`, but
-                // IPstring is a `char[32]` array whose address is never null, so
-                // this ban runs unconditionally. Preserve the always-true quirk.
-                // `IPstring` is a `String`; `AddIP` still takes `char*`, so stage
-                // it in a C buffer (convention 7).
+                // Oracle guards this with `if ( ent->client->sess.IPstring )`.
+                // IPstring is a `char[32]` array, so its address is never null, and this ban runs unconditionally.
+                // `IPstring` is now a `String`, but `AddIP` still takes `char*`, so this stages it in a C buffer.
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
                 AddIP(ctx, ipbuf.as_mut_ptr());
@@ -749,12 +745,12 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:645-661`
 pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    // Raven's `client` param is a `level.clients` slot; the EntityId port carries
-    // the owning entity, whose client index is `ent.index()`.
+    // Raven's `client` param is a `level.clients` slot.
+    // The EntityId port carries the owning entity, whose client index is `ent.index()`.
     let cidx = ent.index();
     for i in 0..ctx.world.level.maxclients {
-        // Faithful to Raven's `if (wCl && wCl != client && …)` — `wCl != client`
-        // is the slot-identity test (a different client than `ent`'s).
+        // Raven's check is `if (wCl && wCl != client && …)`.
+        // `wCl != client` is the slot-identity test, a different client than `ent`'s.
         if i as usize != cidx
             && ctx.world.client(i as usize).pers.connected == CON_CONNECTED
             && ctx.world.client(i as usize).sess.sessionTeam != TEAM_SPECTATOR
@@ -817,8 +813,8 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
             if ctx.world.cvars.g_gametype.integer == GT_DUEL
                 || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
             {
-                // NOTE: Just doing a vs. once it counts two players up — Raven leaves
-                // this branch as commented-out dead code (a currentWinner vs. print).
+                //NOTE: Just doing a vs. once it counts two players up
+                // Raven leaves this branch as commented-out dead code (a currentWinner vs. print).
             } else {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "JOINEDTHEBATTLE");
                 let s = format!(
@@ -847,8 +843,8 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:720-743`
 pub fn G_PowerDuelCheckFail(ctx: &mut GameContext, ent: EntityId) -> qboolean {
-    // Raven `duelTeam_t` (`bg_public.h:1019-1025`); `gclient_t::sess.duelTeam` is
-    // stored as plain `c_int`, so the enum discriminants are transcribed as consts.
+    // Raven `duelTeam_t` (`bg_public.h:1019-1025`).
+    // `gclient_t::sess.duelTeam` stores it as plain `c_int`, so the enum discriminants are transcribed as consts.
     const DUELTEAM_FREE: c_int = 0;
     const DUELTEAM_LONE: c_int = 1;
     const DUELTEAM_DOUBLE: c_int = 2;
@@ -946,7 +942,7 @@ pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: &str) {
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             if ctx.world.client(cidx).tempSpectate >= ctx.world.level.time && team == TEAM_SPECTATOR
             {
-                // sorry, can't do that.
+                //sorry, can't do that.
                 return;
             }
 
@@ -1405,8 +1401,8 @@ pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
         // `ent` is the commanding player, so its client slot is `ent.index()`.
         let cidx = ent.index();
 
-        // Raven's `goto argCheck` is preserved here as the natural fall-through of
-        // the if/else below (both arms reach the same trailing logic) — see §C10.
+        // Raven's `goto argCheck` becomes the natural fall-through of the if/else below.
+        // Both arms reach the same trailing logic (§C10).
         if ctx.world.client(cidx).sess.sessionTeam == TEAM_SPECTATOR {
             crate::w_force::WP_InitForcePowers(ctx, Some(ent));
         } else {
@@ -1448,7 +1444,8 @@ pub fn G_SetSaber(
     saberName: &str,
     siegeOverride: qboolean,
 ) -> qboolean {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    // The function takes an `EntityId` param, but the body re-derives the raw pointer verbatim.
+    // This is known debt for a future cleanup pass.
     let ent: *mut gentity_t = ctx.entity_mut(ent);
 
     unsafe {
@@ -1482,8 +1479,9 @@ pub fn G_SetSaber(
         }
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -1566,7 +1564,8 @@ pub fn Cmd_Follow_f(ctx: &mut GameContext, ent: EntityId) {
         return;
     }
 
-    // can't follow self — Raven's `clients+i == client` is a slot-identity test.
+    // can't follow self
+    // Raven's `clients+i == client` is a slot-identity test.
     if i as usize == cidx {
         return;
     }
@@ -1615,7 +1614,7 @@ pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
     }
 
     if dir != 1 && dir != -1 {
-        // Raven calls G_Error (aborts the game) here; ported as a panic.
+        // Raven calls G_Error (aborts the game) here. This ports as a panic.
         panic!("Cmd_FollowCycle_f: bad dir {}", dir);
     }
 
@@ -1677,8 +1676,8 @@ pub fn G_SayTo(
         if ctx.world.entity(other).client.is_null() {
             return;
         }
-        // `other` is the recipient client entity, so its client slot is
-        // `other.index()`; `ent` is the sender player (`ent.index()`).
+        // `other` is the recipient client entity, so its client slot is `other.index()`.
+        // `ent` is the sender player (`ent.index()`).
         let oidx = other.index();
         let cidx = ent.index();
         if ctx.world.client(oidx).pers.connected != CON_CONNECTED {
@@ -1932,10 +1931,10 @@ pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
 pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_TEAM;
 
-    // Oracle value is 30 (was wrongly 32, which could index past the 30-entry
-    // `bg_customSiegeSoundNames`). No legal workspace canonical (the `mp_cgame`
-    // copy is off-limits; `mp_bg` has only the array, not a const). Consolidation
-    // candidate for `mp_bg`.
+    // Oracle value is 30 (was wrongly 32, which could index past the 30-entry `bg_customSiegeSoundNames`).
+    // No legal workspace canonical exists.
+    // The `mp_cgame` copy is off-limits, and `mp_bg` has only the array, not a const.
+    // This is a consolidation candidate for `mp_bg`.
     // Source: `oracle/codemp/game/bg_public.h:140`
     const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
@@ -2080,7 +2079,7 @@ pub fn SanitizeString2(r#in: &str) -> String {
     // follower (Raven reads the NUL), so it takes the bare-`^` arm.
     while i < bytes.len() {
         if i >= MAX_NAME_LENGTH - 1 {
-            // the ui truncates the name here..
+            //the ui truncates the name here..
             break;
         }
 
@@ -2089,11 +2088,11 @@ pub fn SanitizeString2(r#in: &str) -> String {
         if c == b'^' {
             let next = if i + 1 < bytes.len() { bytes[i + 1] } else { 0 };
             if next >= b'0' && next <= b'9' {
-                // only skip it if there's a number after it for the color
+                //only skip it if there's a number after it for the color
                 i += 2;
                 continue;
             } else {
-                // just skip the ^
+                //just skip the ^
                 i += 1;
                 continue;
             }
@@ -2466,8 +2465,9 @@ pub fn Cmd_Vote_f(ctx: &mut GameContext, ent: EntityId) {
 pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_TEAM;
 
-    // `MAX_NETNAME`/`MAX_VOTE_COUNT` canonical in `client_persistant`;
-    // `ENTITYNUM_NONE` in `mp_qshared::shared::limits` (all value-correct here).
+    // `MAX_NETNAME`/`MAX_VOTE_COUNT` canonical in `client_persistant`.
+    // `ENTITYNUM_NONE` canonical in `mp_qshared::shared::limits`.
+    // Both are value-correct here.
     // Sources: `oracle/codemp/game/g_local.h:438-439`, `q_shared.h:2014`
     use crate::client::client_persistant::{MAX_NETNAME, MAX_VOTE_COUNT};
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
@@ -2563,7 +2563,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
                 }
                 let numeric = i >= 3 || i >= bytes.len();
                 if numeric {
-                    // Source: oracle/codemp/game/g_cmds.c:2273 — plain `atoi(arg2)`.
+                    // Source: oracle/codemp/game/g_cmds.c:2273, plain `atoi(arg2)`.
                     targetClientNum = atoi_bytes(arg2_s.as_bytes());
                     if targetClientNum < 0 || targetClientNum >= ctx.world.level.maxclients {
                         let msg = format!("print \"Bad client slot: {}\n\"", targetClientNum);
@@ -2797,10 +2797,10 @@ pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_Stats_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2452-2467`
-// Raven's body is entirely `#if 0`-style commented out (dead code, kept for
-// reference in the oracle) — the compiled function is a callable no-op.
+// Raven wrote the body entirely inside `#if 0`, so the oracle keeps it as dead code for reference.
+// The compiled function is a callable no-op.
 // Source: `oracle/codemp/game/g_cmds.c:2453-2466`
-// STAGE-1: ctx-free leaf borrow &gentity_t (body ignores `ent` — empty stub).
+// The port takes `ent: &gentity_t`, but the body ignores it, so this stays an empty stub.
 pub fn Cmd_Stats_f(ent: &gentity_t) {}
 
 /// Raven `G_ItemUsable`.
@@ -2968,10 +2968,9 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2595-2670`
 pub fn Cmd_ToggleSaber_f(ctx: &mut GameContext, ent: EntityId) {
-    // Raven reads `ent->client` throughout — the entity's OWN client, which for
-    // NPCs is a pool client (entity number >= MAX_CLIENTS): WP_ForcePowersUpdate
-    // calls this for every saber wielder, so a `level.clients[ent.index()]`
-    // derivation is wrong for NPCs. Pool-client deref stays raw (trap 2b).
+    // Raven reads `ent->client` throughout: the entity's OWN client, which for NPCs is a pool client (entity number >= MAX_CLIENTS).
+    // WP_ForcePowersUpdate calls this for every saber wielder, so a `level.clients[ent.index()]` derivation is wrong for NPCs.
+    // The pool-client deref stays raw.
     let client = ctx.world.entity(ent).client;
     let level_time = ctx.world.level.time;
 
@@ -3048,13 +3047,11 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
         if ctx.world.entity(ent).client.is_null() {
             return;
         }
-        // FLAG(2c): the `(*client).saber[..]` accesses below are passed as pairs of
-        // `&mut client->saber[0/1]` into the `bg_saberLoad` helpers
-        // (`WP_SaberCanTurnOffSomeBlades`, `WP_UseFirstValidSaberStyle`) — two
-        // simultaneous `&mut` into one client's saber array, which the single-borrow
-        // `client_mut(idx)` accessor cannot express (recipe step 4). The client
-        // pointer is read once via the safe entity borrow and its saber fields stay
-        // raw, exactly as Raven does.
+        // FLAG: the `(*client).saber[..]` accesses below pass as pairs of `&mut client->saber[0/1]`
+        // into the `bg_saberLoad` helpers (`WP_SaberCanTurnOffSomeBlades`, `WP_UseFirstValidSaberStyle`).
+        // This needs two simultaneous `&mut` borrows into one client's saber array, which the
+        // single-borrow `client_mut(idx)` accessor cannot express.
+        // The client pointer is read once through the safe entity borrow, and its saber fields stay raw, exactly as Raven does.
         let client = ctx.world.entity(ent).client;
 
         if (*client).saber[0].model[0] != 0 && (*client).saber[1].model[0] != 0 {
@@ -3471,9 +3468,11 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
             ctx.world.client_mut(cidx).ps.saberMove = LS_MOVE_MAX - 1;
         }
 
-        // §19 DIVERGENCE: oracle clamps only the high end, so a negative arg
-        // reads `saberMoveData[negative]` OOB (UB); the Rust index panics instead
-        // (dev-only command, compiled out in FINAL_BUILD). Source: `g_cmds.c:3067-3072`.
+        // §19 DIVERGENCE: oracle clamps only the high end, so a negative arg reads `saberMoveData[negative]`
+        // out of bounds, which is undefined behavior.
+        // The Rust index panics instead.
+        // This is a dev-only command, compiled out in FINAL_BUILD.
+        // Source: `g_cmds.c:3067-3072`.
         let saber_move = ctx.world.client(cidx).ps.saberMove;
         let animIdx = ctx.world.bg_state.saberMoveData[saber_move as usize].animToUse;
         let name = cstr_to_str(animTable[animIdx as usize].name);
@@ -3565,8 +3564,8 @@ pub fn G_ClientNumFromNetname(ctx: &mut GameContext, name: *mut c_char) -> c_int
 pub fn TryGrapple(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     use mp_bg::public::anim_number::animNumber_t;
     use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
-    // `animNumber_t` is `#[repr(i32)]`; the anim fields (`torsoAnim`, ...) store
-    // the value as `c_int`, so compare/pass the discriminant.
+    // `animNumber_t` is `#[repr(i32)]`.
+    // The anim fields (`torsoAnim`, ...) store the value as `c_int`, so this compares/passes the discriminant.
     let kyle_grab: c_int = animNumber_t::BOTH_KYLE_GRAB as c_int;
 
     // `ent` is the commanding player, so its client slot is `ent.index()`.
@@ -3827,8 +3826,9 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 }
             }
         }
-        // §20: `#ifdef _DEBUG` (g_cmds.c:3470-3656) and `#ifdef VM_MEMALLOC_DEBUG`
-        // (g_cmds.c:4013-4055) branches are dropped as dead surface — neither macro is defined in any target build.
+        // This drops the `#ifdef _DEBUG` block (g_cmds.c:3470-3656) and the `#ifdef VM_MEMALLOC_DEBUG` block
+        // (g_cmds.c:4013-4055) as dead surface (§20).
+        // Neither macro is defined in any target build.
         else if cmd_s.eq_ignore_ascii_case("thedestroyer")
             && CheatsOk(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse
             && !ent.is_null()
@@ -4208,9 +4208,8 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 }
             }
         }
-        // Dropped dead surface (porting-rules §20): the `#ifdef VM_MEMALLOC_DEBUG`
-        // `debugTestAlloc` branch — `g_cmds.c:4013-4055`. VM_MEMALLOC_DEBUG is
-        // never defined in any build we target, so it is not compiled in.
+        // Dropped dead surface (porting-rules §20): the `#ifdef VM_MEMALLOC_DEBUG` `debugTestAlloc` branch (`g_cmds.c:4013-4055`).
+        // VM_MEMALLOC_DEBUG is never defined in any build we target, so it never compiles in.
         else if cmd_s.eq_ignore_ascii_case("debugShipDamage") {
             let mut arg = [0 as c_char; MAX_STRING_CHARS];
             let mut arg2 = [0 as c_char; MAX_STRING_CHARS];

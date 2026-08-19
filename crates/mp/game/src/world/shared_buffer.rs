@@ -1,15 +1,11 @@
-//! `SharedBuffer` — the module's engine-registered shared-memory region
-//! (`gSharedBuffer`), plus one typed overlay accessor per `T_G_ICARUS_*`
-//! command (safe-state Stage 4, §F5).
+//! `SharedBuffer`: the module's engine-registered shared-memory region (`gSharedBuffer`), plus one typed overlay accessor per `T_G_ICARUS_*` command.
 //!
-//! The engine registers this buffer via `trap_SV_RegisterSharedMemory`
-//! (`G_InitGame`) and writes each ICARUS command's `T_G_ICARUS_*` payload into
-//! it before dispatching; Raven's `vmMain` switch overlay-casts the raw
-//! `gSharedBuffer` to the command's struct and reads/writes fields in place
-//! (`(T_G_ICARUS_X *)gSharedBuffer`). Module and engine address the SAME bytes,
-//! so out-params land back in the engine's view. Each accessor below reproduces
-//! that one cast behind a typed `&mut`, confining the overlay `unsafe` to the
-//! seam.
+//! The engine registers this buffer via `trap_SV_RegisterSharedMemory` (`G_InitGame`).
+//! It writes each ICARUS command's `T_G_ICARUS_*` payload into the buffer before dispatching.
+//! Raven's `vmMain` switch overlay-casts the raw `gSharedBuffer` to the command's struct.
+//! It reads and writes fields in place (`(T_G_ICARUS_X *)gSharedBuffer`).
+//! Module and engine address the same bytes, so out-params land back in the engine's view.
+//! Each accessor below reproduces that one cast behind a typed `&mut`, and confines the overlay `unsafe` to the seam.
 //!
 //! Source: `oracle/codemp/game/g_local.h:85-86` (buffer decl),
 //! `oracle/codemp/game/g_main.c:881` (definition),
@@ -37,13 +33,10 @@ use mp_qshared::common::mp::qcommon::t_g_icarus_set::T_G_ICARUS_SET;
 use mp_qshared::common::mp::qcommon::t_g_icarus_soundindex::T_G_ICARUS_SOUNDINDEX;
 use mp_qshared::common::mp::qcommon::t_g_icarus_use::T_G_ICARUS_USE;
 
-/// Raven `char gSharedBuffer[MAX_G_SHARED_BUFFER_SIZE]` — the module's
-/// engine-registered shared-memory region.
+/// Raven `char gSharedBuffer[MAX_G_SHARED_BUFFER_SIZE]`: the module's engine-registered shared-memory region.
 ///
-/// `#[repr(C, align(8))]` makes every overlay cast's alignment guaranteed
-/// rather than incidental: the old `Box<[u8; N]>` only guaranteed align 1,
-/// while `align(8)` covers every `T_G_ICARUS_*` payload's alignment (asserted
-/// below).
+/// `#[repr(C, align(8))]` makes every overlay cast's alignment guaranteed rather than incidental.
+/// The old `Box<[u8; N]>` only guaranteed align 1, while `align(8)` covers every `T_G_ICARUS_*` payload's alignment (asserted below).
 /// Source: `oracle/codemp/game/g_local.h:85-86`, `oracle/codemp/game/g_main.c:881`
 #[repr(C, align(8))]
 pub struct SharedBuffer([u8; MAX_G_SHARED_BUFFER_SIZE]);
@@ -53,17 +46,16 @@ pub struct SharedBuffer([u8; MAX_G_SHARED_BUFFER_SIZE]);
 unsafe impl native_platform::ZeroValid for SharedBuffer {}
 
 impl SharedBuffer {
-    /// Raw `*mut c_char` for `trap_SV_RegisterSharedMemory` (`G_InitGame`); the
-    /// engine writes each command's payload here before dispatching.
+    /// Raw `*mut c_char` for `trap_SV_RegisterSharedMemory` (`G_InitGame`).
+    /// The engine writes each command's payload here before dispatching.
     #[inline]
     pub fn as_registration_ptr(&mut self) -> *mut c_char {
         self.0.as_mut_ptr() as *mut c_char
     }
 }
 
-/// One typed overlay accessor per `T_G_ICARUS_*` command: `(T_G_ICARUS_X *)
-/// gSharedBuffer` behind a typed `&mut`. Size and alignment of every payload
-/// are statically asserted (`assert_fits!` below), so the reinterpret is sound.
+/// One typed overlay accessor per `T_G_ICARUS_*` command: `(T_G_ICARUS_X *) gSharedBuffer` behind a typed `&mut`.
+/// Size and alignment of every payload are statically asserted (`assert_fits!` below), so the reinterpret is sound.
 macro_rules! overlay_accessors {
     ($( $(#[$doc:meta])* $name:ident => $ty:ty ),+ $(,)?) => {
         impl SharedBuffer {
@@ -71,8 +63,8 @@ macro_rules! overlay_accessors {
                 $(#[$doc])*
                 #[inline]
                 pub fn $name(&mut self) -> &mut $ty {
-                    // SAFETY: engine-written POD payload; size and alignment
-                    // statically asserted below.
+                    // SAFETY: engine-written POD payload.
+                    // Size and alignment are statically asserted below.
                     unsafe { &mut *(self.0.as_mut_ptr() as *mut $ty) }
                 }
             )+
@@ -117,9 +109,8 @@ overlay_accessors! {
     getsetidforstring => T_G_ICARUS_GETSETIDFORSTRING,
 }
 
-// Every overlay payload must fit within the buffer and be no more aligned than
-// the buffer, or the reinterpret in each accessor would be unsound. Const
-// asserts, fully-qualified paths (import-rule exempt).
+// Every overlay payload must fit within the buffer and be no more aligned than the buffer, or the reinterpret in each accessor would be unsound.
+// Const asserts and fully-qualified paths are exempt from the import rule.
 macro_rules! assert_fits {
     ($($ty:ty),+ $(,)?) => {
         $(

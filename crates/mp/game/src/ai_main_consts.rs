@@ -1,27 +1,25 @@
-//! MP `ai_main.h`/`ai_main.c` plain `#define` constants: `LEVELFLAG_*` bit
-//! flags (`level.levelFlags` / `gLevelFlags` AI hint bits) and bot AI
-//! range/distance/interval tunables.
+//! This file holds plain `#define` constants from `ai_main.h` and `ai_main.c`.
+//! These are the `LEVELFLAG_*` bit flags for `level.levelFlags` / `gLevelFlags` AI hints.
+//! They also include bot AI range, distance, and interval tunables.
 //!
-//! Plain `#define`s (not an enum), so §C8 makes them `const`s directly.
+//! These are plain `#define`s, not an enum, so rule §C8 makes them `const`s directly.
 //!
 //! Source: `oracle/codemp/game/ai_main.h:40-79`,
 //! `oracle/codemp/game/ai_main.c:43`
 
 use core::ffi::c_int;
 
-/// Raven `LEVELFLAG_NOPOINTPREDICTION` — don't take waypoint beyond current
-/// into account when adjusting path view angles.
+/// Raven `LEVELFLAG_NOPOINTPREDICTION`: don't take waypoint beyond current into account when adjusting path view angles.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:40`
 pub const LEVELFLAG_NOPOINTPREDICTION: c_int = 1;
 
-/// Raven `LEVELFLAG_IGNOREINFALLBACK` — ignore enemies when in a fallback
-/// navigation routine.
+/// Raven `LEVELFLAG_IGNOREINFALLBACK`: ignore enemies when in a fallback navigation routine.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:41`
 pub const LEVELFLAG_IGNOREINFALLBACK: c_int = 2;
 
-/// Raven `LEVELFLAG_IMUSTNTRUNAWAY` — don't be scared.
+/// Raven `LEVELFLAG_IMUSTNTRUNAWAY`: don't be scared.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:42`
 pub const LEVELFLAG_IMUSTNTRUNAWAY: c_int = 4;
@@ -46,19 +44,17 @@ pub const SABER_ATTACK_RANGE: c_int = 128;
 /// Source: `oracle/codemp/game/ai_main.h:56`
 pub const BOT_WPTOUCH_DISTANCE: c_int = 32;
 
-/// Raven `BOT_PLANT_DISTANCE` — plant if within this radius from the last
-/// spotted enemy position.
+/// Raven `BOT_PLANT_DISTANCE`: plant if within this radius from the last spotted enemy position.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:61`
 pub const BOT_PLANT_DISTANCE: c_int = 256;
 
-/// Raven `BOT_PLANT_INTERVAL` — only plant once per 15 seconds at max.
+/// Raven `BOT_PLANT_INTERVAL`: only plant once per 15 seconds at max.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:62`
 pub const BOT_PLANT_INTERVAL: c_int = 15000;
 
-/// Raven `BOT_PLANT_BLOW_DISTANCE` — blow det packs if enemy is within this
-/// radius and I am further away than the enemy.
+/// Raven `BOT_PLANT_BLOW_DISTANCE`: blow det packs if enemy is within this radius and I am further away than the enemy.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:63`
 pub const BOT_PLANT_BLOW_DISTANCE: c_int = 256;
@@ -103,14 +99,13 @@ pub const BOT_FLAG_GET_DISTANCE: c_int = 256;
 /// Source: `oracle/codemp/game/ai_main.h:79`
 pub const BOT_SABER_THROW_RANGE: c_int = 800;
 
-/// Raven `BOT_THINK_TIME` — bot think interval (0, i.e. re-evaluated every
-/// server frame).
+/// Raven `BOT_THINK_TIME` sets the bot think interval to 0.
+/// The engine re-evaluates it every server frame.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:43`
 pub const BOT_THINK_TIME: c_int = 0;
 
-/// Raven `MAX_CHICKENWUSS_TIME` — wait 10 secs between checking which
-/// run-away path to take.
+/// Raven `MAX_CHICKENWUSS_TIME`: wait 10 secs between checking which run-away path to take.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:53`
 pub const MAX_CHICKENWUSS_TIME: c_int = 10000;
@@ -120,38 +115,34 @@ pub const MAX_CHICKENWUSS_TIME: c_int = 10000;
 /// Source: `oracle/codemp/game/ai_main.h:55`
 pub const BOT_RUN_HEALTH: c_int = 40;
 
-/// Raven `ENEMY_FORGET_MS` — if our enemy isn't visible within this many ms
-/// (aprx 10sec) then "forget" about him and treat him like every other
-/// threat, but still look for more immediate threats while main enemy is not
-/// visible.
+/// Raven `ENEMY_FORGET_MS`: if the enemy is not visible within this many ms (about 10 seconds), the bot "forgets" about it.
+/// The bot then treats it like every other threat, but still looks for more immediate threats while the main enemy is not visible.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:57`
 pub const ENEMY_FORGET_MS: c_int = 10000;
 
-/// Raven `BASE_GUARD_DISTANCE` — guarding the flag.
+/// Raven `BASE_GUARD_DISTANCE`: guarding the flag.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:73`
 pub const BASE_GUARD_DISTANCE: c_int = 256;
 
-/// Raven `BASE_GETENEMYFLAG_DISTANCE` — waiting around to get the enemy's
-/// flag.
+/// Raven `BASE_GETENEMYFLAG_DISTANCE`: waiting around to get the enemy's flag.
 ///
 /// Source: `oracle/codemp/game/ai_main.h:75`
 pub const BASE_GETENEMYFLAG_DISTANCE: c_int = 256;
 
-// PRT_MESSAGE/PRT_WARNING/PRT_ERROR/PRT_FATAL/PRT_EXIT (`botlib.h:40-44`) live
-// in `mp_qshared::common::mp::botlib::print_type` — botlib.h's ABI seam home.
+// `PRT_MESSAGE`, `PRT_WARNING`, `PRT_ERROR`, `PRT_FATAL`, and `PRT_EXIT` (`botlib.h:40-44`) live in `mp_qshared::common::mp::botlib::print_type`.
+// This is botlib.h's ABI seam home.
 
-/// Raven `STRAFEAROUND_RIGHT`/`STRAFEAROUND_LEFT` — file-local `#define`s in
-/// `ai_main.c` under `BOT_STRAFE_AVOIDANCE`, no ported home in a header.
+/// Raven `STRAFEAROUND_RIGHT` and `STRAFEAROUND_LEFT` are file-local `#define`s in `ai_main.c` under `BOT_STRAFE_AVOIDANCE`.
+/// They have no ported home in a header.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1551-1552`
 pub const STRAFEAROUND_RIGHT: c_int = 1;
 /// Raven `STRAFEAROUND_LEFT`. Source: `oracle/codemp/game/ai_main.c:1552`
 pub const STRAFEAROUND_LEFT: c_int = 2;
 
-/// Raven `ctfStateDescriptions` — CTF state description strings, indexed by
-/// `ctfState_t`.
+/// Raven `ctfStateDescriptions`: CTF state description strings, indexed by `ctfState_t`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:106-113`
 pub static ctfStateDescriptions: [&core::ffi::CStr; 6] = [
@@ -163,7 +154,7 @@ pub static ctfStateDescriptions: [&core::ffi::CStr; 6] = [
     c"I've got the enemy's flag",
 ];
 
-/// Raven `siegeStateDescriptions` — siege state description strings.
+/// Raven `siegeStateDescriptions`: siege state description strings.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:115-119`
 pub static siegeStateDescriptions: [&core::ffi::CStr; 3] = [
@@ -172,7 +163,7 @@ pub static siegeStateDescriptions: [&core::ffi::CStr; 3] = [
     c"I'm preventing the enemy from completing their objective",
 ];
 
-/// Raven `teamplayStateDescriptions` — teamplay state description strings.
+/// Raven `teamplayStateDescriptions`: teamplay state description strings.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:121-126`
 pub static teamplayStateDescriptions: [&core::ffi::CStr; 4] = [

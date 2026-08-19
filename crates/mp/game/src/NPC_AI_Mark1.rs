@@ -1,9 +1,6 @@
-// PORT-COMPLETE: NPC_AI_Mark1.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark1.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Mark1.c`.
 //!
-//! Filled by the jampgame mega-pass; all bodies are live. The file-scope AI
-//! globals (`NPC`, `NPCInfo`, `ucmd`, `gPainHitLoc`) are reached through
-//! `ctx.world.globals`.
+//! The file-scope AI globals (`NPC`, `NPCInfo`, `ucmd`, `gPainHitLoc`) are reached through `ctx.world.globals`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::hit_location::*;
@@ -17,13 +14,11 @@ use crate::g_utils::G_SoundIndex;
 use crate::trap;
 use mp_bg::public::anim_number::animNumber_t::*;
 
-// `DIST_MELEE`/`DIST_LONG` are the canonical `crate::ai::distance` enum variants,
-// reached via the prelude glob (the former per-file duplicate `pub const`
-// copies caused a glob-glob ambiguity with the canonical import at every call
-// site through `crate::prelude::*`; porting-rules §E dedupe-at-import rule).
+// `DIST_MELEE`/`DIST_LONG` are the canonical `crate::ai::distance` enum variants, reached via the prelude glob.
+// A former per-file duplicate `pub const` copy caused a glob-glob ambiguity with the canonical import at every call site through `crate::prelude::*`.
 
-// Raven's file-scope `#define`s (`NPC_AI_Mark1.c:4-22`) — not central
-// constants, ported as file-local consts matching the C values.
+// Raven's file-scope `#define`s (`oracle/codemp/game/NPC_AI_Mark1.c:4-22`) are not central constants.
+// They stay file-local consts matching the C values.
 const MIN_MELEE_RANGE: c_int = 320;
 const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
 const MIN_DISTANCE: c_int = 128;
@@ -40,9 +35,8 @@ pub const BOWCASTER_SIZE: c_int = 2;
 pub const BOWCASTER_SPLASH_DAMAGE: c_int = 0;
 pub const BOWCASTER_SPLASH_RADIUS: c_int = 0;
 
-// Raven's anonymous local-state `enum` (`NPC_AI_Mark1.c:25-35`) — no
-// separate typedef name, so it stays a plain set of `c_int` consts per
-// house rule (typedef int + anonymous enum -> consts).
+// Raven's anonymous local-state `enum` (`oracle/codemp/game/NPC_AI_Mark1.c:25-35`) has no separate typedef name.
+// It stays a plain set of `c_int` consts, matching the typedef-int-plus-anonymous-enum rule.
 const LSTATE_NONE: c_int = 0;
 const LSTATE_ASLEEP: c_int = 1;
 pub const LSTATE_WAKEUP: c_int = 2;
@@ -52,10 +46,9 @@ pub const LSTATE_FIRED2: c_int = 5;
 pub const LSTATE_FIRED3: c_int = 6;
 pub const LSTATE_FIRED4: c_int = 7;
 
-// `MASK_SHOT`/`CONTENTS_LIGHTSABER` are the canonical `mp_qshared::shared::surface_flags`
-// consts, reached via the prelude glob (the former per-file duplicate `pub(crate)`
-// copies caused a glob-glob ambiguity with the canonical import at every call site
-// through `crate::prelude::*`; porting-rules §E dedupe-at-import rule).
+// `MASK_SHOT`/`CONTENTS_LIGHTSABER` are the canonical `mp_qshared::shared::surface_flags` consts, reached via the prelude glob.
+// A former per-file duplicate `pub(crate)` copy caused a glob-glob ambiguity with the canonical import at every call
+// site through `crate::prelude::*`.
 
 /// Raven `NPC_Mark1_Precache`.
 ///
@@ -351,8 +344,8 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
         return;
     };
 
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients), so derefs stay raw
+    // via the safe entity borrow.
     let client = ctx.world.entity(self_id).client;
     if unsafe { (*client).ps.torsoTimer } > 0 {
         if crate::g_timer::TIMER_Done(ctx, Some(self_id), c"dyingExplosion".as_ptr()) != 0 {
@@ -532,7 +525,7 @@ pub fn NPC_Mark1_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:404-416`
 pub fn Mark1_Hunt(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if !npc_info.is_null() {
@@ -560,7 +553,7 @@ pub fn Mark1_Hunt(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:424-488`
 pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if npc.is_null() || npc_info.is_null() {
@@ -671,15 +664,15 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:495-548`
 pub fn Mark1_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if npc.is_null() || npc_info.is_null() {
         return;
     }
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients), so derefs stay raw
+    // via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"attackDelay".as_ptr()) != 0 {
@@ -868,7 +861,7 @@ pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
     }
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
-    // Randomly talk
+    //randomly talk
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
         if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"angerNoise".as_ptr()) != 0 {
             let delay = ctx.world.bg_state.rng.Q_irand(4000, 10000);
@@ -927,8 +920,8 @@ pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
             else {
                 // It should never get here, but just in case
                 ctx.world.entity_mut(npc_id).health = 0;
-                // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients);
-                // deref raw via the safe entity borrow, per trap 2b.
+                // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients), so derefs
+                // stay raw via the safe entity borrow.
                 let client = ctx.world.entity(npc_id).client;
                 unsafe {
                     (*client).ps.stats[STAT_HEALTH as usize] = 0;
@@ -968,7 +961,7 @@ pub fn Mark1_Patrol(ctx: &mut GameContext) {
         return;
     }
 
-    // If we have somewhere to go, then do that
+    //If we have somewhere to go, then do that
     if ctx.world.entity(npc_id).enemy.is_none() {
         let goal = crate::NPC_goal::UpdateGoal(ctx);
         if !goal.is_null() {
@@ -984,7 +977,7 @@ pub fn Mark1_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:747-764`
 pub fn NPC_BSMark1_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if npc.is_null() || npc_info.is_null() {

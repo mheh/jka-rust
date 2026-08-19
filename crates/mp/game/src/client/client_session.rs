@@ -16,19 +16,20 @@ use super::spectator_state::spectatorState_t;
 pub const FOLLOW_ACTIVE1: c_int = -1;
 pub const FOLLOW_ACTIVE2: c_int = -2;
 
-/// Raven `clientSession_t` — client data that stays across levels/tournament restarts.
+/// Raven `clientSession_t`.
 ///
-/// Raven: achieved by writing all the data to cvar strings at game shutdown and
-/// reading them back at connection time; anything added MUST be handled in
-/// `G_InitSessionData()` / `G_ReadSessionData()` / `G_WriteSessionData()`.
+/// Raven: client data that stays across multiple levels or tournament restarts
+/// this is achieved by writing all the data to cvar strings at game shutdown
+/// time and reading them back at connection time.  Anything added here
+/// MUST be dealt with in `G_InitSessionData()` / `G_ReadSessionData()` / `G_WriteSessionData()`
 /// Source: `oracle/codemp/game/g_local.h:408`
 ///
-/// `siegeClass`/`saberType`/`saber2Type`/`IPstring` are owned `String`s (§13
-/// string-endgame): the struct never crosses the DLL seam by layout — it sits
-/// in `gclient_t`'s private tail past `pers`, and the engine only learns the
-/// full stride at runtime — so `#[repr(C)]` and the `size_of` assert are dropped.
-/// Not `Copy` (owns `String`s); the byte-width write bounds (63/63/63/31) are
-/// preserved at every write site instead.
+/// `siegeClass`, `saberType`, `saber2Type`, and `IPstring` are owned `String`s.
+/// The struct never crosses the DLL seam by layout.
+/// It sits in `gclient_t`'s private tail past `pers`, and the engine only learns the full stride at runtime.
+/// So `#[repr(C)]` and the `size_of` assert are dropped.
+/// The struct is not `Copy` because it owns `String`s.
+/// The byte-width write bounds (63/63/63/31) are preserved at every write site instead.
 #[derive(Clone, Debug, PartialEq)]
 pub struct clientSession_t {
     pub sessionTeam: team_t,

@@ -21,20 +21,23 @@ pub const SP_INTERMISSION_DELAY_TIME: c_int = 5000;
 /// Source: `oracle/codemp/game/g_local.h:38`
 pub const CARNAGE_REWARD_TIME: c_int = 3000;
 
-/// Raven `START_TIME_LINK_ENTS` — time-delay after map start at which all
-/// ents have been spawned, so can link them.
+/// Raven `START_TIME_LINK_ENTS`.
+///
+/// Raven: time-delay after map start at which all ents have been spawned, so can link them
 ///
 /// Source: `oracle/codemp/game/g_local.h:45`
 pub const START_TIME_LINK_ENTS: c_int = crate::g_items::FRAMETIME * 1;
 
-/// Raven `START_TIME_FIND_LINKS` — time-delay after map start at which you
-/// can find linked entities.
+/// Raven `START_TIME_FIND_LINKS`.
+///
+/// Raven: time-delay after map start at which you can find linked entities
 ///
 /// Source: `oracle/codemp/game/g_local.h:46`
 pub const START_TIME_FIND_LINKS: c_int = crate::g_items::FRAMETIME * 2;
 
-/// Raven `START_TIME_NAV_CALC` — time-delay after map start to connect
-/// waypoints and calc routes.
+/// Raven `START_TIME_NAV_CALC`.
+///
+/// Raven: time-delay after map start to connect waypoints and calc routes
 ///
 /// Source: `oracle/codemp/game/g_local.h:49`
 pub const START_TIME_NAV_CALC: c_int = crate::g_items::FRAMETIME * 4;

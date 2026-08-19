@@ -1,6 +1,6 @@
 //! MP `tagOwner_t` and its `TAG_*` constants.
 //!
-//! Raven: ref tag stuff ported from SP (and C-ified).
+//! Raven: `//rww - ref tag stuff ported from SP (and C-ified)`.
 //! Type definition source: `oracle/codemp/game/g_misc.c:2867-2884`
 
 use mp_qshared::shared::qboolean;
@@ -14,8 +14,8 @@ use crate::level::reference_tag::{reference_tag_t, MAX_REFNAME};
 pub const TAG_GENERIC_NAME: &str = "__WORLD__";
 
 /// `TAG_GENERIC_NAME` as a C string literal (static storage), for sites that
-/// store the pointer past the enclosing statement — mirrors Raven passing the
-/// string literal directly.
+/// store the pointer past the enclosing statement.
+/// This mirrors Raven passing the string literal directly.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2868`
 pub const TAG_GENERIC_NAME_C: &core::ffi::CStr = c"__WORLD__";
@@ -43,7 +43,8 @@ pub struct tagOwner_t {
     pub inuse: qboolean,
 }
 
-// All-zero bytes are a valid tagOwner_t (name/tags/inuse are all zero-valid
-// #[repr(C)] fields) — the property `GameWorld::zeroed`'s `zeroed_box` relies on.
-// Source: oracle/codemp/game/g_misc.c:2879-2884 (Raven zero-inits refTagOwnerMap)
+// All-zero bytes are a valid tagOwner_t because name, tags, and inuse are all zero-valid #[repr(C)] fields.
+// `GameWorld::zeroed`'s `zeroed_box` relies on this property.
+// Raven zero-inits `refTagOwnerMap` as a file-scope C array.
+// Source: oracle/codemp/game/g_misc.c:2879-2884
 unsafe impl native_platform::ZeroValid for tagOwner_t {}

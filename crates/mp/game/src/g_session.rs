@@ -1,8 +1,6 @@
-// PORT-COMPLETE: g_session.c
-//! FAITHFUL port of `oracle/codemp/game/g_session.c`.
+//! Port of `oracle/codemp/game/g_session.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -19,11 +17,8 @@ use native_string::strncpyz_string;
 ///
 /// Source: `oracle/codemp/game/g_session.c:23-96`
 pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
-    // Raven copies each session string into a scratch buffer and converts its
-    // spaces to char(1) — siege class names contain spaces, but the session
-    // cvar is space-separated. The `String` fields have no interior NUL (they
-    // are filled from NUL-terminated sources), so iterating all bytes matches
-    // Raven's `while (buf[i])` walk exactly.
+    // The `String` fields have no interior NUL because they come from NUL-terminated sources.
+    // Iterating all bytes matches Raven's `while (buf[i])` walk.
     let (mut siege_class, mut saber_type, mut saber2_type) = {
         let c = ctx.world.client(client);
         (
@@ -33,6 +28,7 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
         )
     };
 
+    //sort of a hack.. we don't want spaces by siege class names have spaces so convert them all to unused chars
     for b in siege_class.iter_mut() {
         if *b == b' ' {
             *b = 1;
@@ -40,7 +36,7 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
     }
 
     if siege_class.is_empty() {
-        // make sure there's at least something
+        //make sure there's at least something
         siege_class = b"none".to_vec();
     }
 
@@ -56,14 +52,13 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
         }
     }
 
-    // Space (0x20) becomes 0x01 so the space-separated session cvar parses. The
-    // Latin-1 decode keeps every byte, so the cvar text matches Raven's `%s`.
+    // Space (0x20) becomes 0x01 so the space-separated session cvar parses.
+    // The Latin-1 decode keeps every byte, so the cvar text matches Raven's `%s`.
     let siege_class_str = latin1_to_string(&siege_class);
     let saber_type_str = latin1_to_string(&saber_type);
     let saber2_type_str = latin1_to_string(&saber2_type);
 
-    // `client - level.clients` recomputes to the client index `client` (both
-    // alias `world.clients`), so the session cvar name uses it directly.
+    // `client - level.clients` recomputes to the client index `client`.
     let s = {
         let c = ctx.world.client(client);
         format!(
@@ -101,9 +96,8 @@ pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
     let parts: Vec<&str> = s_str.split_whitespace().collect();
 
     let mut idx = 0;
-    // §19: C's sscanf leaves these uninitialized when the session string has
-    // fewer than the expected tokens and then assigns that garbage (UB); a
-    // short string reads as 0 here instead.
+    // §19: C's sscanf leaves these uninitialized when the session string has fewer than the expected tokens, and then assigns that garbage (UB).
+    // A short string reads as 0 here instead.
     let mut session_team: i32 = 0;
     let mut spectator_state: i32 = 0;
     let mut team_leader: i32 = 0;
@@ -170,15 +164,15 @@ pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
         c.sess.saber2Type = strncpyz_string(parts[idx].as_bytes(), 64);
     }
 
-    // Convert the char(1) placeholders back to spaces, as the session data was
-    // written that way (0x01 and ' ' are single ASCII bytes, so `replace` on
-    // the char is byte-identical to Raven's in-place `buf[i] == 1 -> ' '`).
+    //convert back to spaces from unused chars, as session data is written that way.
+    // 0x01 and ' ' are single ASCII bytes, so `replace` on the char is byte-identical to Raven's in-place `buf[i] == 1 -> ' '` walk.
     c.sess.siegeClass = c.sess.siegeClass.replace('\u{1}', " ");
     c.sess.saberType = c.sess.saberType.replace('\u{1}', " ");
     c.sess.saber2Type = c.sess.saber2Type.replace('\u{1}', " ");
 
     c.sess.sessionTeam = session_team as team_t;
-    // spectatorState_t is `#[repr(i32)]`; the sscanf'd int transmutes to it.
+    // spectatorState_t is `#[repr(i32)]`.
+    // The sscanf'd int transmutes to it.
     c.sess.spectatorState =
         unsafe { core::mem::transmute::<i32, spectatorState_t>(spectator_state) };
     c.sess.teamLeader = if team_leader != 0 { qtrue } else { qfalse };
@@ -263,8 +257,8 @@ pub fn G_InitSessionData(ctx: &mut GameContext, client: usize, userinfo: &str, i
     ctx.world.client_mut(client).sess.spectatorTime = time;
 
     {
-        // Raven clears each with `sess.X[0] = 0` (empty C string); `.clear()`
-        // is the byte-equivalent empty-`String`.
+        // Raven clears each with `sess.X[0] = 0` (empty C string).
+        // `.clear()` is the byte-equivalent empty-`String`.
         let c = ctx.world.client_mut(client);
         c.sess.siegeClass.clear();
         c.sess.saberType.clear();

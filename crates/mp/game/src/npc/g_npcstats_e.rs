@@ -1,8 +1,9 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `gNPCstats_t` — NPC stats, loaded in, and can be set by scripts.
+/// Raven `gNPCstats_t`.
 ///
 /// Raven: Stats, loaded in, and can be set by scripts.
+///
 /// Type definition source: `oracle/codemp/game/b_public.h:86-107`
 #[repr(C)]
 pub struct gNPCstats_t {

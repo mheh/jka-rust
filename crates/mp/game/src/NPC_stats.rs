@@ -1,15 +1,12 @@
-// PORT-COMPLETE: NPC_stats.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_stats.c`.
+//! Port of `oracle/codemp/game/NPC_stats.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer parameters are `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Ctx-free leaf helpers take `&mut`/`&gentity_t`.
+//! Function bodies re-derive the raw pointers at the top.
+//! Callers bridge at the boundary through `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
@@ -22,21 +19,22 @@ use native_string::Q_stricmp;
 use native_string::Q_strncpyzBytes;
 use native_string::atoi;
 
-// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
-// (`c_int`, cast here to match the `vec3_t` components they seed).
+// `DEFAULT_MINS_2` and `DEFAULT_MAXS_2` are canonical in `mp_bg::public::viewheight`.
+// The cast to `c_int` here matches the `vec3_t` components they seed.
 // Source: `oracle/codemp/game/bg_public.h:41-42`
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
-// Raven `CROUCH_MAXS_2` (`bg_public.h`) — redeclared locally per the existing
-// per-file-local-const convention (no canonical shared export).
+// Raven `CROUCH_MAXS_2` (`bg_public.h`) is redeclared locally, per the existing per-file-local-const convention.
+// It has no canonical shared export.
 const CROUCH_MAXS_2: f32 = 16.0;
 
-/// Raven `MAX_NPC_DATA_SIZE` — maximum size for NPC stat loading buffer.
+/// Raven `MAX_NPC_DATA_SIZE`: the maximum size of the NPC stat loading buffer.
 /// Source: `oracle/codemp/game/NPC_stats.c:236`
 const MAX_NPC_DATA_SIZE: c_int = 0x20000;
 
-/// Raven `BSTable` — `bState_t` name/id lookup table (internal-only bStates
-/// past `BS_CINEMATIC` are not name-lookupable, per the oracle table).
+/// Raven `BSTable`: `bState_t` name/id lookup table.
+///
+/// Internal-only bStates past `BS_CINEMATIC` are not name-lookupable, per the oracle table.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:88-99`
 pub static BSTable: [stringID_table_t; 11] = [
@@ -86,7 +84,7 @@ pub static BSTable: [stringID_table_t; 11] = [
     },
 ];
 
-/// Raven `TeamTable` — NPC-team name/id lookup.
+/// Raven `TeamTable`: NPC-team name/id lookup.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:14-20`
 pub static TeamTable: [stringID_table_t; 5] = [
@@ -112,8 +110,8 @@ pub static TeamTable: [stringID_table_t; 5] = [
     }, // terminator: Raven's `"", -1`
 ];
 
-/// Raven `ClassTable` — NPC-class name/id lookup (order must match the `class_t`
-/// enum in `teams.h`).
+/// Raven `ClassTable`: NPC-class name/id lookup.
+/// Its order must match the `class_t` enum in `teams.h`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:23-86`
 pub static ClassTable: [stringID_table_t; 57] = [
@@ -173,8 +171,8 @@ pub static ClassTable: [stringID_table_t; 57] = [
         name: c"CLASS_HOWLER".as_ptr() as *mut c_char,
         id: CLASS_HOWLER as c_int,
     },
-    // ENUM2STRING(CLASS_RANCOR) — commented out in the oracle here (line 40); the
-    // active CLASS_RANCOR entry appears near the end (line 83).
+    // ENUM2STRING(CLASS_RANCOR) is commented out in the oracle here (line 40).
+    // The active CLASS_RANCOR entry appears near the end (line 83).
     stringID_table_t {
         name: c"CLASS_IMPERIAL".as_ptr() as *mut c_char,
         id: CLASS_IMPERIAL as c_int,
@@ -331,8 +329,8 @@ pub static ClassTable: [stringID_table_t; 57] = [
         name: c"CLASS_BOBAFETT".as_ptr() as *mut c_char,
         id: CLASS_BOBAFETT as c_int,
     },
-    // ENUM2STRING(CLASS_ROCKETTROOPER) — commented out in the oracle (line 80).
-    // ENUM2STRING(CLASS_PLAYER) — commented out in the oracle (line 81).
+    // ENUM2STRING(CLASS_ROCKETTROOPER) is commented out in the oracle (line 80).
+    // ENUM2STRING(CLASS_PLAYER) is commented out in the oracle (line 81).
     stringID_table_t {
         name: c"CLASS_VEHICLE".as_ptr() as *mut c_char,
         id: CLASS_VEHICLE as c_int,
@@ -355,15 +353,14 @@ pub static ClassTable: [stringID_table_t; 57] = [
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:220-223`
 pub fn NPC_ReactionTime(ctx: &mut GameContext) -> c_int {
-    // `NPCInfo` (`NPC.c:34`) is a real `*mut gNPC_t` field on `GameGlobals` now
-    // (pass-2 backfill) — deref straight through.
+    // `NPCInfo` (`NPC.c:34`) is a real `*mut gNPC_t` field on `GameGlobals`.
+    // We deref it straight through.
     unsafe { 200 * (6 - (*ctx.world.globals.NPCInfo).stats.reactions) }
 }
 
 /// Raven `TranslateRankName`.
 ///
-/// Raven: `Should be used to determine pip bolt-ons` (see the commented-out
-/// `TranslateRankName` doc block above the live definition).
+/// Raven: `Should be used to determine pip bolt-ons` (see the commented-out `TranslateRankName` doc block above the live definition).
 /// Source: `oracle/codemp/game/NPC_stats.c:287-330`
 pub fn TranslateRankName(name: &str) -> rank_t {
     if Q_stricmp(name, "civilian") == 0 {
@@ -403,16 +400,17 @@ pub fn G_ParseAnimFileSet(
     animFileIndex: *mut c_int,
 ) -> qboolean {
     // Raven: `*animFileIndex = BG_ParseAnimationFile(filename, NULL, qfalse);`
-    // "if it's humanoid we should have it cached and return it, if it is not
-    // it will be loaded (unless it's also cached already)". `animCFG` is
-    // unused by the live body (matches oracle — it is only forwarded by the
-    // (disabled) caller, not read here).
+    // Raven: "if it's humanoid we should have it cached and return it, if it is not it will be loaded (unless it's also cached already)".
+    // `animCFG` is unused by the live body.
+    // This matches the oracle, where it is only forwarded by the disabled caller and never read here.
     let _ = animCFG;
 
     unsafe {
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -428,15 +426,15 @@ pub fn G_ParseAnimFileSet(
             return 0; // qfalse
         }
     }
-    // "I guess this isn't really even needed game-side." — BG_ParseAnimationSndFile
-    // call stays commented out per oracle.
+    // Raven: "I guess this isn't really even needed game-side."
+    // The `BG_ParseAnimationSndFile` call stays commented out, per oracle.
     1 // qtrue
 }
 
 /// Raven `NPC_PrecacheAnimationCFG`.
 ///
-/// Raven: entire body is compiled out (`#if 0 //rwwFIXMEFIXME: Actually
-/// precache stuff here.` ... `#endif`) — the live function is a no-op.
+/// Raven: the entire body is compiled out (`#if 0 //rwwFIXMEFIXME: Actually precache stuff here.` ... `#endif`).
+/// The live function is a no-op.
 /// Source: `oracle/codemp/game/NPC_stats.c:439-548`
 pub fn NPC_PrecacheAnimationCFG(NPC_type: &str) {
     let _ = NPC_type;
@@ -464,10 +462,8 @@ pub fn NPC_PrecacheWeapons(
         }
         curWeap += 1;
     }
-    // The `#if 0 //rwwFIXMEFIXME: actually precache weapons here` block (the
-    // ghoul2 in-hand/in-world weapon-model precache) is dead in the oracle —
-    // dropped per porting-rules §17/§20 (dead disabled surface, not ported
-    // speculatively).
+    // The `#if 0 //rwwFIXMEFIXME: actually precache weapons here` block is dead in the oracle.
+    // It is the ghoul2 in-hand/in-world weapon-model precache, dropped per porting-rules §17/§20 (dead disabled surface, not ported speculatively).
 }
 
 /// Raven `NPC_Precache`.
@@ -477,9 +473,9 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
-        // `spawner` stays an `EntityId`; entity fields go through
-        // `ctx.world.entity(spawner)` accessor borrows (2c). Its pool `client`
-        // (`gClPtrs`) is read via the safe borrow, then dereffed raw.
+        // `spawner` stays an `EntityId`.
+        // Entity fields go through `ctx.world.entity(spawner)` accessor borrows.
+        // Its pool `client` (`gClPtrs`) is read through the safe borrow, then dereferenced raw.
         let mut player_team: team_t = NPCTEAM_FREE;
         let mut md3_model: qboolean = 0; // qfalse
         let mut custom_skin: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
@@ -555,8 +551,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     continue;
                 }
                 if Q_stricmp("none", &value) == 0 {
-                    // (nothing — headModelName not wired yet, matches oracle's
-                    // commented-out Q_strncpyz)
+                    // Nothing happens here: `headModelName` is not wired yet, matching the oracle's commented-out `Q_strncpyz`.
                 }
                 md3_model = 1;
                 continue;
@@ -574,7 +569,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     continue;
                 }
                 if Q_stricmp("none", &value) == 0 {
-                    // (nothing — torsoModelName not wired yet)
+                    // Nothing happens here: `torsoModelName` is not wired yet.
                 }
                 md3_model = 1;
                 continue;
@@ -639,8 +634,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                // Raven bug (transcribed faithfully): sprintf's from `token`
-                // (still "playerTeam"), not the just-parsed `value`.
+                // Raven bug: sprintf's from `token` (still "playerTeam"), not the just-parsed `value`.
                 let tk = format!("NPC{}", token);
                 player_team =
                     GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &tk);
@@ -762,17 +756,14 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 continue;
             }
 
-            // (unrecognized token inside this block falls through — the
-            // oracle loop has no `else` catch-all here, matching its while(1),
-            // so an unrecognized token is ignored and the loop continues,
-            // rather than exiting early)
+            // An unrecognized token inside this block falls through, and the loop continues.
+            // The oracle loop has no `else` catch-all here, matching its `while(1)`, so an unrecognized token never exits early.
             continue;
         }
 
         // If we're not a vehicle, then an error here would be valid...
-        // FLAG: `spawner.client` is a `BG_Alloc`'d pool `gClPtrs` client
-        // (`g_utils.c:430`), not a `level.clients` slot; read the pointer via the
-        // safe borrow, deref raw (recipe 2b/2c).
+        // FLAG: `spawner.client` is a `BG_Alloc`'d pool `gClPtrs` client (`g_utils.c:430`), not a `level.clients` slot.
+        // Read the pointer through the safe borrow, then dereference it raw.
         let client_ptr = ctx.world.entity(spawner).client;
         if client_ptr.is_null() || (*client_ptr).NPC_class != CLASS_VEHICLE {
             if md3_model != 0 {
@@ -820,16 +811,15 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
-        // `NPC` stays an `EntityId`; entity fields go through
-        // `ctx.world.entity(NPC)` accessor borrows (2c).
+        // `NPC` stays an `EntityId`.
+        // Entity fields go through `ctx.world.entity(NPC)` accessor borrows.
         let mut NPCName = NPCName_in;
 
         let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut playerModel: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut customSkin: [c_char; MAX_QPATH] = [0; MAX_QPATH];
-        // FLAG: `NPC.client`/`NPC.NPC` are `BG_Alloc`'d pool `gClPtrs`/`gNPC_t`
-        // (`g_utils.c:430`), not `level.clients`/accessor-backed; read the raw
-        // pointer values via the safe borrow, deref raw below (recipe 2b/2c).
+        // FLAG: `NPC.client`/`NPC.NPC` are `BG_Alloc`'d pool `gClPtrs`/`gNPC_t` (`g_utils.c:430`), not `level.clients` or accessor-backed.
+        // Read the raw pointer values through the safe borrow, then dereference raw below.
         let client_ptr = ctx.world.entity(NPC).client;
         let ri: *mut renderInfo_t = &mut (*client_ptr).renderInfo as *mut renderInfo_t;
         let mut stats: *mut gNPCstats_t = std::ptr::null_mut();
@@ -1159,9 +1149,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 continue;
             }
 
-            // headYawRangeLeft / Right / headPitchRangeUp / Down /
-            // torsoYawRangeLeft / Right / torsoPitchRangeUp / Down — all share
-            // the same shape (parse int, reject negative, store on `ri`).
+            // headYawRangeLeft / Right / headPitchRangeUp / Down / torsoYawRangeLeft / Right / torsoPitchRangeUp / Down all share the same shape.
+            // Each one parses an int, rejects a negative value, and stores it on `ri`.
             macro_rules! range_field {
                 ($lit:literal, $field:ident) => {
                     if Q_stricmp(&token, $lit) == 0 {
@@ -1234,7 +1223,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 continue;
             }
 
-            // X/Y/Z scale — unsupported in MP, parsed and discarded.
+            // X/Y/Z scale is unsupported in MP.
+            // It is parsed and discarded.
             macro_rules! scale_axis {
                 ($lit:literal) => {
                     if Q_stricmp(&token, $lit) == 0 {
@@ -1272,8 +1262,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
 
             //===AI STATS=====================================================================
             if parsingPlayer == 0 {
-                // int-valued 1-5-range NPC stats (aggression/aim/evasion/
-                // intelligence/move/reactions) — same shape.
+                // int-valued 1-5-range NPC stats (aggression/aim/evasion/intelligence/move/reactions) share the same shape.
                 macro_rules! stat_1_5 {
                     ($lit:literal, $field:ident) => {
                         if Q_stricmp(&token, $lit) == 0 {
@@ -1465,7 +1454,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     }
                     continue;
                 }
-                // race — commented out in oracle, dropped per §17/§20.
+                // `race` is commented out in the oracle, dropped per §17/§20.
 
                 // rank
                 if Q_stricmp(&token, "rank") == 0 {
@@ -1582,9 +1571,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     ClassTable.as_ptr() as *mut stringID_table_t,
                     &value,
                 );
-                // Divergence (§19): Raven stores GetIDForString's -1 miss (SP-only
-                // class names) straight into the enum; `class_t` can't hold -1, and
-                // no MP code compares against CLASS_NONE, so a miss clamps to it.
+                // Divergence (§19): Raven stores `GetIDForString`'s -1 miss (SP-only class names) straight into the enum.
+                // `class_t` cannot hold -1, and no MP code compares against `CLASS_NONE`, so a miss clamps to it.
                 // `s.NPC_class` below keeps the raw -1 exactly as Raven.
                 (*client_ptr).NPC_class =
                     if class_id >= 0 && class_id < class_t::CLASS_NUM_CLASSES as c_int {
@@ -1611,8 +1599,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 continue;
             }
 
-            // dismemberment probabilities — parsed, never applied (MP doesn't
-            // support dismemberment; matches oracle's commented-out fields).
+            // Dismemberment probabilities are parsed but never applied.
+            // MP does not support dismemberment, matching the oracle's commented-out fields.
             macro_rules! dismember_stub {
                 ($lit:literal) => {
                     if Q_stricmp(&token, $lit) == 0 {
@@ -1775,7 +1763,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     continue;
                 }
 
-                // walkSpeed / runSpeed / acceleration — int stats, reject < 0.
+                // walkSpeed, runSpeed, and acceleration are int stats that reject values below 0.
                 macro_rules! stat_nonneg {
                     ($lit:literal, $field:ident) => {
                         if Q_stricmp(&token, $lit) == 0 {
@@ -1866,9 +1854,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 }
             }
 
-            // snd / sndcombat / sndextra / sndjedi — parsed for their
-            // directory prefix but not applied (client-side sound-dir fields
-            // are not ported; matches oracle's commented-out ci-> stores).
+            // `snd`, `sndcombat`, `sndextra`, and `sndjedi` are parsed for their directory prefix, but not applied.
+            // Client-side sound-dir fields are not ported, matching the oracle's commented-out `ci->` stores.
             macro_rules! snd_dir {
                 ($lit:literal, $flag:expr) => {
                     if Q_stricmp(&token, $lit) == 0 {
@@ -2053,8 +2040,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 Q_strncpyzBytes(saber_dest, value.as_bytes(), 4096);
 
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                    // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                    // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                    // A raw store is required for bg-seam re-entry.
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };
@@ -2092,8 +2080,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     Q_strncpyzBytes(saber_dest, value.as_bytes(), 4096);
 
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                        // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                        // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                        // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                        // A raw store is required for bg-seam re-entry.
                         world: ctx.world_raw(),
                         engine: ctx.engine,
                     };
@@ -2121,8 +2110,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 continue;
             }
 
-            // saberColor / saberColor2..8 — set-all-blades vs single-blade
-            // color, mirrored for saber[1] as saber2Color / saber2Color2..8.
+            // `saberColor` sets the color on all blades, `saberColor2`..`8` set a single blade.
+            // The same pair mirrors for `saber[1]` as `saber2Color` and `saber2Color2`..`8`.
             if Q_stricmp(&token, "saberColor") == 0 {
                 let mut value = String::new();
                 if crate::q_shared::COM_ParseString(
@@ -2401,8 +2390,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 //use "kyle" for a default then
                 npcSaber1 = G_ModelIndex(ctx, "@Kyle");
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                    // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                    // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                    // A raw store is required for bg-seam re-entry.
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };

@@ -21,16 +21,18 @@ pub const MAX_NETNAME: usize = 36;
 /// Raven `MAX_VOTE_COUNT`. Source: `oracle/codemp/game/g_local.h:439`
 pub const MAX_VOTE_COUNT: c_int = 3;
 
-/// Raven `clientPersistant_t` — client data that stays across respawns, cleared
-/// on each level/team change at `ClientBegin()`.
+/// Raven `clientPersistant_t`.
+///
+/// This holds client data that survives across respawns.
+/// It clears on each level or team change, at `ClientBegin()`.
 ///
 /// Type definition source: `oracle/codemp/game/g_local.h:443-458`
 ///
-/// `netname` is an owned `String` (§13 string-endgame): the field never crosses
-/// the DLL seam by layout — the engine only sees `playerState`/`userinfo` — so
-/// the old `#[repr(C)]` and `offset_of`/`size_of` asserts are dropped. `Default`
-/// is Raven's zero image (all scalars 0, `netname` empty), matching the
-/// `memset(client, 0, ...)` clears in `ClientConnect`/`ClientSpawn`.
+/// `netname` is an owned `String`, because the field never crosses the DLL seam by layout.
+/// The engine only sees `playerState` and `userinfo`, so this file drops the old `#[repr(C)]`
+/// and `offset_of`/`size_of` asserts.
+/// `Default` gives Raven's zero image: all scalars 0, `netname` empty.
+/// This matches the `memset(client, 0, ...)` clears in `ClientConnect` and `ClientSpawn`.
 #[derive(Clone, Default)]
 pub struct clientPersistant_t {
     pub connected: clientConnected_t,

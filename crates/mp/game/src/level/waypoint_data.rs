@@ -6,12 +6,13 @@
 
 use core::ffi::c_int;
 
-/// Raven `waypointData_t` — cleared as each map is entered.
+/// Raven `waypointData_t`.
 ///
-/// The five name fields hold `Q_strncpyz`-bounded (`MAX_QPATH`) copies of an
-/// entity's targetname/target chain; they are owned `String`s (the byte bound
-/// is applied at the `NAV_StoreWaypoint` write sites). Game-internal storage
-/// (`tempWaypointList`), so layout is free.
+/// Raven: this structure is cleared as each map is entered
+///
+/// The five name fields hold `Q_strncpyz`-bounded (`MAX_QPATH`) copies of an entity's targetname or target chain.
+/// They are owned `String`s, and the byte bound applies at the `NAV_StoreWaypoint` write sites.
+/// This is game-internal storage (`tempWaypointList`), so the layout is free.
 ///
 /// Type definition source: `oracle/codemp/game/g_local.h:810-818`
 #[derive(Clone, Default)]

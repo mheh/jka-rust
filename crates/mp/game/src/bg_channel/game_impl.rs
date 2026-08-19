@@ -1,19 +1,18 @@
 //! Game-tier implementations of the bg channel traits.
 //!
-//! `BgTraps`/`GameCallbacks` are declared in the (conceptually bg) channel with
-//! bg-visible signatures; their concrete implementations belong to the game
-//! tier and hold the game's `&Engine` / world handle. Everything currently
-//! lives in `mp_game`, so the impls live here beside the traits; when the bg
-//! crate splits out, only this file moves to game proper.
+//! `BgTraps` and `GameCallbacks` are declared in the (conceptually bg) channel with
+//! bg-visible signatures.
+//! Their concrete implementations belong to the game tier and hold the game's
+//! `&Engine` and world handle.
+//! Everything currently lives in `mp_game`, so the impls live here beside the traits.
+//! When the bg crate splits out, only this file moves to game proper.
 //!
-//! Exercised in the pmove slice: [`GameBgTraps::pointcontents`] delegates to
-//! `crate::trap::PointContents` with a real `Engine` handle — the end-to-end
-//! plumbing proof. Every other `BgTraps`/`GameCallbacks` method now delegates the
-//! same way (resolve entity nums against the world arena, rebuild `GameContext`,
-//! call the ported `trap_*`/`G_*` body). One exception remains:
-//! [`GameCallbacksImpl::flyveh_surface_destruction`] is a loud `todo!()`
-//! escalation — its bg-visible signature cannot carry the impact `trace_t*`/force
-//! flag its game-tier target needs (see the method for the full note).
+//! [`GameBgTraps::pointcontents`] delegates to `crate::trap::PointContents` with a real
+//! `Engine` handle, the end-to-end plumbing proof exercised in the pmove slice.
+//! Most `BgTraps`/`GameCallbacks` methods delegate the same way: resolve entity nums
+//! against the world arena, rebuild `GameContext`, and call the ported `trap_*`/`G_*`
+//! body.
+//! Documented exceptions are noted at their own method site.
 #![allow(non_snake_case, unused_variables, clippy::too_many_arguments)]
 
 use core::ffi::{c_char, c_int, c_void};
@@ -44,10 +43,11 @@ use mp_bg::vehicles::fighter_npc::FighterIsLanded;
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
 
-/// The game-side `BgTraps` implementation: holds the `&Engine` from which
-/// engine syscalls are issued via `crate::trap` wrappers (Stage 2a: the former
-/// null-world placeholder `GameContext` is impossible with a borrowed world —
-/// and was never needed; only the engine channel is).
+/// The game-side `BgTraps` implementation.
+/// It holds the `&Engine` from which engine syscalls are issued through `crate::trap`
+/// wrappers.
+/// A placeholder world field is unnecessary because only the engine channel is needed
+/// here, and it would not compile against a borrowed world.
 pub struct GameBgTraps<'a> {
     pub engine: &'a Engine,
 }
@@ -69,7 +69,8 @@ impl BgTraps for GameBgTraps<'_> {
         passEntityNum: c_int,
         contentMask: c_int,
     ) {
-        // Mechanical delegation. Raven: `trap_Trace` (`G_TRACE`).
+        // Mechanical delegation.
+        // Raven: `trap_Trace` (`G_TRACE`).
         use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
         trap::Trace(
             self.engine,
@@ -78,20 +79,22 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn pointcontents(&self, point: *const vec3_t, passEntityNum: c_int) -> c_int {
-        // Real delegation — the pmove slice's PM_SetWaterLevel drives this.
+        // Real delegation.
+        // The pmove slice's PM_SetWaterLevel drives this.
         // Raven: `trap_PointContents` (`G_POINT_CONTENTS`).
         use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
         trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
     }
 
     fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
-        // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). The caller guarantees
-        // `f` is valid.
+        // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`).
+        // The caller guarantees `f` is valid.
         trap::FS_FOpenFile(self.engine, qpath, unsafe { &mut *f }, mode)
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
-        // Mechanical delegation — matches the proven `pointcontents`
-        // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
+        // Mechanical delegation.
+        // It matches the proven `pointcontents` shape.
+        // Raven: `trap_FS_Read` (`G_FS_READ`).
         let buf = unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
         trap::FS_Read(self.engine, buf, f)
     }
@@ -131,8 +134,8 @@ impl BgTraps for GameBgTraps<'_> {
         modelFlags: c_int,
         lodBias: c_int,
     ) -> c_int {
-        // Mechanical delegation. Raven: `trap_G2API_InitGhoul2Model`
-        // (`G_G2_INITGHOUL2MODEL`).
+        // Mechanical delegation.
+        // Raven: `trap_G2API_InitGhoul2Model` (`G_G2_INITGHOUL2MODEL`).
         trap::G2API_InitGhoul2Model(
             self.engine,
             ghoul2Ptr,
@@ -145,17 +148,17 @@ impl BgTraps for GameBgTraps<'_> {
         )
     }
     fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void) {
-        // Mechanical delegation. Raven: `trap_G2API_CleanGhoul2Models`
-        // (`G_G2_CLEANMODELS`).
+        // Mechanical delegation.
+        // Raven: `trap_G2API_CleanGhoul2Models` (`G_G2_CLEANMODELS`).
         trap::G2API_CleanGhoul2Models(
             self.engine,
             mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
         )
     }
     fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: &str) -> c_int {
-        // Real delegation to the already-wired `trap_G2API_AddBolt` seam
-        // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
-        // only carry `&dyn BgTraps`, not `&Engine`.
+        // This delegates to the `trap_G2API_AddBolt` seam (`G_G2_ADDBOLT`).
+        // Bg-visible callers, for example `AttachRidersGeneric`, only carry `&dyn BgTraps`,
+        // not `&Engine`.
         trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, boneName)
     }
     fn g2api_get_bolt_matrix(
@@ -192,8 +195,9 @@ impl BgTraps for GameBgTraps<'_> {
         scale: *const vec3_t,
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoltMatrix_NoReconstruct` (`G_G2_GETBOLT_NOREC`).
-        // The syscall `Args` takes `scale` as `*mut vec3_t`; the bg-visible sig is
-        // `*const`, so cast at the seam (the engine never mutates it here).
+        // The syscall `Args` takes `scale` as `*mut vec3_t`.
+        // The bg-visible signature is `*const`, so cast at the seam (the engine never
+        // mutates it here).
         use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs;
         trap::G2API_GetBoltMatrix_NoReconstruct(
             self.engine,
@@ -344,8 +348,8 @@ impl BgTraps for GameBgTraps<'_> {
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneIKState` (`G_G2_SETBONEIKSTATE`).
-        // `None` rides through as a null boneName on the wire — the engine's
-        // init/reset-IK branch (`G2_bones.cpp:4674`).
+        // `None` rides through as a null boneName on the wire.
+        // This triggers the engine's init/reset-IK branch (`G2_bones.cpp:4674`).
         (trap::G2API_SetBoneIKState(self.engine, ghoul2, time, boneName, ikState, params))
             as qboolean
     }
@@ -365,8 +369,7 @@ impl BgTraps for GameBgTraps<'_> {
         modelIndex: c_int,
         surfaceName: &str,
     ) -> c_int {
-        // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus`
-        // (G_G2_GETSURFACERENDERSTATUS).
+        // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus` (G_G2_GETSURFACERENDERSTATUS).
         trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, surfaceName)
     }
 
@@ -378,20 +381,20 @@ impl BgTraps for GameBgTraps<'_> {
         vol: c_int,
         rad: c_int,
     ) {
-        // `trap_FX_PlayEffectID` is cgame-only: in the oracle it is declared and
-        // called only under `#ifndef QAGAME` (bg_slidemove.c:38,122,550), while
-        // the QAGAME (server/game) build routes the same effect through
-        // `G_PlayEffectID` (a `GameCallbacks` upcall). There is no
-        // `G_FX_PLAY_EFFECT_ID` in the game syscall table, so this method is dead
-        // surface on the game side and must never be reached here.
+        // `trap_FX_PlayEffectID` is cgame-only: the oracle declares and calls it only
+        // under `#ifndef QAGAME` (bg_slidemove.c:38,122,550).
+        // The QAGAME (server/game) build routes the same effect through
+        // `G_PlayEffectID`, a `GameCallbacks` upcall.
+        // There is no `G_FX_PLAY_EFFECT_ID` in the game syscall table, so this method
+        // is dead surface on the game side and must never be reached here.
         // Source: `oracle/codemp/game/bg_slidemove.c:37-39,116-124`
         unreachable!(
             "trap_FX_PlayEffectID is cgame-only (#ifndef QAGAME); QAGAME uses G_PlayEffectID"
         )
     }
     fn snap_vector(&self, v: *mut f32) {
-        // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
-        // 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
+        // Raven: `trap_SnapVector` (`G_SNAPVECTOR`).
+        // The `vec3_t*` is the caller's 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
         use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
         trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
@@ -402,28 +405,31 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn com_printf(&self, msg: &str) {
-        // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the
-        // game-tier `Com_Printf` port takes. Source: `g_main.c:1219-1228`.
+        // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the game-tier
+        // `Com_Printf` port takes.
+        // Source: `g_main.c:1219-1228`.
         trap::Printf(self.engine, msg)
     }
     fn com_error(&self, error_level: c_int, msg: &str) {
-        // Raven `Com_Error` -> `trap_Error` (`G_ERROR`); `error_level` is dropped
-        // at the seam like the game-tier `Com_Error` port. Source: `g_main.c:1208-1217`.
+        // Raven `Com_Error` -> `trap_Error` (`G_ERROR`).
+        // `error_level` is dropped at the seam like the game-tier `Com_Error` port.
+        // Source: `g_main.c:1208-1217`.
         let _ = error_level;
         trap::Error(self.engine, msg)
     }
 }
 
-/// The game-side `GameCallbacks` implementation. Carries the game handles the
-/// `G_*` upcalls need (the world island + the engine); each method resolves the
-/// bg-visible entity nums against the world and delegates to the ported `G_*`
-/// body. All upcalls now delegate; the sole exception is
-/// [`GameCallbacksImpl::flyveh_surface_destruction`], a documented escalation
-/// (its signature cannot carry the impact `trace_t*`/force the target requires).
+/// The game-side `GameCallbacks` implementation.
+/// It carries the game handles the `G_*` upcalls need: the world island and the engine.
+/// Most methods resolve the bg-visible entity nums against the world and delegate to
+/// the ported `G_*` body.
+/// A few methods read the world arena directly instead.
+/// Documented exceptions are noted at their own method site.
 pub struct GameCallbacksImpl<'a> {
-    /// The one owned `GameWorld` island (raw so a `&mut dyn GameCallbacks` and a
-    /// `&mut BgState` borrowed from the same world can coexist across the seam;
-    /// STATE-D6 leaf reborrows discipline applies inside the method bodies).
+    /// The one owned `GameWorld` island.
+    /// The pointer is raw so a `&mut dyn GameCallbacks` and a `&mut BgState` borrowed
+    /// from the same world can coexist across the seam.
+    /// Method bodies reborrow the world as a leaf borrow.
     pub world: *mut GameWorld,
     pub engine: &'a Engine,
 }
@@ -441,10 +447,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         mod_: c_int,
     ) {
         // Resolves the entity nums against the world arena, rebuilds the module
-        // `GameContext`, and delegates to the ported `G_Damage`. `dir`/`point` are
-        // bg-visible raw pointers; the ported body takes `dir: Option<&mut vec3_t>`
-        // and `point` by value. Every bg caller passes `dir = null` and a non-null
-        // `point`. Source: `oracle/codemp/game/g_combat.c` (`G_Damage`).
+        // `GameContext`, and delegates to the ported `G_Damage`.
+        // `dir`/`point` are bg-visible raw pointers, and the ported body takes
+        // `dir: Option<&mut vec3_t>` and `point` by value.
+        // Every bg caller passes `dir = null` and a non-null `point`.
+        // Source: `oracle/codemp/game/g_combat.c` (`G_Damage`).
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -486,11 +493,14 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         dflags: c_int,
         mod_: c_int,
     ) {
-        // Delegates to `G_DamageFromKiller(pEnt, pVehEnt, attacker, org, ...)`: the
-        // bg-visible `targNum`->`pEnt`, `inflictorNum`->`pVehEnt`, `attackerNum`->
-        // `attacker`. `killerNum` is not a body parameter — `G_DamageFromKiller`
-        // initializes `killer = attacker` internally (bg passes it equal to
-        // `attackerNum`); `dir` is unused (bg passes null). `point`->`org` by value.
+        // Delegates to `G_DamageFromKiller(pEnt, pVehEnt, attacker, org, ...)`.
+        // The bg-visible names map as `targNum`->`pEnt`, `inflictorNum`->`pVehEnt`,
+        // `attackerNum`->`attacker`.
+        // `killerNum` is not a body parameter.
+        // `G_DamageFromKiller` initializes `killer = attacker` internally, and bg
+        // passes `killerNum` equal to `attackerNum`.
+        // `dir` is unused because bg passes null.
+        // `point` maps to `org` by value.
         // Source: `oracle/codemp/game/g_combat.c` (`G_DamageFromKiller`).
         let _ = (killerNum, dir);
         unsafe {
@@ -517,7 +527,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn add_event(&mut self, entNum: c_int, event: c_int, eventParm: c_int) {
-        // `G_AddEvent` is ctx-free and takes a `gentity_t*`; resolve `entNum`.
+        // `G_AddEvent` is ctx-free and takes a `gentity_t*`.
+        // Resolve `entNum`.
         // Source: `oracle/codemp/game/g_utils.c` (`G_AddEvent`).
         unsafe {
             let ent = &mut (*self.world).g_entities.entities[entNum as usize] as *mut gentity_t;
@@ -531,11 +542,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { (*self.world).g_entities.entities[entNum as usize].s.torsoAnim }
     }
     fn alloc(&mut self, size: c_int) -> *mut c_void {
-        // `G_Alloc` bumps the game pool via `ctx.world`; rebuild the ctx from the
-        // impl's owned `world`/`engine` (STATE-D6 leaf reborrow).
+        // `G_Alloc` bumps the game pool through `ctx.world`.
+        // Rebuild the ctx from the impl's owned `world`/`engine`.
         // Source: `oracle/codemp/game/g_mem.c` (`G_Alloc`).
-        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
-        // single-threaded module, no live sibling borrow across this call.
+        // SAFETY: seam reborrow of the impl's owned world island.
+        // Single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
@@ -543,11 +554,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         G_Alloc(&mut ctx, size)
     }
     fn new_string(&mut self, string: &str) -> *mut c_char {
-        // `prefix_string` stores the copy in `ctx.world`'s level-lifetime prefix
-        // arena (replacing `G_NewString`'s pool copy) and returns the slot pointer.
+        // `prefix_string` stores the copy in `ctx.world`'s level-lifetime prefix arena,
+        // replacing `G_NewString`'s pool copy, and returns the slot pointer.
         // Source: `oracle/codemp/game/g_spawn.c:724-749` (`G_NewString`).
-        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
-        // single-threaded module, no live sibling borrow across this call.
+        // SAFETY: seam reborrow of the impl's owned world island.
+        // Single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
@@ -555,16 +566,17 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         ctx.prefix_string(string)
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
-        // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
-        // temp-entity return is discarded (as at the bg call sites).
+        // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value.
+        // The spawned temp-entity return is discarded, as at the bg call sites.
         // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffect`).
         unsafe {
             G_PlayEffect(fxID, *org, *ang);
         }
     }
     fn play_effect_id(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) -> c_int {
-        // `G_PlayEffectID` returns the spawned temp-entity; the bg-visible upcall
-        // yields its entity number (`ENTITYNUM_NONE` when none was spawned).
+        // `G_PlayEffectID` returns the spawned temp-entity.
+        // The bg-visible upcall yields its entity number (`ENTITYNUM_NONE` when none
+        // was spawned).
         // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffectID`).
         unsafe {
             let te = G_PlayEffectID(fxID, *org, *ang);
@@ -608,8 +620,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.
         // Source: `oracle/codemp/game/g_active.c` (`G_CheapWeaponFire`).
-        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
-        // single-threaded module, no live sibling borrow across this call.
+        // SAFETY: seam reborrow of the impl's owned world island.
+        // Single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
@@ -617,7 +629,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         G_CheapWeaponFire(&mut ctx, entNum, weapon);
     }
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int) {
-        // Raven `Client_CheckImpactBBrush(self, other)`; resolve both nums.
+        // Raven `Client_CheckImpactBBrush(self, other)`.
+        // Resolve both nums.
         // Source: `oracle/codemp/game/g_active.c` (`Client_CheckImpactBBrush`).
         unsafe {
             let mut ctx = GameContext {
@@ -640,10 +653,10 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     ) {
         // Resolve `entNum`->vehicle gentity, rebuild `ctx`, and delegate to
         // `G_FlyVehicleSurfaceDestruction` with the bg-supplied impact `trace` and
-        // `force` flag. Source: `oracle/codemp/game/g_vehicles.c:3190`;
-        // `bg_slidemove.c:472`.
-        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
-        // single-threaded module, no live sibling borrow across this call.
+        // `force` flag.
+        // Source: `oracle/codemp/game/g_vehicles.c:3190`; `bg_slidemove.c:472`.
+        // SAFETY: seam reborrow of the impl's owned world island.
+        // Single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
@@ -659,8 +672,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         setAnimFlags: c_int,
         blendTime: c_int,
     ) {
-        // `G_SetAnim` takes a `gentity_t*` + the module `GameContext`; resolve
-        // `entNum`, rebuild `ctx`, and pass the bg-owned `ucmd` through.
+        // `G_SetAnim` takes a `gentity_t*` and the module `GameContext`.
+        // Resolve `entNum`, rebuild `ctx`, and pass the bg-owned `ucmd` through.
         // Source: `g_utils.c` (`G_SetAnim`).
         unsafe {
             let mut ctx = GameContext {
@@ -681,8 +694,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int) {
-        // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)`;
-        // resolve `entNum` and rebuild `ctx`. Source: `npc.cpp` (`NPC_SetAnim`).
+        // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)`.
+        // Resolve `entNum` and rebuild `ctx`.
+        // Source: `npc.cpp` (`NPC_SetAnim`).
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -699,7 +713,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         pilotEntNum: c_int,
         camPos: *mut vec3_t,
     ) {
-        // Resolves the vehicle + pilot nums against the world arena, rebuilds the
+        // Resolves the vehicle and pilot nums against the world arena, rebuilds the
         // module `GameContext`, and delegates to the ported `WP_GetVehicleCamPos`.
         // Source: `oracle/codemp/game/g_weapon.c:3961-4020`.
         unsafe {
@@ -715,7 +729,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
-        // Raven `G_CanBeEnemy(self, enemy)`; resolve both nums.
+        // Raven `G_CanBeEnemy(self, enemy)`.
+        // Resolve both nums.
         // Source: `oracle/codemp/game/w_saber.c` (`G_CanBeEnemy`).
         unsafe {
             let mut ctx = GameContext {
@@ -734,9 +749,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { (*self.world).level.time }
     }
     fn try_grapple(&mut self, entNum: c_int) -> qboolean {
-        // Resolves `entNum` against the world arena, rebuilds the module
-        // `GameContext` from the handles this impl holds, and delegates to the
-        // ported `TryGrapple` body.
+        // Resolves `entNum` against the world arena and rebuilds the module
+        // `GameContext` from the handles this impl holds.
+        // Delegates to the ported `TryGrapple` body.
         // Source: `oracle/codemp/game/g_cmds.c:3148-3191` (`TryGrapple`).
         unsafe {
             let mut ctx = GameContext {
@@ -749,11 +764,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: &str) {
-        // `Q3_SetParm` takes `entID` as a raw index and resolves it internally; it
-        // still takes a `*const c_char`, so re-encode the `&str` for the call.
+        // `Q3_SetParm` takes `entID` as a raw index and resolves it internally.
+        // It still takes a `*const c_char`, so re-encode the `&str` for the call.
         // Source: `oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
-        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
-        // single-threaded module, no live sibling borrow across this call.
+        // SAFETY: seam reborrow of the impl's owned world island.
+        // Single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
@@ -761,10 +776,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         Q3_SetParm(&mut ctx, entID, parmNum, cstr(parmValue).as_ptr());
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
-        // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
-        // the world arena, rebuilds the module `GameContext` from the handles this
-        // impl holds, and delegates to `crate::veh_dispatch::board` (now that the
-        // dispatch chain threads `ctx`). Source: `oracle/codemp/game/g_vehicles.c:630`.
+        // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against the
+        // world arena.
+        // Rebuilds the module `GameContext` from the handles this impl holds and
+        // delegates to `crate::veh_dispatch::board`.
+        // Source: `oracle/codemp/game/g_vehicles.c:630`.
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -778,8 +794,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn update_vehicle(&mut self, vehEntNum: c_int, ucmd: *const usercmd_t) {
-        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
-        // generic-base `Update` dispatch. Source: `bg_pmove.c:10919-10944`.
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, and delegate to the
+        // generic-base `Update` dispatch.
+        // Source: `bg_pmove.c:10919-10944`.
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -791,8 +808,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn pm_animate_vehicle(&mut self, vehEntNum: c_int) {
-        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
-        // generic-base `Animate` dispatch. Source: `bg_pmove.c:10921-10945`.
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, and delegate to the
+        // generic-base `Animate` dispatch.
+        // Source: `bg_pmove.c:10921-10945`.
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -804,9 +822,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn update_rider(&mut self, vehEntNum: c_int, riderEntNum: c_int, ucmd: *mut usercmd_t) {
-        // Resolve the vehicle + rider. Driver path: bg passed `&pVeh->m_ucmd`.
+        // Resolve the vehicle and rider.
+        // Driver path: bg passed `&pVeh->m_ucmd`.
         // Passenger path: bg passes null, so guard `inuse && client` and use the
-        // rider's own `client->pers.cmd` (game-side). Source: `bg_pmove.c:10947-10961`.
+        // rider's own `client->pers.cmd` (game-side).
+        // Source: `bg_pmove.c:10947-10961`.
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -827,8 +847,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn attach_riders(&mut self, vehEntNum: c_int) {
-        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
-        // generic-base `AttachRiders` dispatch. Source: `bg_pmove.c:11146-11149`.
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, and delegate to the
+        // generic-base `AttachRiders` dispatch.
+        // Source: `bg_pmove.c:11146-11149`.
         unsafe {
             let mut ctx = GameContext {
                 world: &mut *self.world,
@@ -840,9 +861,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn my_saber(&mut self, client_num: c_int, saber_num: c_int) -> *mut saberInfo_t {
-        // Reproduces the QAGAME `BG_MySaber` body over the game arena: NULL
-        // unless the client is in use, has a `client`, and that saber has a
-        // model. Source: `oracle/codemp/game/bg_saber.c:4100-4141`.
+        // Reproduces the QAGAME `BG_MySaber` body over the game arena: NULL unless the
+        // client is in use, has a `client`, and that saber has a model.
+        // Source: `oracle/codemp/game/bg_saber.c:4100-4141`.
         unsafe {
             let ent = &(*self.world).g_entities.entities[client_num as usize] as *const gentity_t;
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
@@ -870,9 +891,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         self_num: c_int,
         gametype: c_int,
     ) -> qboolean {
-        // `PM_CrashLand` landed-vehicle gate, verbatim over the game arena;
-        // `gametype` is read bg-side (`pm->gametype`) and passed in. Source:
-        // `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
+        // `PM_CrashLand` landed-vehicle gate, verbatim over the game arena.
+        // `gametype` is read bg-side (`pm->gametype`) and passed in.
+        // Source: `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
         unsafe {
             let trEnt = &(*self.world).g_entities.entities[tr_ent_num as usize] as *const gentity_t;
             let veh = (*trEnt).m_pVehicle;
@@ -927,8 +948,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         veh_weapon: c_int,
         weapon_type: c_int,
     ) {
-        // `PM_VehicleImpact` knockdown: the three `gclient_t` killer-credit
-        // fields (not on `ps`). Source: `oracle/codemp/game/bg_slidemove.c:402-542`.
+        // `PM_VehicleImpact` knockdown: the three `gclient_t` killer-credit fields, not
+        // on `ps`.
+        // Source: `oracle/codemp/game/bg_slidemove.c:402-542`.
         unsafe {
             let client = (*self.world).g_entities.entities[ent_num as usize].client;
             (*client).otherKillerMOD = mod_;
@@ -953,10 +975,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean {
         // Reproduces the inline `FighterIsLanded(hitEnt->m_pVehicle,
-        // hitEnt->playerState)` over the game arena; the bg-side
-        // `!playerState.is_null()` gate short-circuits before this call.
-        // Source: `oracle/codemp/game/bg_slidemove.c:313-398`;
-        // `oracle/codemp/game/FighterNPC.c:300-308`.
+        // hitEnt->playerState)` over the game arena.
+        // The bg-side `!playerState.is_null()` gate short-circuits before this call.
+        // Source: `oracle/codemp/game/bg_slidemove.c:313-398`; `oracle/codemp/game/FighterNPC.c:300-308`.
         unsafe {
             let ent = &(*self.world).g_entities.entities[veh_ent_num as usize] as *const gentity_t;
             FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
@@ -964,7 +985,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn entity_sound(&mut self, ent_num: c_int, channel: c_int, sound_index: c_int) {
         // QAGAME island in the moved fighter `ProcessMoveCommands` (takeoff/turbo
-        // sounds); resolve `ent_num`, rebuild `ctx`, delegate to `G_EntitySound`.
+        // sounds).
+        // Resolve `ent_num`, rebuild `ctx`, delegate to `G_EntitySound`.
         // Source: `oracle/codemp/game/FighterNPC.c:463,512`.
         unsafe {
             let mut ctx = GameContext {
@@ -977,8 +999,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn fighter_is_in_space(&mut self, ent_num: c_int) -> qboolean {
-        // `FighterIsInSpace` is `#ifdef QAGAME` (reads `client->inSpaceIndex`);
-        // resolve `ent_num` and delegate the read-only check.
+        // `FighterIsInSpace` is `#ifdef QAGAME` (reads `client->inSpaceIndex`).
+        // Resolve `ent_num` and delegate the read-only check.
         // Source: `oracle/codemp/game/FighterNPC.c:275-287`.
         unsafe {
             let ent = &(*self.world).g_entities.entities[ent_num as usize];
@@ -987,8 +1009,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn veh_turbo_start_fx(&mut self, veh_ent_num: c_int) {
         // The `#ifdef QAGAME` turbo-start effect loop from the moved speeder
-        // `ProcessMoveCommands`; it reaches the parent's `ghoul2`/`modelScale`,
-        // so it lives game-side. Raven: "fine, I'll use a tempent for this, but
+        // `ProcessMoveCommands`.
+        // It reaches the parent's `ghoul2`/`modelScale`, so it lives game-side.
+        // Raven: "fine, I'll use a tempent for this, but
         // only because it's played only once at the start of a turbo."
         // Source: `oracle/codemp/game/SpeederNPC.c:350-371`.
         unsafe {
@@ -1038,7 +1061,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                         Eorientations::ORIGIN as c_int,
                         &mut boltOrg,
                     );
-                    // Raven fills boltDir from ORIGIN too (not a direction); preserved.
+                    // Raven fills boltDir from ORIGIN too, not a direction.
                     // Source: oracle/codemp/game/SpeederNPC.c:366-367
                     BG_GiveMeVectorFromMatrix(
                         &boltMatrix,
@@ -1053,7 +1076,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn veh_fighter_crash_suicide(&mut self, parent_ent_num: c_int) {
         // The `#ifdef QAGAME` land-while-broken suicide from the moved fighter
-        // `FighterDamageRoutine`; the NULL attacker is preserved as `None`.
+        // `FighterDamageRoutine`.
+        // The NULL attacker maps to `None`.
         // Source: `oracle/codemp/game/FighterNPC.c:1021-1032`.
         unsafe {
             let mut ctx = GameContext {
@@ -1078,12 +1102,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
 
     // ---------------------------------------------------------------------
-    // DEC-36 D5 — per-module bg arms, QAGAME side.
+    // DEC-36 D5: per-module bg arms, QAGAME side.
     //
-    // Each method below reproduces this module's `#ifdef` arm exactly. Where
-    // Raven's QAGAME arm is empty — a commented-out call, or an `#ifdef` chain
-    // with no QAGAME branch — the body is empty and the destination slot is
-    // left untouched, matching the game DLL byte for byte.
+    // Each method below reproduces this module's `#ifdef` arm exactly.
+    // Where Raven's QAGAME arm is empty, for example a commented-out call or an
+    // `#ifdef` chain with no QAGAME branch, the body is empty.
+    // The destination slot stays untouched, matching the game DLL byte for byte.
     // ---------------------------------------------------------------------
 
     fn veh_field_model(&mut self, value: &str, dest: *mut c_int) {
@@ -1092,8 +1116,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { *dest = self.model_index(value) }
     }
     fn veh_field_model_client(&mut self, value: &str, dest: *mut c_int) {
-        // QAGAME: the `G_ModelIndex` store is commented out under `#elif QAGAME`
-        // — the game module writes nothing.
+        // QAGAME: the `G_ModelIndex` store is commented out under `#elif QAGAME`.
+        // The game module writes nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:238-246,912-920`
     }
     fn veh_field_effect(&mut self, value: &str, dest: *mut c_int) {
@@ -1102,17 +1126,18 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { *dest = self.effect_index(value) }
     }
     fn veh_field_effect_client(&mut self, value: &str, dest: *mut c_int) {
-        // QAGAME: the `G_EffectIndex` store is commented out under `#elif QAGAME`
-        // — the game module writes nothing.
+        // QAGAME: the `G_EffectIndex` store is commented out under `#elif QAGAME`.
+        // The game module writes nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:254-262,928-936`
     }
     fn veh_field_shader(&mut self, value: &str, dest: *mut c_int) {
-        // The `#ifdef WE_ARE_IN_THE_UI`/`#elif CGAME` chain has no QAGAME arm —
-        // the game module writes nothing.
+        // The `#ifdef WE_ARE_IN_THE_UI`/`#elif CGAME` chain has no QAGAME arm.
+        // The game module writes nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:263-269,937-943`
     }
     fn veh_field_shader_nomip(&mut self, value: &str, dest: *mut c_int) {
-        // Guarded `#ifndef QAGAME` — the game module writes nothing.
+        // Guarded `#ifndef QAGAME`.
+        // The game module writes nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:270-274,944-948`
     }
     fn veh_field_sound(&mut self, value: &str, dest: *mut c_int) {
@@ -1121,21 +1146,24 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { *dest = self.sound_index(value) }
     }
     fn veh_field_sound_client(&mut self, value: &str, dest: *mut c_int) {
-        // QAGAME: the `G_SoundIndex` store is commented out under `#elif QAGAME`
-        // — the game module writes nothing.
+        // QAGAME: the `G_SoundIndex` store is commented out under `#elif QAGAME`.
+        // The game module writes nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:282-290,956-964`
     }
     fn veh_weapon_homing_precache(&mut self) {
-        // Raven: "Hmm, no need fo have server register this, is there?" — both
-        // `G_SoundIndex` calls are commented out; the game registers nothing.
+        // Raven: "Hmm, no need fo have server register this, is there?"
+        // Both `G_SoundIndex` calls are commented out.
+        // The game registers nothing.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:390-409`
     }
     fn vehicle_skin_precache(&mut self, model: &str, skin: &str) {
-        // Guarded `#ifndef QAGAME` — the game registers no vehicle skin.
+        // Guarded `#ifndef QAGAME`.
+        // The game registers no vehicle skin.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:1293-1299`
     }
     fn vehicle_load_precache(&mut self, hideRider: qboolean) {
-        // QAGAME arm; `hideRider` gates cgame-only radar shaders.
+        // QAGAME arm.
+        // `hideRider` gates cgame-only radar shaders.
         // Source: `oracle/codemp/game/bg_vehicleLoad.c:1336-1359`
         self.effect_index("volumetric/black_smoke");
         self.effect_index("ships/fire");
@@ -1147,9 +1175,10 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         (0, String::new())
     }
     fn siege_class_shader(&mut self, class_shader: &str, class_name: &str) -> (c_int, bool) {
-        // QAGAME: `classShader = 0` — the shader is never registered server-side.
-        // The `#ifdef QAGAME` arm has no `else` gate, so the class-determination
-        // block runs unconditionally.
+        // QAGAME: `classShader = 0`.
+        // The shader is never registered server-side.
+        // The `#ifdef QAGAME` arm has no `else` gate, so the class-determination block
+        // runs unconditionally.
         // Source: `oracle/codemp/game/bg_saga.c:994-1039`
         (0, true)
     }

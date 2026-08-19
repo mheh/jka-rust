@@ -1,39 +1,27 @@
-// PORT-COMPLETE: NPC_reactions.c
-//! Port of `oracle/codemp/game/NPC_reactions.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_reactions.c`.
 //!
-//! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
-//! jampgame mega-pass (settled fork rulings,
-//! `docs/handoffs/jampgame-fork-discovery.md`).
+//! This file follows the calling convention in `docs/architecture/engine-seam.md` (precedent `w_force.rs`/`NPC_utils.rs`).
+//! Functions that reach `level`, cvars, or traps thread the `GameContext<'_>` receiver as an additive first parameter.
+//! The receiver is `.world: &mut GameWorld` and `.engine`.
+//! The C signature carries none of this.
+//! `level` becomes `ctx.world.level`, and cvars become `ctx.world.cvars`.
+//! Traps go through `trap::X(ctx.engine, ...)`.
+//! Cross-file callees take raw-pointer signatures verbatim, because their own files use the same calling convention.
+//! Raw `gNPC_t*`/`gclient_t*` chains stay `unsafe` raw-pointer field access that mirrors the C exactly.
+//! `gentity_t::NPC` is `*mut gNPC_t`, and `::client` is a BG_Alloc'd pool `*mut gclient_t`.
 //!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
-//! `w_force.rs`/`NPC_utils.rs`): logic fns that reach `level`/cvars/traps
-//! thread the `GameContext<'_>` receiver (`.world: &mut GameWorld`, `.engine`)
-//! as an ADDITIVE first parameter (the faithful C signature carries none).
-//! `level` → `ctx.world.level`, cvars → `ctx.world.cvars`. Traps go
-//! through `trap::X(ctx.engine, …)`. Cross-file callees are invoked with the
-//! packet's resolved raw-pointer signatures verbatim (their own porters
-//! thread the spine). Raw `gNPC_t*`/`gclient_t*` chains are transcribed as
-//! `unsafe` raw-pointer field access mirroring the C exactly (`gentity_t::NPC`
-//! is `*mut gNPC_t`, `::client` is a BG_Alloc'd pool `*mut gclient_t`).
+//! Ambient-state resolution: the bot-AI "current actor" globals that Raven's `ai_main.c` think loop sets per frame (`NPC`, `NPCInfo`).
+//! These are threaded as `ctx.world.globals.NPC` and `.NPCInfo`.
+//! `NPC_ChoosePainAnimation` indexes the runtime-populated `bgAllAnims`/`bgHumanoidAnimations` tables through `ctx.world.bg_state`.
+//! `NPC_Respond`'s droid-class `va(fmt, ...)` sound-path calls are ported through `format!()`.
+//! They format one `int`, so the string is byte-identical to Raven's.
 //!
-//! Ambient-state resolution (formerly parked topics, now bodied): the bot-AI
-//! "current actor" globals Raven's `ai_main.c` think-loop sets per frame
-//! (`NPC`, `NPCInfo`) are threaded as `ctx.world.globals.NPC` /
-//! `.NPCInfo`; `NPC_ChoosePainAnimation` indexes the runtime-populated
-//! `bgAllAnims`/`bgHumanoidAnimations` tables through `ctx.world.bg_state`;
-//! and `NPC_Respond`'s droid-class `va(fmt, …)` sound-path calls are ported
-//! faithfully via `format!()` (they format one `int`, so the string is
-//! byte-identical to Raven's).
-//!
-//! Safe-state migration **Stage 2c** (deref-regime conversion): entity-pointer
-//! params are `EntityId` / `Option<EntityId>` handles (§B5), and every entity
-//! field read/write goes through a checked `ctx.world.entity(id)` /
-//! `entity_mut(id)` borrow at the point of use — the fn-top `STAGE-1` raw
-//! re-derives are gone. The remaining `unsafe` derefs are the sanctioned raw
-//! ones the recipe keeps: `gNPC_t` (`gentity_t::NPC` / `globals.NPCInfo`, which
-//! have no accessor) and BG_Alloc'd pool clients (`gentity_t::client`, `gClPtrs`
-//! — never `level.clients`), each read through a copied pointer value in a
-//! tight, FLAGged `unsafe` block. Behavior is byte-identical, referee-verified.
+//! Entity-pointer params are `EntityId`/`Option<EntityId>` handles (§B5), not raw `gentity_t*`.
+//! Entity fields are read and written through a checked `ctx.world.entity(id)`/`entity_mut(id)` borrow at the point of use.
+//! The only raw derefs left carry a one-line `FLAG` comment, and each is a sanctioned category.
+//! `gNPC_t` (`gentity_t::NPC`/`globals.NPCInfo`) has no accessor.
+//! An NPC entity carries a BG_Alloc'd pool client (`gentity_t::client`, `gClPtrs`) for which `level.clients` is not valid.
+//! Each of these reads through a copied pointer value in a tight, FLAGged `unsafe` block.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -60,11 +48,11 @@ use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:42-131`
 pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: c_int) {
-    // `mod` is a plain c_int, so keep a local c_int alias sourced from the
-    // canonical meansOfDeath_t. Source: `oracle/codemp/game/bg_public.h:1046-1099`
+    // `mod` is a plain c_int, so this keeps a local alias sourced from the canonical meansOfDeath_t.
+    // Source: `oracle/codemp/game/bg_public.h:1046-1099`
     const MOD_SABER: c_int = meansOfDeath_t::MOD_SABER as c_int;
 
-    // valid ent
+    //valid ent - FIXME: a VALIDENT macro would be nice here
     let Some(other_id) = other else {
         return;
     };
@@ -90,7 +78,7 @@ pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: 
         return;
     }
 
-    // We have an enemy, see if he's dead
+    // we have an enemy, see if he's dead
     if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
         if ctx.world.entity(enemy_id).health <= 0 {
             G_ClearEnemy(ctx, npc_id);
@@ -105,32 +93,35 @@ pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: 
     }
 
     // Check if we're a Jedi
-    // §19: Raven derefs `NPC->client` unconditionally; the null guard is
-    // defensive (NPCs always have a client here). Source: NPC_reactions.c:89.
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // §19: Raven derefs `NPC->client` unconditionally.
+    // The null guard is defensive, because NPCs always have a client here.
+    // Source: NPC_reactions.c:89.
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     let is_jedi_saber = !client.is_null() && unsafe { (*client).ps.weapon } == WP_SABER;
     if is_jedi_saber {
         // I'm a jedi
         if r#mod == MOD_SABER {
-            // Always switch to this enemy if I'm a jedi and hit by another saber
+            // always switch to this enemy if I'm a jedi and hit by another saber
             G_ClearEnemy(ctx, npc_id);
             G_SetEnemy(ctx, npc_id, Some(other_id));
             return;
         }
     }
 
-    // Special case player interactions (entity 0 is the player)
+    // Special case player interactions
+    // Entity 0 is the player.
     if other_id == EntityId(0) {
         // Account for the skill level to skew the results
         let luck_threshold = match ctx.world.cvars.g_spskill.integer {
-            0 => 0.9f32, // Easiest difficulty
-            1 => 0.5f32, // Medium difficulty
-            _ => 0.0f32, // Hardest difficulty
+            0 => 0.9f32, // Easiest difficulty, mild chance of picking up the player
+            1 => 0.5f32, // Medium difficulty, half-half chance of picking up the player
+            _ => 0.0f32, // Hardest difficulty, always turn on attacking player
         };
 
-        // Randomly pick up the target. Raven `random()` is already in [0,1);
-        // `Rng::random` matches it, so no extra /32768 normalization.
+        // Randomly pick up the target
+        // Raven's `random()` is already in [0,1).
+        // `Rng::random` matches it, so this needs no extra /32768 normalization.
         if ctx.world.bg_state.rng.random() > luck_threshold {
             G_ClearEnemy(ctx, other_id);
             ctx.world.entity_mut(other_id).enemy = Some(npc_id);
@@ -142,14 +133,14 @@ pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: 
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:133-149`
 pub fn NPC_SetPainEvent(ctx: &mut GameContext, self_: EntityId) {
-    // FLAG: gNPC_t deref stays raw (recipe 2c).
+    // FLAG: gNPC_t deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     // Raven: `!self->NPC || !(self->NPC->aiFlags&NPCAI_DIE_ON_IMPACT)`.
     // NPCAI_DIE_ON_IMPACT resolves through the prelude (crate::npc::ai_flags).
     // Source: oracle/codemp/game/b_public.h:23
     let enter = npc.is_null() || unsafe { ((*npc).aiFlags & NPCAI_DIE_ON_IMPACT) == 0 };
     if enter {
-        // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+        // FLAG: pool client (gClPtrs) deref stays raw.
         let client = ctx.world.entity(self_).client;
         let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
         let pending = trap::ICARUS_TaskIDPending(
@@ -179,7 +170,7 @@ pub fn NPC_GetPainChance(ctx: &mut GameContext, self_: EntityId, damage: c_int) 
         return 1.0f32;
     }
 
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return 1.0f32;
@@ -203,7 +194,8 @@ pub fn NPC_GetPainChance(ctx: &mut GameContext, self_: EntityId, damage: c_int) 
             pain_chance *= 0.5f32;
         }
         _ => {
-            //hard (also default)
+            //hard
+            // The `_` arm covers Raven's explicit `case 2` and `default`.
             pain_chance *= 0.1f32;
         }
     }
@@ -223,21 +215,21 @@ pub fn NPC_ChoosePainAnimation(
     hitLoc: c_int,
     voiceEvent: c_int,
 ) {
-    // Pain-anim numbers are `animNumber_t` variants; keep local c_int
-    // aliases because `pain_anim` and `BG_PickAnim` operate in c_int.
+    // Pain-anim numbers are `animNumber_t` variants.
+    // This keeps local c_int aliases, because `pain_anim` and `BG_PickAnim` operate in c_int.
     // Source: `oracle/codemp/game/anims.h:6-1791`
     const BOTH_PAIN1: c_int = animNumber_t::BOTH_PAIN1 as c_int;
     const BOTH_PAIN2: c_int = animNumber_t::BOTH_PAIN2 as c_int;
     const BOTH_PAIN3: c_int = animNumber_t::BOTH_PAIN3 as c_int;
     const BOTH_PAIN18: c_int = animNumber_t::BOTH_PAIN18 as c_int;
-    // `mod` is a plain c_int; alias the canonical meansOfDeath_t variants.
+    // `mod` is a plain c_int.
+    // This aliases the canonical meansOfDeath_t variants.
     // Source: `oracle/codemp/game/bg_public.h:1046-1099`
     const MOD_MELEE: c_int = meansOfDeath_t::MOD_MELEE as c_int;
     const MOD_CRUSH: c_int = meansOfDeath_t::MOD_CRUSH as c_int;
-    // `HL_GENERIC1` (top-of-file import), `SETANIM_*` (mp_bg set_anim),
-    // `WP_SABER`/`WP_THERMAL` (mp_bg weapon_t), `NPCTEAM_PLAYER`
-    // (crate::teams::npcteam) and the `CLASS_*` `class_t` variants all
-    // resolve through the prelude — no local placeholders.
+    // `HL_GENERIC1` (top-of-file import), `SETANIM_*` (mp_bg set_anim), and `WP_SABER`/`WP_THERMAL` (mp_bg weapon_t) resolve through the prelude.
+    // `NPCTEAM_PLAYER` (crate::teams::npcteam) and the `CLASS_*` `class_t` variants also resolve through the prelude.
+    // This file needs no local placeholders for them.
 
     // If we've already taken pain, then don't take it again
     if ctx.world.level.time < ctx.world.entity(self_).painDebounceTime && r#mod != MOD_MELEE {
@@ -245,48 +237,50 @@ pub fn NPC_ChoosePainAnimation(
     }
 
     if ctx.world.entity(self_).s.weapon == WP_THERMAL && !ctx.world.entity(self_).client.is_null() {
-        // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+        // FLAG: pool client (gClPtrs) deref stays raw.
         let client = ctx.world.entity(self_).client;
         if unsafe { (*client).ps.weaponTime } > 0 {
-            // Don't interrupt thermal throwing anim
+            //don't interrupt thermal throwing anim
             return;
         }
     }
 
-    // FLAG: pool client (gClPtrs) derefs below stay raw (recipe 2b).
+    // FLAG: pool client (gClPtrs) derefs below stay raw.
     let client = ctx.world.entity(self_).client;
     let mut pain_chance = 0.5f32;
 
     if !client.is_null() && unsafe { (*client).NPC_class } == CLASS_GALAKMECH {
         if hitLoc == HL_GENERIC1 {
-            // Hit the antenna!
+            //hit the antenna!
             pain_chance = 1.0f32;
         } else if ctx.world.entity(self_).health > 200 && damage < 100 {
-            // Have a lot of health
+            //have a *lot* of health
             pain_chance = 0.05f32;
         } else {
-            // The lower my health and greater the damage, the more likely I am to play a pain anim
+            //the lower my health and greater the damage, the more likely I am to play a pain anim
             let health = ctx.world.entity(self_).health;
             pain_chance = (200.0f32 - health as f32) / 100.0f32 + damage as f32 / 50.0f32;
         }
     } else if !client.is_null()
         && unsafe { (*client).playerTeam } == NPCTEAM_PLAYER
-        // playerTeam is npcteam_t (== c_int); NPCTEAM_PLAYER from prelude.
+        // playerTeam is npcteam_t (== c_int).
+        // NPCTEAM_PLAYER comes from the prelude.
         && other.is_some()
         && ctx.world.entity(other.unwrap()).s.number == 0
     {
-        // Ally shot by player always complains
+        //ally shot by player always complains
         pain_chance = 1.1f32;
     } else {
         if (other.is_some() && ctx.world.entity(other.unwrap()).s.weapon == WP_SABER)
             || r#mod == MOD_CRUSH
         {
-            pain_chance = 1.0f32; // Always take pain from saber
+            pain_chance = 1.0f32; //always take pain from saber
         } else if r#mod == MOD_MELEE {
-            // Higher in rank (skill) we are, less likely we are to be fazed by a punch
-            // §19: Raven derefs `self->NPC->rank` unconditionally; the null
-            // guard is defensive and picks 1.0. Source: NPC_reactions.c:257.
-            // FLAG: gNPC_t deref stays raw (recipe 2c).
+            //higher in rank (skill) we are, less likely we are to be fazed by a punch
+            // §19: Raven derefs `self->NPC->rank` unconditionally.
+            // The null guard is defensive and picks 1.0.
+            // Source: NPC_reactions.c:257.
+            // FLAG: gNPC_t deref stays raw.
             let npc = ctx.world.entity(self_).NPC;
             if !npc.is_null() {
                 pain_chance = 1.0f32
@@ -306,17 +300,18 @@ pub fn NPC_ChoosePainAnimation(
         }
     }
 
-    // See if we're going to flinch. Raven `random()` is already in [0,1);
-    // `Rng::random` matches it, so no extra /32768 normalization.
+    //See if we're going to flinch
+    // Raven's `random()` is already in [0,1).
+    // `Rng::random` matches it, so this needs no extra /32768 normalization.
     if ctx.world.bg_state.rng.random() < pain_chance {
         let mut pain_anim = -1;
 
-        // Pick and play our animation
+        //Pick and play our animation
         let gripped = !client.is_null()
             && unsafe { (*client).ps.fd.forceGripBeingGripped } < ctx.world.level.time as f32;
         if gripped {
-            // Not being force-gripped or force-drained
-            // FLAG: pool client (gClPtrs) derefs stay raw (recipe 2b).
+            //not being force-gripped or force-drained
+            // FLAG: pool client (gClPtrs) derefs stay raw.
             let legs_anim = unsafe { (*client).ps.legsAnim };
             let torso_anim = unsafe { (*client).ps.torsoAnim };
 
@@ -329,7 +324,7 @@ pub fn NPC_ChoosePainAnimation(
                         && mp_bg::bg_panimate::PM_InCartwheel(legs_anim) == qfalse)
             };
             if can_anim {
-                // Play an anim
+                //play an anim
                 let local_anim_index = ctx.world.entity(self_).localAnimIndex;
 
                 if !client.is_null() && unsafe { (*client).NPC_class } == CLASS_GALAKMECH {
@@ -342,7 +337,7 @@ pub fn NPC_ChoosePainAnimation(
                         BOTH_PAIN3,
                     );
                 } else if ctx.world.entity(self_).s.weapon == WP_SABER {
-                    // These are the only 2 pain anims that look good when holding a saber
+                    //temp HACK: these are the only 2 pain anims that look good when holding a saber
                     pain_anim = mp_bg::bg_panimate::BG_PickAnim(
                         &mut ctx.world.bg_state,
                         local_anim_index,
@@ -395,8 +390,9 @@ pub fn NPC_ChoosePainAnimation(
                 entity_event_t::EV_CHOKE1 as c_int,
                 entity_event_t::EV_CHOKE3 as c_int,
             );
-            // Being force-gripped. Oracle: `Q_irand(EV_CHOKE1, EV_CHOKE3)`
-            // (the BOTH_PAIN* anim numbers are unrelated).
+            // Being force-gripped.
+            // Oracle: `Q_irand(EV_CHOKE1, EV_CHOKE3)`.
+            // The BOTH_PAIN* anim numbers are unrelated.
             crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, voice_event, 0);
         }
 
@@ -405,8 +401,8 @@ pub fn NPC_ChoosePainAnimation(
         let num_frames = if pain_anim >= 0 {
             // Oracle: animLength = bgAllAnims[self->localAnimIndex].anims[pain_anim].numFrames
             //   * fabs((float)(bgHumanoidAnimations[pain_anim].frameLerp));
-            // numFrames comes from the skeleton-specific table, frameLerp from the
-            // humanoid table (they are intentionally different tables in the C source).
+            // numFrames comes from the skeleton-specific table, and frameLerp comes from the humanoid table.
+            // The two are intentionally different tables in the C source.
             let bg = &ctx.world.bg_state;
             let anims = bg.bgAllAnims[local_anim_index as usize].anims;
             unsafe {
@@ -415,9 +411,9 @@ pub fn NPC_ChoosePainAnimation(
                     as c_int
             }
         } else {
-            // §19: Raven indexes `anims[pain_anim]`/`bgHumanoidAnimations[pain_anim]`
-            // unconditionally, so pain_anim == -1 reads element [-1] (deterministic
-            // garbage animLength). We pick 0, so painDebounceTime = level.time.
+            // §19: Raven indexes `anims[pain_anim]`/`bgHumanoidAnimations[pain_anim]` unconditionally, so pain_anim == -1 reads element [-1].
+            // This is a deterministic garbage animLength.
+            // This picks 0, so painDebounceTime becomes level.time.
             // Source: `oracle/codemp/game/NPC_reactions.c:351`
             0
         };
@@ -436,12 +432,13 @@ pub fn NPC_ChoosePainAnimation(
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:363-529`
 pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
-    // `otherTeam` is npcteam_t (== c_int); keep TEAM_FREE (== 0) local.
+    // `otherTeam` is npcteam_t (== c_int).
+    // This keeps TEAM_FREE (== 0) local.
     const TEAM_FREE: c_int = 0;
-    // BSET_* are bSet_t variants but G_ActivateBehavior takes c_int; PM_DEAD
-    // is a pmtype_t variant compared against the c_int `pm_type` field; and
-    // EV_FFWARN is the absolute entity_event_t value G_AddVoiceEvent
-    // consumes — alias each from its canonical enum so values track the port.
+    // BSET_* are bSet_t variants, but G_ActivateBehavior takes c_int.
+    // PM_DEAD is a pmtype_t variant compared against the c_int `pm_type` field.
+    // EV_FFWARN is the absolute entity_event_t value that G_AddVoiceEvent consumes.
+    // This file aliases each from its canonical enum, so the values track the port.
     // Source: bSet_t `oracle/codemp/game/g_public.h:641-664`,
     // pmtype_t `oracle/codemp/game/bg_public.h:360-370`,
     // entity_event_t `oracle/codemp/game/bg_public.h:745-990`.
@@ -459,7 +456,7 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     let mut point = [0.0f32; 3];
     crate::q_math::_VectorCopy(ctx.world.globals.gPainPoint, &mut point);
 
-    // FLAG: gNPC_t deref stays raw (recipe 2c).
+    // FLAG: gNPC_t deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     if npc.is_null() {
         return;
@@ -469,9 +466,10 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         return;
     };
 
-    // §19: Raven derefs `self->client->ps.pm_type` unconditionally; the null
-    // guard is defensive. Source: NPC_reactions.c:381.
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // §19: Raven derefs `self->client->ps.pm_type` unconditionally.
+    // The null guard is defensive.
+    // Source: NPC_reactions.c:381.
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
     if !client.is_null() && unsafe { (*client).ps.pm_type } == PM_DEAD {
         return;
@@ -481,8 +479,8 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         return;
     }
 
-    // Ignore damage from your own team for now
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    //MCG: Ignore damage from your own team for now
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let other_client = ctx.world.entity(other_id).client;
     if !other_client.is_null() {
         other_team = unsafe { (*other_client).playerTeam };
@@ -493,17 +491,21 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         && !other_client.is_null()
         && other_team == unsafe { (*client).playerTeam }
     {
-        // Hit by a teammate. Oracle uses `self`/`other`, not the ambient
-        // `NPC` global (SetNPCGlobals(self) is not called until later).
+        //hit by a teammate
+        // Oracle uses `self`/`other`, not the ambient `NPC` global, because SetNPCGlobals(self) is not called until later.
         let self_enemy = ctx.world.entity(self_).enemy;
         let other_enemy = ctx.world.entity(other_id).enemy;
 
         if self_enemy != Some(other_id) && other_enemy != Some(self_) {
-            // We weren't already enemies
+            //we weren't already enemies
             if self_enemy.is_some() || other_enemy.is_some() {
-                // If one of us actually has an enemy already, it's okay, just an accident
+                //if one of us actually has an enemy already, it's okay, just an accident OR
+                //wasn't hit by player or someone controlled by player OR
+                //player hit ally and didn't get 25% chance of getting mad (FIXME:accumulate anger+base on diff?)
+                //FIXME: player should have to do a certain amount of damage to ally or hit them several times to make them mad
+                //Still run pain and flee scripts
                 if !client.is_null() && !npc.is_null() {
-                    // Run any pain instructions
+                    //Run any pain instructions
                     let health = ctx.world.entity(self_).health;
                     let max_third =
                         unsafe { (*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] } / 3;
@@ -542,14 +544,14 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
                 return;
             } else if !npc.is_null() && ctx.world.entity(other_id).s.number == 0 {
                 // NPC hit by player
-                // FLAG: gNPC_t derefs stay raw (recipe 2c).
+                // FLAG: gNPC_t derefs stay raw.
                 if unsafe { (*npc).charmedTime } != 0 {
-                    // Mindtricked
+                    //mindtricked
                     return;
                 } else if unsafe { (*npc).ffireCount }
                     < 3 + ((2 - ctx.world.cvars.g_spskill.integer) * 2)
                 {
-                    // Not mad enough yet
+                    //not mad enough yet
                     if damage != -1 {
                         if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                             NPC_ChoosePainAnimation(
@@ -577,10 +579,11 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
                     }
                     return;
                 } else if G_ActivateBehavior(ctx, Some(self_), BSET_FFIRE) != 0 {
-                    // We have a specific script to run
+                    //we have a specific script to run, so do that instead
                     return;
                 } else {
-                    // Turn on our ally
+                    //okay, we're going to turn on our ally, we need to set and lock our enemy and put ourselves in a bstate that lets us attack him
+                    //(and clear any flags that would stop us)
                     unsafe {
                         (*npc).blockedSpeechDebounceTime = 0;
                     }
@@ -614,14 +617,15 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     SaveNPCGlobals(ctx);
     SetNPCGlobals(ctx, self_);
 
-    // Do extra bits
-    // §19: Raven derefs `NPCInfo->ignorePain` unconditionally (SetNPCGlobals
-    // just set it); the null guard is defensive. Source: NPC_reactions.c:494.
-    // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
+    //Do extra bits
+    // §19: Raven derefs `NPCInfo->ignorePain` unconditionally, because SetNPCGlobals just set it.
+    // The null guard is defensive.
+    // Source: NPC_reactions.c:494.
+    // FLAG: gNPC_t (NPCInfo) derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
     if !npc_info_ptr.is_null() && unsafe { (*npc_info_ptr).ignorePain } == 0 {
         unsafe {
-            (*npc_info_ptr).confusionTime = 0; // Clear any charm or confusion
+            (*npc_info_ptr).confusionTime = 0; //clear any charm or confusion, regardless
         }
         if damage != -1 {
             NPC_ChoosePainAnimation(
@@ -672,10 +676,9 @@ pub fn NPC_Touch(
     other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
-    // MAX_CLIENTS_I32 (mp_qshared limits, == 32) and NPCAI_TOUCHED_GOAL
-    // (crate::npc::ai_flags, == 0x8) resolve through the prelude.
+    // MAX_CLIENTS_I32 (mp_qshared limits, == 32) and NPCAI_TOUCHED_GOAL (crate::npc::ai_flags, == 0x8) resolve through the prelude.
 
-    // FLAG: gNPC_t deref stays raw (recipe 2c).
+    // FLAG: gNPC_t deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     if npc.is_null() {
         return;
@@ -684,26 +687,26 @@ pub fn NPC_Touch(
     SaveNPCGlobals(ctx);
     SetNPCGlobals(ctx, self_);
 
-    // Raven derefs the touch `other` unconditionally below (never null on a
-    // touch callback); resolve the handle once.
+    // Raven derefs the touch `other` unconditionally below (never null on a touch callback).
+    // This resolves the handle once.
     let other_id = other.unwrap();
 
-    // I am dead and carrying a key
+    //I am dead and carrying a key
     if ctx.world.entity(self_).message.is_some() && ctx.world.entity(self_).health <= 0 {
-        // Player touched me
-        // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+        //player touched me
+        // FLAG: pool client (gClPtrs) deref stays raw.
         let other_client = ctx.world.entity(other_id).client;
         if !other_client.is_null() && ctx.world.entity(other_id).s.number < MAX_CLIENTS_I32 {
-            // Placeholder: would handle key pickup here (commented out in oracle)
+            // This body is empty, because Raven's key-pickup logic here is commented out in the oracle.
         }
     }
 
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let other_client = ctx.world.entity(other_id).client;
     if !other_client.is_null() {
         // Other has a client (is a player)
         if ctx.world.entity(other_id).health > 0 {
-            // FLAG: gNPC_t (NPCInfo) deref stays raw (recipe 2c).
+            // FLAG: gNPC_t (NPCInfo) deref stays raw.
             let npc_info_ptr = ctx.world.globals.NPCInfo;
             if !npc_info_ptr.is_null() {
                 unsafe {
@@ -721,16 +724,16 @@ pub fn NPC_Touch(
             }
         }
 
-        // Check for enemy collision. Oracle's only active test is
-        // `!(other->flags & FL_NOTARGET)`; the SVF_IGNORE_ENEMIES clause is
-        // commented out there, so it is not reintroduced here.
+        // Check for enemy collision.
+        // Oracle's only active test is `!(other->flags & FL_NOTARGET)`.
+        // The SVF_IGNORE_ENEMIES clause is commented out there, so it is not reintroduced here.
         if (ctx.world.entity(other_id).flags & FL_NOTARGET) == 0 {
-            // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+            // FLAG: pool client (gClPtrs) deref stays raw.
             let client = ctx.world.entity(self_).client;
             if !client.is_null() && unsafe { (*client).enemyTeam } != 0 {
-                // See if we bumped into an enemy
+                //See if we bumped into an enemy
                 if unsafe { (*other_client).playerTeam } == unsafe { (*client).enemyTeam } {
-                    // Bumped into an enemy
+                    //bumped into an enemy
                     let npc_info_ptr = ctx.world.globals.NPCInfo;
                     let cond = !npc_info_ptr.is_null()
                         && unsafe {
@@ -750,9 +753,8 @@ pub fn NPC_Touch(
     } else {
         // Other is not a client
         if ctx.world.entity(other_id).health > 0 {
-            // Non-NPC entity (probably an object)
             if 0 != 0 {
-                // rwwFIXMEFIXME condition always false
+                //rwwFIXMEFIXME: Can probably just check if num < MAX_CLIENTS for non-npc enemy stuff
                 let npc_info_ptr = ctx.world.globals.NPCInfo;
                 if !npc_info_ptr.is_null() {
                     unsafe {
@@ -762,7 +764,7 @@ pub fn NPC_Touch(
             }
         }
 
-        // FLAG: gNPC_t (NPCInfo) deref stays raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) deref stays raw.
         let npc_info_ptr = ctx.world.globals.NPCInfo;
         let goal_matches =
             !npc_info_ptr.is_null() && unsafe { (*npc_info_ptr).goalEntity } == Some(other_id);
@@ -786,7 +788,7 @@ pub fn NPC_TempLookTarget(
     mut minLookTime: c_int,
     mut maxLookTime: c_int,
 ) {
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
@@ -821,12 +823,11 @@ pub fn NPC_TempLookTarget(
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:690-942`
 pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
-    // The `CLASS_*` `class_t` variants resolve through the prelude; the
-    // match below is on `NPC_class` (already `class_t`) directly rather than
-    // a c_int cast, so no local class placeholders are needed.
+    // The `CLASS_*` `class_t` variants resolve through the prelude.
+    // The match below is on `NPC_class` (already `class_t`) directly rather than a c_int cast, so this file needs no local class placeholders.
     const CHAN_AUTO: c_int = 0;
-    // Absolute entity_event_t values — G_AddVoiceEvent consumes the enum
-    // value directly, so these must match the ported entity_event_t.
+    // Absolute entity_event_t values.
+    // G_AddVoiceEvent consumes the enum value directly, so these must match the ported entity_event_t.
     const EV_CHASE1: c_int = 133;
     const EV_CHASE3: c_int = 135;
     const EV_OUTFLANK1: c_int = 147;
@@ -856,19 +857,19 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
     let mut event = -1;
 
     if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-        // Set looktarget to them for a second or two
+        //set looktarget to them for a second or two
         NPC_TempLookTarget(ctx, self_, userNum, 1000, 3000);
     }
 
-    // Some last-minute hacked in responses
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    //some last-minute hacked in responses
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
     if client.is_null() {
         return;
     }
 
     let npc_class = unsafe { (*client).NPC_class };
-    // FLAG: gNPC_t deref stays raw (recipe 2c).
+    // FLAG: gNPC_t deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
 
     match npc_class {
@@ -952,7 +953,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
             let is_variant1 = npc_type.is_some_and(|s| Q_stricmp(s, "bespincop") == 0);
 
             if is_variant1 {
-                // Variant 1
+                //variant 1
                 if ctx.world.entity(self_).enemy.is_some() {
                     if ctx.world.bg_state.rng.Q_irand(0, 9) > 6 {
                         event = ctx.world.bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
@@ -973,7 +974,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
                     event = EV_GIVEUP4;
                 }
             } else {
-                // Variant 2
+                //variant2
                 if ctx.world.entity(self_).enemy.is_some() {
                     if ctx.world.bg_state.rng.Q_irand(0, 9) > 6 {
                         event = ctx.world.bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
@@ -1031,7 +1032,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
     }
 
     if event != -1 {
-        // Hack here because we reuse some "combat" and "extra" sounds
+        //hack here because we reuse some "combat" and "extra" sounds
         let add_flag = if !npc.is_null() {
             (unsafe { (*npc).scriptFlags } & SCF_NO_COMBAT_TALK) != 0
         } else {
@@ -1063,8 +1064,7 @@ pub fn NPC_UseResponse(
     user: Option<EntityId>,
     useWhenDone: qboolean,
 ) {
-    // FLAG: gNPC_t deref (npc) + pool client (gClPtrs) derefs stay raw
-    // (recipe 2c/2b).
+    // FLAG: gNPC_t deref (npc) + pool client (gClPtrs) derefs stay raw.
     let npc = ctx.world.entity(self_).NPC;
     let client = ctx.world.entity(self_).client;
     if npc.is_null() || client.is_null() {
@@ -1115,16 +1115,14 @@ pub fn NPC_Use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // `pm_type` is a c_int field and `BSET_USE` indexes `behaviorSet`
-    // (c_int/usize), so alias both from their canonical enums.
-    // `CLASS_VEHICLE`/`CLASS_GONK` are `class_t` variants from the prelude,
-    // compared against `NPC_class` directly below.
+    // `pm_type` is a c_int field, and `BSET_USE` indexes `behaviorSet` (c_int/usize), so this aliases both from their canonical enums.
+    // `CLASS_VEHICLE`/`CLASS_GONK` are `class_t` variants from the prelude, compared against `NPC_class` directly below.
     // Source: pmtype_t `oracle/codemp/game/bg_public.h:360-370`,
     // bSet_t `oracle/codemp/game/g_public.h:641-664`.
     const PM_DEAD: c_int = pmtype_t::PM_DEAD as c_int;
     const BSET_USE: c_int = bSet_t::BSET_USE as c_int;
 
-    // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
+    // FLAG: pool client (gClPtrs) deref stays raw.
     let client = ctx.world.entity(self_).client;
     if client.is_null() || unsafe { (*client).ps.pm_type } == PM_DEAD {
         return;
@@ -1133,14 +1131,14 @@ pub fn NPC_Use(
     SaveNPCGlobals(ctx);
     SetNPCGlobals(ctx, self_);
 
-    // FLAG: gNPC_t deref stays raw (recipe 2c).
+    // FLAG: gNPC_t deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     if !client.is_null() && !npc.is_null() {
-        // Check if this is a vehicle
+        // If this is a vehicle, let the other guy board it. Added 12/14/02 by AReis.
         if unsafe { (*client).NPC_class } == CLASS_VEHICLE {
-            // If this is a vehicle, let the other guy board it.
             let pVeh = ctx.world.entity(self_).m_pVehicle;
-            // FLAG: Vehicle_t has no accessor; m_pVehicleInfo deref stays raw.
+            // FLAG: Vehicle_t has no accessor.
+            // The m_pVehicleInfo deref stays raw.
             let veh_ok = !pVeh.is_null() && unsafe { !(*pVeh).m_pVehicleInfo.is_null() };
             if veh_ok {
                 //if I used myself, eject everyone on me
@@ -1171,10 +1169,9 @@ pub fn NPC_Use(
             && ctx.world.entity(activator.unwrap()).s.number == 0
             && unsafe { (*client).NPC_class } == CLASS_GONK;
         if gonk_use {
-            // Must be using the gonk, so attempt to give battery power.
-            // Oracle itself leaves the Add_Batteries call commented out
-            // (`//rwwFIXMEFIXME: support for this?`), so this is a faithful
-            // empty body — not a port gap.
+            // must be using the gonk, so attempt to give battery power.
+            // Oracle itself leaves the Add_Batteries call commented out (`//rwwFIXMEFIXME: support for this?`).
+            // This body is empty, not a port gap.
         }
 
         if ctx.world.entity(self_).behavior_set_str(BSET_USE as usize).is_some() {
@@ -1185,8 +1182,8 @@ pub fn NPC_Use(
             && ctx.world.entity(activator.unwrap()).s.number == 0
             && (unsafe { (*npc).scriptFlags } & SCF_NO_RESPONSE) == 0
         {
-            // I don't have an enemy and I was used by the player
-            // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE))
+            //I don't have an enemy and I'm not talking and I was used by the player
+            // The oracle gates on !(scriptFlags & SCF_NO_RESPONSE).
             NPC_UseResponse(ctx, self_, other, 0);
         }
     }
@@ -1196,15 +1193,13 @@ pub fn NPC_Use(
 
 /// Raven `NPC_CheckPlayerAim`.
 ///
-/// Raven: body is entirely commented out (`//FIXME: need appropriate
-/// dialogue`) — a dead no-op in the oracle.
+/// Raven: body is entirely commented out (`//FIXME: need appropriate dialogue`), a dead no-op in the oracle.
 /// Source: `oracle/codemp/game/NPC_reactions.c:1095-1111`
 pub fn NPC_CheckPlayerAim() {}
 
 /// Raven `NPC_CheckAllClear`.
 ///
-/// Raven: body is entirely commented out (`//FIXME: need to make this happen
-/// only once after losing enemies, not over and over again`) — a dead no-op
-/// in the oracle.
+/// Raven: body is entirely commented out (`//FIXME: need to make this happen only once after losing enemies, not over and over again`).
+/// This is a dead no-op in the oracle.
 /// Source: `oracle/codemp/game/NPC_reactions.c:1113-1125`
 pub fn NPC_CheckAllClear() {}

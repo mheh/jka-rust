@@ -1,13 +1,11 @@
-// PORT-COMPLETE: FighterNPC.c
 //! Game-only half of `oracle/codemp/game/FighterNPC.c`.
 //!
-//! The shared (game + cgame) steering/physics — `BG_FighterUpdate`,
-//! `ProcessMoveCommands`, `ProcessOrientCommands`, and their helpers — moved to
-//! `mp_bg::vehicles::fighter_npc` (a cgame TU in `JK2_cgame.vcproj`), so the
-//! cgame vehicle `Pmove` can steer fighters during prediction. What stays here is
-//! the `#ifdef QAGAME`-only surface: `Board`/`Eject`/`Update`/`AnimateVehicle`/
-//! `AnimateRiders`/`FighterPitchClamp`/`G_CreateFighterNPC`, plus `FighterIsInSpace`
-//! (the callback target reached from the moved bg code under the Game host).
+//! The shared (game + cgame) steering and physics functions moved to `mp_bg::vehicles::fighter_npc`, a cgame TU in `JK2_cgame.vcproj`.
+//! These are `BG_FighterUpdate`, `ProcessMoveCommands`, `ProcessOrientCommands`, and their helpers.
+//! The move lets the cgame vehicle `Pmove` steer fighters during prediction.
+//! What stays here is the `#ifdef QAGAME`-only surface:
+//! `Board`, `Eject`, `Update`, `AnimateVehicle`, `AnimateRiders`, `FighterPitchClamp`, and `G_CreateFighterNPC`.
+//! `FighterIsInSpace` also stays here, as the callback target reached from the moved bg code under the Game host.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -21,12 +19,14 @@ use mp_bg::bg_pmove::BG_UnrestrainedPitchRoll;
 use mp_bg::bg_vehicleLoad::BG_VehicleGetIndex;
 use mp_bg::vehicles::fighter_npc::{BG_FighterUpdate, FighterIsLanded, FighterIsLanding};
 
-// Constants used by the game-only fighter bodies. Values from the oracle.
+// Constants used by the game-only fighter bodies.
+// Values from the oracle.
 // Source: `oracle/codemp/game/{bg_public.h,bg_vehicles.h,FighterNPC.c}`.
 const HYPERSPACE_TIME: c_int = 4000; // bg_public.h:1679
 const MIN_LANDING_SLOPE: f32 = 0.8; // bg_vehicles.h:400
 const CHAN_AUTO: c_int = 0; // soundChannel_t CHAN_AUTO
-                            // `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.
+                            // `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`.
+                            // Source: `bg_vehicles.h:417`.
 const VEH_WINGSOPEN: u64 = 0x0000_0020;
 const VEH_GEARSOPEN: u64 = 0x0000_0040;
 
@@ -64,15 +64,15 @@ pub fn Eject(
     }
 }
 
-/// Raven `Update` — the fighter's per-frame update slot (QAGAME game-side).
+/// Raven `Update`, the fighter's per-frame update slot on the QAGAME game side.
 ///
-/// The `#ifdef QAGAME` `Ghost` loop hoisted out of `BG_FighterUpdate` (it reaches
-/// the game-only vehicle/passenger entities and only ran game-side) runs here
-/// first — same call order as the oracle, where `Update` calls `BG_FighterUpdate`
-/// whose top does the Ghost loop — then the moved bg `BG_FighterUpdate` (fighter
-/// gravity + landing trace, built with a `pm`-null `PmoveContext`), then the
-/// generic base `Update`. `trMins`/`trMaxs` are the parent gentity's
-/// `r.mins`/`r.maxs`; gravity is the `g_gravity` cvar.
+/// The `#ifdef QAGAME` `Ghost` loop hoisted out of `BG_FighterUpdate` runs here first.
+/// It reaches the game-only vehicle and passenger entities, and it only ran game-side.
+/// This matches the oracle's call order, where `Update` calls `BG_FighterUpdate` and its top runs the `Ghost` loop.
+/// The moved bg `BG_FighterUpdate` runs next, with fighter gravity and the landing trace, built with a `pm`-null `PmoveContext`.
+/// The generic base `Update` runs last.
+/// `trMins` and `trMaxs` are the parent gentity's `r.mins` and `r.maxs`.
+/// Gravity is the `g_gravity` cvar.
 /// Source: `oracle/codemp/game/FighterNPC.c:105-114,188-209`
 pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
@@ -106,11 +106,13 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
             (e.r.mins, e.r.maxs)
         };
 
-        // `BG_FighterUpdate` now lives in bg; build a `pm`-null `PmoveContext`.
+        // `BG_FighterUpdate` now lives in bg.
+        // Build a `pm`-null `PmoveContext`.
         let traps = GameBgTraps::new(ctx.engine);
         let mut callbacks = GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -133,8 +135,8 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
 
 /// Raven `FighterIsInSpace`.
 ///
-/// The whole function is `#ifdef QAGAME`; it stays game-side as the target of the
-/// bg `fighter_is_in_space` upcall (it reads `client->inSpaceIndex`).
+/// The whole function is `#ifdef QAGAME`.
+/// It stays game-side as the target of the bg `fighter_is_in_space` upcall, because it reads `client->inSpaceIndex`.
 /// Source: `oracle/codemp/game/FighterNPC.c:276-286`
 pub fn FighterIsInSpace(gParent: &gentity_t) -> qboolean {
     unsafe {
@@ -165,7 +167,7 @@ pub fn FighterPitchClamp(
 ) {
     unsafe {
         if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
-            // Cap pitch reasonably
+            //cap pitch reasonably
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
                 if vi.pitchLimit != -1.0
                     && (*pVeh).m_iRemovedSurfaces == 0
@@ -182,11 +184,11 @@ pub fn FighterPitchClamp(
     }
 }
 
-/// Raven `AnimateVehicle` — sync the fighter's wing/gear/hyperspace anim state to
-/// its flight state.
+/// Raven `AnimateVehicle`.
 ///
-/// Raven: MP (`_JK2MP` + `QAGAME`) build; `curTime` is `level.time`. The
-/// landing-state predicates are the moved bg helpers (called with `BgHost::Game`).
+/// It syncs the fighter's wing, gear, and hyperspace anim state to its flight state.
+/// This is the MP (`_JK2MP` and `QAGAME`) build, and `curTime` is `level.time`.
+/// The landing-state predicates are the moved bg helpers, called with `BgHost::Game`.
 /// Source: `oracle/codemp/game/FighterNPC.c:1836-1937`
 pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
@@ -200,7 +202,8 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
         if (*parentPS).hyperSpaceTime != 0 && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
         {
-            // Going to Hyperspace: close the wings.
+            //Going to Hyperspace
+            //close the wings (FIXME: makes sense on X-Wing, not Shuttle?)
             if (*pVeh).m_ulFlags & VEH_WINGSOPEN != 0 {
                 (*pVeh).m_ulFlags &= !VEH_WINGSOPEN;
                 Anim = BOTH_WINGS_CLOSE as c_int;
@@ -209,8 +212,8 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             let isLanding = FighterIsLanding(BgHost::Game, pVeh, parentPS);
             let isLanded = FighterIsLanded(pVeh, parentPS);
 
+            // if we're above launch height (way up in the air)...
             if isLanding == qfalse && isLanded == qfalse {
-                // way up in the air: open wings, close gears
                 if (*pVeh).m_ulFlags & VEH_WINGSOPEN == 0 {
                     (*pVeh).m_ulFlags |= VEH_WINGSOPEN;
                     (*pVeh).m_ulFlags &= !VEH_GEARSOPEN;
@@ -222,34 +225,38 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 && (*pVeh).m_LandTrace.fraction <= 0.4
                 && (*pVeh).m_LandTrace.plane.normal[2] >= MIN_LANDING_SLOPE
             {
-                // already landed / close to ground: open gears
+                //already landed or trying to land and close to ground
+                // Open gears.
                 if (*pVeh).m_ulFlags & VEH_GEARSOPEN == 0 {
                     if (*vi).soundLand != 0 {
-                        // just landed (QAGAME game-side)
+                        //just landed?
                         crate::g_utils::G_EntitySound(ctx, parent_id, CHAN_AUTO, (*vi).soundLand);
                     }
                     (*pVeh).m_ulFlags |= VEH_GEARSOPEN;
                     Anim = BOTH_GEARS_OPEN as c_int;
                 }
             } else if (*pVeh).m_ulFlags & VEH_GEARSOPEN != 0 {
-                // taking off, almost halfway off the ground: close gears
+                //trying to take off and almost halfway off the ground
+                // Close gears (if they're open).
                 (*pVeh).m_ulFlags &= !VEH_GEARSOPEN;
                 Anim = BOTH_GEARS_CLOSE as c_int;
             } else if (*pVeh).m_ulFlags & VEH_WINGSOPEN != 0 {
-                // gears closed and below launch height: close wings
+                // If gears are closed, and we are below launch height, close the wings.
                 (*pVeh).m_ulFlags &= !VEH_WINGSOPEN;
                 Anim = BOTH_WINGS_CLOSE as c_int;
             }
         }
 
         if Anim != -1 {
-            // `BG_SetAnim` is a `PmoveContext` method; build a pm-null per-call
-            // context from `ctx`.
+            // `BG_SetAnim` is a `PmoveContext` method.
+            // Build a pm-null per-call context from `ctx`.
             let idx = ctx.world.entity(parent_id).localAnimIndex as usize;
             let anims = ctx.world.bg_state.bgAllAnims[idx].anims;
             let traps = GameBgTraps::new(ctx.engine);
             let mut callbacks = GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -266,14 +273,16 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `AnimateRiders` — the `_JK2MP`/`QAGAME` body is empty (a deliberate
-/// no-op, like `SpeederNPC`'s).
+/// Raven `AnimateRiders`.
+///
+/// The `_JK2MP`/`QAGAME` body is empty, matching `SpeederNPC`'s.
 /// Source: `oracle/codemp/game/FighterNPC.c:1938-1944`
 pub fn AnimateRiders(_ctx: &mut GameContext, _pVeh: *mut Vehicle_t) {}
 
-// `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
-// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
-// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
+// `G_SetFighterVehicleFunctions` is retired.
+// It only assigned the now-removed `vehicleInfo_t` fn-ptr slots.
+// Vehicle dispatch is `vehicleType_t`-keyed in `crate::veh_dispatch`.
+// Source: see the per-class setter in the oracle .c file.
 
 /// Raven `G_CreateFighterNPC`.
 ///
@@ -284,7 +293,7 @@ pub fn G_CreateFighterNPC(
     strType: *const c_char,
 ) {
     unsafe {
-        // Allocate the Vehicle (MP QAGAME path).
+        // Allocate the Vehicle.
         G_AllocateVehicleObject(ctx, pVeh);
 
         // Zero out the Vehicle structure.
@@ -292,8 +301,9 @@ pub fn G_CreateFighterNPC(
 
         // Set the vehicle info pointer based on vehicle type name.
         let mut callbacks = GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };

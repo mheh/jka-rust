@@ -6,7 +6,7 @@
 
 /// Raven `spectatorState_t`.
 ///
-/// Verified against oracle: this is a **named `typedef enum`**, not a `typedef int`.
+/// This is a named enum in the oracle, not a `typedef int`.
 /// Type definition source: `oracle/codemp/game/g_local.h:374-378`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

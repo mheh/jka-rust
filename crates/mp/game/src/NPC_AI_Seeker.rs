@@ -1,17 +1,16 @@
-// PORT-COMPLETE: NPC_AI_Seeker.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Seeker.c`.
+//! This module ports `oracle/codemp/game/NPC_AI_Seeker.c`.
 //!
-//! All 10 functions ported. Nearly every function in this file relies on
-//! file-scope globals set up by `SetNPCGlobals()` (NPC, NPCInfo, ucmd, etc.)
-//! or reads other ambient state (level, g_entities, g_spskill cvars). These
-//! globals are now threaded through GameContext and accessed via ctx.world.
+//! Nearly every function in this file relies on file-scope globals set up by
+//! `SetNPCGlobals()` (NPC, NPCInfo, ucmd, etc.) or reads other ambient state
+//! (level, g_entities, g_spskill cvars). GameContext threads these globals
+//! through, and the code reaches them via ctx.world.
 //!
-//! Safe-state 2c: the NPC entity half is converted to `ctx.world.entity(npc_id)`
-//! / `entity_mut` accessor borrows. Two irreducible raw-deref regimes remain
-//! (FLAGged inline, task #7): `NPCInfo` is a `*mut gNPC_t` with no safe
-//! accessor, and NPCs carry a `BG_Alloc`'d pool `gclient_t` (`gClPtrs`,
-//! g_utils.c:430) that is not a `level.clients` slot, so `NPC->client` (and
-//! other entities' `->client` in this AI) is dereffed raw exactly as Raven does.
+//! The NPC entity side uses `ctx.world.entity(npc_id)` / `entity_mut` accessor
+//! borrows. Two raw-deref regimes remain, flagged inline: `NPCInfo` is a
+//! `*mut gNPC_t` with no safe accessor, and NPCs carry a `BG_Alloc`'d pool
+//! `gclient_t` (`gClPtrs`, g_utils.c:430) that is not a `level.clients` slot, so
+//! `NPC->client` (and other entities' `->client` in this AI) is dereffed raw,
+//! the same as Raven.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_missile::CreateMissile;
@@ -46,9 +45,9 @@ pub const SEEKER_FORWARD_MULTIPLIER: f32 = 2.0f32;
 // Raven `#define SEEKER_SEEK_RADIUS 1024`.
 pub const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// Keep the source spelling at assignment sites.
 
-// Local constants for Seeker AI.
 // Source: oracle/codemp/game/NPC_AI_Seeker.c / g_local.h
 const MOD_FALLING: c_int = 38;
 const MOD_BLASTER: c_int = 6;
@@ -75,13 +74,12 @@ pub fn NPC_Seeker_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; `aiFlags` read
-    // stays a raw deref through the pointer read via the safe entity borrow.
+    // FLAG: NPCInfo (gNPC_t) has no safe accessor.
+    // The `aiFlags` read stays a raw deref through the pointer read via the safe entity borrow.
     let npc_info = ctx.world.entity(self_).NPC;
     if unsafe { (*npc_info).aiFlags } & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY == 0 {
-        // Raven passes the global `vec3_origin` as `dir`; G_Damage normalizes
-        // `dir` in place (a no-op on the zero vector), so a fresh local copy
-        // is behaviorally identical.
+        // Raven passes the global `vec3_origin` as `dir`.
+        // G_Damage normalizes `dir` in place, a no-op on the zero vector, so a fresh local copy is behaviorally identical.
         let mut origin = vec3_origin;
         crate::g_combat::G_Damage(
             ctx,
@@ -114,7 +112,7 @@ pub fn Seeker_MaintainHeight(ctx: &mut GameContext) {
     // Update our angles regardless
     crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for every velocity op.
+    // FLAG: NPC pool `gclient_t`, raw deref for every velocity op.
     let client = ctx.world.entity(npc_id).client;
     let enemy = ctx.world.entity(npc_id).enemy;
 
@@ -168,7 +166,7 @@ pub fn Seeker_MaintainHeight(ctx: &mut GameContext) {
             }
         }
     } else {
-        // FLAG (task #7): NPCInfo (gNPC_t) goalEntity/lastGoalEntity — raw reads.
+        // FLAG: NPCInfo (gNPC_t) goalEntity/lastGoalEntity, raw reads.
         let goal: Option<EntityId> = unsafe {
             if (*npc_info).goalEntity.is_some() {
                 // Is there a goal?
@@ -235,11 +233,11 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
     let mut dir: vec3_t = [0.0f32; 3];
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for eyeAngles / velocity.
+    // FLAG: NPC pool `gclient_t`, raw deref for eyeAngles / velocity.
     let client = ctx.world.entity(npc_id).client;
 
-    // Read `NPC->enemy` for the branch predicate; the RNG draw is the first
-    // operand and must be evaluated regardless (Raven `||` short-circuit).
+    // Read `NPC->enemy` for the branch predicate.
+    // The RNG draw is the first operand, and it evaluates regardless, matching Raven's `||` short-circuit order.
     let enemy = ctx.world.entity(npc_id).enemy;
     let regular = ctx.world.bg_state.rng.random() > 0.7f32
         || enemy.is_none()
@@ -255,7 +253,6 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
         // reasonably valid
         let side = if (roll) != 0 { -1 } else { 1 };
         let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
-        // Inline VectorMA: end = origin + scalar * right
         for i in 0..3 {
             end[i] = npc_org[i] + SEEKER_STRAFE_DIS * side as f32 * right[i];
         }
@@ -290,7 +287,6 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
                 vel *= 3.0f32;
                 upPush *= 4.0f32;
             }
-            // Inline VectorMA: velocity += vel * side * right
             unsafe {
                 for i in 0..3 {
                     (*client).ps.velocity[i] += vel * side as f32 * right[i];
@@ -299,7 +295,7 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
                 (*client).ps.velocity[2] += upPush;
             }
 
-            // FLAG (task #7): NPCInfo (gNPC_t) standTime — raw write.
+            // FLAG: NPCInfo (gNPC_t) standTime, raw write.
             let stand =
                 ctx.world.level.time + 1000 + (ctx.world.bg_state.rng.random() * 500.0f32) as c_int;
             unsafe {
@@ -307,11 +303,11 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
             }
         }
     } else {
-        // guaranteed non-null by the `if` branch above (enemy is_some && enemy.client non-null)
+        // The `if` branch above guarantees non-null: enemy is_some and enemy.client is non-null.
         let enemy_id = enemy.unwrap();
 
         // Do a strafe to try and keep on the side of their enemy.
-        // FLAG (task #7): enemy pool/real `gclient_t` — raw deref for eyeAngles.
+        // FLAG: enemy pool/real `gclient_t`, raw deref for eyeAngles.
         let enemy_client = ctx.world.entity(enemy_id).client;
         let enemy_eye = unsafe { (*enemy_client).renderInfo.eyeAngles };
         crate::q_math::AngleVectors(enemy_eye, Some(&mut dir), Some(&mut right), None);
@@ -324,16 +320,14 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
             stDis *= 2.0f32;
         }
         let enemy_org = ctx.world.entity(enemy_id).r.currentOrigin;
-        // Inline VectorMA: end = enemy_origin + stDis * side * right
         for i in 0..3 {
             end[i] = enemy_org[i] + stDis * side as f32 * right[i];
         }
 
         // then add a very small bit of random in front of/behind the player action
-        // VectorMA is the live `#if 1` MACRO (q_shared.h:1365) — the scale expr
-        // `crandom()*25` is substituted per component: THREE crandom draws, each
-        // product in f64, narrowed at the store. Never reason from `_VectorMA`'s
-        // float-scale signature (dead `#else` branch, q_shared.h:1381).
+        // VectorMA is the live `#if 1` macro (q_shared.h:1365).
+        // The scale expression `crandom()*25` substitutes per component: three crandom draws, each product in f64, narrowed at the store.
+        // Do not reason from `_VectorMA`'s float-scale signature, the dead `#else` branch (q_shared.h:1381).
         // Source: oracle/codemp/game/NPC_AI_Seeker.c:207
         for i in 0..3 {
             end[i] =
@@ -359,14 +353,12 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
         if tr.fraction > 0.9f32 {
             let mut upPush: f32;
 
-            // Inline VectorSubtract: dir = endpos - origin
             for i in 0..3 {
                 dir[i] = tr.endpos[i] - npc_org[i];
             }
             dir[2] *= 0.25f32; // do less upward change
             let dis = crate::q_math::VectorNormalize(&mut dir);
 
-            // Inline VectorMA: velocity += dis * dir
             unsafe {
                 for i in 0..3 {
                     (*client).ps.velocity[i] += dis * dir[i];
@@ -391,7 +383,7 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
                 (*client).ps.velocity[2] += upPush;
             }
 
-            // FLAG (task #7): NPCInfo (gNPC_t) standTime — raw write.
+            // FLAG: NPCInfo (gNPC_t) standTime, raw write.
             let stand =
                 ctx.world.level.time + 2500 + (ctx.world.bg_state.rng.random() * 500.0f32) as c_int;
             unsafe {
@@ -412,7 +404,7 @@ pub fn Seeker_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) 
     crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
     // If we're not supposed to stand still, pursue the player.
-    // FLAG (task #7): NPCInfo (gNPC_t) standTime — raw read.
+    // FLAG: NPCInfo (gNPC_t) standTime, raw read.
     if unsafe { (*npc_info).standTime } < ctx.world.level.time {
         // Only strafe when we can see the player
         if visible != 0 {
@@ -429,7 +421,7 @@ pub fn Seeker_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) 
     // Only try and navigate if the player is visible
     if visible == qfalse {
         // Move towards our goal.
-        // FLAG (task #7): NPCInfo (gNPC_t) goalEntity/goalRadius — raw writes.
+        // FLAG: NPCInfo (gNPC_t) goalEntity/goalRadius, raw writes.
         let enemy = ctx.world.entity(npc_id).enemy;
         unsafe {
             (*npc_info).goalEntity = enemy;
@@ -486,14 +478,12 @@ pub fn Seeker_Fire(ctx: &mut GameContext) {
     let enemy_id = ctx.world.entity(npc_id).enemy;
     crate::NPC_utils::CalcEntitySpot(ctx, enemy_id, spot_t::SPOT_HEAD, &mut enemy_org);
     let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
-    // Inline VectorSubtract: dir = enemy_org - origin
     for i in 0..3 {
         dir[i] = enemy_org[i] - npc_org[i];
     }
     crate::q_math::VectorNormalize(&mut dir);
 
     // move a bit forward in the direction we shall shoot in so that the bolt doesn't poke out the other side of the seeker
-    // Inline VectorMA: muzzle = origin + 15 * dir
     for i in 0..3 {
         muzzle[i] = npc_org[i] + 15.0f32 * dir[i];
     }
@@ -529,7 +519,7 @@ pub fn Seeker_Ranged(ctx: &mut GameContext, visible: qboolean, advance: qboolean
     let npc_id = ctx.entity_id_of(npc).unwrap();
     let npc_info = ctx.world.globals.NPCInfo;
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for NPC_class.
+    // FLAG: NPC pool `gclient_t`, raw deref for NPC_class.
     let client = ctx.world.entity(npc_id).client;
     if unsafe { (*client).NPC_class } != CLASS_BOBAFETT {
         if ctx.world.entity(npc_id).count > 0 {
@@ -555,7 +545,7 @@ pub fn Seeker_Ranged(ctx: &mut GameContext, visible: qboolean, advance: qboolean
         }
     }
 
-    // FLAG (task #7): NPCInfo (gNPC_t) scriptFlags — raw read.
+    // FLAG: NPCInfo (gNPC_t) scriptFlags, raw read.
     if (unsafe { (*npc_info).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
         Seeker_Hunt(ctx, visible, advance);
     }
@@ -585,7 +575,7 @@ pub fn Seeker_Attack(ctx: &mut GameContext) {
         qfalse
     };
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for NPC_class.
+    // FLAG: NPC pool `gclient_t`, raw deref for NPC_class.
     let client = ctx.world.entity(npc_id).client;
     if unsafe { (*client).NPC_class } == CLASS_BOBAFETT {
         advance = if distance > (200.0f32 * 200.0f32) {
@@ -597,7 +587,7 @@ pub fn Seeker_Attack(ctx: &mut GameContext) {
 
     // If we cannot see our target, move to see it
     if visible == qfalse {
-        // FLAG (task #7): NPCInfo (gNPC_t) scriptFlags — raw read.
+        // FLAG: NPCInfo (gNPC_t) scriptFlags, raw read.
         if unsafe { (*npc_info).scriptFlags } & (SCF_CHASE_ENEMIES as c_int) != 0 {
             Seeker_Hunt(ctx, visible, advance);
             return;
@@ -645,9 +635,8 @@ pub fn Seeker_FindEnemy(ctx: &mut GameContext) {
             continue;
         }
 
-        // FLAG (task #7): both entities can be NPCs carrying pool `gclient_t`s;
-        // `playerTeam` is read through each entity's client pointer, raw, exactly
-        // as Raven does — never via a `level.clients` index.
+        // FLAG: both entities can be NPCs carrying pool `gclient_t`s.
+        // `playerTeam` reads through each entity's client pointer, raw, the same as Raven, never via a `level.clients` index.
         let npc_client = ctx.world.entity(npc_id).client;
         let ent_team = unsafe { (*ent_client).playerTeam };
         let npc_team = unsafe { (*npc_client).playerTeam };
@@ -696,7 +685,7 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
 
     Seeker_MaintainHeight(ctx);
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for NPC_class / jetPackTime.
+    // FLAG: NPC pool `gclient_t`, raw deref for NPC_class / jetPackTime.
     let client = ctx.world.entity(npc_id).client;
     if unsafe { (*client).NPC_class } == CLASS_BOBAFETT {
         owner_id = ctx.world.entity(npc_id).enemy;
@@ -724,9 +713,9 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
 
     if dis < minDistSqr {
         // generally circle the player closely till we take an enemy..this is our target point
-        // `cos`/`sin` are the double libm: the f32 argument is promoted, the
-        // transcendental and its scaling evaluate in f64, and the sum with the
-        // float origin narrows to f32 only on store.
+        // `cos`/`sin` are the double libm.
+        // The f32 argument is promoted, and the transcendental and its scaling evaluate in f64.
+        // The sum with the float origin narrows to f32 only on store.
         let time = ctx.world.level.time;
         let random = ctx.world.entity(npc_id).random;
         let owner_org = ctx.world.entity(owner_id).r.currentOrigin;
@@ -749,11 +738,9 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
         }
 
         let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
-        // Inline VectorSubtract: dir = pt - origin
         for i in 0..3 {
             dir[i] = pt[i] - npc_org[i];
         }
-        // Inline VectorMA: velocity += 0.8 * dir
         unsafe {
             for i in 0..3 {
                 (*client).ps.velocity[i] += 0.8f32 * dir[i];
@@ -775,7 +762,7 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
         }
 
         // Hey come back!
-        // FLAG (task #7): NPCInfo (gNPC_t) goalEntity/goalRadius — raw writes.
+        // FLAG: NPCInfo (gNPC_t) goalEntity/goalRadius, raw writes.
         unsafe {
             (*npc_info).goalEntity = Some(owner_id);
             (*npc_info).goalRadius = 32;
@@ -784,7 +771,7 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
         ctx.world.entity_mut(npc_id).parent = Some(owner_id);
     }
 
-    // FLAG (task #7): NPCInfo (gNPC_t) enemyCheckDebounceTime — raw read/write.
+    // FLAG: NPCInfo (gNPC_t) enemyCheckDebounceTime, raw read and write.
     if unsafe { (*npc_info).enemyCheckDebounceTime } < ctx.world.level.time {
         // check twice a second to find a new enemy
         Seeker_FindEnemy(ctx);
@@ -809,8 +796,7 @@ pub fn NPC_BSSeeker_Default(ctx: &mut GameContext) {
     if ctx.world.entity(npc_id).r.ownerNum < ENTITYNUM_NONE {
         let owner_id = EntityId(0);
         let owner_health = ctx.world.entity(owner_id).health;
-        // FLAG (task #7): owner client — read through the entity's client
-        // pointer, dereffed raw exactly as Raven does.
+        // FLAG: owner client, read through the entity's client pointer, dereffed raw the same as Raven.
         let owner_client = ctx.world.entity(owner_id).client;
         if owner_health <= 0
             || (!owner_client.is_null()
@@ -845,7 +831,7 @@ pub fn NPC_BSSeeker_Default(ctx: &mut GameContext) {
         let enemy_inuse = ctx.world.entity(enemy_id).inuse;
         // Oracle tests `NPC->enemy->health` truthy (`!= 0`), not `> 0`.
         if enemy_health != 0 && enemy_inuse != 0 {
-            // FLAG (task #7): NPC / enemy pool `gclient_t` — raw derefs for NPC_class.
+            // FLAG: NPC / enemy pool `gclient_t`, raw derefs for NPC_class.
             let client = ctx.world.entity(npc_id).client;
             let npc_class = unsafe { (*client).NPC_class };
             let enemy_number = ctx.world.entity(enemy_id).s.number;

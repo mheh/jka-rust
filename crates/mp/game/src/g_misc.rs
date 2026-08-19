@@ -1,7 +1,3 @@
-// PORT-COMPLETE: g_misc.c
-//! FAITHFUL port of `oracle/codemp/game/g_misc.c`.
-//!
-//! Filled by the jampgame mega-pass.
 #![allow(non_snake_case, unused, clippy::all)]
 
 
@@ -75,7 +71,7 @@ pub const MAX_SHOOTERS: c_int = 16;
 ///
 /// Type definition source: `oracle/codemp/game/g_misc.c:3346-3350`
 ///
-/// Not `Copy`: `cl.pers.netname` is an owned `String` (§13).
+/// This struct is not `Copy`. `cl.pers.netname` is an owned `String` (§13).
 #[derive(Clone)]
 pub struct shooterClient_t {
     pub cl: gclient_t,
@@ -84,8 +80,7 @@ pub struct shooterClient_t {
 
 impl Default for shooterClient_t {
     fn default() -> Self {
-        // Raven's `memset(g_shooterClients, 0, ...)` init: `gclient_t::default()`
-        // is that zero image (its `pers.netname` `String` empty, all else 0).
+        // Raven's `memset(g_shooterClients, 0, ...)` init: `gclient_t::default()` is that zero image (its `pers.netname` `String` empty, all else 0).
         Self {
             cl: gclient_t::default(),
             inuse: qfalse,
@@ -93,7 +88,7 @@ impl Default for shooterClient_t {
     }
 }
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven's `qboolean` is `c_int`. The source spelling stays at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 /// Raven `SP_info_camp`.
@@ -102,7 +97,6 @@ impl Default for shooterClient_t {
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/codemp/game/g_misc.c:25-27`
 pub fn SP_info_camp(self_: &mut gentity_t) {
-    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
     let origin = self_.s.origin;
     G_SetOrigin(self_, origin);
 }
@@ -122,7 +116,6 @@ pub fn SP_info_null(ctx: &mut GameContext, self_: EntityId) {
 /// targets. `target_position` does the same thing.
 /// Source: `oracle/codemp/game/g_misc.c:42-44`
 pub fn SP_info_notnull(self_: &mut gentity_t) {
-    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
     let origin = self_.s.origin;
     G_SetOrigin(self_, origin);
 }
@@ -232,7 +225,7 @@ pub fn SP_light(ctx: &mut GameContext, self_: EntityId) {
     e.r.svFlags |= SVF_NOCLIENT;
 
     if e.spawnflags & 4 == 0 {
-        // turn myself on now
+        //turn myself on now
         e.alt_fire = qtrue;
     }
     misc_lightstyle_set(ctx, self_);
@@ -244,8 +237,8 @@ pub fn SP_light(ctx: &mut GameContext, self_: EntityId) {
 pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, angles: vec3_t) {
     use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
     use mp_bg::public::team::TEAM_SPECTATOR;
-    // FLAG (task #7): player->client is a real/NPC-pool gclient_t ptr with no
-    // accessor for ps; dereffed raw exactly as Raven does (copied pointer value).
+    // `player->client` is a real or NPC-pool `gclient_t` pointer, and it has no accessor for `ps`.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let client = ctx.world.entity(player).client;
     unsafe {
         let mut is_npc = qfalse;
@@ -323,8 +316,8 @@ pub fn SP_misc_teleporter_dest(ent: &mut gentity_t) {}
 
 /// Raven `SP_misc_model`.
 ///
-/// The live (non-`#if 0`) path just frees the entity — map triangle
-/// generation was compiled out.
+/// The live path (not `#if 0`) just frees the entity.
+/// Map triangle generation was compiled out.
 /// Source: `oracle/codemp/game/g_misc.c:249-262`
 pub fn SP_misc_model(ctx: &mut GameContext, ent: EntityId) {
     G_FreeEntity(ctx, Some(ent));
@@ -442,8 +435,7 @@ pub fn SP_misc_portal_camera(ctx: &mut GameContext, ent: EntityId) {
     let mut roll: f32 = 0.0;
     G_SpawnFloat(ctx, c"roll".as_ptr(), c"0".as_ptr(), &mut roll);
 
-    // C evaluates `roll/360.0 * 256` in double (360.0 is a double literal),
-    // then truncates to int.
+    // C evaluates `roll/360.0 * 256` in double (360.0 is a double literal), then truncates to int.
     ctx.world.entity_mut(ent).s.clientNum = (roll as f64 / 360.0 * 256.0) as c_int;
 }
 
@@ -477,11 +469,10 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         G_SpawnInt(ctx, c"flatten".as_ptr(), c"0".as_ptr(), &mut tempint);
         ctx.world.entity_mut(ent).s.time = tempint;
 
-        // NOTE: Raven's own `char temp[MAX_QPATH]` is a stack local later
-        // assigned into `level.mTargetAdjust` (a persistent `char *`) — the
-        // pointer dangles once this fn returns. Faithful UB per porting
-        // rules S19; we keep the one Raven-defined behavior rather than
-        // invent a fix.
+        // NOTE: Raven's own `char temp[MAX_QPATH]` is a stack local, later assigned into `level.mTargetAdjust`, a persistent `char *`.
+        // The pointer dangles once this function returns.
+        // This is UB per porting-rules §19.
+        // The port keeps the one Raven-defined behavior instead of inventing a fix.
         let mut temp: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         write_cstr_field(&mut temp, &format!("#{}", out));
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
@@ -528,8 +519,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
 pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
     use mp_abi::game::syscalls::G_RMG_INIT::GRmgInitArgs;
     use mp_qshared::shared::MAX_QPATH;
-    // `MAX_INFO_STRING` resolves via the crate prelude glob
-    // (`mp_qshared::shared::limits`).
+    // `MAX_INFO_STRING` comes from the crate prelude glob (`mp_qshared::shared::limits`).
     unsafe {
         // Force it to 1 when there is terrain on the level.
         trap::Cvar_Set(ctx.engine, "RMG", "1");
@@ -761,14 +751,13 @@ pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
     let level_time = ctx.world.level.time;
     let e = ctx.world.entity_mut(ent);
     e.think = Some(EntThink::G_PortalifyEntities).into();
-    e.nextthink = level_time + 1050; // give it some time first so that all other entities are spawned.
+    e.nextthink = level_time + 1050; //give it some time first so that all other entities are spawned.
 }
 
 /// Raven `HolocronRespawn`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:760-763`
 pub fn HolocronRespawn(self_: &mut gentity_t) {
-    // STAGE-1: ctx-free leaf borrows &mut gentity_t (Stage-1 rule 2).
     self_.s.modelindex = self_.count - 128;
 }
 
@@ -820,8 +809,8 @@ pub fn HolocronTouch(
         Some(o) => o,
         None => return,
     };
-    // FLAG (task #7): other->client is a player/NPC-pool gclient_t ptr; ps is
-    // dereffed raw exactly as Raven does (copied pointer value).
+    // `other->client` is a player or NPC-pool `gclient_t` pointer, and `ps` is on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let client = ctx.world.entity(other).client;
     if client.is_null() || ctx.world.entity(other).health < 1 {
         return;
@@ -864,7 +853,7 @@ pub fn HolocronTouch(
     }
 
     if hasall {
-        // once we pick up this holocron we'll have all of them, so give us super special best prize!
+        //once we pick up this holocron we'll have all of them, so give us super special best prize!
         //G_Printf("You deserve a pat on the back.\n");
     }
 
@@ -885,7 +874,7 @@ pub fn HolocronTouch(
 
     let maxcarry = ctx.world.cvars.g_MaxHolocronCarry.integer;
     if maxcarry != 0 && othercarrying >= maxcarry {
-        // make the oldest holocron carried by the player pop out to make room for this one
+        //make the oldest holocron carried by the player pop out to make room for this one
         unsafe {
             (*client).ps.holocronsCarried[index_lowest as usize] = 0.0;
         }
@@ -924,15 +913,15 @@ pub fn HolocronTouch(
     //G_Printf("DON'T TOUCH ME\n");
 }
 
-// Raven's `goto justthink;` is ported as an early return after inlining the
-// shared tail (porting-rules §C10 — preserve behavior, not shape).
+// Raven's `goto justthink;` is ported as an early return after inlining the shared tail.
+// This follows porting-rules §C10: preserve behavior, not shape.
 /// Raven `HolocronThink`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:907-991`
 pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): the holocron carrier (`enemy`) is a player/NPC-pool
-    // client; its `client->ps` is dereffed raw exactly as Raven does (copied
-    // pointer value), while the holocron entity itself rides the accessors.
+    // The holocron carrier (`enemy`) is a player or NPC-pool client.
+    // We deref its `client->ps` raw, exactly as Raven does, as a copied pointer value.
+    // The holocron entity itself still rides the normal accessors.
     let justthink = |id: EntityId, ctx: &mut GameContext| {
         let time = ctx.world.level.time;
         ctx.world.entity_mut(id).nextthink = time + 50;
@@ -964,7 +953,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                     en.s.origin = cl_origin;
                     en.r.currentOrigin = cl_origin;
                 }
-                // copy to person carrying's origin before popping out of them
+                //copy to person carrying's origin before popping out of them
                 HolocronPopOut(ctx, ent);
                 let count = ctx.world.entity(ent).count;
                 unsafe {
@@ -1009,7 +998,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                     en.s.origin = cl_origin;
                     en.r.currentOrigin = cl_origin;
                 }
-                // copy to person carrying's origin before popping out of them
+                //copy to person carrying's origin before popping out of them
                 HolocronPopOut(ctx, ent);
                 ctx.world.entity_mut(ent).enemy = None;
 
@@ -1105,8 +1094,8 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             e.r.maxs = [8.0, 8.0, 8.0];
             e.r.mins = [-8.0, -8.0, -8.0];
 
-            // `0.1` is a bare double in the oracle; add in f64, narrow once at
-            // the f32 store. Source: g_misc.c:1020-1021
+            // `0.1` is a bare double in the oracle.
+            // We add it in f64, then narrow once at the f32 store. Source: g_misc.c:1020-1021
             e.s.origin[2] = (e.s.origin[2] as f64 + 0.1) as f32;
             e.r.maxs[2] = (e.r.maxs[2] as f64 - 0.1) as f32;
         }
@@ -1138,7 +1127,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        // add the 0.1 back after the trace (bare double; g_misc.c:1033)
+        // add the 0.1 back after the trace (bare double, g_misc.c:1033)
         {
             let e = ctx.world.entity_mut(ent);
             e.r.maxs[2] = (e.r.maxs[2] as f64 + 0.1) as f32;
@@ -1235,8 +1224,7 @@ pub fn Use_Shooter(
     PerpendicularVector(&mut up, dir);
     CrossProduct(up, dir, &mut right);
 
-    // C `float deg = crandom() * ent->random`: the `double` product narrows
-    // to `float deg`, then feeds `VectorMA` as the scale.
+    // C evaluates `float deg = crandom() * ent->random` as a `double` product, narrows it to `float deg`, then feeds `VectorMA` as the scale.
     let random = ctx.world.entity(ent).random;
     let mut deg = (ctx.world.bg_state.rng.crandom() * random as f64) as f32;
     let mut new_dir: vec3_t = [0.0, 0.0, 0.0];
@@ -1301,8 +1289,8 @@ pub fn InitShooter(ctx: &mut GameContext, ent: EntityId, weapon: c_int) {
     if ctx.world.entity(ent).random == 0.0 {
         ctx.world.entity_mut(ent).random = 1.0;
     }
-    // C evaluates `sin( M_PI * ent->random / 180 )` in double (M_PI and the
-    // libm sin are double); narrow only on store.
+    // C evaluates `sin( M_PI * ent->random / 180 )` in double, since `M_PI` and the libm `sin` are both double.
+    // We narrow only on store.
     let random = ctx.world.entity(ent).random;
     ctx.world.entity_mut(ent).random = (std::f64::consts::PI * random as f64 / 180.0).sin() as f32;
     // target might be a moving object, so we can't set movedir for it
@@ -1331,8 +1319,8 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
 
     let activator = ctx.world.entity(ent).activator;
-    // FLAG (task #7): activator->client is a player/NPC-pool gclient_t ptr;
-    // pers.cmd dereffed raw exactly as Raven does (copied pointer value).
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and `pers.cmd` is on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let activator_cl = match activator {
         Some(a) => ctx.world.entity(a).client,
         None => core::ptr::null_mut(),
@@ -1405,8 +1393,8 @@ pub fn shield_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): activator/other ->client are player/NPC-pool gclient_t
-    // ptrs; ps/siegeClass dereffed raw exactly as Raven does (copied pointers).
+    // `activator`/`other`'s `client` fields are player or NPC-pool `gclient_t` pointers, and `ps`/`siegeClass` are on them.
+    // The deref is raw, exactly as Raven does, on copied pointer values.
     let act_cl = ctx.world.entity(activator).client;
     if act_cl.is_null() {
         return;
@@ -1522,8 +1510,8 @@ pub fn ammo_generic_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): activator->client is a player/NPC-pool gclient_t ptr; ps
-    // eFlags/ammo dereffed raw exactly as Raven does (copied pointer value).
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.eFlags`/`ps.ammo` are on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
         return;
@@ -1775,8 +1763,8 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             e.r.mins = [-16.0, -16.0, 0.0];
             e.r.maxs = [16.0, 16.0, 40.0];
 
-            // `0.1` is a bare double in the oracle; add in f64, narrow once at
-            // the f32 store. Source: g_misc.c:1618-1619
+            // `0.1` is a bare double in the oracle.
+            // We add it in f64, then narrow once at the f32 store. Source: g_misc.c:1618-1619
             e.s.origin[2] = (e.s.origin[2] as f64 + 0.1) as f32;
             e.r.maxs[2] = (e.r.maxs[2] as f64 - 0.1) as f32;
         }
@@ -1808,7 +1796,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        // add the 0.1 back after the trace (bare double; g_misc.c:1631)
+        // add the 0.1 back after the trace (bare double, g_misc.c:1631)
         {
             let e = ctx.world.entity_mut(ent);
             e.r.maxs[2] = (e.r.maxs[2] as f64 + 0.1) as f32;
@@ -1981,8 +1969,8 @@ pub fn ammo_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): activator->client is a player/NPC-pool gclient_t ptr; ps
-    // ammo dereffed raw exactly as Raven does (copied pointer value).
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.ammo` is on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
         return;
@@ -2136,8 +2124,8 @@ pub fn health_power_converter_use(
         Some(a) => a,
         None => return,
     };
-    // FLAG (task #7): activator->client is a player/NPC-pool gclient_t ptr; ps
-    // stats dereffed raw exactly as Raven does (copied pointer value).
+    // `activator->client` is a player or NPC-pool `gclient_t` pointer, and its `ps.stats` is on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let acl = ctx.world.entity(activator).client;
     if acl.is_null() {
         return;
@@ -2658,8 +2646,8 @@ pub fn Use_Target_Escapetrig(
         ctx.world.globals.gEscaping = qfalse;
         while i < mp_qshared::shared::MAX_CLIENTS_I32 {
             let e_id = EntityId(i as u32);
-            // FLAG (task #7): client-slot pool `gclient_t` — dereffed raw exactly
-            // as Raven does (copied pointer value); i < MAX_CLIENTS is a real slot.
+            // This is the client-slot pool `gclient_t`.
+            // The deref is raw, exactly as Raven does, on a copied pointer value, since `i < MAX_CLIENTS` marks a real slot.
             let c = ctx.world.entity(e_id).client;
             let inuse = ctx.world.entity(e_id).inuse;
             let health = ctx.world.entity(e_id).health;
@@ -2716,9 +2704,8 @@ pub fn SP_target_escapetrig(ctx: &mut GameContext, ent: EntityId) {
 
 /// Raven `maglock_die`.
 ///
-/// Unlocks our door if we're the last lock pointed at the door, then fires
-/// this maglock's targets. `WP_Explode` was already dead code upstream
-/// (`//rwwFIXMEFIXME - weap expl func`).
+/// This unlocks our door if we are the last lock pointed at the door, then fires this maglock's targets.
+/// `WP_Explode` was already dead code upstream (`//rwwFIXMEFIXME - weap expl func`).
 /// Source: `oracle/codemp/game/g_misc.c:2623-2640`
 pub fn maglock_die(
     ctx: &mut GameContext,
@@ -3213,7 +3200,7 @@ pub fn TAG_Add(
 ) -> *mut reference_tag_t {
     unsafe {
         let mut owner = owner;
-        // Make sure this tag's name isn't already in use
+        //Make sure this tag's name isn't alread in use
         if !TAG_Find(ctx, owner, name).is_null() {
             crate::g_main::Com_Printf(&format!(
                 "^1Duplicate tag name \"{}\"\n",
@@ -3240,8 +3227,8 @@ pub fn TAG_Add(
             }
         }
 
-        // This is actually reverse order of how SP does it because of the way we're storing/allocating.
-        // Now that we have the owner, we want to get the first free reftag on the owner itself.
+        // This is reverse order from how SP does it, because of the way this stores and allocates.
+        // With the owner in hand, this gets the first free reftag on the owner itself.
         let tag = FirstFreeRefTag(ctx, tag_owner);
 
         if tag.is_null() {
@@ -3279,10 +3266,9 @@ pub fn TAG_Add(
     }
 }
 
-// vec3 out-param reshape: `origin` is written through
-// (`VectorClear`/`VectorCopy` in every branch), never read — reshaped to
-// `&mut vec3_t` (no same-file callers to fix; cross-file callers are the
-// fixer's job per the packet).
+// vec3 out-param reshape: `origin` is written through (`VectorClear`/`VectorCopy` in every branch) and never read.
+// The reshape yields `&mut vec3_t`.
+// This file has no same-file callers to fix. Cross-file callers need the same fix at their own call sites.
 /// Raven `TAG_GetOrigin`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3112-3125`
@@ -3303,8 +3289,7 @@ pub fn TAG_GetOrigin(
     1
 }
 
-// vec3 out-param reshape (as `TAG_GetOrigin`): `origin` is written
-// through, never read.
+// vec3 out-param reshape, as in `TAG_GetOrigin`: `origin` is written through and never read.
 /// Raven `TAG_GetOrigin2`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3134-3146`
@@ -3324,8 +3309,7 @@ pub fn TAG_GetOrigin2(
     1
 }
 
-// vec3 out-param reshape (as `TAG_GetOrigin`): `angles` is written
-// through, never read.
+// vec3 out-param reshape, as in `TAG_GetOrigin`: `angles` is written through and never read.
 /// Raven `TAG_GetAngles`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3153-3166`
@@ -3337,8 +3321,8 @@ pub fn TAG_GetAngles(
 ) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
-        // Raven `assert(0)` on the not-found path (UB in a release build,
-        // porting-rules §19); we take the one defined behavior — report failure.
+        // Raven calls `assert(0)` on the not-found path, which is undefined behavior in a release build.
+        // The port takes the one defined behavior per porting-rules §19: report failure.
         return 0;
     }
     unsafe {
@@ -3353,8 +3337,8 @@ pub fn TAG_GetAngles(
 pub fn TAG_GetRadius(ctx: &mut GameContext, owner: *const c_char, name: *const c_char) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
-        // Raven `assert(0)` on the not-found path (UB in a release build,
-        // porting-rules §19); we take the one defined behavior — report failure.
+        // Raven calls `assert(0)` on the not-found path, which is undefined behavior in a release build.
+        // The port takes the one defined behavior per porting-rules §19: report failure.
         return 0;
     }
     unsafe { (*tag).radius }
@@ -3366,8 +3350,8 @@ pub fn TAG_GetRadius(ctx: &mut GameContext, owner: *const c_char, name: *const c
 pub fn TAG_GetFlags(ctx: &mut GameContext, owner: *const c_char, name: *const c_char) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
-        // Raven `assert(0)` on the not-found path (UB in a release build,
-        // porting-rules §19); we take the one defined behavior — report failure.
+        // Raven calls `assert(0)` on the not-found path, which is undefined behavior in a release build.
+        // The port takes the one defined behavior per porting-rules §19: report failure.
         return 0;
     }
     unsafe { (*tag).flags }
@@ -3446,9 +3430,8 @@ pub fn G_ClientForShooter(ctx: &mut GameContext) -> *mut gclient_t {
         if ctx.world.globals.g_shooterClientInit == qfalse {
             // in theory it should be initialized to 0 on the stack, but just in case.
             for slot in ctx.world.globals.g_shooterClients.iter_mut() {
-                // `shooterClient_t::default()` is the memset-0 image (its
-                // `cl.pers.netname` `String` is not zero-valid, so reset the
-                // whole slot rather than byte-zeroing over it).
+                // `shooterClient_t::default()` is the memset-0 image.
+                // `cl.pers.netname`'s `String` is not zero-valid, so this resets the whole slot instead of byte-zeroing over it.
                 *slot = shooterClient_t::default();
             }
             ctx.world.globals.g_shooterClientInit = qtrue;
@@ -3544,8 +3527,8 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
                 &mut ctx.world.entity_mut(self_).pos1,
             );
             ctx.world.entity_mut(self_).pos1 = targ_origin;
-            // FLAG (task #7): self_->client is a shooter-pool gclient_t; ps
-            // viewangles dereffed raw exactly as Raven does (copied pointer value).
+            // `self_->client` is a shooter-pool `gclient_t`, and its `ps.viewangles` is on it.
+            // The deref is raw, exactly as Raven does, on a copied pointer value.
             let client = ctx.world.entity(self_).client;
             let pos1 = ctx.world.entity(self_).pos1;
             unsafe {
@@ -3572,8 +3555,8 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
 
     let (_, s) = G_SpawnString(ctx, "weapon", "");
 
-    // FLAG (task #7): self_->client is a shooter-pool gclient_t; ps dereffed raw
-    // exactly as Raven does (copied pointer value).
+    // `self_->client` is a shooter-pool `gclient_t`, and `ps` is on it.
+    // The deref is raw, exactly as Raven does, on a copied pointer value.
     let client = ctx.world.entity(self_).client;
 
     // set weapon
@@ -3636,8 +3619,7 @@ pub fn SP_misc_weather_zone(ctx: &mut GameContext, ent: EntityId) {
     G_FreeEntity(ctx, Some(ent));
 }
 
-// The local `G_SpawnInt` shim formerly here (adapting byte-string literals to
-// `*const c_char`) is dropped: its only callers (`EnergyShieldStationSettings`/
-// `EnergyAmmoStationSettings`/`EnergyHealthStationSettings`) are parked
-// (`seam-threading` — `G_SpawnInt` needs a `GameContext` this shim had no way
-// to supply), so it has zero live callers (porting-rules §20).
+// The local `G_SpawnInt` shim, which adapted byte-string literals to `*const c_char`, is gone.
+// `EnergyShieldStationSettings`/`EnergyAmmoStationSettings`/`EnergyHealthStationSettings` call the canonical
+// `ctx`-based `G_SpawnInt` in `g_spawn.rs` instead.
+// The shim has zero live callers, per porting-rules §20.

@@ -1,4 +1,4 @@
-//! `g_init_game` — Raven `G_InitGame` (`g_main.c:897-1118`).
+//! `g_init_game` - Raven `G_InitGame` (`g_main.c:897-1118`).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -25,10 +25,9 @@ use crate::NPC_combat::CP_FindCombatPointWaypoints;
 use mp_bg::bg_saberLoad::WP_SaberLoadParms;
 use mp_bg::bg_vehicleLoad::BG_VehicleLoadParms;
 
-// Explicit import: `mp_bg::public::configstring::*` and `crate::g_client::*`
-// both glob-export `CS_CLIENT_JEDIMASTER` (prelude ambiguous-glob-reexports
-// warning); an explicit import resolves the ambiguity for this file, matching
-// the g_main.rs precedent for the same configstring family.
+// Explicit import: `mp_bg::public::configstring::*` and `crate::g_client::*` both glob-export `CS_CLIENT_JEDIMASTER`.
+// This causes a prelude ambiguous-glob-reexports warning, so this file uses an explicit import.
+// The import matches the g_main.rs precedent for the same configstring family.
 use mp_bg::public::configstring::CS_CLIENT_JEDIMASTER;
 
 use mp_abi::game::vmcalls::GAME_INIT::GameInitArgs;
@@ -39,45 +38,42 @@ use mp_abi::game::syscalls::G_LOCATE_GAME_DATA::GLocateGameDataArgs;
 use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs;
 use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 
-// `MAX_INFO_STRING` resolves via the crate prelude glob
-// (`mp_qshared::shared::limits`); the shadowing local copy (and its stale "no
-// ported home" note) was removed by the placeholder-const sweep.
+// `MAX_INFO_STRING` resolves via the crate prelude glob (`mp_qshared::shared::limits`).
+// The shadowing local copy and its stale "no ported home" note were removed.
 
 /// Raven `void G_InitGame( int levelTime, int randomSeed, int restart )`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:897-1118`
 pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
-    // Arm the ctx-less `strap_*` seam engine cell from the GAME_INIT
-    // entrypoint that owns the engine, before any bg logic can call `strap_*`.
+    // This arms the ctx-less `strap_*` engine cell from the GAME_INIT entrypoint that owns the engine.
+    // This must happen before any bg logic can call `strap_*`.
     crate::g_strap::init_strap_engine(ctx.engine);
-    // Arm (re-arm) the seam world cell for the ctx-less boundary fns whose
-    // oracle bodies read the `level` global (`G_AddEvent`/`G_PlayEffect`/
-    // `G_PlayEffectID`, `g_utils.c`); the shell rebuilds the world Box every
-    // GAME_INIT, so this re-arms each time.
+    // This arms, or re-arms, the world cell for the ctx-less boundary functions.
+    // Their oracle bodies read the `level` global (`G_AddEvent`/`G_PlayEffect`/`G_PlayEffectID`, `g_utils.c`).
+    // The shell rebuilds the world `Box` on every GAME_INIT, so this call re-arms the cell each time.
     crate::g_strap::init_strap_world(ctx.world);
 
     unsafe {
-        // Raven: `#ifdef _XBOX` guards `BG_ClearVehicleParseParms()` +
-        // `RemoveAllWP()` here (`g_main.c:902-907`) — dead branch on this
-        // (non-Xbox) build, dropped per the `_XBOX`-branch-drop precedent
-        // (`q_math.rs`, `NPC_utils.rs`).
+        // Raven's `#ifdef _XBOX` guards `BG_ClearVehicleParseParms()` and `RemoveAllWP()` here (`g_main.c:902-907`).
+        // This branch is dead on this non-Xbox build, dropped per the `_XBOX`-branch-drop precedent (`q_math.rs`, `NPC_utils.rs`).
 
-        // Init RMG to 0, it will be autoset to 1 if there is terrain on the level.
+        //Init RMG to 0, it will be autoset to 1 if there is terrain on the level.
         trap::Cvar_Set(ctx.engine, "RMG", "0");
         ctx.world.cvars.g_RMG.integer = 0;
 
-        // Clean up any client-server ghoul2 instance attachments that may
-        // still exist exe-side.
+        //Clean up any client-server ghoul2 instance attachments that may still exist exe-side
         trap::G2API_CleanEntAttachments(ctx.engine, GG2CleanentattachmentsArgs::new());
 
-        // The bg-channel handles this transcription threads through the
-        // BgTraps/GameCallbacks seam (bg has no `Engine`/`GameContext`).
+        // The `bg` crate has no `Engine` or `GameContext`.
+        // This call threads through the BgTraps/GameCallbacks interface via the bg-channel.
         let bg_traps = GameBgTraps::new(ctx.engine);
 
         // BG_InitAnimsets(); //clear it out
         {
             let mut callbacks = GameCallbacksImpl {
-                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -92,13 +88,12 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             GSetSharedBufferArgs::new(ctx.world.gSharedBuffer.as_registration_ptr()),
         );
 
-        // Load external vehicle data
+        //Load external vehicle data
         BG_VehicleLoadParms(&mut ctx.world.bg_state, &bg_traps);
 
         G_Printf(ctx, "------- Game Initialization -------\n");
         G_Printf(ctx, "gamename: basejka\n");
-        // Raven's `__DATE__` (compile-time C macro): `build.rs` emits it as
-        // the `BUILD_DATE` env var (`__DATE__` format, computed at build time).
+        // Raven's `__DATE__` (compile-time C macro): `build.rs` emits it as the `BUILD_DATE` env var (`__DATE__` format, computed at build time).
         G_Printf(
             ctx,
             &format!(
@@ -107,17 +102,16 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             ),
         );
 
-        // Raven `srand( randomSeed )` — resolves to `bg_lib.c`'s own
-        // `srand`/`rand` pair (not the platform libc), which seed the
-        // `randSeed` LCG dozens of gameplay sites read via bare `rand()`
-        // (ai_main.c bot aim jitter, g_client.c/g_items.c/g_team.c/g_utils.c
-        // spawn-choice picks). That LCG is `BgState::rng`'s `randSeed` field
-        // (`bg_channel/rng.rs`); reseed it here.
+        // Raven `srand( randomSeed )` resolves to `bg_lib.c`'s own `srand`/`rand` pair, not the platform libc.
+        // That pair seeds the `randSeed` LCG that dozens of gameplay sites read via bare `rand()`,
+        // including ai_main.c bot aim jitter and g_client.c/g_items.c/g_team.c/g_utils.c spawn-choice picks.
+        // The LCG is `BgState::rng`'s `randSeed` field (`bg_channel/rng.rs`).
+        // We reseed it here.
         ctx.world.bg_state.rng.srand(args.random_seed() as c_uint);
 
         G_RegisterCvars(ctx);
 
-        // Raven: `//G_ProcessIPBans();` — already commented out in the oracle.
+        // Raven: `//G_ProcessIPBans();` is already commented out in the oracle.
         G_LoadIPBans(ctx);
 
         G_InitMemory(ctx);
@@ -133,10 +127,9 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         ctx.world.level.snd_medHealed = G_SoundIndex(ctx, "sound/player/supp_healed.wav");
         ctx.world.level.snd_medSupplied = G_SoundIndex(ctx, "sound/player/supp_supplied.wav");
 
-        // Raven: `//trap_SP_RegisterServer("mp_svgame");` — already commented
-        // out in the oracle.
+        // Raven: `//trap_SP_RegisterServer("mp_svgame");` is already commented out in the oracle.
 
-        // Raven guards this block with `#ifndef _XBOX` — live on this build.
+        // Raven guards this block with `#ifndef _XBOX`, which is live on this build.
         if ctx.world.cvars.g_log.string[0] != 0 {
             let mode = if ctx.world.cvars.g_logSync.integer != 0 {
                 FS_APPEND_SYNC
@@ -175,13 +168,12 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         G_InitWorldSession(ctx);
 
-        // initialize all entities for this game — Raven `memset(g_entities, 0,
-        // ...)` (g_main.c). The owned `String`/`Option<String>` fields must be
-        // dropped before the byte-zero and re-seated after: their all-zero byte
-        // image is an INVALID value, not `None`/`""` (the `Option<String>`
-        // niche is Vec's capacity invariant, not the null pointer — zeroed
-        // bytes decode as a null-pointer `Some`). `FnId<EntXxx>` handler fields
-        // stay zero == `None` (`Option<NonZeroU8>`, std-guaranteed).
+        // initialize all entities for this game
+        // Raven's `memset(g_entities, 0, ...)` (g_main.c) zeroes the array.
+        // The owned `String`/`Option<String>` fields must drop before the byte-zero and re-seat after.
+        // Their all-zero byte image is an INVALID value, not `None` or `""`.
+        // The `Option<String>` niche uses `Vec`'s capacity invariant, not the null pointer, so zeroed bytes decode as a null-pointer `Some`.
+        // `FnId<EntXxx>` handler fields stay zero as `None` (`Option<NonZeroU8>`, guaranteed by std).
         {
             let base = ctx.world.g_entities.as_mut_ptr();
             for i in 0..MAX_GENTITIES {
@@ -196,9 +188,9 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         // initialize all clients for this game
         ctx.world.level.maxclients = ctx.world.cvars.g_maxclients.integer;
-        // Raven `memset(g_clients, 0, sizeof(g_clients))` (g_main.c). `netname` is
-        // a `String`, so reset each slot to its zero image (dropping any prior
-        // occupant's name) rather than byte-zeroing over live `String`s.
+        // Raven `memset(g_clients, 0, sizeof(g_clients))` (g_main.c).
+        // `netname` is a `String`, so reset each slot to its zero image, dropping any prior occupant's name,
+        // rather than byte-zeroing over live `String`s.
         for i in 0..MAX_CLIENTS {
             ctx.world.clients[i] = gclient_t::default();
         }
@@ -228,7 +220,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             ),
         );
 
-        // Load sabers.cfg data
+        //Load sabers.cfg data
         WP_SaberLoadParms(&mut ctx.world.bg_state, &bg_traps);
 
         NPC_InitGame(ctx);
@@ -297,8 +289,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         SaveRegisteredItems(ctx);
 
-        // Raven: `//G_Printf ("-----------------------------------\n");` —
-        // already commented out in the oracle.
+        // Raven: `//G_Printf ("-----------------------------------\n");` is already commented out in the oracle.
 
         if ctx.world.cvars.g_gametype.integer == GT_SINGLE_PLAYER
             || trap::Cvar_VariableIntegerValue(ctx.engine, "com_buildScript") != 0
@@ -338,8 +329,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             //need to do this, because combatpoint waypoints aren't saved out...?
             CP_FindCombatPointWaypoints(ctx);
             ctx.world.globals.navCalcPathTime = 0;
-            // Raven's commented-out `eSavedGameJustLoaded` failed-edge clear
-            // is SP-only ("No loading games in MP.").
+            // Raven's commented-out `eSavedGameJustLoaded` failed-edge clear is SP-only ("No loading games in MP.").
         }
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {

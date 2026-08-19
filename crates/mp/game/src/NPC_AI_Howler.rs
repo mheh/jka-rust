@@ -1,58 +1,44 @@
-// PORT-COMPLETE: NPC_AI_Howler.c
+//! This is a port of `oracle/codemp/game/NPC_AI_Howler.c`.
 //!
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Howler.c`.
-//!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
-//!
-//! PORT STATUS: 3 functions ported (NPC_Howler_Precache, Howler_Idle,
-//! NPC_Howler_Pain), 6 parked under `ambient-ai-state` escalation —
-//! Howler_Patrol, Howler_Move, Howler_TryDamage, Howler_Attack,
-//! Howler_Combat, NPC_BSHowler_Default all read/write the ambient `NPC`
-//! and `NPCInfo` globals (b_local.h) that are set per-frame by ai_main.c
-//! before calling through the bState fn-pointer table. The fnskel-generated
-//! signatures take the C signature faithfully (zero params for most), and
-//! neither the packet's rulings nor GameWorld establish how a behavior-state
-//! fn reaches "the NPC currently being thought for" — this is a cross-file
-//! architecture decision above single-file packet scope.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps
+//! through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
-// Raven `#define LSTATE_*` — file-scope local state for Howler NPC
-// (stored in `gNPC_t::localState`).
+// Raven `#define LSTATE_*`, file-scope local state for the Howler NPC.
+// The state lives in `gNPC_t::localState`.
 // Source: `oracle/codemp/game/NPC_AI_Howler.c:10-11`
 pub const LSTATE_CLEAR: i32 = 0;
 pub const LSTATE_WAITING: i32 = 1;
 
-// Combat distance constants for Howler melee attacks.
-// Source: `oracle/codemp/game/NPC_AI_Howler.c:4,7`
+// These define the working combat range for these suckers
+// Source: `oracle/codemp/game/NPC_AI_Howler.c:3-7`
 const MIN_DISTANCE: c_int = 54;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const MAX_DISTANCE: c_int = 128;
 
-// SETANIM_BOTH (= SETANIM_TORSO|SETANIM_LEGS), BOTH_PAIN1, and BOTH_ATTACK1 come
-// from the prelude (set_anim / anim_number); no local copies here so the enum
-// values stay authoritative. SETANIM_FLAG_* imported from `mp_bg::public::set_anim`.
+// `SETANIM_BOTH` (`SETANIM_TORSO | SETANIM_LEGS`), `BOTH_PAIN1`, and `BOTH_ATTACK1` come from the prelude (`set_anim` / `anim_number`).
+// No local copies live here, so the enum values stay authoritative.
+// `SETANIM_FLAG_*` comes from `mp_bg::public::set_anim`.
 // Source: `oracle/codemp/game/bg_public.h:500`, `anims.h`
 
 /// Raven `NPC_Howler_Precache`.
 ///
-/// Precache sounds/effects for Howler NPC (currently a no-op in Raven).
+/// This precaches sounds and effects for the Howler NPC.
+/// The function is empty in Raven.
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:18-20`
 pub fn NPC_Howler_Precache() {
-    // Empty in oracle (faithfully ported as no-op).
 }
 
 /// Raven `Howler_Idle`.
 ///
-/// Idle behavior for Howler NPC (currently a no-op in Raven).
+/// This is the idle behavior for the Howler NPC.
+/// The function is empty in Raven.
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:28-30`
 pub fn Howler_Idle() {
-    // Empty in oracle (faithfully ported as no-op).
 }
 
 /// Raven `Howler_Patrol`.
@@ -61,14 +47,14 @@ pub fn Howler_Idle() {
 pub fn Howler_Patrol(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+    // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     unsafe {
         (*npc_info).localState = LSTATE_CLEAR;
     }
 
-    // If we have somewhere to go, then do that
+    //If we have somewhere to go, then do that
     if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
         ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
         crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
@@ -79,7 +65,7 @@ pub fn Howler_Patrol(ctx: &mut GameContext) {
         }
     }
 
-    // rwwFIXMEFIXME: Care about all clients, not just client 0
+    //rwwFIXMEFIXME: Care about all clients, not just client 0
     let mut dif: vec3_t = [0.0; 3];
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
     crate::q_math::_VectorSubtract(
@@ -104,7 +90,7 @@ pub fn Howler_Patrol(ctx: &mut GameContext) {
 pub fn Howler_Move(ctx: &mut GameContext, visible: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; derefs stay raw.
+    // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     unsafe {
@@ -131,9 +117,8 @@ pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: 
     let mut dir: vec3_t = [0.0; 3];
     let mut tr: trace_t = unsafe { std::mem::zeroed() };
 
-    // FLAG (task #7): NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
-    // `level.clients` slot; the pointer is read via the entity borrow and
-    // dereffed raw exactly as Raven does.
+    // FLAG: NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) is not a `level.clients` slot.
+    // The pointer is read via the entity borrow and dereffed raw, matching Raven.
     let client = ctx.world.entity(npc_id).client;
     let viewangles = unsafe { (*client).ps.viewangles };
     crate::q_math::AngleVectors(viewangles, Some(&mut dir), None, None);
@@ -209,7 +194,7 @@ pub fn Howler_Attack(ctx: &mut GameContext) {
 pub fn Howler_Combat(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; derefs stay raw.
+    // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     let distance: f32;
@@ -234,9 +219,9 @@ pub fn Howler_Combat(ctx: &mut GameContext) {
     crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
-    // Raven derefs `enemy_ptr` (from `NPC->enemy`); the caller
-    // (`NPC_BSHowler_Default`) only enters combat with a live enemy, so unwrap
-    // here (a null enemy would be a null deref in Raven).
+    // Raven derefs `NPC->enemy` directly.
+    // The caller, `NPC_BSHowler_Default`, only enters combat with a live enemy, so this unwraps here.
+    // A null enemy would be a null deref in Raven too.
     let enemy_origin = ctx.world.entity(enemy.unwrap()).r.currentOrigin;
     distance = crate::q_math::DistanceHorizontalSquared(npc_origin, enemy_origin);
     advance = (distance > MIN_DISTANCE_SQR as f32) as qboolean;
@@ -259,8 +244,8 @@ pub fn Howler_Combat(ctx: &mut GameContext) {
 
 /// Raven `NPC_Howler_Pain`.
 ///
-/// Raven: pain handler when Howler takes damage >= 10. Sets pain animation
-/// and waiting state, cancels current attack.
+/// This runs on damage of 10 or more.
+/// The function sets the pain animation, sets the waiting state, and cancels the current attack.
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:178-194`
 pub fn NPC_Howler_Pain(
     ctx: &mut GameContext,
@@ -268,13 +253,12 @@ pub fn NPC_Howler_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1 removed: `self_` stays `EntityId`; `attacker` is unused in the body
-    // (as in Raven).
+    // `attacker` is unused in the body, matching Raven.
     if damage >= 10 {
         crate::g_timer::TIMER_Remove(ctx, Some(self_), c"attacking".as_ptr());
         crate::g_timer::TIMER_Set(ctx, Some(self_), c"takingPain".as_ptr(), 2900);
 
-        // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+        // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if !npc.is_null() {
             let last_path_angles = unsafe { (*npc).lastPathAngles };
@@ -289,7 +273,7 @@ pub fn NPC_Howler_Pain(
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
 
-        // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+        // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the deref stays raw.
         let npc = ctx.world.entity(self_).NPC;
         if !npc.is_null() {
             unsafe {
@@ -301,13 +285,13 @@ pub fn NPC_Howler_Pain(
 
 /// Raven `NPC_BSHowler_Default`.
 ///
-/// Default behavior state for Howler NPC — dispatch based on whether the
-/// Howler has an enemy target or is in patrol/idle mode.
+/// This is the default behavior state for the Howler NPC.
+/// It dispatches based on whether the Howler has an enemy target or is in patrol or idle mode.
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:202-218`
 pub fn NPC_BSHowler_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+    // FLAG: NPCInfo (gNPC_t) has no safe accessor, so the deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if ctx.world.entity(npc_id).enemy.is_some() {

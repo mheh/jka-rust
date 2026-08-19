@@ -1,15 +1,10 @@
-// PORT-COMPLETE: NPC_AI_Droid.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Droid.c`.
+//! Raven `NPC_AI_Droid.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the threaded `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state campaign 2c: entity (`gentity_t`) derefs of the ambient `NPC`
-//! (and the `self_` handle) reads/writes route through the `GameWorld`/`GameContext`
-//! accessors (`ctx.world.entity()`/`entity_mut()`) instead of raw pointers. The
-//! `NPCInfo` (`gNPC_t`) and `.client` (`gclient_t`) derefs stay raw — those two
-//! regimes are task #7 territory and remain in isolated `unsafe` blocks.
+//! Entity (`gentity_t`) derefs of the ambient `NPC` and the `self_` handle route through the `GameWorld`/`GameContext` accessors
+//! (`ctx.world.entity()`/`entity_mut()`) instead of raw pointers.
+//! The `gNPC_t` (`NPCInfo`) and `.client` (`gclient_t`) derefs stay raw in isolated `unsafe` blocks.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::cstr_util::cstr;
@@ -45,7 +40,7 @@ const TURN_OFF: c_int = 0x00000100;
 
 /// Raven `R2D2_PartsMove`.
 ///
-/// Raven: Front 'eye' lense animation.
+/// Raven: Front 'eye' lense
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:24-46`
 pub fn R2D2_PartsMove(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
@@ -82,7 +77,7 @@ pub fn R2D2_PartsMove(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:53-58`
 pub fn Droid_Idle() {
-    // Empty function — Raven code has only commented-out code
+    // The function is empty because Raven's code here is only commented-out code.
 }
 
 /// Raven `R2D2_TurnAnims`.
@@ -97,20 +92,19 @@ pub fn R2D2_TurnAnims(ctx: &mut GameContext) {
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
     let current_yaw = ctx.world.entity(npc_id).r.currentAngles[1];
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
     let desired_yaw = unsafe { (*npc_info).desiredYaw };
     let turndelta = AngleDelta(current_yaw, desired_yaw); // YAW = 1
     let anim: c_int;
 
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: the gclient_t (.client) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     let npc_class = unsafe { (*client).NPC_class };
 
     if (turndelta.abs() > 20.0)
         && (npc_class == class_t::CLASS_R2D2 || npc_class == class_t::CLASS_R5D2)
     {
-        // CLASS_R2D2 = 2, CLASS_R5D2 = 3 (or check from globals)
-        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        // FLAG: the gclient_t (.client) deref stays raw.
         anim = unsafe { (*client).ps.legsAnim };
         if turndelta < 0.0 {
             if anim != BOTH_TURN_LEFT1 as c_int {
@@ -158,12 +152,10 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
     let normalized = AngleNormalize360(ctx.world.entity(npc_id).pos1[1]);
     ctx.world.entity_mut(npc_id).pos1[1] = normalized;
 
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: the gclient_t (.client) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     if !client.is_null() && unsafe { (*client).NPC_class } != class_t::CLASS_GONK {
-        // CLASS_GONK
         if unsafe { (*client).NPC_class } != class_t::CLASS_R5D2 {
-            // CLASS_R5D2
             R2D2_PartsMove(ctx);
         }
         R2D2_TurnAnims(ctx);
@@ -173,14 +165,12 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
         ctx.world.globals.ucmd.buttons |= 1; // BUTTON_WALKING
         NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
 
-        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        // FLAG: the gclient_t (.client) deref stays raw.
         let client = ctx.world.entity(npc_id).client;
         if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_MOUSE {
-            // CLASS_MOUSE
-            // `.5` is a double literal and `sin` is the double libm: the whole
-            // term is evaluated in f64 and narrowed only on store to the float.
+            // `.5` is a double literal and `sin` is the double libm: the whole term is evaluated in f64 and narrowed only on store to the float.
             let time = ctx.world.level.time;
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: the gNPC_t (NPCInfo) deref stays raw.
             unsafe {
                 (*npc_info).desiredYaw =
                     ((*npc_info).desiredYaw as f64 + (time as f64 * 0.5).sin() * 25.0) as f32;
@@ -205,7 +195,6 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                 );
             }
         } else if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_R2D2 {
-            // CLASS_R2D2
             if TIMER_Done(
                 ctx,
                 Some(npc_id),
@@ -225,7 +214,6 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                 );
             }
         } else if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_R5D2 {
-            // CLASS_R5D2
             if TIMER_Done(
                 ctx,
                 Some(npc_id),
@@ -246,7 +234,6 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
             }
         }
         if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_GONK {
-            // CLASS_GONK
             if TIMER_Done(
                 ctx,
                 Some(npc_id),
@@ -283,10 +270,10 @@ pub fn Droid_Run(ctx: &mut GameContext) {
 
     R2D2_PartsMove(ctx);
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
     if unsafe { (*npc_info).localState } == LSTATE_BACKINGUP {
         ctx.world.globals.ucmd.forwardmove = -127;
-        // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: the gNPC_t (NPCInfo) derefs stay raw.
         unsafe {
             (*npc_info).desiredYaw += 5.0;
             (*npc_info).localState = LSTATE_NONE;
@@ -296,10 +283,9 @@ pub fn Droid_Run(ctx: &mut GameContext) {
         if !UpdateGoal(ctx).is_null() {
             if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
                 // qfalse
-                // `.5` is a double literal and `sin` is the double libm: the whole
-                // term is evaluated in f64 and narrowed only on store to the float.
+                // `.5` is a double literal and `sin` is the double libm: the whole term is evaluated in f64 and narrowed only on store to the float.
                 let time = ctx.world.level.time;
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_info).desiredYaw =
                         ((*npc_info).desiredYaw as f64 + (time as f64 * 0.5).sin() * 5.0) as f32;
@@ -326,12 +312,11 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
 
     R2D2_TurnAnims(ctx);
 
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: the gclient_t (.client) deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     let npc_class = unsafe { (*client).NPC_class };
 
     if npc_class == class_t::CLASS_R5D2 || npc_class == class_t::CLASS_R2D2 {
-        // CLASS_R5D2, CLASS_R2D2
         // No head?
         let ghoul2 = ctx.world.entity(npc_id).ghoul2;
         if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "head") > 0
@@ -380,19 +365,19 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                     delay,
                 );
                 let dy = ctx.world.bg_state.rng.Q_irand(0, 360) as f32;
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_info).desiredYaw = dy;
                 }
             }
         } else {
             if TIMER_Done(ctx, Some(npc_id), b"roam\0".as_ptr() as *const c_char) != 0 {
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_info).localState = LSTATE_NONE;
                 }
             } else {
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
                 }
@@ -400,12 +385,12 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
         }
     } else {
         if TIMER_Done(ctx, Some(npc_id), b"roam\0".as_ptr() as *const c_char) != 0 {
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: the gNPC_t (NPCInfo) deref stays raw.
             unsafe {
                 (*npc_info).localState = LSTATE_NONE;
             }
         } else {
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: the gNPC_t (NPCInfo) deref stays raw.
             unsafe {
                 (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
             }
@@ -427,18 +412,16 @@ pub fn NPC_Droid_Pain(
     let mod_: c_int = ctx.world.globals.gPainMOD;
     let mut pain_chance: f32;
 
-    // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
     let npc_ptr = ctx.world.entity(self_).NPC;
     let last_path_angles = unsafe { (*npc_ptr).lastPathAngles };
     crate::q_math::_VectorCopy(last_path_angles, &mut ctx.world.entity_mut(self_).s.angles);
 
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: the gclient_t (.client) deref stays raw.
     let client = ctx.world.entity(self_).client;
     let npc_class = unsafe { (*client).NPC_class };
 
     if npc_class == class_t::CLASS_R5D2 {
-        // CLASS_R5D2
         pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
         if mod_ == MOD_DEMP2 as c_int
@@ -451,7 +434,7 @@ pub fn NPC_Droid_Pain(
                 && (health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
             {
                 if (ctx.world.entity(self_).spawnflags & 2) == 0 {
-                    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                     let local_state = unsafe { (*npc_ptr).localState };
                     let ghoul2 = ctx.world.entity(self_).ghoul2;
                     if (local_state != LSTATE_SPINNING)
@@ -464,7 +447,7 @@ pub fn NPC_Droid_Pain(
                             TURN_OFF,
                         );
 
-                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        // FLAG: the gclient_t (.client) deref stays raw.
                         let veh = unsafe { (*client).ps.m_iVehicleNum };
                         if veh != 0 {
                             let mut up = [0.0f32; 3];
@@ -491,7 +474,7 @@ pub fn NPC_Droid_Pain(
                         }
 
                         let time = ctx.world.level.time;
-                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        // FLAG: the gclient_t (.client) deref stays raw.
                         unsafe {
                             (*client).ps.electrifyTime = time + 3000;
                         }
@@ -503,14 +486,14 @@ pub fn NPC_Droid_Pain(
                             5000,
                         );
                         TIMER_Set(ctx, Some(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
-                        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                        // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                         unsafe {
                             (*npc_ptr).localState = LSTATE_SPINNING;
                         }
                     }
                 }
             } else {
-                // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                // FLAG: the gclient_t (.client) deref stays raw.
                 let anim = unsafe { (*client).ps.legsAnim };
 
                 if anim == BOTH_STAND2 as c_int {
@@ -531,7 +514,7 @@ pub fn NPC_Droid_Pain(
                     );
                 }
 
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_ptr).localState = LSTATE_SPINNING;
                 }
@@ -540,27 +523,25 @@ pub fn NPC_Droid_Pain(
             }
         }
     } else if npc_class == class_t::CLASS_MOUSE {
-        // CLASS_MOUSE
         if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
             let time = ctx.world.level.time;
-            // gNPC_t + gclient derefs stay raw (task #7 regimes) — FLAG.
+            // FLAG: the gNPC_t (NPCInfo) and gclient_t (.client) derefs stay raw.
             unsafe {
                 (*npc_ptr).localState = LSTATE_SPINNING;
                 (*client).ps.electrifyTime = time + 3000;
             }
         } else {
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: the gNPC_t (NPCInfo) deref stays raw.
             unsafe {
                 (*npc_ptr).localState = LSTATE_BACKINGUP;
             }
         }
 
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: the gNPC_t (NPCInfo) deref stays raw.
         unsafe {
             (*npc_ptr).scriptFlags &= !SCF_LOOK_FOR_ENEMIES;
         }
     } else if npc_class == class_t::CLASS_R2D2 {
-        // CLASS_R2D2
         pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
         if mod_ == MOD_DEMP2 as c_int
@@ -573,7 +554,7 @@ pub fn NPC_Droid_Pain(
                 && (health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
             {
                 if (ctx.world.entity(self_).spawnflags & 2) == 0 {
-                    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                     let local_state = unsafe { (*npc_ptr).localState };
                     let ghoul2 = ctx.world.entity(self_).ghoul2;
                     if (local_state != LSTATE_SPINNING)
@@ -586,7 +567,7 @@ pub fn NPC_Droid_Pain(
                             TURN_OFF,
                         );
 
-                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        // FLAG: the gclient_t (.client) deref stays raw.
                         let veh = unsafe { (*client).ps.m_iVehicleNum };
                         if veh != 0 {
                             let mut up = [0.0f32; 3];
@@ -613,7 +594,7 @@ pub fn NPC_Droid_Pain(
                         }
 
                         let time = ctx.world.level.time;
-                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        // FLAG: the gclient_t (.client) deref stays raw.
                         unsafe {
                             (*client).ps.electrifyTime = time + 3000;
                         }
@@ -625,14 +606,14 @@ pub fn NPC_Droid_Pain(
                             5000,
                         );
                         TIMER_Set(ctx, Some(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
-                        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                        // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                         unsafe {
                             (*npc_ptr).localState = LSTATE_SPINNING;
                         }
                     }
                 }
             } else {
-                // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                // FLAG: the gclient_t (.client) deref stays raw.
                 let anim = unsafe { (*client).ps.legsAnim };
 
                 if anim == BOTH_STAND2 as c_int {
@@ -653,7 +634,7 @@ pub fn NPC_Droid_Pain(
                     );
                 }
 
-                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                // FLAG: the gNPC_t (NPCInfo) deref stays raw.
                 unsafe {
                     (*npc_ptr).localState = LSTATE_SPINNING;
                 }
@@ -665,7 +646,6 @@ pub fn NPC_Droid_Pain(
         && (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
         && attacker.is_some()
     {
-        // CLASS_INTERROGATOR
         let attacker_id = attacker.unwrap();
         let mut dir = [0.0f32; 3];
         let self_origin = ctx.world.entity(self_).r.currentOrigin;
@@ -673,7 +653,7 @@ pub fn NPC_Droid_Pain(
         crate::q_math::_VectorSubtract(self_origin, attacker_origin, &mut dir);
         VectorNormalize(&mut dir);
 
-        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        // FLAG: the gclient_t (.client) deref stays raw.
         unsafe {
             let velocity = (*client).ps.velocity;
             crate::q_math::_VectorMA(velocity, 550.0, dir, &mut (*client).ps.velocity);
@@ -696,7 +676,7 @@ pub fn Droid_Pain(ctx: &mut GameContext) {
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
     if TIMER_Done(ctx, Some(npc_id), b"droidpain\0".as_ptr() as *const c_char) != 0 {
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: the gNPC_t (NPCInfo) deref stays raw.
         unsafe {
             (*npc_info).localState = LSTATE_NONE;
         }
@@ -786,7 +766,7 @@ pub fn NPC_BSDroid_Default(ctx: &mut GameContext) {
         return;
     }
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
     let local_state = unsafe { (*npc_info).localState };
     if local_state == LSTATE_SPINNING {
         Droid_Spin(ctx);
@@ -795,7 +775,7 @@ pub fn NPC_BSDroid_Default(ctx: &mut GameContext) {
     } else if local_state == LSTATE_DROP {
         NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
         ctx.world.globals.ucmd.upmove = (ctx.world.bg_state.rng.crandom() * 64.0) as c_int as i8;
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: the gNPC_t (NPCInfo) deref stays raw.
     } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
         Droid_Patrol(ctx);
     } else {

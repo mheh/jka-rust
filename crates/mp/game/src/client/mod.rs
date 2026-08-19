@@ -1,4 +1,4 @@
-//! MP server-side player client (`g_local.h`). Ported fresh from oracle.
+//! MP server-side player client (`g_local.h`).
 
 pub mod client_connected;
 pub mod client_persistant;

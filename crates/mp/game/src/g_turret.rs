@@ -1,18 +1,9 @@
-// PORT-COMPLETE: g_turret.c
-//! FAITHFUL port of `oracle/codemp/game/g_turret.c`.
-//!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
-//!
-//! Safe-state migration **Stage 2c**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5); bodies reach their entities through the
-//! `ctx.world.entity()`/`entity_mut()` accessors instead of re-deriving raw
-//! `gentity_t*` at the top. The only residual `unsafe` derefs are the sanctioned
-//! seam ones: pool `gclient_t*` reads (an arbitrary target/attacker/enemy may be
-//! an NPC carrying a `BG_Alloc`'d pool client, so its `client` value is read via
-//! the safe borrow and dereferenced raw — recipe 2b), `m_pVehicle`/
-//! `m_pVehicleInfo` (no accessor), and C-string byte checks.
+//! Entity-pointer parameters are `EntityId` / `Option<EntityId>` handles (§B5).
+//! Bodies reach their entities through the `ctx.world.entity()`/`entity_mut()` accessors instead of deriving raw `gentity_t*` pointers.
+//! The remaining `unsafe` derefs are the sanctioned seam ones.
+//! They cover pool `gclient_t*` reads, `m_pVehicle`/`m_pVehicleInfo` (no accessor), and C-string byte checks.
+//! An arbitrary target, attacker, or enemy may be an NPC carrying a `BG_Alloc`'d pool client.
+//! The code reads its `client` value through the safe borrow and dereferences it raw.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ent_fn_enums::{EntDie, EntPain, EntThink, EntUse};
@@ -64,8 +55,8 @@ pub fn TurretPain(
     }
 
     if let Some(attacker_id) = attacker {
-        // CLIENT-POINTER TRAP: attacker may be an NPC → pool client; read the
-        // `client` value via the safe borrow and deref it raw (recipe 2b).
+        // CLIENT-POINTER TRAP: the attacker may be an NPC with a pool client.
+        // The code reads the `client` value through the safe borrow and dereferences it raw.
         let client = ctx.world.entity(attacker_id).client;
         if !client.is_null() {
             let weapon = unsafe { (*client).ps.weapon };
@@ -135,7 +126,6 @@ pub fn auto_turret_die(
         e.s.loopSound = 0;
         e.s.shouldtarget = qfalse;
 
-        // VectorCopy(self->r.currentOrigin, pos)
         pos[0] = e.r.currentOrigin[0];
         pos[1] = e.r.currentOrigin[1];
         pos[2] = e.r.currentOrigin[2];
@@ -178,12 +168,10 @@ pub fn auto_turret_die(
 
         {
             let e = ctx.world.entity_mut(self_);
-            // VectorCopy(self->r.currentAngles, self->s.apos.trBase)
             e.s.apos.trBase[0] = e.r.currentAngles[0];
             e.s.apos.trBase[1] = e.r.currentAngles[1];
             e.s.apos.trBase[2] = e.r.currentAngles[2];
 
-            // VectorClear(self->s.apos.trDelta)
             e.s.apos.trDelta[0] = 0.0;
             e.s.apos.trDelta[1] = 0.0;
             e.s.apos.trDelta[2] = 0.0;
@@ -271,12 +259,10 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     b.methodOfDeath = MOD_TARGET_LASER as c_int;
     b.clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 
-    // VectorSet(maxs, 1.5, 1.5, 1.5)
     b.r.maxs[0] = 1.5;
     b.r.maxs[1] = 1.5;
     b.r.maxs[2] = 1.5;
 
-    // VectorScale(maxs, -1.0, mins)
     b.r.mins[0] = -b.r.maxs[0];
     b.r.mins[1] = -b.r.maxs[1];
     b.r.mins[2] = -b.r.maxs[2];
@@ -284,28 +270,24 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     b.s.pos.trType = TR_LINEAR;
     b.s.pos.trTime = level_time;
 
-    // VectorCopy(start, trBase)
     b.s.pos.trBase[0] = start[0];
     b.s.pos.trBase[1] = start[1];
     b.s.pos.trBase[2] = start[2];
 
-    // VectorScale(dir, ent->mass, trDelta)
     b.s.pos.trDelta[0] = dir[0] * ent_mass as f32;
     b.s.pos.trDelta[1] = dir[1] * ent_mass as f32;
     b.s.pos.trDelta[2] = dir[2] * ent_mass as f32;
 
     snap_vector(&mut b.s.pos.trDelta);
 
-    // VectorCopy(start, currentOrigin)
     b.r.currentOrigin[0] = start[0];
     b.r.currentOrigin[1] = start[1];
     b.r.currentOrigin[2] = start[2];
 
     b.parent = Some(ent);
 
-    // Prefix write routes through the single `set()` choke point (Raven
-    // `bolt->classname = "turret_proj"`); the raw-ptr-into-ctx seam mirrors the
-    // dispatch code, since `set()` needs `ctx` while the entity is borrowed.
+    // The prefix write goes through the single `set()` function, matching Raven's `bolt->classname = "turret_proj"`.
+    // The raw pointer into `ctx` mirrors the dispatch code, because `set()` needs `ctx` while the entity is borrowed.
     ctx.ent_set(bolt_id, PrefixSet::ClassnameStatic(c"turret_proj"));
 }
 
@@ -344,12 +326,10 @@ pub fn turret_head_think(ctx: &mut GameContext, self_: EntityId) {
         let wait = ctx.world.entity(self_).wait as c_int;
         ctx.world.entity_mut(self_).setTime = level_time + wait;
 
-        // Get top entity's position and angles
         let top_origin = ctx.world.entity(top_id).r.currentOrigin;
         let top_angles = ctx.world.entity(top_id).r.currentAngles;
         let top_maxs = ctx.world.entity(top_id).r.maxs[2];
 
-        // VectorCopy(top->r.currentOrigin, org)
         org[0] = top_origin[0];
         org[1] = top_origin[1];
         org[2] = top_origin[2];
@@ -360,7 +340,6 @@ pub fn turret_head_think(ctx: &mut GameContext, self_: EntityId) {
         // AngleVectors(top->r.currentAngles, fwd, NULL, NULL)
         AngleVectors(top_angles, Some(&mut fwd), None, None);
 
-        // VectorMA(org, START_DIS, fwd, org)
         org[0] = org[0] + START_DIS * fwd[0];
         org[1] = org[1] + START_DIS * fwd[1];
         org[2] = org[2] + START_DIS * fwd[2];
@@ -394,8 +373,7 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
 
     let level_time = ctx.world.level.time;
 
-    // Evaluate trajectory for the gun base. `currentAngles` is the entity's
-    // persistent field (evaluated + normalized here, written back at the end).
+    // `currentAngles` is the entity's persistent field, evaluated and normalized here and written back at the end.
     let apos = ctx.world.entity(top_id).s.apos;
     let mut currentAngles: vec3_t = [0.0; 3];
     BG_EvaluateTrajectory(&apos as *const trajectory_t, level_time, &mut currentAngles);
@@ -404,7 +382,7 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
     turnSpeed = ctx.world.entity(top_id).speed;
 
     if ctx.world.entity(self_).painDebounceTime > level_time {
-        // In pain — aim randomly
+        // In pain, aim randomly.
         // Oracle uses `flrand` (holdrand stream), not the `random()` macro.
         // Source: `oracle/codemp/game/g_turret.c:249-250`
         desiredAngles[YAW] = currentAngles[YAW] + ctx.world.bg_state.rng.flrand(-45.0, 45.0);
@@ -437,11 +415,10 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
             && enemy_npcclass == class_t::CLASS_VEHICLE as c_int
             && !enemy_veh.is_null()
         {
-            // FLAG: m_pVehicle / m_pVehicleInfo have no accessor; the vehicle
-            // derefs stay raw (recipe 2c). C dereferences `m_pVehicleInfo`
-            // unconditionally here; the added null guard is a defined-behavior
-            // choice for the (always-holding) `m_pVehicle` non-null =>
-            // `m_pVehicleInfo` non-null invariant.
+            // FLAG: `m_pVehicle` and `m_pVehicleInfo` have no accessor, so the vehicle derefs stay raw.
+            // The oracle dereferences `m_pVehicleInfo` unconditionally here.
+            // The added null guard is a defined-behavior choice for the invariant.
+            // A non-null `m_pVehicle` always has a non-null `m_pVehicleInfo`.
             unsafe {
                 if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
                     if (*(*enemy_veh).m_pVehicleInfo).r#type == VH_WALKER {
@@ -473,10 +450,9 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
         diffYaw = AngleSubtract(desiredAngles[YAW], currentAngles[YAW]);
         diffPitch = AngleSubtract(desiredAngles[PITCH], currentAngles[PITCH]);
     } else {
-        // No enemy — pan back and forth
-        // C: `sin( level.time * 0.0001f + top->count )` — the sum is float
-        // (the `0.0001f` literal and int operands stay float), then promotes
-        // to double for the libm `sin`, and the result truncates to float.
+        // No enemy, pan back and forth.
+        // Raven's `sin( level.time * 0.0001f + top->count )` computes the sum in `f32`, since the `0.0001f` literal and the int operand stay float.
+        // The sum promotes to `f64` for the libm `sin`, and the result truncates back to `f32`.
         let top_count = ctx.world.entity(top_id).count;
         let self_angles_yaw = ctx.world.entity(self_).s.angles[YAW];
         desiredAngles[YAW] = ((level_time as f32 * 0.0001 + top_count as f32) as f64).sin() as f32;
@@ -547,12 +523,10 @@ pub fn turret_turnoff(ctx: &mut GameContext, self_: EntityId) {
     if top_num < ctx.world.g_entities.len() {
         let top = ctx.world.entity_mut(EntityId(top_num as u32));
 
-        // VectorCopy(top->r.currentAngles, top->s.apos.trBase)
         top.s.apos.trBase[0] = top.r.currentAngles[0];
         top.s.apos.trBase[1] = top.r.currentAngles[1];
         top.s.apos.trBase[2] = top.r.currentAngles[2];
 
-        // VectorClear(top->s.apos.trDelta)
         top.s.apos.trDelta[0] = 0.0;
         top.s.apos.trDelta[1] = 0.0;
         top.s.apos.trDelta[2] = 0.0;
@@ -630,8 +604,8 @@ pub fn turret_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             Some(t) => t,
             None => continue,
         };
-        // CLIENT-POINTER TRAP: an arbitrary radius target may be an NPC → pool
-        // client; read the `client` value via the safe borrow, deref raw (2b).
+        // CLIENT-POINTER TRAP: a radius target may be an NPC with a pool client.
+        // The code reads the `client` value through the safe borrow and dereferences it raw.
         let target_client = ctx.world.entity(target_id).client;
         if target_client.is_null() {
             continue;
@@ -648,8 +622,7 @@ pub fn turret_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             continue;
         }
         if self_alliedTeam != 0 {
-            // `target_client` is provably non-null here (null was filtered
-            // above), so the oracle's `else`-teamnodmg arm is dead.
+            // `target_client` is provably non-null here, since null was filtered above, so the oracle's `else`-teamnodmg arm is dead.
             // FLAG: pool-client deref (target may be an NPC).
             if unsafe { (*target_client).sess.sessionTeam } == self_alliedTeam {
                 continue;
@@ -744,13 +717,13 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
     let level_time = ctx.world.level.time;
 
     if (ctx.world.entity(self_).spawnflags & 1) != 0 {
-        // Not turned on
+        // not turned on
         turret_turnoff(ctx, self_);
         ctx.world.entity_mut(self_).flags |= FL_NOTARGET;
         ctx.world.entity_mut(self_).nextthink = -1;
         return;
     } else {
-        // All hot and bothered
+        // I'm all hot and bothered
         ctx.world.entity_mut(self_).flags &= !FL_NOTARGET;
         ctx.world.entity_mut(self_).nextthink = level_time + FRAMETIME;
     }
@@ -761,19 +734,19 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
         }
     } else {
         let enemy_id = ctx.world.entity(self_).enemy.unwrap();
-        // CLIENT-POINTER TRAP: enemy may be an NPC → pool client; read the
-        // `client` value via the safe borrow, deref raw (recipe 2b).
+        // CLIENT-POINTER TRAP: the enemy may be an NPC with a pool client.
+        // The code reads the `client` value through the safe borrow and dereferences it raw.
         let enemy_client = ctx.world.entity(enemy_id).client;
         // FLAG: pool-client deref (enemy may be an NPC).
         let enemy_is_spectator = !enemy_client.is_null()
             && unsafe { (*enemy_client).sess.sessionTeam } == TEAM_SPECTATOR;
         if enemy_is_spectator {
-            // Don't keep going after spectators
+            //don't keep going after spectators
             ctx.world.entity_mut(self_).enemy = None;
         } else {
             //FIXME: remain single-minded or look for a new enemy every now and then?
             if ctx.world.entity(enemy_id).health > 0 {
-                // Enemy is alive
+                // enemy is alive
                 let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
                 let self_origin = ctx.world.entity(self_).r.currentOrigin;
                 let mut enemyDir = [0.0; 3];
@@ -785,7 +758,7 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
 
                 let radius = ctx.world.entity(self_).radius;
                 if enemyDist < (radius * radius) {
-                    // Was in valid radius
+                    // was in valid radius
                     if trap::InPVS(
                         ctx.engine,
                         mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
@@ -794,7 +767,7 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
                         ),
                     ) != 0
                     {
-                        // Every now and then, check if we can trace to enemy
+                        // Every now and again, check to see if we can even trace to the enemy
                         let mut tr: trace_t = unsafe { std::mem::zeroed() };
                         let mut org = [0.0; 3];
                         let mut org2 = [0.0; 3];
@@ -845,9 +818,8 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
                     }
                 }
             }
-            // Oracle calls turret_head_think only in this branch (enemy
-            // existed and is not a spectator), NOT on the frame a fresh
-            // enemy is acquired via turret_find_enemies.
+            // The code calls `turret_head_think` only when the enemy already existed and is not a spectator.
+            // It does not call `turret_head_think` on the frame a fresh enemy is acquired through `turret_find_enemies`.
             turret_head_think(ctx, self_);
         }
     }
@@ -874,8 +846,8 @@ pub fn turret_base_use(
 ) {
     // Toggle on and off
     self_.spawnflags ^= 1;
-    // Raven's commented-out EF_SHADER_ANIM frame toggle (g_turret.c:610-619)
-    // is dead code in the oracle source; not ported.
+    // Raven's commented-out `EF_SHADER_ANIM` frame toggle (`g_turret.c:610-619`) is dead code in the oracle source.
+    // The port omits it.
 }
 
 /// Raven `SP_misc_turret`.
@@ -902,12 +874,10 @@ pub fn SP_misc_turret(ctx: &mut GameContext, base: EntityId) {
         let b = ctx.world.entity_mut(base);
         b.r.contents = CONTENTS_BODY;
 
-        // VectorSet(maxs, 32, 32, 128)
         b.r.maxs[0] = 32.0;
         b.r.maxs[1] = 32.0;
         b.r.maxs[2] = 128.0;
 
-        // VectorSet(mins, -32, -32, 0)
         b.r.mins[0] = -32.0;
         b.r.mins[1] = -32.0;
         b.r.mins[2] = 0.0;
@@ -974,15 +944,15 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
 
     ctx.world.entity_mut(base).s.eType = ET_GENERAL as c_int;
 
-    // Set up explosion effects
+    // Set up our explosion effect for the ExplodeDeath code....
     G_EffectIndex(ctx, "turret/explode");
     G_EffectIndex(ctx, "sparks/spark_exp_nosnd");
     G_EffectIndex(ctx, "turret/hoth_muzzle_flash");
 
-    // Pitch angle (actually yaw, stored in speed field)
+    // this is really the pitch angle.....
     ctx.world.entity_mut(top_id).speed = 0.0;
 
-    // Random time offset for no-enemy-search-around mode
+    // this is a random time offset for the no-enemy-search-around-mode
     let rnd = ctx.world.bg_state.rng.random();
     ctx.world.entity_mut(top_id).count = (rnd * 9000.0) as c_int;
 
@@ -1011,13 +981,13 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
         b.die = Some(EntDie::bottom_die).into();
     }
 
-    // Shot speed
+    //design specified shot speed
     let mut mass = 0.0f32;
     G_SpawnFloat(ctx, c"shotspeed".as_ptr(), c"1100".as_ptr(), &mut mass);
     ctx.world.entity_mut(base).mass = mass;
     ctx.world.entity_mut(top_id).mass = mass;
 
-    // Light crosshair
+    //even if we don't want to show health, let's at least light the crosshair up properly over ourself
     if ctx.world.entity(top_id).s.teamowner == 0 {
         let top_alliedTeam = ctx.world.entity(top_id).alliedTeam;
         ctx.world.entity_mut(top_id).s.teamowner = top_alliedTeam;
@@ -1031,11 +1001,11 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     ctx.world.entity_mut(base).s.shouldtarget = qtrue;
     ctx.world.entity_mut(top_id).s.shouldtarget = qtrue;
 
-    // Link them to each other
+    //link them to each other
     ctx.world.entity_mut(base).target_ent = Some(top_id);
     ctx.world.entity_mut(top_id).target_ent = Some(base);
 
-    // Search radius
+    // search radius
     if ctx.world.entity(base).radius == 0.0 {
         ctx.world.entity_mut(base).radius = 1024.0;
     }
@@ -1062,14 +1032,14 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     let base_splashRadius = ctx.world.entity(base).splashRadius;
     ctx.world.entity_mut(top_id).splashRadius = base_splashRadius;
 
-    // Damage per shot
+    // how much damage each shot does
     if ctx.world.entity(base).damage == 0 {
         ctx.world.entity_mut(base).damage = 100;
     }
     let base_damage = ctx.world.entity(base).damage;
     ctx.world.entity_mut(top_id).damage = base_damage;
 
-    // How fast it turns
+    // how fast it turns
     if ctx.world.entity(base).speed == 0.0 {
         ctx.world.entity_mut(base).speed = 20.0;
     }
@@ -1078,12 +1048,10 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
 
     {
         let tp = ctx.world.entity_mut(top_id);
-        // VectorSet(maxs, 48, 48, 16)
         tp.r.maxs[0] = 48.0;
         tp.r.maxs[1] = 48.0;
         tp.r.maxs[2] = 16.0;
 
-        // VectorSet(mins, -48, -48, 0)
         tp.r.mins[0] = -48.0;
         tp.r.mins[1] = -48.0;
         tp.r.mins[2] = 0.0;
@@ -1108,10 +1076,10 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
         tp.material = MAT_METAL;
     }
 
-    // Register item for missile effect
+    // Register this so that we can use it for the missile effect
     RegisterItem(ctx, BG_FindItemForWeapon(WP_EMPLACED_GUN));
 
-    // Set as turret
+    // But set us as a turret so that we can be identified as a turret
     ctx.world.entity_mut(top_id).s.weapon = WP_EMPLACED_GUN;
 
     let top_ptr: *mut gentity_t = ctx.world.entity_mut(top_id);
@@ -1122,5 +1090,5 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     qtrue
 }
 
-// `atoi` is the libc-parity helper reached via the prelude
-// (`crate::cstr_util::atoi`); no local extern shim.
+// `atoi` is the libc-parity helper reached through the prelude (`crate::cstr_util::atoi`).
+// The file needs no local extern shim.

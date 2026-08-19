@@ -1,44 +1,35 @@
-// PORT-COMPLETE: g_navnew.c
-//! Port of `oracle/codemp/game/g_navnew.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/g_navnew.c`.
 //!
-//! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the
-//! jampgame mega-pass (settled fork rulings,
-//! `docs/handoffs/jampgame-fork-discovery.md`).
+//! Logic functions that reach `level`, cvars, or traps thread the `GameContext<'_>` receiver
+//! (`.world: &mut GameWorld`, `.engine`) as an additive first parameter
+//! (`docs/architecture/engine-seam.md`, precedent `NPC_reactions.rs`/`w_force.rs`).
+//! The C signature carries none of this parameter.
+//! Globals map to `GameWorld` fields: `level` becomes `ctx.world.level`, and cvars become `ctx.world.cvars`.
+//! Traps go through `trap::X(ctx.engine, ..)`.
+//! `vec3_t` (`[f32; 3]`) is `Copy`, so the oracle's inline vector macros (`VectorCopy`, `VectorMA`,
+//! `VectorScale`, `VectorAdd`, `VectorSubtract`, `VectorClear`, `VectorSet`, `DotProduct`, `VectorCompare`)
+//! transcribe as plain array arithmetic, not function calls.
+//! Raw `gentity_t*` chains stay `unsafe` raw-pointer field access that mirrors the C exactly.
+//! `gentity_t::NPC` and `::client` are opaque `*mut c_void`, cast to `gNPC_t`/`gclient_t` per the
+//! `NPC_reactions.rs` precedent.
 //!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
-//! `NPC_reactions.rs`/`w_force.rs`): logic fns that reach `level`/cvars/traps
-//! thread the `GameContext<'_>` receiver (`.world: *mut GameWorld`, `.engine`)
-//! as an ADDITIVE first parameter (the faithful C signature carries none).
-//! `level` -> `ctx.world.level`, cvars -> `ctx.world.cvars`. Traps go
-//! through `trap::X(ctx.engine, ..)`. `vec3_t` (`[f32;3]`) is `Copy`, so
-//! `VectorCopy`/`VectorMA`/`VectorScale`/`VectorAdd`/`VectorSubtract`/
-//! `VectorClear`/`VectorSet`/`DotProduct`/`VectorCompare` (all inline macros
-//! in the oracle) transcribe as plain array arithmetic per the bless-the-rule
-//! appendix, not function calls. Raw `gentity_t*` chains are `unsafe`
-//! raw-pointer field access mirroring the C exactly (`gentity_t::NPC`/
-//! `::client` are opaque `*mut c_void`, cast to `gNPC_t`/`gclient_t` per the
-//! `NPC_reactions.rs` precedent).
+//! `NAVNEW_DanceWithBlocker` and `NAVNEW_SidestepBlocker` cannot receive their `movedir`
+//! out-param as a by-value `vec3_t`.
+//! This file owns the `movedir` out-params, unlike the cross-file callee `G_GetHitLocation`
+//! (`g_combat.rs`), whose frozen signature takes its out-param by value.
+//! Porting rule §C7 (out-params become return values or mutable references) declares this file's
+//! out-params `movedir: &mut vec3_t` instead.
 //!
-//! `NAVNEW_DanceWithBlocker`/`NAVNEW_SidestepBlocker`'s faithful `movedir`
-//! out-param cannot be received as a by-value `vec3_t` (`vec3-outparam-seam`,
-//! `g_combat.rs` precedent) — but unlike that cross-file precedent, these
-//! `movedir` out-params are OWNED by this same file (not a frozen callee
-//! signature), so per §C7 (out-params -> return values / mutable refs) they
-//! are declared `movedir: &mut vec3_t` here instead of parking.
-//!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`.
-//!
-//! Safe-state **campaign 2c** (task #7): the Stage-1 fn-top raw re-derives are
-//! retired — entity fields read/write through `ctx.world.entity(id)` /
-//! `entity_mut(id)` at the point of use; seam `.cast()` entity-pointer passes to
-//! `trap_Nav_*` derive their raw `*mut gentity_t` locally at the call site. The
-//! only raw derefs left are the sanctioned ones, each FLAGged inline: gNPC_t
-//! (`self->NPC`/NPCInfo, no safe accessor), the NPC pool `gclient_t`
-//! (`blocker->client`, `gClPtrs` — not a `level.clients` slot), and the
-//! caller-owned `*mut navInfo_t` scratch pointer. Callers bridge stored raw
-//! pointers at the boundary via `ctx.entity_id_of(ptr)`.
+//! Entity-pointer parameters are `EntityId`/`Option<EntityId>` handles (porting rule §B5) instead of
+//! raw `gentity_t*`.
+//! Ctx-free leaf helpers borrow `&gentity_t`/`&mut gentity_t`.
+//! Entity fields are read and written through `ctx.world.entity(id)`/`entity_mut(id)` at the point of use.
+//! The seam `.cast()` entity-pointer passes to `trap_Nav_*` derive their raw `*mut gentity_t` locally
+//! at the call site.
+//! The remaining raw derefs are sanctioned, and each carries an inline `FLAG:` comment: `gNPC_t`
+//! (`self->NPC`/`NPCInfo`, which has no safe accessor), the NPC pool `gclient_t` (`blocker->client`,
+//! `gClPtrs`, not a `level.clients` slot), and the caller-owned `*mut navInfo_t` scratch pointer.
+//! Callers bridge stored raw pointers at the boundary through `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::{G_DrawEdge, G_DrawNode, NAV_CheckAhead, NAV_TestBestNode, NAV_TestForBlocked};
@@ -55,20 +46,17 @@ use mp_qshared::shared::MAX_GENTITIES;
 
 use crate::q_math::VectorNormalize;
 
-// `ENTITYNUM_NONE`/`ENTITYNUM_WORLD` resolve via the crate prelude glob
-// (`mp_qshared::shared::limits`); the shadowing local copies were removed by
-// the placeholder-const sweep.
+// `ENTITYNUM_NONE`/`ENTITYNUM_WORLD` resolve via the crate prelude glob (`mp_qshared::shared::limits`).
 
-// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
-// (`c_int`, cast here to match the `vec3_t` components they seed).
+// `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` are canonical in `mp_bg::public::viewheight` (`c_int`), cast here to match the `vec3_t` components they seed.
 // Source: `oracle/codemp/game/bg_public.h:41-42`
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
 /// Raven `NAV_CheckNodeFailedForEnt`.
 ///
-/// Raven: "FIXME: must be a better way to do this". `+1` because 0 is a valid
-/// nodeNum but also the default (unset) slot value.
+/// Raven: "FIXME: must be a better way to do this."
+/// Raven: "+1 because 0 is a valid nodeNum, but also the default."
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:15-28`
 pub fn NAV_CheckNodeFailedForEnt(ent: &gentity_t, nodeNum: c_int) -> qboolean {
@@ -85,8 +73,8 @@ pub fn NAV_CheckNodeFailedForEnt(ent: &gentity_t, nodeNum: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:34-41`
 pub fn NPC_ClearBlocked(self_: &mut gentity_t) {
-    // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; read the pointer via
-    // the safe field access and deref raw exactly as Raven does.
+    // FLAG: gNPC_t (`NPC`) has no safe accessor.
+    // The code reads the pointer through the safe field access, then derefs raw exactly as Raven does.
     let npc = self_.NPC;
     if npc.is_null() {
         return;
@@ -101,16 +89,16 @@ pub fn NPC_ClearBlocked(self_: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:43-51`
 pub fn NPC_SetBlocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<EntityId>) {
-    // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; read the pointer via
-    // the safe borrow and deref raw exactly as Raven does.
+    // FLAG: gNPC_t (`NPC`) has no safe accessor.
+    // The code reads the pointer through the safe borrow, then derefs raw exactly as Raven does.
     let npc = ctx.world.entity(self_).NPC;
     if npc.is_null() {
         return;
     }
 
     //self->NPC->aiFlags |= NPCAI_BLOCKED;
-    // RHS reads level.time + draws RNG (order-preserving) before the raw writes
-    // to the gNPC_t pool struct.
+    // The right-hand side reads `level.time` and draws RNG before the raw writes to the gNPC_t pool struct.
+    // This keeps Raven's evaluation order.
     let debounce = ctx.world.level.time
         + MIN_BLOCKED_SPEECH_TIME
         + ((ctx.world.bg_state.rng.random() * 4000.0) as c_int);
@@ -159,7 +147,8 @@ pub fn NAVNEW_ClearPathBetweenPoints(
 
         //if( ( ( trace.startsolid == false ) && ( trace.allsolid == false ) ) && ( trace.fraction < 1.0f ) )
         //{//FIXME: check for drops?
-        //FIXME: if startsolid or allsolid, then the path isn't clear... but returning ENTITYNUM_NONE indicates to CheckFailedEdge that is is clear...?
+        //FIXME: if startsolid or allsolid, then the path isn't clear... but returning ENTITYNUM_NONE indicates to CheckFailedEdge
+        //that is is clear...?
         trace.entityNum as c_int
         //}
 
@@ -180,8 +169,8 @@ pub fn NAVNEW_PushBlocker(
     setBlockedInfo: qboolean,
 ) {
     let blocker = blocker.unwrap();
-    // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; read the pointer via
-    // the safe borrow and deref raw exactly as Raven does.
+    // FLAG: gNPC_t (`NPC`) has no safe accessor.
+    // The code reads the pointer through the safe borrow, then derefs raw exactly as Raven does.
     let npc = ctx.world.entity(self_).NPC;
     if unsafe { (*npc).shoveCount } > 30 {
         //don't push for more than 3 seconds;
@@ -193,11 +182,11 @@ pub fn NAVNEW_PushBlocker(
         return;
     }
 
-    // FLAG (task #7): NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
-    // `level.clients` slot; read the pointer via the safe borrow, deref raw.
+    // FLAG: this is the NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430), not a `level.clients` slot.
+    // The code reads the pointer through the safe borrow, then derefs raw.
     let client = ctx.world.entity(blocker).client;
-    // Oracle: `!blocker->client || !VectorCompare(pushVec, vec3_origin)` — bail
-    // when the blocker has no client OR is already being pushed elsewhere.
+    // Oracle: `!blocker->client || !VectorCompare(pushVec, vec3_origin)`.
+    // This bails when the blocker has no client, or is already being pushed elsewhere.
     if client.is_null() || !unsafe { VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) } {
         //someone else is pushing him, wait until they give up?
         return;
@@ -207,8 +196,8 @@ pub fn NAVNEW_PushBlocker(
     crate::q_math::_VectorCopy(ctx.world.entity(blocker).r.mins, &mut mins);
     mins[2] += STEPSIZE;
 
-    // Raven: `(float sum) * 1.2` — the f32 maxs sum promotes to f64 for the
-    // double literal, multiplied in f64 and narrowed once at the float store.
+    // Raven: `(float sum) * 1.2`.
+    // The f32 maxs sum promotes to f64 for the double literal, multiplies in f64, and narrows once at the float store.
     // Source: `oracle/codemp/game/g_navnew.c:108`
     let moveamt = ((ctx.world.entity(self_).r.maxs[1] + ctx.world.entity(blocker).r.maxs[1]) as f64
         * 1.2) as f32; //yes, magic number
@@ -239,8 +228,8 @@ pub fn NAVNEW_PushBlocker(
         0.0f32
     };
 
-    // SAFETY: `client` is the blocker's pool `gclient_t` read above; the writes
-    // mirror Raven's `blocker->client->pushVec*` stores.
+    // SAFETY: `client` is the blocker's pool `gclient_t`, read above.
+    // The writes mirror Raven's `blocker->client->pushVec*` stores.
     unsafe {
         if leftSucc >= 1.0f32 {
             //it's clear, shove him that way
@@ -302,10 +291,9 @@ pub fn NAVNEW_PushBlocker(
 ///
 /// Raven: sees if blocker has any lateral movement.
 ///
-/// The faithful `movedir` out-param is declared `&mut vec3_t` (§C7) rather
-/// than by-value — this is this file's own signature, not a frozen cross-file
-/// callee, so unlike the `vec3-outparam-seam` park precedent (`g_combat.rs`)
-/// it is fixed here rather than parked.
+/// The `movedir` out-param is declared `&mut vec3_t` (§C7) instead of by-value.
+/// This file owns the signature, unlike the cross-file callee `G_GetHitLocation` (`g_combat.rs`),
+/// whose frozen signature takes its out-param by value.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
@@ -317,8 +305,8 @@ pub fn NAVNEW_DanceWithBlocker(
 ) -> qboolean {
     // `self_` is unused by Raven's body (kept for signature fidelity).
     let blocker = blocker.unwrap();
-    // FLAG (task #7): NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
-    // `level.clients` slot; read the pointer via the safe borrow, deref raw.
+    // FLAG: this is the NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430), not a `level.clients` slot.
+    // The code reads the pointer through the safe borrow, then derefs raw.
     let client = ctx.world.entity(blocker).client;
     unsafe {
         if !client.is_null() && (*client).ps.velocity != [0.0f32, 0.0, 0.0] {
@@ -375,8 +363,8 @@ pub fn NAVNEW_SidestepBlocker(
     right: vec3_t,
 ) -> qboolean {
     let blocker = blocker.unwrap();
-    // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; the pointer is read
-    // via the safe borrow and dereffed raw exactly as Raven does.
+    // FLAG: gNPC_t (`NPC`) has no safe accessor.
+    // The pointer is read through the safe borrow, then dereffed raw exactly as Raven does.
     let npc = ctx.world.entity(self_).NPC;
     unsafe {
         let mut mins = [0.0f32; 3];
@@ -387,8 +375,8 @@ pub fn NAVNEW_SidestepBlocker(
         let yaw = mp_bg::bg_misc::vectoyaw(blocked_dir);
 
         //Get the avoid radius
-        // Raven: `sqrt(a) + sqrt(b)` — the f32 products promote to f64 for libm
-        // sqrt, summed in f64 and narrowed once at the float store.
+        // Raven: `sqrt(a) + sqrt(b)`.
+        // The f32 products promote to f64 for libm sqrt, sum in f64, and narrow once at the float store.
         // Source: `oracle/codemp/game/g_navnew.c:236-237`
         let blocker_maxs = ctx.world.entity(blocker).r.maxs;
         let self_maxs = ctx.world.entity(self_).r.maxs;
@@ -468,9 +456,8 @@ pub fn NAVNEW_SidestepBlocker(
             ),
         );
 
-        // Oracle computes rightSucc then ALWAYS runs the left trace and computes
-        // leftSucc; the combined `rightSucc*dist>=avoidRadius || leftSucc*dist>=..`
-        // partial-success check must run for both sides, so keep this flat.
+        // Oracle computes `rightSucc`, then always runs the left trace and computes `leftSucc`.
+        // The combined `rightSucc*dist>=avoidRadius || leftSucc*dist>=avoidRadius` check needs both sides, so this stays flat.
         let rightSucc = if tr.allsolid == 0 && tr.startsolid == 0 {
             if tr.fraction >= 1.0f32 {
                 //all clear, go for it (favor the right if both are equal)
@@ -555,8 +542,7 @@ pub fn NAVNEW_Bypass(
     movedir: &mut vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
-    // `movedir` is threaded `&mut` (Raven's out-param): DanceWithBlocker /
-    // SidestepBlocker write the avoid-direction back for the caller to copy.
+    // `movedir` is threaded `&mut` (Raven's out-param): DanceWithBlocker and SidestepBlocker write the avoid-direction back for the caller to copy.
     //Draw debug info if requested
     if ctx.world.globals.NAVDEBUG_showCollision != 0 {
         let self_origin = ctx.world.entity(self_).r.currentOrigin;
@@ -597,7 +583,7 @@ pub fn NAVNEW_Bypass(
 
 /// Raven `NAVNEW_CheckDoubleBlock`.
 ///
-/// Raven: stop double waiting.
+/// Raven: Stop double waiting.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:384-391`
 pub fn NAVNEW_CheckDoubleBlock(
@@ -605,8 +591,8 @@ pub fn NAVNEW_CheckDoubleBlock(
     blocker: &gentity_t,
     blocked_dir: vec3_t,
 ) -> qboolean {
-    // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; read the pointer via
-    // the safe field access and deref raw as Raven does.
+    // FLAG: gNPC_t (`NPC`) has no safe accessor.
+    // The code reads the pointer through the safe field access, then derefs raw as Raven does.
     let npc = blocker.NPC;
     if !npc.is_null() && unsafe { (*npc).blockingEntNum } == self_.s.number {
         return qtrue;
@@ -625,8 +611,8 @@ pub fn NAVNEW_ResolveEntityCollision(
     pathDir: vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
-    // `movedir` threaded `&mut` down to Bypass so the avoid-direction write
-    // reaches AvoidCollision's `VectorCopy(movedir, info->direction)`.
+    // `movedir` is threaded `&mut` down to Bypass, so the avoid-direction write reaches
+    // AvoidCollision's `VectorCopy(movedir, info->direction)`.
     let blocker = blocker.unwrap();
     //Doors are ignored
     let blocker_classname = ctx.world.entity(blocker).classname_str();
@@ -694,9 +680,9 @@ pub fn NAVNEW_AvoidCollision(
     setBlockedInfo: qboolean,
     blockedMovesLimit: c_int,
 ) -> qboolean {
-    // `info` is a caller-owned `*mut navInfo_t` scratch pointer (not an entity);
-    // `(*info).*` derefs stay raw exactly as Raven does. gNPC_t (`NPC`) likewise
-    // has no safe accessor. FLAG (task #7).
+    // FLAG: `info` is a caller-owned `*mut navInfo_t` scratch pointer, not an entity.
+    // Its `(*info).*` derefs stay raw exactly as Raven does.
+    // gNPC_t (`NPC`) likewise has no safe accessor.
     unsafe {
         //Cap our distance
         if (*info).distance > MAX_COLL_AVOID_DIST as f32 {
@@ -804,8 +790,7 @@ pub fn NAVNEW_AvoidCollision(
 
 /// Raven `NAVNEW_TestNodeConnectionBlocked`.
 ///
-/// Raven: see if the direct path between 2 nodes is blocked by architecture
-/// or an ent.
+/// Raven: see if the direct path between 2 nodes is blocked by architecture or an ent.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:520-572`
 pub fn NAVNEW_TestNodeConnectionBlocked(
@@ -863,9 +848,9 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
         crate::q_math::_VectorCopy(ctx.world.entity(ignore_id).r.maxs, &mut maxs);
         ignoreEntNum = ctx.world.entity(ignore_id).s.number;
     } else {
-        // §19: Raven copies playerMaxs into `mins` here (its own bug, preserved),
-        // leaving `maxs` uninitialized before the reads below; the zeroed `maxs`
-        // declared above is the defined-behavior choice for that C UB.
+        // §19: Raven copies `playerMaxs` into `mins` here.
+        // This is Raven's own bug, and it leaves `maxs` uninitialized before the reads below.
+        // The zeroed `maxs` declared above is the defined-behavior choice for that C undefined behavior.
         crate::q_math::_VectorCopy(localPlayerMins, &mut mins);
         crate::q_math::_VectorCopy(localPlayerMaxs, &mut mins);
         ignoreEntNum = ENTITYNUM_NONE;
@@ -901,14 +886,14 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:578-865`
 pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navInfo_t) -> c_int {
-    // `info` is a caller-owned `*mut navInfo_t` scratch pointer (not an entity);
-    // its `(*info).*` derefs, the seam `.cast()` entity-pointer passes, and the
-    // gNPC_t (`npc`) derefs stay raw exactly as Raven does. FLAG (task #7). The
-    // stored `goalEntity` is a valid `Some(EntityId)`, so — matching Raven's
-    // unconditional `self->NPC->goalEntity->*` derefs — its fields read straight
-    // through the accessor (the port's always-true null guards are dropped).
+    // FLAG: `info` is a caller-owned `*mut navInfo_t` scratch pointer, not an entity.
+    // Its `(*info).*` derefs and the seam `.cast()` entity-pointer passes stay raw exactly as Raven does.
+    // The gNPC_t (`npc`) derefs stay raw the same way.
+    // The stored `goalEntity` is always a valid `Some(EntityId)`.
+    // This matches Raven's unconditional `self->NPC->goalEntity->*` derefs, so its fields read straight through the accessor.
+    // The port drops the always-true null guards.
     unsafe {
-        // FLAG (task #7): gNPC_t (`NPC`) has no safe accessor; held raw as `self->NPC`.
+        // FLAG: gNPC_t (`NPC`) has no safe accessor, so it is held raw as `self->NPC`.
         let npc = ctx.world.entity(self_).NPC;
         let mut bestNode = WAYPOINT_NONE;
         let mut foundClearPath = qfalse;
@@ -997,7 +982,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
             inGoalWP = qfalse;
 
             if bestNode == WAYPOINT_NONE {
-                // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                 // Source: `oracle/codemp/game/g_navnew.c:637,844`
                 trap::Nav_GetNodePosition(
                     ctx.engine,
@@ -1100,7 +1085,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                     if (*info).direction[2] * (*info).distance > 64.0 {
                         (*npc).aiFlags |= NPCAI_BLOCKED;
                         crate::q_math::_VectorCopy(origin, &mut (*npc).blockedDest);
-                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                         // Source: `oracle/codemp/game/g_navnew.c:730,844`
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1141,7 +1126,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                                 self_wp,
                             ),
                         );
-                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                         // Source: `oracle/codemp/game/g_navnew.c:750,844`
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1182,7 +1167,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         bestNode = self_wp;
                     } else {
                         //we should stop
-                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                         // Source: `oracle/codemp/game/g_navnew.c:776,844`
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1208,7 +1193,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         );
                         //Now we should get our waypoints again
                         //FIXME: cache the trace-data for subsequent calls as only the route info would have changed
-                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                         // Source: `oracle/codemp/game/g_navnew.c:789,844`
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1220,7 +1205,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         return WAYPOINT_NONE;
                     } else {
                         //we should stop
-                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                         // Source: `oracle/codemp/game/g_navnew.c:795,844`
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1238,7 +1223,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                     numTries
                 } >= 10
                 {
-                    // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                    // This is Raven's `goto failed` label, inlined: `trap_Nav_GetNodePosition(waypoint, origin)` runs before the bail.
                     // Source: `oracle/codemp/game/g_navnew.c:801,844`
                     trap::Nav_GetNodePosition(
                         ctx.engine,

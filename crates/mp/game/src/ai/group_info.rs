@@ -13,11 +13,11 @@ use mp_qshared::shared::{qboolean, vec3_t};
 use super::consts::{MAX_GROUP_MEMBERS, NUM_SQUAD_STATES};
 use super::group_member::AIGroupMember_t;
 
-/// Raven `AIGroupInfo_t` — squad/group AI shared state.
+/// Raven `AIGroupInfo_t`: squad/group AI shared state.
 ///
 /// Raven: `!!!!!!!!!! LOADSAVE-affecting structure !!!!!!!!!!`
-/// Pointer-bearing (`gentity_t *`) => arch-dependent layout; the `size_of`
-/// assert pins the host-64-bit size.
+/// This struct is pointer-bearing (`gentity_t *`), so the layout depends on the architecture.
+/// The `size_of` assert pins the host 64-bit size.
 /// Type definition source: `oracle/codemp/game/ai.h:97-116`
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

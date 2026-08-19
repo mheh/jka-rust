@@ -1,9 +1,7 @@
-//! NPC AI Default behavior states for `oracle/codemp/game/NPC_AI_Default.c`.
+//! NPC AI default behavior states for `oracle/codemp/game/NPC_AI_Default.c`.
 //!
-//! Pass-3 port: 15/15 functions transcribed from oracle source with settled
-//! rulings 12-22. Game-tier functions thread `ctx: &mut GameContext` as first param;
-//! reach ambient AI state through `ctx.world.globals.*` (NPC, NPCInfo, client,
-//! ucmd, enemyVisibility).
+//! Game-tier functions take `ctx: &mut GameContext` as the first parameter.
+//! They reach ambient AI state through `ctx.world.globals.*` (NPC, NPCInfo, client, ucmd, enemyVisibility).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -19,7 +17,6 @@ pub fn NPC_LostEnemyDecideChase(ctx: &mut GameContext) {
     let npc_id = ctx.entity_id_of(ctx.world.globals.NPC).unwrap();
     match unsafe { (*npc_info).behaviorState } {
         BS_HUNT_AND_KILL => {
-            // Oracle: `NPC->enemy == NPCInfo->goalEntity && NPC->enemy->lastWaypoint != WAYPOINT_NONE`.
             if let Some(enemy_id) = npc.enemy {
                 if npc.enemy == unsafe { (*npc_info).goalEntity } {
                     let last_waypoint = ctx.entity(enemy_id).lastWaypoint;
@@ -39,14 +36,14 @@ pub fn NPC_LostEnemyDecideChase(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:42-85`
 pub fn NPC_StandIdle() {
-    // Function is completely commented out in oracle source. Port as no-op.
+    // The oracle body is fully commented out.
+    // This port keeps it a no-op.
 }
 
 /// Raven `NPC_StandTrackAndShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:87-158`
 pub fn NPC_StandTrackAndShoot(ctx: &mut GameContext, NPC: EntityId, canDuck: qboolean) -> qboolean {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let NPC: *mut gentity_t = ctx.entity_mut(NPC);
     let npc = unsafe { &mut *NPC };
     let client = unsafe { &mut *ctx.world.globals.client };
@@ -114,7 +111,7 @@ pub fn NPC_BSIdle(ctx: &mut GameContext) {
         && ctx.world.globals.ucmd.rightmove == 0
         && ctx.world.globals.ucmd.upmove == 0
     {
-        // NPC_StandIdle(); - commented out in oracle
+        // NPC_StandIdle();
     }
 
     NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -218,8 +215,7 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
             crate::q_math::_VectorSubtract(enemy_origin, npc.r.currentOrigin, &mut vec);
             enemy_dist = crate::q_math::VectorLength(vec);
 
-            // `1.5` is a double literal, so the scaled square is computed in f64
-            // (the float weapon range promotes) before the comparison.
+            // `1.5` is a double literal in the oracle, so the scaled square computes in f64 before the comparison, matching the weapon-range promotion.
             if enemy_dist > 48.0
                 && ((enemy_dist as f64 * 1.5) * (enemy_dist as f64 * 1.5)
                     >= NPC_MaxDistSquaredForWeapon(ctx) as f64
@@ -274,7 +270,7 @@ pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if client.playerTeam != 0 && client.enemyTeam != 0 {
-        // many commented-out checks in oracle
+        // The oracle has many checks commented out here.
     }
 
     NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
@@ -462,7 +458,7 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
 
     match client.ps.weapon as i32 {
         x if x == WP_NONE as i32 || x == WP_STUN_BATON as i32 || x == WP_SABER as i32 => {
-            // don't change pitch
+            //don't do any pitch change if not holding a firing weapon
         }
         _ => {
             let val = crate::q_math::AngleNormalize360(angles[PITCH]);

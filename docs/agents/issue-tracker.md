@@ -47,6 +47,8 @@ Work branches from `master` and is named by the issue that drives it:
 
 Every change reaches `master` through a pull request (DEC-67). Push the branch, open the PR, and merge it on GitHub with a merge commit, only green (build + gates). Never squash, and never commit directly on master. Delete the branch after the merge. Long-lived phase branches (the old `ui-port` pattern) are retired.
 
+The PR waits at the `ci-approval` deployment gate. The owner approves the deployment in the PR's checks box (Review deployments), the matrix runs, and the required `ci-green` check unlocks the merge. The repository admin can bypass the ruleset on any PR or push directly (the DEC-67 amendment records the full mechanics).
+
 ## Session state and handoffs (DEC-52 process pass, 2026-08-01)
 
 In-progress state for claimed work goes into a comment on the claimed ticket: what is done, what is open, and the next step. A later session reads the ticket and continues. Do not write new files under `docs/handoffs/` - that directory is legacy and stays for history only. A deep investigation that outgrows a comment gets a doc under `docs/plans/` or `docs/audits/`, and the ticket links it.

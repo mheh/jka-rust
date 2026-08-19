@@ -1,5 +1,4 @@
-// PORT-COMPLETE: NPC_AI_ImperialProbe.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_ImperialProbe.c`.
+//! Port of `oracle/codemp/game/NPC_AI_ImperialProbe.c`.
 //!
 //! Imperial Probe droid AI behavior: idle, patrol, hunt, strafe, ranged attack.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -30,7 +29,7 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
 use mp_bg::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 
-// Local state enums
+//Local state enums
 // Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
 const LSTATE_NONE: i32 = 0;
 const LSTATE_BACKINGUP: i32 = 1;
@@ -86,11 +85,11 @@ pub fn NPC_Probe_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
 pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client, not level.clients, so the
+    // deref stays raw through the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     // Update our angles regardless
@@ -173,11 +172,11 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
 pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client, not level.clients, so the
+    // deref stays raw through the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     let mut right = [0.0; 3];
@@ -240,11 +239,11 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:220-261`
 pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client, not level.clients, so the
+    // deref stays raw through the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     let mut forward = [0.0; 3];
@@ -259,7 +258,7 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
     );
 
     unsafe {
-        // If we're not supposed to stand still, pursue the player
+        //If we're not supposed to stand still, pursue the player
         if (*npc_info).standTime < ctx.world.level.time {
             // Only strafe when we can see the player
             if visible != 0 {
@@ -268,18 +267,18 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
             }
         }
 
-        // If we don't want to advance, stop here
+        //If we don't want to advance, stop here
         if advance == 0 {
             return;
         }
 
-        // Only try and navigate if the player is visible
+        //Only try and navigate if the player is visible
         if visible == 0 {
             // Move towards our goal
             (*npc_info).goalEntity = ctx.world.entity(npc_id).enemy;
             (*npc_info).goalRadius = 12;
 
-            // Get our direction from the navigator if we can't see our target
+            //Get our direction from the navigator if we can't see our target
             if NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0 {
                 return;
             }
@@ -399,7 +398,7 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:331-363`
 pub fn ImperialProbe_Ranged(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
@@ -429,14 +428,14 @@ pub fn ImperialProbe_Ranged(ctx: &mut GameContext, visible: qboolean, advance: q
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
 pub fn ImperialProbe_AttackDecision(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
     // Always keep a good height off the ground
     ImperialProbe_MaintainHeight(ctx);
 
-    // randomly talk
+    //randomly talk
     if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
         if TIMER_Done(ctx, Some(npc_id), c"angerNoise".as_ptr()) != 0 {
             let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
@@ -462,7 +461,7 @@ pub fn ImperialProbe_AttackDecision(ctx: &mut GameContext) {
         SETANIM_FLAG_NORMAL,
     );
 
-    // Rate our distance to the target, and our visibility
+    // Rate our distance to the target, and our visibilty
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
     let enemy_origin = if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
         ctx.world.entity(enemy_id).r.currentOrigin
@@ -504,8 +503,7 @@ pub fn NPC_Probe_Pain(
 ) {
     let mod_ = ctx.world.globals.gPainMOD;
 
-    // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let self_npc = ctx.world.entity(self_).NPC;
     let last_path_angles = unsafe { (*self_npc).lastPathAngles };
     ctx.world.entity_mut(self_).s.angles = last_path_angles;
@@ -555,7 +553,7 @@ pub fn NPC_Probe_Pain(
                 _VectorSubtract(self_origin, other_origin, &mut dir);
                 VectorNormalize(&mut dir);
 
-                // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                // FLAG: pool client, so the deref stays raw through the safe entity borrow.
                 let client = ctx.world.entity(self_).client;
                 unsafe {
                     _VectorMA(
@@ -569,13 +567,13 @@ pub fn NPC_Probe_Pain(
             }
 
             let level_time = ctx.world.level.time;
-            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+            // FLAG: pool client, so the deref stays raw through the safe entity borrow.
             let client = ctx.world.entity(self_).client;
             unsafe {
                 (*client).ps.electrifyTime = level_time + 3000;
             }
 
-            // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+            // FLAG: gNPC_t (NPCInfo) has no accessor, so the deref stays raw.
             unsafe {
                 (*self_npc).localState = LSTATE_DROP;
             }
@@ -619,7 +617,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
         return;
     }
 
-    // If we have somewhere to go, then do that
+    //If we have somewhere to go, then do that
     if ctx.world.entity(npc_id).enemy.is_none() {
         NPC_SetAnim(
             ctx,
@@ -630,13 +628,13 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
         );
 
         if UpdateGoal(ctx) != core::ptr::null_mut() {
-            // start loop sound once we move
+            //start loop sound once we move
             let loop_sound = G_SoundIndex(ctx, "sound/chars/probe/misc/probedroidloop");
             ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
             ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             NPC_MoveToGoal(ctx, 1);
         }
-        // randomly talk
+        //randomly talk
         if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
             let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
             let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
@@ -664,7 +662,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
 pub fn ImperialProbe_Wait(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
@@ -721,7 +719,7 @@ pub fn ImperialProbe_Wait(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
 pub fn NPC_BSImperialProbe_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 

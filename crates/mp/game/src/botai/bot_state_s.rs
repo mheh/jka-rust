@@ -26,37 +26,35 @@ pub const MAX_LOVED_ONES: usize = 4;
 /// Source: `oracle/codemp/game/ai_main.h:20`
 pub const MAX_FORCE_INFO_SIZE: usize = 2048;
 
-/// Raven `bot_state_t` — per-bot AI state (goals, waypoints, timers, chat, saber
-/// combat, force powers, ...).
+/// Raven `bot_state_t`: per-bot AI state (goals, waypoints, timers, chat, saber combat, force powers, ...).
 ///
-/// Raven: `FORCEJUMP_INSTANTMETHOD` is commented out at `ai_main.h:5`, so the
-/// `#ifndef FORCEJUMP_INSTANTMETHOD` branch is always active and
-/// `forceJumpChargeTime` is always present in this build.
+/// Raven: `FORCEJUMP_INSTANTMETHOD` is commented out at `ai_main.h:5`,
+/// so the `#ifndef FORCEJUMP_INSTANTMETHOD` branch is always active and `forceJumpChargeTime` is always present in this build.
 /// Type definition source: `oracle/codemp/game/ai_main.h:148-342`
 #[repr(C)]
 pub struct bot_state_t {
-    pub inuse: c_int,             // true if this state is used by a bot client
-    pub botthink_residual: c_int, // residual for the bot thinks
-    pub client: c_int,            // client number of the bot
-    pub entitynum: c_int,         // entity number of the bot
-    pub cur_ps: playerState_t,    // current player state
-    pub lastucmd: usercmd_t,      // usercmd from last frame
-    pub settings: bot_settings_t, // several bot settings
-    pub thinktime: f32,           // time the bot thinks this frame
-    pub origin: vec3_t,           // origin of the bot
-    pub velocity: vec3_t,         // velocity of the bot
-    pub eye: vec3_t,              // eye coordinates of the bot
-    pub setupcount: c_int,        // true when the bot has just been setup
-    pub ltime: f32,               // local bot time
-    pub entergame_time: f32,      // time the bot entered the game
-    pub ms: c_int,                // move state of the bot
-    pub gs: c_int,                // goal state of the bot
-    pub ws: c_int,                // weapon state of the bot
-    pub viewangles: vec3_t,       // current view angles
-    pub ideal_viewangles: vec3_t, // ideal view angles
+    pub inuse: c_int,             //true if this state is used by a bot client
+    pub botthink_residual: c_int, //residual for the bot thinks
+    pub client: c_int,            //client number of the bot
+    pub entitynum: c_int,         //entity number of the bot
+    pub cur_ps: playerState_t,    //current player state
+    pub lastucmd: usercmd_t,      //usercmd from last frame
+    pub settings: bot_settings_t, //several bot settings
+    pub thinktime: f32,           //time the bot thinks this frame
+    pub origin: vec3_t,           //origin of the bot
+    pub velocity: vec3_t,         //velocity of the bot
+    pub eye: vec3_t,              //eye coordinates of the bot
+    pub setupcount: c_int,        //true when the bot has just been setup
+    pub ltime: f32,               //local bot time
+    pub entergame_time: f32,      //time the bot entered the game
+    pub ms: c_int,                //move state of the bot
+    pub gs: c_int,                //goal state of the bot
+    pub ws: c_int,                //weapon state of the bot
+    pub viewangles: vec3_t,       //current view angles
+    pub ideal_viewangles: vec3_t, //ideal view angles
     pub viewanglespeed: vec3_t,
 
-    // rww - new AI values
+    //rww - new AI values
     pub currentEnemy: Option<EntityId>,
     pub revengeEnemy: Option<EntityId>,
 
@@ -171,9 +169,9 @@ pub struct bot_state_t {
     pub runningLikeASissy: c_int,
     pub runningToEscapeThreat: c_int,
 
-    // Raven: `chatBuffer[MAX_CHAT_BUFFER_SIZE]` is commented out here — since
-    // bots are once again not allocated dynamically, shoving a 64k chat buffer
-    // into one is a bad thing.
+    //char				chatBuffer[MAX_CHAT_BUFFER_SIZE];
+    //Since we're once again not allocating bot structs dynamically,
+    //shoving a 64k chat buffer into one is a bad thing.
     pub skills: botskills_t,
 
     pub loved: [botattachment_t; MAX_LOVED_ONES],
@@ -193,7 +191,7 @@ pub struct bot_state_t {
 
     pub jmState: c_int,
 
-    pub state_Forced: c_int, // set by player ordering menu
+    pub state_Forced: c_int, //set by player ordering menu
 
     pub saberDefending: c_int,
     pub saberDefendDecideTime: c_int,
@@ -223,7 +221,7 @@ pub struct bot_state_t {
     pub forceMove_Forward: c_int,
     pub forceMove_Right: c_int,
     pub forceMove_Up: c_int,
-    // end rww
+    //end rww
 }
 
 const _: () = assert!(core::mem::offset_of!(bot_state_t, inuse) == 0);
@@ -232,10 +230,10 @@ const _: () = assert!(core::mem::offset_of!(bot_state_t, client) == 8);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, entitynum) == 12);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, cur_ps) == 16);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, lastucmd) == 1568);
-// `settings` (`bot_settings_t`) is the first non-faithful field: it owns
-// `String`s and drops `#[repr(C)]`, so it and every field after it shift off
-// Raven's byte offsets. This struct is game-internal — it never crosses the ABI
-// seam (only its `cur_ps`/`ms`/`gs`/`ws` handles reach the engine) — so its
-// tail layout is free. The `size_of` assert and every `offset_of` assert
-// at/after `settings` are therefore dropped; only the fixed-prefix asserts
-// above (declared before `settings`) remain.
+// `settings` (`bot_settings_t`) is the first non-faithful field.
+// It owns `String`s and drops `#[repr(C)]`, so it and every field after it shift off Raven's byte offsets.
+// This struct is game-internal.
+// It never crosses the ABI seam, only its `cur_ps`/`ms`/`gs`/`ws` handles reach the engine.
+// Its tail layout is free.
+// The `size_of` assert and every `offset_of` assert at/after `settings` are therefore dropped.
+// Only the fixed-prefix asserts above, declared before `settings`, remain.

@@ -1,15 +1,13 @@
-// PORT-COMPLETE: g_vehicleTurret.c
-
-//! FAITHFUL port of `oracle/codemp/game/g_vehicleTurret.c`.
+//! Port of `oracle/codemp/game/g_vehicleTurret.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and
+//! engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
@@ -30,12 +28,12 @@ use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 use crate::q_shared;
 
-// `PITCH`/`YAW` resolve via the crate prelude glob (`crate::q_math`); the
-// shadowing local copies were removed by the placeholder-const sweep.
+// `PITCH`/`YAW` resolve through the crate prelude glob (`crate::q_math`).
+// This file has no local shadowing constants for them.
 
 /// Raven `VEH_TurretCheckFire`.
 ///
-/// If it's time to fire and we have an enemy, then gun 'em down! pushDebounce time controls next fire time.
+/// if it's time to fire and we have an enemy, then gun 'em down!  pushDebounce time controls next fire time
 ///
 /// Source: `oracle/codemp/game/g_vehicleTurret.c:12-59`
 pub fn VEH_TurretCheckFire(
@@ -50,27 +48,27 @@ pub fn VEH_TurretCheckFire(
     unsafe {
         // if it's time to fire and we have an enemy, then gun 'em down!  pushDebounce time controls next fire time
         if (*pVeh).m_iMuzzleTag[curMuzzle as usize] == -1 {
-            // invalid muzzle?
+            //invalid muzzle?
             return;
         }
 
         if (*pVeh).m_iMuzzleWait[curMuzzle as usize] >= ctx.world.level.time {
-            // can't fire yet
+            //can't fire yet
             return;
         }
 
         if (*pVeh).turretStatus[turretNum as usize].ammo < (*vehWeapon).iAmmoPerShot {
-            // no ammo, can't fire
+            //no ammo, can't fire
             return;
         }
 
-        // FIXME: check to see if I'm aiming generally where I want to
+        //FIXME: check to see if I'm aiming generally where I want to
         let mut nextMuzzle: c_int = 0;
         let muzzlesFired: c_int = 1 << curMuzzle;
         let missile: *mut gentity_t;
         WP_CalcVehMuzzle(ctx, parent, curMuzzle);
 
-        // FIXME: some variation in fire dir
+        //FIXME: some variation in fire dir
         missile = WP_FireVehicleWeapon(
             ctx,
             parent,
@@ -81,12 +79,12 @@ pub fn VEH_TurretCheckFire(
             true,
         );
 
-        // play the weapon's muzzle effect if we have one
+        //play the weapon's muzzle effect if we have one
         G_VehMuzzleFireFX(ctx, parent, ctx.entity_id_of(missile), muzzlesFired);
 
-        // take the ammo away
+        //take the ammo away
         (*pVeh).turretStatus[turretNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
-        // toggle to the next muzzle on this turret, if there is one
+        //toggle to the next muzzle on this turret, if there is one
         nextMuzzle =
             if (curMuzzle + 1) == (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0] {
                 (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[1]
@@ -94,11 +92,11 @@ pub fn VEH_TurretCheckFire(
                 (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0]
             };
         if nextMuzzle != 0 {
-            // a valid muzzle to toggle to
+            //a valid muzzle to toggle to
             (*pVeh).turretStatus[turretNum as usize].nextMuzzle = nextMuzzle - 1;
-            // -1 because you type muzzles 1-10 in the .veh file
+            //-1 because you type muzzles 1-10 in the .veh file
         }
-        // add delay to the next muzzle so it doesn't fire right away on the next frame
+        //add delay to the next muzzle so it doesn't fire right away on the next frame
         (*pVeh).m_iMuzzleWait[(*pVeh).turretStatus[turretNum as usize].nextMuzzle as usize] =
             ctx.world.level.time + (*turretStats).iDelay;
     }
@@ -126,8 +124,8 @@ pub fn VEH_TurretAnglesToEnemy(
             _VectorSubtract(org, (*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut diff);
             let dist = VectorNormalize(&mut diff);
             if !turretEnemy.client.is_null() {
-                // FLAG: turretEnemy may be an NPC/vehicle carrying a BG_Alloc'd pool
-                // client (trap 2b); deref the client pointer raw, as Raven does.
+                // FLAG: turretEnemy may be an NPC/vehicle carrying a BG_Alloc'd pool client.
+                // The client pointer is deref'd raw, as Raven does.
                 let tec = turretEnemy.client;
                 _VectorCopy((*tec).ps.velocity, &mut velocity);
             } else {
@@ -166,9 +164,9 @@ pub fn VEH_TurretAim(
         let mut aimCorrect: qboolean = qfalse;
 
         WP_CalcVehMuzzle(ctx, parent, curMuzzle);
-        // get the current absolute angles of the turret right now
+        //get the current absolute angles of the turret right now
         vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
-        // subtract out the vehicle's angles to get the relative alignment
+        //subtract out the vehicle's angles to get the relative alignment
         AnglesSubtract(
             curAngles,
             *((*pVeh).m_vOrientation as *const vec3_t),
@@ -188,14 +186,14 @@ pub fn VEH_TurretAim(
                 desiredAngles,
             );
         }
-        // subtract out the vehicle's angles to get the relative desired alignment
+        //subtract out the vehicle's angles to get the relative desired alignment
         AnglesSubtract(
             *desiredAngles,
             *((*pVeh).m_vOrientation as *const vec3_t),
             desiredAngles,
         );
-        // Now clamp the desired relative angles
-        // clamp yaw
+        //Now clamp the desired relative angles
+        //clamp yaw
         (*desiredAngles)[YAW] = AngleNormalize180((*desiredAngles)[YAW]);
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft != 0.0
             && (*desiredAngles)[YAW]
@@ -213,7 +211,7 @@ pub fn VEH_TurretAim(
             (*desiredAngles)[YAW] =
                 (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight;
         }
-        // clamp pitch
+        //clamp pitch
         (*desiredAngles)[PITCH] = AngleNormalize180((*desiredAngles)[PITCH]);
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown != 0.0
             && (*desiredAngles)[PITCH]
@@ -231,47 +229,45 @@ pub fn VEH_TurretAim(
             (*desiredAngles)[PITCH] =
                 (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp;
         }
-        // Now get the offset we want from our current relative angles
+        //Now get the offset we want from our current relative angles
         AnglesSubtract(*desiredAngles, curAngles, &mut addAngles);
-        // Now cap the addAngles for our fTurnSpeed
+        //Now cap the addAngles for our fTurnSpeed
         if addAngles[PITCH] > (*turretStats).fTurnSpeed {
-            // aimCorrect = qfalse;//???
+            //aimCorrect = qfalse;//???
             addAngles[PITCH] = (*turretStats).fTurnSpeed;
         } else if addAngles[PITCH] < -(*turretStats).fTurnSpeed {
-            // aimCorrect = qfalse;//???
+            //aimCorrect = qfalse;//???
             addAngles[PITCH] = -(*turretStats).fTurnSpeed;
         }
         if addAngles[YAW] > (*turretStats).fTurnSpeed {
-            // aimCorrect = qfalse;//???
+            //aimCorrect = qfalse;//???
             addAngles[YAW] = (*turretStats).fTurnSpeed;
         } else if addAngles[YAW] < -(*turretStats).fTurnSpeed {
-            // aimCorrect = qfalse;//???
+            //aimCorrect = qfalse;//???
             addAngles[YAW] = -(*turretStats).fTurnSpeed;
         }
-        // Now add the additional angles back in to our current relative angles
-        // FIXME: add some AI aim error randomness...?
+        //Now add the additional angles back in to our current relative angles
+        //FIXME: add some AI aim error randomness...?
         newAngles[PITCH] = AngleNormalize180(curAngles[PITCH] + addAngles[PITCH]);
         newAngles[YAW] = AngleNormalize180(curAngles[YAW] + addAngles[YAW]);
-        // Now set the bone angles to the new angles
-        // set yaw
+        //Now set the bone angles to the new angles
+        //set yaw
         if (*turretStats).yawBone != core::ptr::null_mut() {
-            // VectorClear( yawAngles );
             yawAngles[0] = 0.0;
             yawAngles[1] = 0.0;
             yawAngles[2] = 0.0;
             yawAngles[(*turretStats).yawAxis as usize] = newAngles[YAW];
             NPC_SetBoneAngles(ctx, parent, (*turretStats).yawBone, yawAngles);
         }
-        // set pitch
+        //set pitch
         if (*turretStats).pitchBone != core::ptr::null_mut() {
-            // VectorClear( pitchAngles );
             pitchAngles[0] = 0.0;
             pitchAngles[1] = 0.0;
             pitchAngles[2] = 0.0;
             pitchAngles[(*turretStats).pitchAxis as usize] = newAngles[PITCH];
             NPC_SetBoneAngles(ctx, parent, (*turretStats).pitchBone, pitchAngles);
         }
-        // force muzzle to recalc next check
+        //force muzzle to recalc next check
         (*pVeh).m_iMuzzleTime[curMuzzle as usize] = 0;
 
         return aimCorrect;
@@ -303,9 +299,9 @@ pub fn VEH_TurretFindEnemies(
             [core::ptr::null_mut(); MAX_GENTITIES];
         let mut best_id: Option<EntityId> = None;
 
-        // FLAG: parent is a vehicle carrying a BG_Alloc'd pool client (trap 2b);
-        // its `client` pointer is deref'd raw below, so read the (stable) pointer
-        // value once and keep it, exactly as Raven's `parent->client` does.
+        // FLAG: parent is a vehicle carrying a BG_Alloc'd pool client.
+        // The `client` pointer is deref'd raw below.
+        // Read the pointer value once and keep it, as Raven's `parent->client` does.
         let parent_client = ctx.world.entity(parent).client;
 
         WP_CalcVehMuzzle(ctx, parent, curMuzzle);
@@ -337,9 +333,9 @@ pub fn VEH_TurretFindEnemies(
             if ctx.world.entity(target_id).client.is_null() {
                 // only attack clients
                 if (ctx.world.entity(target_id).flags & FL_BBRUSH) == 0
-                    // not a breakable brush
+                    //not a breakable brush
                     || ctx.world.entity(target_id).takedamage == qfalse
-                    // is a bbrush, but invincible
+                    //is a bbrush, but invincible
                     || (!ctx.world.entity(target_id).NPC_targetname.is_empty()
                         && ctx.world.entity(parent).targetname_str().is_some()
                         && Q_stricmp(
@@ -347,7 +343,7 @@ pub fn VEH_TurretFindEnemies(
                             &ctx.world.entity(parent).targetname_str().unwrap(),
                         ) != 0)
                 {
-                    // not in invicible bbrush, but can only be broken by an NPC that is not me
+                    //not in invicible bbrush, but can only be broken by an NPC that is not me
                     if ctx.world.entity(target_id).s.weapon == WP_TURRET
                         && !ctx.world.entity(target_id).classname_str().is_empty()
                         && Q_strncmp(
@@ -356,17 +352,17 @@ pub fn VEH_TurretFindEnemies(
                             11,
                         ) == 0
                     {
-                        // these guys we want to shoot at
+                        //these guys we want to shoot at
                     } else {
                         i += 1;
                         continue;
                     }
                 }
-                // else: we will shoot at bbrushes!
+                //else: we will shoot at bbrushes!
             } else {
-                // client is non-null here
-                // FLAG: target may be an NPC carrying a pool client (trap 2b);
-                // deref the client pointer raw, as Raven does.
+                // The client is non-null here.
+                // FLAG: target may be an NPC carrying a pool client.
+                // The client pointer is deref'd raw, as Raven does.
                 let tc = ctx.world.entity(target_id).client;
                 if !tc.is_null() && (*tc).sess.sessionTeam == TEAM_SPECTATOR {
                     i += 1;
@@ -376,12 +372,13 @@ pub fn VEH_TurretFindEnemies(
             if target == (*pVeh).m_pPilot as *mut gentity_t
                 || ctx.world.entity(target_id).r.ownerNum == ctx.world.entity(parent).s.number
             {
-                // don't get angry at my pilot or passengers?
+                //don't get angry at my pilot or passengers?
                 i += 1;
                 continue;
             }
             if !parent_client.is_null() && (*parent_client).sess.sessionTeam != 0 {
-                // FLAG: parent/target pool clients (trap 2b); deref raw.
+                // FLAG: parent and target carry pool clients.
+                // Deref raw.
                 let tc = ctx.world.entity(target_id).client;
                 if !tc.is_null() {
                     if (*tc).sess.sessionTeam == (*parent_client).sess.sessionTeam {
@@ -391,7 +388,7 @@ pub fn VEH_TurretFindEnemies(
                     }
                 } else if ctx.world.entity(target_id).teamnodmg == (*parent_client).sess.sessionTeam
                 {
-                    // some other entity that's allied with us
+                    //some other entity that's allied with us
                     i += 1;
                     continue;
                 }
@@ -442,7 +439,7 @@ pub fn VEH_TurretFindEnemies(
                     bestDist = enemyDist;
                     found = qtrue;
                     if !ctx.world.entity(target_id).client.is_null() {
-                        // prefer clients over non-clients
+                        //prefer clients over non-clients
                         foundClient = qtrue;
                     }
                 }
@@ -476,11 +473,11 @@ pub fn VEH_TurretObeyPassengerControl(
 
         if !passenger.is_null() {
             let passenger_id = ctx.entity_id_of(passenger).unwrap();
-            // FLAG: passenger may be an NPC carrying a pool client (trap 2b); read
-            // the (stable) client pointer once and deref it raw, as Raven does.
+            // FLAG: passenger may be an NPC carrying a pool client.
+            // Read the client pointer once and deref it raw, as Raven does.
             let passenger_client = ctx.world.entity(passenger_id).client;
             if !passenger_client.is_null() && ctx.world.entity(passenger_id).health > 0 {
-                // a valid, living passenger client
+                //a valid, living passenger client
                 let vehWeapon: *mut vehWeaponInfo_t =
                     &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
                 let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
@@ -500,7 +497,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 );
                 if ((*passenger_client).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) != 0
                 {
-                    // he's pressing an attack button, so fire!
+                    //he's pressing an attack button, so fire!
                     VEH_TurretCheckFire(
                         ctx,
                         pVeh,
@@ -534,25 +531,25 @@ pub fn VEH_TurretThink(
             &mut (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize];
         let mut vehWeapon: *mut vehWeaponInfo_t = core::ptr::null_mut();
         let mut turretEnemy: Option<EntityId> = None;
-        let mut curMuzzle: c_int = 0; // ?
+        let mut curMuzzle: c_int = 0; //?
 
         if turretStats.is_null() || (*turretStats).iAmmoMax == 0 {
-            // not a valid turret
+            //not a valid turret
             return;
         }
 
         if (*turretStats).passengerNum != 0
             && (*pVeh).m_iNumPassengers >= (*turretStats).passengerNum
         {
-            // the passenger that has control of this turret is on the ship
+            //the passenger that has control of this turret is on the ship
             VEH_TurretObeyPassengerControl(ctx, pVeh, parent, turretNum);
             return;
         } else if (*turretStats).bAI == qfalse {
-            // try AI
-            // this turret does not think on its own.
+            //try AI
+            //this turret does not think on its own.
             return;
         }
-        // okay, so it has AI, but still don't think if there's no pilot!
+        //okay, so it has AI, but still don't think if there's no pilot!
         if (*pVeh).m_pPilot.is_null() {
             return;
         }
@@ -567,16 +564,17 @@ pub fn VEH_TurretThink(
             if ctx.world.entity(te_id).health < 0
                 || ctx.world.entity(te_id).inuse == qfalse
                 || ctx.entity_id_of((*pVeh).m_pPilot as *mut gentity_t) == Some(te_id)
-                // enemy became my pilot///?
+                //enemy became my pilot///?
                 || te_id == parent
                 || ctx.world.entity(te_id).r.ownerNum == ctx.world.entity(parent).s.number // a passenger?
                 || {
-                    // FLAG: te may be an NPC carrying a pool client (trap 2b); deref raw.
+                    // FLAG: te may be an NPC carrying a pool client.
+                    // Deref raw.
                     let tec = ctx.world.entity(te_id).client;
                     !tec.is_null() && (*tec).sess.sessionTeam == TEAM_SPECTATOR
                 }
             {
-                // don't keep going after spectators, pilot, self, dead people, etc.
+                //don't keep going after spectators, pilot, self, dead people, etc.
                 turretEnemy = None;
                 (*pVeh).turretStatus[turretNum as usize].enemyEntNum = ENTITYNUM_NONE;
             }
@@ -596,7 +594,7 @@ pub fn VEH_TurretThink(
                         if ctx.world.cvars.g_gametype.integer < GT_TEAM
                             || OnSameTeam(ctx, Some(enemy_id), Some(parent)) == qfalse
                         {
-                            // either not in a team game or the enemy isn't on the same team
+                            //either not in a team game or the enemy isn't on the same team
                             turretEnemy = Some(enemy_id);
                             doAim = qtrue;
                         }
@@ -604,13 +602,13 @@ pub fn VEH_TurretThink(
                 }
             }
             if let Some(te_id) = turretEnemy {
-                // found one
+                //found one
                 if !ctx.world.entity(te_id).client.is_null() {
-                    // hold on to clients for a min of 3 seconds
+                    //hold on to clients for a min of 3 seconds
                     (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
                         ctx.world.level.time + 3000;
                 } else {
-                    // hold less
+                    //hold less
                     (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
                         ctx.world.level.time + 500;
                 }

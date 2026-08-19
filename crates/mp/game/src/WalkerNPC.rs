@@ -1,11 +1,8 @@
-// PORT-COMPLETE: WalkerNPC.c
 //! Game-only half of `oracle/codemp/game/WalkerNPC.c`.
 //!
-//! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` and
-//! the `WalkerYawAdjust` helper moved to `mp_bg::vehicles::walker_npc` (a cgame
-//! TU in `JK2_cgame.vcproj`) so the cgame vehicle `Pmove` can steer walkers
-//! during prediction. What stays here is `#ifdef QAGAME`-only: `RegisterAssets`,
-//! `AnimateVehicle`, `Board`, `G_CreateWalkerNPC`.
+//! The shared (game + cgame) `ProcessMoveCommands`/`ProcessOrientCommands` and the `WalkerYawAdjust` helper moved to `mp_bg::vehicles::walker_npc`,
+//! a cgame TU in `JK2_cgame.vcproj`, so the cgame vehicle `Pmove` can steer walkers during prediction.
+//! What stays here is `#ifdef QAGAME`-only: `RegisterAssets`, `AnimateVehicle`, `Board`, `G_CreateWalkerNPC`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -17,18 +14,19 @@ use crate::q_math::YAW;
 /// Source: `oracle/codemp/game/WalkerNPC.c:84-95`
 pub fn RegisterAssets(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
-        // atst uses turret weapon (#ifdef _JK2MP path — both MP/SP port to same)
+        //atst uses turret weapon
         let weapon = mp_bg::bg_misc::BG_FindItemForWeapon(WP_TURRET);
         crate::g_items::RegisterItem(ctx, weapon);
 
-        // The generic base RegisterAssets body (empty).
+        //call the standard RegisterAssets now
+        // The base body is empty.
         crate::g_vehicles::RegisterAssets(pVeh);
     }
 }
 
 /// Raven `AnimateVehicle`.
 ///
-/// Animates the Walker vehicle based on speed and state.
+/// This function makes sure that the vehicle is properly animated.
 /// Source: `oracle/codemp/game/WalkerNPC.c:415-536`
 pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
@@ -41,16 +39,16 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         if parent_bg.is_null() {
             return;
         }
-        // Overlay cast: `bgEntity_t` is only the shared head of
-        // `gentity_t`; `health`/`client` live past that head on the real object.
+        // Overlay cast: `bgEntity_t` is only the shared head of `gentity_t`.
+        // `health` and `client` live past that head on the real object.
         let parent = parent_bg as *mut gentity_t;
 
-        // We're dead (boarding is reused here so I don't have to make another variable)
+        // We're dead (boarding is reused here so I don't have to make another variable :-).
         if (*parent).health <= 0 {
             return;
         }
 
-        // Percentage of maximum speed relative to current speed
+        // Percentage of maximum speed relative to current speed.
         let speed_max = pVeh
             .m_pVehicleInfo
             .as_ref()
@@ -70,11 +68,11 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             let f_yaw_delta =
                 pVeh.m_vPrevOrientation[YAW as usize] - *pVeh.m_vOrientation.add(YAW as usize);
 
-            // If we're walking (or our speed is less than 27.5%)...
+            // If we're walking (or our speed is less than .275%)...
             if (pVeh.m_ucmd.buttons & BUTTON_WALKING as c_int) != 0 || f_speed_perc_to_max < 0.275 {
                 anim = BOTH_WALK1;
             } else {
-                // Otherwise we're running
+                // otherwise we're running.
                 anim = BOTH_RUN1;
             }
         } else {
@@ -84,7 +82,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 anim = BOTH_WALKBACK1;
                 i_blend = 500;
             } else {
-                // Idle state
+                // Every once in a while buck or do a different idle...
                 i_flags = SETANIM_FLAG_NORMAL | SETANIM_FLAG_RESTART | SETANIM_FLAG_HOLD;
                 i_blend = 600;
 
@@ -97,7 +95,6 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             }
         }
 
-        // Call Vehicle_SetAnim
         crate::g_vehicles::Vehicle_SetAnim(
             ctx,
             ctx.entity_id_of(parent as *mut gentity_t).unwrap(),
@@ -109,13 +106,16 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-// `G_SetWalkerVehicleFunctions` retired — it only assigned the now-removed
-// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
-// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
+// `G_SetWalkerVehicleFunctions` is retired.
+// It only assigned the removed `vehicleInfo_t` function-pointer slots.
+// Vehicle dispatch is keyed by `vehicleType_t` in `crate::veh_dispatch`.
+// The per-class setter in the oracle `.c` file is the equivalent old code.
 
 /// Raven `Board`.
 ///
-/// Board the Walker vehicle (reached via `crate::veh_dispatch::board`).
+/// Board this Vehicle (get on). The first entity to board an empty vehicle becomes the Pilot.
+///
+/// Reached via `crate::veh_dispatch::board`.
 /// Source: `oracle/codemp/game/WalkerNPC.c:106-115`
 pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     unsafe {
@@ -133,7 +133,8 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
 
 /// Raven `G_CreateWalkerNPC`.
 ///
-/// Allocate and initialize a new Walker vehicle.
+/// Create/Allocate a new Animal Vehicle (initializing it as well).
+/// this is a BG function too in MP so don't un-bg-compatibilify it -rww
 /// Source: `oracle/codemp/game/WalkerNPC.c:594-615`
 pub fn G_CreateWalkerNPC(
     ctx: &mut GameContext,
@@ -141,17 +142,20 @@ pub fn G_CreateWalkerNPC(
     strAnimalType: *const c_char,
 ) {
     unsafe {
-        // Allocate the Vehicle (MP path, QAGAME branch)
+        // Allocate the Vehicle.
+        //these will remain on entities on the client once allocated because the pointer is
+        //never stomped. on the server, however, when an ent is freed, the entity struct is
+        //memset to 0, so this memory would be lost..
         crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
 
-        // Zero out the allocated memory
         if !(*pVeh).is_null() {
             core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
 
             // Set the vehicle info pointer to the appropriate vehicle type
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };

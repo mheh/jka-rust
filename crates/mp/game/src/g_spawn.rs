@@ -1,30 +1,22 @@
-// PORT-COMPLETE: g_spawn.c
-//! FAITHFUL port of `oracle/codemp/game/g_spawn.c` — entity spawn
-//! dispatch, `level.spawnVars[]` parsing, and `worldspawn`.
+//! Port of `oracle/codemp/game/g_spawn.c`: entity spawn dispatch, `level.spawnVars[]` parsing, and `worldspawn`.
 //!
-//! Filled by the jampgame mega-pass (settled fork rulings,
-//! `docs/handoffs/jampgame-fork-discovery.md`).
+//! `docs/architecture/engine-seam.md` (precedent `g_client.rs`/`w_force.rs`) documents the calling convention this file follows.
+//! Functions that reach `level`, cvars, `g_entities`, or traps thread the `GameContext<'_>` receiver.
+//! The receiver is `.world: &mut GameWorld` and `.engine`, added as a first parameter.
+//! This parameter is not present on the staged raw-pointer skeleton.
+//! Globals are `GameWorld` fields: `level` becomes `ctx.world.level`, cvars become `ctx.world.cvars`,
+//! and `g_entities[i]` becomes `ctx.world.g_entities[i]`.
+//! Traps go through `trap::X(ctx.engine, <Name>Args::new(...))`.
+//! Cross-file callees take the resolved raw-pointer signatures verbatim.
 //!
-//! SPINE (per the settled fork rulings + `docs/architecture/engine-seam.md`,
-//! precedent `g_client.rs`/`w_force.rs`): logic fns that reach `level`/cvars/
-//! `g_entities`/traps thread the `GameContext<'_>` receiver (`.world: *mut
-//! GameWorld`, `.engine`) as an ADDED first parameter (not present on the
-//! staged raw-pointer skeleton). Globals are `GameWorld` fields:
-//! `level` -> `ctx.world.level`, cvars -> `ctx.world.cvars`,
-//! `g_entities[i]` -> `ctx.world.g_entities[i]`. Traps go through
-//! `trap::X(ctx.engine, <Name>Args::new(...))`. Cross-file callees are invoked
-//! with the packet's resolved raw-pointer signatures verbatim.
+//! `fields[]` (`BG_field_t[]`, `g_spawn.c:54-149`) is this file's own file-scope table.
+//! It is not defined out-of-file.
+//! The port transcribes it below as `FIELDS`, with offsets from `offset_of!(gentity_t, ...)` against the already-ported, offset-asserted `gentity_t`.
+//! This mirrors the `g_client.rs`/`g_mover.rs`/`g_team.rs` precedent of `offset_of!(gentity_t, targetname)` for `G_Find`.
 //!
-//! `fields[]` (`BG_field_t[]`, g_spawn.c:54-149) is this file's own file-scope
-//! table (not out-of-file) — transcribed below as `FIELDS`, offsets taken via
-//! `offset_of!(gentity_t, ...)` against the already-ported, offset-asserted
-//! `gentity_t` (mirrors the `g_client.rs`/`g_mover.rs`/`g_team.rs` precedent of
-//! `offset_of!(gentity_t, targetname)` etc for `G_Find`).
-//!
-//! `GT_*`/`TEAM_*`/`BSET_SPAWN` constant spellings the packet does not
-//! enumerate are transcribed as local consts by their faithful Raven values
-//! (same convention as `g_team.rs`'s local `TEAM_RED`/`TEAM_BLUE`), resolved
-//! at integration.
+//! `GT_*`/`TEAM_*`/`BSET_SPAWN` constant spellings that are not otherwise enumerated are transcribed as local consts,
+//! at their Raven values.
+//! This is the same convention as `g_team.rs`'s local `TEAM_RED`/`TEAM_BLUE`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::q_shared::Q_strlen as strlen;
@@ -51,7 +43,6 @@ use crate::ent_fn_enums::EntThink;
 use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
 use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 
-// Missing trap Args types - will be resolved by integration
 use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
@@ -60,25 +51,23 @@ use crate::q_shared;
 use mp_bg::public::bg_field::SpawnStringSetter;
 use mp_bg::public::fieldtype::fieldtype_t;
 
-// `TEAM_RED`/`TEAM_BLUE` (`bg_public.h`) — local consts, same convention as
-// `g_team.rs`, resolved at integration.
+// `TEAM_RED`/`TEAM_BLUE` (`bg_public.h`) are local consts, the same convention as `g_team.rs`.
 const TEAM_RED: c_int = 1;
 const TEAM_BLUE: c_int = 2;
 
-// `GT_*` (`bg_public.h`) — local consts, resolved at integration.
+// `GT_*` (`bg_public.h`) are local consts.
 const GT_FFA: c_int = 0;
 const GT_SINGLE_PLAYER: c_int = 5;
 const GT_TEAM: c_int = 6;
 const GT_MAX_GAME_TYPE: c_int = 10;
 
-// `BSET_SPAWN` (`g_public.h`'s `bSet_t`, `g_local.h`) — local const.
+// `BSET_SPAWN` (`g_public.h`'s `bSet_t`, `g_local.h`) is a local const.
 const BSET_SPAWN: c_int = 0;
 
-// Configstring indices come from the canonical `mp_bg::public::configstring`
-// module via the prelude glob (`CS_GAME_VERSION`=20, `CS_MUSIC`=2, `CS_MESSAGE`=3,
-// `CS_MOTD`=4, `CS_WARMUP`=5, `CS_LEVEL_START_TIME`=21, `CS_GLOBAL_AMBIENT_SET`=32,
-// `CS_LIGHT_STYLES`=`CS_EFFECTS+MAX_FX`). The former file-local block diverged from
-// these oracle values and was removed.
+// Configstring indices come from the canonical `mp_bg::public::configstring` module, through the prelude glob.
+// (`CS_GAME_VERSION`=20, `CS_MUSIC`=2, `CS_MESSAGE`=3, `CS_MOTD`=4, `CS_WARMUP`=5, `CS_LEVEL_START_TIME`=21,
+// `CS_GLOBAL_AMBIENT_SET`=32, `CS_LIGHT_STYLES`=`CS_EFFECTS+MAX_FX`.)
+// The former file-local block diverged from these oracle values, and was removed.
 // Source: `oracle/codemp/game/bg_public.h:59-114`
 
 // Light style constants
@@ -86,10 +75,10 @@ const BSET_SPAWN: c_int = 0;
 const LS_STYLES_START: c_int = 0;
 const LS_NUM_STYLES: c_int = 32;
 
-// `ENTITYNUM_WORLD` (== MAX_GENTITIES-2 == 1022) is canonical in
-// `mp_qshared::shared::limits` and reaches here via the prelude glob. The
-// former local decl was wrongly 0, which indexed g_entities[0] (a client slot)
-// instead of the world entity in SP_worldspawn / worldspawn behaviorSet setup.
+// `ENTITYNUM_WORLD` (== MAX_GENTITIES-2 == 1022) is canonical in `mp_qshared::shared::limits`.
+// It reaches this file through the prelude glob.
+// The former local declaration was wrongly 0, which indexed `g_entities[0]` (a client slot),
+// instead of the world entity in `SP_worldspawn` and the worldspawn `behaviorSet` setup.
 // Source: `oracle/codemp/game/q_shared.h:2015`
 
 /// Raven `G_SpawnString`.
@@ -102,9 +91,9 @@ const LS_NUM_STYLES: c_int = 32;
 pub const MAX_AMBIENT_SETS: c_int = 256;
 
 pub fn G_SpawnString(ctx: &mut GameContext, key: &str, default: &str) -> (qboolean, String) {
-    // Raven's `if ( !level.spawning ) { *out = default; }` is a no-op guard: the
-    // `G_Error` return is commented out in Raven, so the search runs regardless
-    // and the fall-through supplies `default` anyway.
+    // Raven's `if ( !level.spawning ) { *out = default; }` is a no-op guard.
+    // Raven comments out the `G_Error` return, so the search runs regardless.
+    // The fall-through supplies `default` anyway.
     for (k, v) in &ctx.world.level.spawnVars {
         if Q_stricmp(k, key) == 0 {
             return (qtrue, v.clone());
@@ -156,9 +145,8 @@ pub fn G_SpawnVector(
 ) -> qboolean {
     unsafe {
         let (present, s) = G_SpawnString(ctx, &cstr_to_str(key), &cstr_to_str(defaultString));
-        // Unmatched components are left as whatever `*out` already held
-        // (porting-rules §19) — read the current 3 floats, let `sscanf_str_3f`
-        // overwrite only the ones libc `sscanf` would have matched.
+        // Unmatched components stay whatever `*out` already held (porting-rules §19).
+        // The port reads the current 3 floats first, and `sscanf_str_3f` overwrites only the ones libc `sscanf` would have matched.
         let mut vec: [f32; 3] = [*out.add(0), *out.add(1), *out.add(2)];
         sscanf_str_3f(&s, &mut vec);
         *out.add(0) = vec[0];
@@ -169,30 +157,30 @@ pub fn G_SpawnVector(
 }
 
 // ---------------------------------------------------------------------
-// Local helpers mirroring libc semantics used throughout this file
-// (`atoi`/`sscanf("%f %f %f", ...)` — house rule: libc/other symbols use the
-// Rust std equivalent, no resolved signature needed). `atof` is libc strtod —
-// `native_string::atof` (retail's JK2_game.vcproj excludes bg_lib.c from the
-// native DLL, so its QVM `atof` never linked); `sscanf_3f`/`sscanf_1f` route
-// through the shared libc-`%f` scanner `native_string::sscanf::sscanf_f32s`.
+// Local helpers mirror libc semantics used throughout this file.
+// `atoi`/`sscanf("%f %f %f", ...)` follow the house rule: libc and other symbols use the Rust std equivalent, with no resolved signature needed.
+// `atof` is libc strtod, so it uses `native_string::atof`.
+// Retail's `JK2_game.vcproj` excludes `bg_lib.c` from the native DLL, so its QVM `atof` never linked.
+// `sscanf_3f`/`sscanf_1f` route through the shared libc-`%f` scanner `native_string::sscanf::sscanf_f32s`.
 // ---------------------------------------------------------------------
 
-/// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared
-/// libc-`%f`-faithful scanner. Unmatched components are left at whatever
-/// value `out` already held (porting-rules §19) — callers pre-seed `out`
-/// before calling. An empty `s` matches nothing, mirroring the old NULL-pointer
-/// early return.
+/// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared libc-`%f` scanner.
+/// Unmatched components are left at whatever value `out` already held (porting-rules §19).
+/// Callers pre-seed `out` before the call.
+/// An empty `s` matches nothing, mirroring the old NULL-pointer early return.
 fn sscanf_str_3f(s: &str, out: &mut [f32; 3]) {
     sscanf_f32s(s, out);
 }
 
-/// `sscanf(s, "%f", out)` via the shared libc-`%f`-faithful scanner. Leaves
-/// `*out` untouched on a failed match (porting-rules §19).
+/// `sscanf(s, "%f", out)` via the shared libc-`%f` scanner.
+/// This leaves `*out` untouched on a failed match (porting-rules §19).
 fn sscanf_str_1f(s: &str, out: &mut f32) {
     sscanf_f32s(s, std::slice::from_mut(out));
 }
 
-/// Raven `SP_item_botroam` — empty body (Raven's is a stub too).
+/// Raven `SP_item_botroam`.
+///
+/// This has an empty body, because Raven's is a stub too.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:368-370`
 pub fn SP_item_botroam(ent: &mut gentity_t) {}
@@ -202,9 +190,9 @@ pub fn SP_item_botroam(ent: &mut gentity_t) {}
 /// Source: `oracle/codemp/game/g_spawn.c:372-431`
 pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
     unsafe {
-        // Raven reads "teamfilter" into a local that is never used again (the
-        // team override below consults `level.mTeamFilter`); the call is pure, so
-        // its result is discarded.
+        // Raven reads "teamfilter" into a local that is never used again.
+        // The team override below consults `level.mTeamFilter` instead.
+        // The call is pure, so the port discards its result.
         let _ = G_SpawnString(ctx, "teamfilter", "");
 
         let origin = ctx.entity(id).s.origin;
@@ -241,8 +229,8 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
 
             if let Some(item) = item {
                 ctx.ent_set(id, PrefixSet::Targetname(None));
-                // Raven `ent->classname = item->classname`: alias the item table's
-                // `'static` classname pointer (no pool copy).
+                // Raven's `ent->classname = item->classname` aliases the item table's `'static` classname pointer.
+                // The port does not copy it into a pool.
                 let classname: &'static CStr = CStr::from_ptr(item.classname_cstr());
                 ctx.ent_set(id, PrefixSet::ClassnameStatic(classname));
                 G_SpawnItem(ctx, id, item);
@@ -253,9 +241,8 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
 
 /// Raven `G_CallSpawn`.
 ///
-/// Finds the spawn function for the entity and calls it, returning `qfalse`
-/// if not found. Checks item spawn functions first (from `bg_itemlist`), then
-/// normal spawn functions (from `spawns[]` table).
+/// Finds the spawn function for the entity and calls it, and returns `qfalse` if not found.
+/// It checks item spawn functions first (from `bg_itemlist`), then normal spawn functions (from the `spawns[]` table).
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:683-714`
 pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
@@ -297,9 +284,9 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
     qfalse
 }
 
-/// `fields[]` (`BG_field_t[]`) — this file's own file-scope table, feeding
-/// `BG_ParseField` in `G_SpawnGEntityFromSpawnVars`/`SP_worldspawn`. Offsets
-/// via `offset_of!` against the already offset-asserted `gentity_t`.
+/// `fields[]` (`BG_field_t[]`) is this file's own file-scope table.
+/// It feeds `BG_ParseField` in `G_SpawnGEntityFromSpawnVars` and `SP_worldspawn`.
+/// Offsets come from `offset_of!` against the already offset-asserted `gentity_t`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:54-149`
 pub static FIELDS: &[BG_field_t] = &[
@@ -328,8 +315,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, alliedTeam),
         fieldtype_t::F_INT,
     ),
-    // `roffname`/`rofftarget` fields deleted (zero readers); their spawn keys
-    // parse silently as F_IGNORE so maps still load.
+    // `roffname`/`rofftarget` fields are deleted, because they have zero readers.
+    // Their spawn keys parse silently as F_IGNORE, so maps still load.
     field(c"roffname", 0, fieldtype_t::F_IGNORE),
     field(c"rofftarget", 0, fieldtype_t::F_IGNORE),
     field_owned(c"healingclass", set_healingclass),
@@ -553,9 +540,9 @@ pub static FIELDS: &[BG_field_t] = &[
     field(c"parm14", 0, fieldtype_t::F_PARM14),
     field(c"parm15", 0, fieldtype_t::F_PARM15),
     field(c"parm16", 0, fieldtype_t::F_PARM16),
-    // {NULL} terminator: BG_ParseField scans `for (f=l_fields; f->name; f++)`,
-    // so the sentinel's `name` must be a genuine null pointer, not a pointer to
-    // an empty string, or the scan runs off the end of the table.
+    // {NULL} terminator: `BG_ParseField` scans `for (f=l_fields; f->name; f++)`.
+    // The sentinel's `name` must be a genuine null pointer, not a pointer to an empty string.
+    // Otherwise the scan runs off the end of the table.
     BG_field_t {
         name: std::ptr::null_mut(),
         ofs: 0,
@@ -565,11 +552,10 @@ pub static FIELDS: &[BG_field_t] = &[
     },
 ];
 
-// `behaviorSet[i]` is a `[*mut c_char; NUM_BSETS]` array of pointer-sized slots;
-// the `+ i * size_of::<*mut c_char>()` strides above mirror Raven's
-// `FOFS(behaviorSet[BSET_X])` at the target's pointer width (8 on LP64, 4 on
-// ILP32) without indexing through a non-const array-index `offset_of!` (not yet
-// stable for computed indices).
+// `behaviorSet[i]` is a `[*mut c_char; NUM_BSETS]` array of pointer-sized slots.
+// The `+ i * size_of::<*mut c_char>()` strides above mirror Raven's `FOFS(behaviorSet[BSET_X])`.
+// This is at the target's pointer width (8 on LP64, 4 on ILP32).
+// `offset_of!` is not yet stable for a non-const computed array index, so the port cannot index through it directly.
 const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field_t {
     BG_field_t {
         name: name.as_ptr() as *mut c_char,
@@ -580,10 +566,9 @@ const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field
     }
 }
 
-/// Owned-tail-field entry: [`fieldtype_t::F_STRING_OWNED`] with no offset — the
-/// typed `set`ter stores the decoded value into the entity's owned
-/// `String`/`Option<String>` field. Replaces the `F_LSTRING` (pool-pointer)
-/// entry for every migrated tail field.
+/// This is an owned-tail-field entry: [`fieldtype_t::F_STRING_OWNED`] with no offset.
+/// The typed setter stores the decoded value into the entity's owned `String`/`Option<String>` field.
+/// It replaces the `F_LSTRING` (pool-pointer) entry for every migrated tail field.
 const fn field_owned(name: &'static CStr, set: SpawnStringSetter) -> BG_field_t {
     BG_field_t {
         name: name.as_ptr() as *mut c_char,
@@ -594,13 +579,12 @@ const fn field_owned(name: &'static CStr, set: SpawnStringSetter) -> BG_field_t 
     }
 }
 
-// Typed setters for the owned tail fields migrated in this batch (all plain
-// `String`: `""` ≡ absent per the migration's ruling C). Each casts the
-// type-erased entity base and stores the decoded value; the setter matches the
-// [`SpawnStringSetter`] shape bg's `BG_ParseField` invokes.
+// These are typed setters for the owned tail fields migrated in this batch,
+// all plain `String` where `""` stands for absent, per the migration's ruling C.
+// Each setter casts the type-erased entity base and stores the decoded value.
+// The setter matches the [`SpawnStringSetter`] shape that bg's `BG_ParseField` invokes.
 //
-// # Safety (all): `ent` is the base of one live `gentity_t`, as `BG_ParseField`
-// passes it.
+// # Safety (all): `ent` is the base of one live `gentity_t`, as `BG_ParseField` passes it.
 fn set_healingclass(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).healingclass = val.to_owned() };
 }
@@ -613,8 +597,8 @@ fn set_ownername(ent: *mut byte, val: &str) {
 fn set_NPC_target(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).NPC_target = val.to_owned() };
 }
-// `NPC_type` is `Option<String>` (`None` ≡ Raven NULL); a present spawn key —
-// even `""` — is `Some(..)`, matching Raven's non-NULL pool pointer.
+// `NPC_type` is `Option<String>`, where `None` stands for Raven NULL.
+// A present spawn key, even `""`, is `Some(..)`, matching Raven's non-NULL pool pointer.
 fn set_NPC_type(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).NPC_type = Some(val.to_owned()) };
 }
@@ -651,9 +635,8 @@ fn set_goaltarget(ent: *mut byte, val: &str) {
 fn set_idealclass(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).idealclass = val.to_owned() };
 }
-// `target`/`target2`/`team` are `Option<String>` (`None` ≡ Raven NULL); a
-// present spawn key — even `""` — is `Some(..)`, matching Raven's non-NULL pool
-// pointer.
+// `target`/`target2`/`team` are `Option<String>`, where `None` stands for Raven NULL.
+// A present spawn key, even `""`, is `Some(..)`, matching Raven's non-NULL pool pointer.
 fn set_target(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).target = Some(val.to_owned()) };
 }
@@ -664,9 +647,8 @@ fn set_team(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).team = Some(val.to_owned()) };
 }
 
-// `model`/`closetarget`/`opentarget`/`paintarget` are `Option<String>` (`None` ≡
-// Raven NULL); a present spawn key — even `""` — is `Some(..)`, matching Raven's
-// non-NULL pool pointer.
+// `model`/`closetarget`/`opentarget`/`paintarget` are `Option<String>`, where `None` stands for Raven NULL.
+// A present spawn key, even `""`, is `Some(..)`, matching Raven's non-NULL pool pointer.
 fn set_model(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).model = Some(val.to_owned()) };
 }
@@ -680,18 +662,17 @@ fn set_paintarget(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).paintarget = Some(val.to_owned()) };
 }
 
-// `message` is `Option<String>` too, but its old `F_LSTRING` write ran through
-// `G_NewString`, whose `\n`-escape translation must be reproduced here or
-// multi-line message text regresses (G1 flag).
+// `message` is `Option<String>` too, but its old `F_LSTRING` write ran through `G_NewString`.
+// `G_NewString`'s `\n`-escape translation must be reproduced here, or multi-line message text regresses.
 fn set_message(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).message = Some(translate_newlines(val)) };
 }
 
-/// Reproduces `G_NewString`'s `\n`-escape translation as an owned `String`
-/// (no pool allocation): a `\` followed by `n` becomes a real linefeed, any
-/// other `\x` collapses to a lone `\` (the escaped char is dropped), matching
-/// the C copy loop byte-for-byte. Shared by the owned-`String` setters whose
-/// Raven write went through `G_NewString`.
+/// Reproduces `G_NewString`'s `\n`-escape translation as an owned `String`, with no pool allocation.
+/// A `\` followed by `n` becomes a real linefeed.
+/// Any other `\x` collapses to a lone `\`, and the escaped character is dropped.
+/// This matches the C copy loop byte-for-byte.
+/// The owned-`String` setters whose Raven write went through `G_NewString` share this helper.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:724-749`
 pub fn translate_newlines(src: &str) -> String {
@@ -708,19 +689,19 @@ pub fn translate_newlines(src: &str) -> String {
         }
         i += 1;
     }
-    // `src` is valid UTF-8 and the translation only ever emits `\n`/`\\`/copied
-    // input bytes, so the result is still valid UTF-8.
+    // `src` is valid UTF-8, and the translation only ever emits `\n`, `\\`, or copied input bytes.
+    // The result is still valid UTF-8.
     String::from_utf8(out).unwrap()
 }
 
-/// Raven `G_SpawnGEntityFromSpawnVars` — spawns an entity and fills in all of
-/// the level fields from `level.spawnVars[]`, then calls the class-specific
-/// spawn function.
+/// Raven `G_SpawnGEntityFromSpawnVars`.
+///
+/// Spawns an entity and fills in all of the level fields from `level.spawnVars[]`, then calls the class-specific spawn function.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:766-842`
 pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
     unsafe {
-        // static char *gametypeNames[] — fn-scope const table.
+        // Raven's `static char *gametypeNames[]` becomes this fn-scope const table.
         const GAMETYPE_NAMES: [&CStr; 10] = [
             c"ffa",
             c"holocron",
@@ -739,8 +720,9 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         let ent = ctx.entity_mut(ent_eid) as *mut gentity_t;
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -826,10 +808,10 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
     }
 }
 
-// Raven `G_AddSpawnVarToken` (g_spawn.c:851-866) deleted: it bump-copied a token
-// into the fixed `spawnVarChars` pool and returned a pointer. `spawnVars` is now
-// an owned `Vec<(String, String)>`, so tokens are pushed as owned strings and the
-// pool (and its `MAX_SPAWN_CHARS` overflow error) no longer exist.
+// Raven `G_AddSpawnVarToken` (`g_spawn.c:851-866`) is deleted.
+// It bump-copied a token into the fixed `spawnVarChars` pool and returned a pointer.
+// `spawnVars` is now an owned `Vec<(String, String)>`, so tokens are pushed as owned strings.
+// The pool, and its `MAX_SPAWN_CHARS` overflow error, no longer exist.
 
 /// Raven `AddSpawnField`.
 ///
@@ -849,8 +831,9 @@ pub fn AddSpawnField(ctx: &mut GameContext, field: &str, value: &str) {
 
 pub const NOVALUE: &CStr = c"novalue";
 
-/// Raven `HandleEntityAdjustment` (file-static) — sub-BSP instance origin/
-/// angle/name-prefix rewriting.
+/// Raven `HandleEntityAdjustment` (file-static).
+///
+/// Rewrites sub-BSP instance origin, angle, and name prefix.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:888-1006`
 fn HandleEntityAdjustment(ctx: &mut GameContext) {
@@ -858,19 +841,17 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         let mut new_origin: vec3_t = [0.0; 3];
 
         let (_, value) = G_SpawnString(ctx, "origin", "novalue");
-        // `origin` is pre-seeded 0.0 (matching the else-branch below); any
-        // component `sscanf_str_3f` fails to match is left at that seed rather
-        // than picking up C's stack garbage (porting-rules §19).
+        // `origin` is pre-seeded 0.0, matching the else-branch below.
+        // Any component `sscanf_str_3f` fails to match is left at that seed, not C's stack garbage (porting-rules §19).
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
         if Q_stricmp(&value, "novalue") != 0 {
             sscanf_str_3f(&value, &mut origin);
         }
 
-        // `DEG2RAD(a)` is `(a * M_PI) / 180.0F`; M_PI resolves to glibc's double
-        // (math.h at q_shared.h:82 precedes the `#ifndef M_PI` float redefine at
-        // :547), so `float * double / float` evaluates entirely in f64 and
-        // narrows once at the f32 store. `cos`/`sin` are the double libm
-        // functions and each `origin[k]*cos(...)` term likewise evaluates in f64.
+        // `DEG2RAD(a)` is `(a * M_PI) / 180.0F`.
+        // `M_PI` resolves to glibc's double, because `math.h` at `q_shared.h:82` precedes the `#ifndef M_PI` float redefine at `q_shared.h:547`.
+        // So `float * double / float` evaluates entirely in f64, and narrows once at the f32 store.
+        // `cos`/`sin` are the double libm functions, and each `origin[k]*cos(...)` term likewise evaluates in f64.
         // Source: `oracle/codemp/game/q_shared.h:547-548,1174`
         let rotation =
             ((ctx.world.level.mRotationAdjust as f64 * std::f64::consts::PI) / 180.0f64) as f32;
@@ -884,10 +865,9 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         new_origin[1] += origin_adjust[1];
         new_origin[2] += origin_adjust[2];
 
-        // damn VMs don't handle outputing a float that is compatible with sscanf
-        // in all cases — Com_sprintf("%0.0f %0.0f %0.0f", ...) inlined directly
-        // (Com_sprintf itself is parked variadic-c-abi; same `COM_DefaultExtension`
-        // precedent as `q_shared.rs`).
+        // damn VMs don't handle outputing a float that is compatible with sscanf in all cases
+        // `Com_sprintf("%0.0f %0.0f %0.0f", ...)` is inlined directly.
+        // `Com_sprintf` itself is parked as variadic C ABI, the same `COM_DefaultExtension` precedent as `q_shared.rs`.
         let temp = format!(
             "{:.0} {:.0} {:.0}",
             new_origin[0], new_origin[1], new_origin[2]
@@ -899,9 +879,8 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
             let mut angles: vec3_t = [0.0, 0.0, 0.0];
             sscanf_str_3f(&value, &mut angles);
 
-            // `fmod` is a double-precision truncated remainder whose sign follows
-            // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
-            // negative sum.
+            // `fmod` is a double-precision truncated remainder whose sign follows the dividend.
+            // `rem_euclid` (the least non-negative result) differs by 360 for a negative sum.
             angles[1] = ((angles[1] + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0} {:.0} {:.0}", angles[0], angles[1], angles[2]);
             AddSpawnField(ctx, "angles", &temp);
@@ -957,14 +936,15 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
     }
 }
 
-/// Raven `G_ParseSpawnVars` — parses a brace-bounded set of key/value pairs
-/// out of the level's entity strings into `level.spawnVars[]`. Does not
-/// actually spawn an entity.
+/// Raven `G_ParseSpawnVars`.
+///
+/// Parses a brace-bounded set of key/value pairs out of the level's entity strings into `level.spawnVars[]`.
+/// It does not spawn an entity.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1018-1067`
 pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
-    // `MAX_TOKEN_CHARS` (value 1024) canonical in `mp_qshared::shared::limits`,
-    // reaches this file via the crate prelude glob.
+    // `MAX_TOKEN_CHARS` (value 1024) is canonical in `mp_qshared::shared::limits`.
+    // It reaches this file through the crate prelude glob.
     ctx.world.level.spawnVars.clear();
 
     // parse the opening brace
@@ -1001,8 +981,8 @@ pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
         ctx.world.level.spawnVars.push((keyname, com_token));
     }
 
-    // Oracle calls HandleEntityAdjustment exactly once, after the loop, gated on
-    // inSubBSP. Source: `oracle/codemp/game/g_spawn.c:1061-1064`
+    // Oracle calls `HandleEntityAdjustment` exactly once, after the loop, gated on `inSubBSP`.
+    // Source: `oracle/codemp/game/g_spawn.c:1061-1064`
     if inSubBSP != qfalse {
         HandleEntityAdjustment(ctx);
     }
@@ -1012,8 +992,8 @@ pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
 
 /// Raven `SP_worldspawn`.
 ///
-/// Spawns the world entity and initializes the level. Parses worldspawn-specific
-/// spawn variables, loads animations and ghoul2 models, and sets up configstrings.
+/// Spawns the world entity and initializes the level.
+/// It parses worldspawn-specific spawn variables, loads animations and ghoul2 models, and sets up configstrings.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1259-1386`
 pub fn SP_worldspawn(ctx: &mut GameContext) {
@@ -1024,8 +1004,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         let mut lengthBlue: c_int;
         let mut lengthGreen: c_int;
 
-        // STAGE-2b: irreducible — `g_cullDistance` is a `&mut f32` out-param
-        // aliasing `ctx.world` while `ctx` is also passed to `G_SpawnFloat`.
+        // This raw store is irreducible.
+        // `g_cullDistance` is a `&mut f32` out-param that aliases `ctx.world`, and `ctx` is also passed to `G_SpawnFloat`.
         let cull_out = &mut (*ctx.world_raw()).globals.g_cullDistance;
         // I want to "cull" entities out of net sends to clients to reduce
         // net traffic on our larger open maps -rww
@@ -1041,8 +1021,9 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         }
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-            // field; a raw store is required (bg-seam re-entry).
+            // SEAM-BG-REENTRY (DEC-28, sanctioned).
+            // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+            // A raw store is required for bg-seam re-entry.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
@@ -1051,7 +1032,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
                 let field_key = cstr(&ctx.world.level.spawnVars[i].0);
                 let field_value = cstr(&ctx.world.level.spawnVars[i].1);
                 let ent_base = ctx.world.g_entities.as_mut_ptr() as *mut byte;
-                // Only let them set spawnscript, we don't want them setting an angle or something on the world.
+                // ONly let them set spawnscript, we don't want them setting an angle or something on the world.
                 BG_ParseField(
                     &mut callbacks,
                     FIELDS.as_ptr() as *mut BG_field_t,
@@ -1063,14 +1044,15 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         }
 
         // The server will precache the standard model and animations, so that there is no hit
-        // when the first client connects.
+        // when the first client connnects.
         if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
-                // field aliasing the `bg_state` args below; the callbacks handle and
-                // both `&mut bg_state`/`bgHumanoidAnimations` derefs alias one world,
-                // so the whole `BG_ParseAnimationFile` seam stays a raw-pointer group.
+                // SEAM-BG-REENTRY (DEC-28, sanctioned).
+                // GameCallbacksImpl.world is a `*mut GameWorld` field aliasing bg_state.
+                // A raw store is required for bg-seam re-entry.
+                // The callbacks handle and both the `&mut bg_state` and `bgHumanoidAnimations` derefs alias one world.
+                // The whole `BG_ParseAnimationFile` call stays a raw-pointer group.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
@@ -1241,9 +1223,10 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
     }
 }
 
-/// Raven `SP_bsp_worldspawn` — rww: planning on having something here?
+/// Raven `SP_bsp_worldspawn`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1389-1392`
+//rww - Planning on having something here?
 pub fn SP_bsp_worldspawn() -> qboolean {
     qtrue
 }
@@ -1255,12 +1238,11 @@ pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
     let mut counted_sets: c_int = 0;
 
     for i in 0..MAX_GENTITIES {
-        // `soundSet` is now an owned `String` (`""` ≡ Raven's NULL-or-empty
-        // guard `!soundSet || !soundSet[0]`).
+        // `soundSet` is now an owned `String`, where `""` stands for Raven's NULL-or-empty guard `!soundSet || !soundSet[0]`.
         if ctx.world.g_entities[i].inuse != qfalse && !ctx.world.g_entities[i].soundSet.is_empty() {
             if counted_sets >= MAX_AMBIENT_SETS {
                 panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n");
-                // Com_Error(ERR_DROP, ...) -> panic
+                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
             }
 
             let soundSet = ctx.world.g_entities[i].soundSet.clone();
@@ -1271,8 +1253,9 @@ pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
     }
 }
 
-/// Raven `G_SpawnEntitiesFromString` — parses textual entity definitions out
-/// of an entstring and spawns gentities.
+/// Raven `G_SpawnEntitiesFromString`.
+///
+/// Parses textual entity definitions out of an entstring and spawns gentities.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1424-1478`
 pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
@@ -1313,8 +1296,8 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
             if !script_runner.is_null() {
                 let id = script_runner_eid;
                 let next_think = ctx.world.level.time + 100;
-                // Raven aliased the world's spawn-script pointer into the runner's
-                // BSET_USESCRIPT (`behaviorSet[1]`) slot; the set copy is content-identical.
+                // Raven aliases the world's spawn-script pointer into the runner's `BSET_USESCRIPT` (`behaviorSet[1]`) slot.
+                // The port's set makes a content-identical copy instead.
                 ctx.ent_set(id, PrefixSet::BehaviorSet(1, Some(&world_bset)));
                 {
                     let e = ctx.world.entity_mut(id);
@@ -1337,9 +1320,10 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
     }
 }
 
-/// Raven `defaultStyles[32][3]` — per-style light-pattern strings indexed by
-/// `[styleIndex][fixture 0..2]`; entries 14-31 are empty strings (Raven never
-/// filled them in).
+/// Raven `defaultStyles[32][3]`.
+///
+/// Holds per-style light-pattern strings, indexed by `[styleIndex][fixture 0..2]`.
+/// Entries 14-31 are empty strings, because Raven never filled them in.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1070-1236`
 pub const defaultStyles: [[*const c_char; 3]; 32] = [

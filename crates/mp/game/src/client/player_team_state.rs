@@ -8,7 +8,7 @@ use core::ffi::c_int;
 
 /// Raven `playerTeamStateState_t`.
 ///
-/// Verified against oracle: a **named `typedef enum`**, not a `typedef int`.
+/// This is a named enum in the oracle, not a `typedef int`.
 /// Type definition source: `oracle/codemp/game/g_local.h:380-383`
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -18,7 +18,9 @@ pub enum playerTeamStateState_t {
     TEAM_ACTIVE, // Now actively playing
 }
 
-/// Raven `playerTeamState_t` — status in teamplay games.
+/// Raven `playerTeamState_t`.
+///
+/// This tracks player status in teamplay games.
 ///
 /// Type definition source: `oracle/codemp/game/g_local.h:385-401`
 #[repr(C)]
