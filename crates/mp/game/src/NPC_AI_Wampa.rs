@@ -1,23 +1,18 @@
-// PORT-COMPLETE: NPC_AI_Wampa.c
-//! Port of `oracle/codemp/game/NPC_AI_Wampa.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_AI_Wampa.c`.
 //!
-//! SPINE (fork rulings 1/4): NPC AI think-loop helper functions. Most functions
-//! in this file read the implicit NPC/NPCInfo/ucmd bot-AI actor globals that
-//! Raven's `ai_main.c` think-loop sets per NPC frame. The faithful skeleton
-//! signatures carry no channel to reach these implicit globals (no `GameWorld`/
-//! `GameContext` field for "current NPC" and no entity parameter in most cases).
-//! This matches the `ai-context` precedent in `NPC_utils.rs`, `NPC_combat.rs`,
-//! `NPC_AI_Jedi.rs` — parked pending resolution of how NPC-frame state is
-//! threaded to these helpers (topic: `ai-context-threading`).
+//! Most functions in this file read the implicit NPC/NPCInfo/ucmd bot-AI actor globals that
+//! Raven's `ai_main.c` think-loop sets per NPC frame.
+//! The function signatures carry no channel to reach these implicit globals: no `GameWorld`/
+//! `GameContext` field for "current NPC" and no entity parameter in most cases.
+//! `NPC_utils.rs`, `NPC_combat.rs`, and `NPC_AI_Jedi.rs` use the same pattern.
 //!
-//! Safe-state migration **Campaign 2c** (deref regime): every entity reach is a
-//! checked `ctx.world.entity(id)`/`entity_mut(id)` borrow taken at the point of
-//! use; the ambient `NPC` actor is a raw pointer value only long enough to
-//! recover its `EntityId`. The `gNPC_t` (`NPCInfo`/`self->NPC`) struct has no
-//! accessor, so its derefs stay raw in tight `unsafe` blocks (`// FLAG:` sites),
-//! as do the BG_Alloc'd pool-client (`gclient_t`) derefs, read via the safe
-//! entity borrow (trap 2b/2c). This file is referee-blind — parity rests on the
-//! compile + golden suite.
+//! Every entity reach is a checked `ctx.world.entity(id)`/`entity_mut(id)` borrow taken at the
+//! point of use.
+//! The ambient `NPC` actor is a raw pointer value only long enough to recover its `EntityId`.
+//! The `gNPC_t` (`NPCInfo`/`self->NPC`) struct has no accessor, so its derefs stay raw in tight
+//! `unsafe` blocks (`// FLAG:` sites), as do the BG_Alloc'd pool-client (`gclient_t`) derefs,
+//! read via the safe entity borrow.
+//! Parity for this file rests on the compile and golden test suite, not the lockstep referee.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_utils::G_SoundIndex;
@@ -25,7 +20,8 @@ use crate::prelude::*;
 use crate::trap;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
-// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Raven `qboolean` is `c_int`.
+// The source spelling stays at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
 // These define the working combat range for these suckers
@@ -49,7 +45,7 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
     let Some(self_id) = self_ else {
         return;
     };
-    // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+    // FLAG: Wampa pool client, deref raw via the safe entity borrow.
     let client = ctx.world.entity(self_id).client;
     if client.is_null() {
         return;
@@ -69,11 +65,12 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
 
 /// Raven `NPC_Wampa_Precache`.
 ///
-/// Precaches the swipe-hit sound. All growl/snort variants are commented out
-/// in the oracle source (oracle/codemp/game/NPC_AI_Wampa.c:45-55).
+/// Precaches the swipe-hit sound.
+/// The growl and snort variants are commented out in the oracle source.
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:43-58`
 pub fn NPC_Wampa_Precache(ctx: &mut GameContext) {
-    // Only the swipe sound is live; growl/snort loops are commented out
+    // Only the swipe sound is live.
+    // The growl and snort loops are commented out in the oracle source.
     G_SoundIndex(ctx, "sound/chars/rancor/swipehit.wav");
 }
 
@@ -81,7 +78,7 @@ pub fn NPC_Wampa_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:66-76`
 pub fn Wampa_Idle(ctx: &mut GameContext) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so the deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     if !npc_info.is_null() {
         unsafe {
@@ -115,7 +112,7 @@ pub fn Wampa_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             anim,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
-        // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+        // FLAG: Wampa pool client, deref raw via the safe entity borrow.
         let client = ctx.world.entity(self_).client;
         let legs_timer = unsafe { (*client).ps.legsTimer };
         crate::g_timer::TIMER_Set(ctx, Some(self_), c"rageTime".as_ptr(), legs_timer);
@@ -130,7 +127,7 @@ pub fn Wampa_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 pub fn Wampa_Patrol(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so the deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     if !npc_info.is_null() {
@@ -170,7 +167,7 @@ pub fn Wampa_Patrol(ctx: &mut GameContext) {
 pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so the derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
 
     unsafe {
@@ -212,7 +209,7 @@ pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
 
             if (*npc_info).stats.runSpeed == 300 {
                 // need to use the alternate run - hunched over on all fours
-                // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+                // FLAG: Wampa pool client, deref raw via the safe entity borrow.
                 let client = ctx.world.entity(npc_id).client;
                 (*client).ps.eFlags2 |= mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
             }
@@ -259,8 +256,8 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
             continue;
         }
 
-        // FLAG: arbitrary hit ent — client may be real or NPC pool; read the
-        // pointer via the safe entity borrow, deref raw (trap 2c).
+        // FLAG: the hit entity is arbitrary, so its client may be a real player or an NPC pool slot.
+        // Read the pointer via the safe entity borrow, then deref it raw.
         let radius_client = ctx.world.entity(radius_id).client;
         if radius_client.is_null() {
             // must be a client
@@ -270,9 +267,9 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
         let radius_origin = ctx.world.entity(radius_id).r.currentOrigin;
         if DistanceSquared(radius_origin, boltOrg) <= radiusSquared {
             // smack
-            // Raven passes the global `vec3_origin` as `dir`; G_Damage
-            // normalizes `dir` in place (a no-op on the zero vector), so a
-            // fresh local copy is behaviorally identical.
+            // Raven passes the global `vec3_origin` as `dir`.
+            // G_Damage normalizes `dir` in place, a no-op on the zero vector.
+            // A fresh local copy produces the same result.
             let mut origin = vec3_origin;
             crate::g_combat::G_Damage(
                 ctx,
@@ -293,14 +290,14 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                 // actually push the enemy
                 let mut pushDir: [f32; 3] = [0.0; 3];
                 let mut angs: [f32; 3] = [0.0; 3];
-                // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+                // FLAG: Wampa pool client, deref raw via the safe entity borrow.
                 let npc_client = ctx.world.entity(npc_id).client;
                 let viewangles = unsafe { (*npc_client).ps.viewangles };
                 crate::q_math::_VectorCopy(viewangles, &mut angs);
                 angs[crate::prelude::YAW as usize] += ctx.world.bg_state.rng.flrand(25.0, 50.0);
                 angs[crate::prelude::PITCH as usize] = ctx.world.bg_state.rng.flrand(-25.0, -15.0);
                 crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
-                // FLAG: arbitrary hit ent client, deref raw via the safe borrow (trap 2c).
+                // FLAG: the hit entity is arbitrary, so its client is read via the safe borrow and dereferenced raw.
                 let npc_class = unsafe { (*radius_client).NPC_class };
                 if npc_class != crate::prelude::CLASS_WAMPA
                     && npc_class != crate::prelude::CLASS_RANCOR
@@ -351,7 +348,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                         );
                     }
                     let dismember_origin = ctx.world.entity(radius_id).r.currentOrigin;
-                    // FLAG: arbitrary hit ent client, deref raw via the safe borrow (trap 2c).
+                    // FLAG: the hit entity is arbitrary, so its client is read via the safe borrow and dereferenced raw.
                     let torso_anim = unsafe { (*radius_client).ps.torsoAnim };
                     crate::g_combat::G_Dismember(
                         ctx,
@@ -371,7 +368,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                 // one out of every 4 normal hits does a knockdown, too
                 let mut pushDir: [f32; 3] = [0.0; 3];
                 let mut angs: [f32; 3] = [0.0; 3];
-                // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+                // FLAG: Wampa pool client, deref raw via the safe entity borrow.
                 let npc_client = ctx.world.entity(npc_id).client;
                 let viewangles = unsafe { (*npc_client).ps.viewangles };
                 crate::q_math::_VectorCopy(viewangles, &mut angs);
@@ -397,7 +394,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
 pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+    // FLAG: Wampa pool client, deref raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     unsafe {
         if crate::g_timer::TIMER_Exists(ctx, Some(npc_id), c"attacking".as_ptr()) == 0 {
@@ -510,10 +507,10 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
 pub fn Wampa_Combat(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so the derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // Raven dereferences `NPC->enemy` unguarded here; this function is only
-    // called while actively engaged, so the enemy is assumed live.
+    // Raven dereferences `NPC->enemy` unguarded here.
+    // This function is only called while actively engaged, so the enemy is assumed live.
     let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
 
     unsafe {
@@ -615,16 +612,16 @@ pub fn NPC_Wampa_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG: Wampa pool client (self), deref raw via the safe entity borrow (trap 2b).
+    // FLAG: Wampa pool client (self), deref raw via the safe entity borrow.
     let self_client = ctx.world.entity(self_).client;
-    // FLAG: gNPC_t (self->NPC) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (self->NPC) has no accessor, so the derefs stay raw.
     let self_npc = ctx.world.entity(self_).NPC;
 
     unsafe {
         let mut hitByWampa = qfalse;
         if let Some(attacker_id) = attacker {
-            // FLAG: arbitrary attacker — client may be real or NPC pool; read the
-            // pointer via the safe entity borrow, deref raw (trap 2c).
+            // FLAG: the attacker is arbitrary, so its client may be a real player or an NPC pool slot.
+            // Read the pointer via the safe entity borrow, then deref it raw.
             let attacker_client = ctx.world.entity(attacker_id).client;
             if !attacker_client.is_null()
                 && (*attacker_client).NPC_class == crate::prelude::CLASS_WAMPA
@@ -643,8 +640,8 @@ pub fn NPC_Wampa_Pain(
                 let attacker_origin = ctx.world.entity(attacker_id).r.currentOrigin;
                 let enemy_health = self_enemy.map(|id| ctx.world.entity(id).health);
                 let enemy_origin = self_enemy.map(|id| ctx.world.entity(id).r.currentOrigin);
-                // FLAG: enemy client may be real or NPC pool; read ptr via safe
-                // borrow, deref raw (trap 2c).
+                // FLAG: the enemy client may be a real player or an NPC pool slot.
+                // Read the pointer via the safe borrow, then deref it raw.
                 let enemy_is_wampa = match self_enemy {
                     Some(id) => {
                         let c = ctx.world.entity(id).client;
@@ -683,7 +680,8 @@ pub fn NPC_Wampa_Pain(
                 }
             }
         }
-        if (hitByWampa != 0 || ctx.world.bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
+        //hit by wampa, hit while holding live victim, or took a lot of damage
+        if (hitByWampa != 0 || ctx.world.bg_state.rng.Q_irand(0, 100) < damage)
             && (*self_client).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
             && (*self_client).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
             && crate::g_timer::TIMER_Done(ctx, Some(self_), c"takingPain".as_ptr()) != 0
@@ -720,8 +718,8 @@ pub fn NPC_Wampa_Pain(
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                             );
                         }
-                        // Oracle reads legsTimer + draws Q_irand(0,500) LAST —
-                        // after the anim-pick draw and after NPC_SetAnim.
+                        // Raven reads legsTimer and draws Q_irand(0, 500) last.
+                        // This happens after the anim-pick draw and after NPC_SetAnim.
                         // Source: oracle/codemp/game/NPC_AI_Wampa.c:485
                         let taking_pain =
                             (*self_client).ps.legsTimer + ctx.world.bg_state.rng.Q_irand(0, 500);
@@ -752,9 +750,9 @@ pub fn NPC_Wampa_Pain(
 pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so the derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
-    // FLAG: Wampa pool client, deref raw via the safe entity borrow (trap 2b).
+    // FLAG: Wampa pool client, deref raw via the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
 
     unsafe {
@@ -777,8 +775,8 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
             return;
         }
         if ctx.world.entity(npc_id).enemy.is_some() {
-            // Guaranteed `Some` inside this block by the guard above (mirrors
-            // Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known set).
+            // The guard above guarantees `Some` inside this block.
+            // This mirrors Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known to be set.
             let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
             if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"attacking".as_ptr()) == 0 {
                 // in middle of attack
@@ -814,8 +812,8 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     );
                 }
                 // else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
-                // FLAG: enemy client may be real or NPC pool; read ptr via safe
-                // borrow, deref raw (trap 2c).
+                // FLAG: the enemy client may be a real player or an NPC pool slot.
+                // Read the pointer via the safe borrow, then deref it raw.
                 let enemy_is_wampa = {
                     let c = ctx.world.entity(enemy_id).client;
                     !c.is_null() && (*c).NPC_class == crate::prelude::CLASS_WAMPA

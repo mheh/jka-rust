@@ -1,9 +1,7 @@
-// PORT-COMPLETE: NPC_AI_Grenadier.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Grenadier.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Grenadier.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through
+//! the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_public_consts::SVF_GLASS_BRUSH;
@@ -23,16 +21,16 @@ use mp_bg::public::entity_event::entity_event_t::{
 };
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
-// Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
-// (file-scope local state, `gNPC_t::localState`) — not a central type, ported
-// as file-local consts matching the C values.
+// Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }` (file-scope local
+// state, `gNPC_t::localState`) is not a central type.
+// It ports as file-local consts matching the C values.
 // Source: `oracle/codemp/game/NPC_AI_Grenadier.c:42-47`
 const LSTATE_NONE: i32 = 0;
 pub const LSTATE_UNDERFIRE: i32 = 1;
 pub const LSTATE_INVESTIGATE: i32 = 2;
 
-// Raven's `enum { SQUAD_IDLE, SQUAD_STAND_AND_SHOOT, ... }` from `ai.h`
-// (squad state selector, `gNPC_t::squadState`) — file-scope consts matching C values.
+// Raven's `enum { SQUAD_IDLE, SQUAD_STAND_AND_SHOOT, ... }` from `ai.h` (squad state selector,
+// `gNPC_t::squadState`) ports as file-scope consts matching the C values.
 // Source: `oracle/codemp/game/ai.h:36-43`
 const SQUAD_IDLE: i32 = 0;
 const SQUAD_STAND_AND_SHOOT: i32 = 1;
@@ -62,7 +60,7 @@ pub fn Grenadier_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
     );
     TIMER_Set(ctx, Some(ent), c"roamTime".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, Some(ent), c"hideTime".as_ptr() as *const c_char, 0);
-    // FIXME: Slant for difficulty levels (Raven comment).
+    // FIXME: Slant for difficulty levels
     TIMER_Set(ctx, Some(ent), c"attackDelay".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, Some(ent), c"stick".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, Some(ent), c"scoutTime".as_ptr() as *const c_char, 0);
@@ -73,7 +71,7 @@ pub fn Grenadier_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:65-81`
 pub fn NPC_Grenadier_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
-    // FIXME: make this a custom sound in sound set (Raven comment).
+    // FIXME: make this a custom sound in sound set
     if ctx.world.entity(self_).health > 0 {
         let confuse_event = ctx
             .world
@@ -90,13 +88,14 @@ pub fn NPC_Grenadier_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) 
         0,
     );
     TIMER_Set(ctx, Some(self_), c"flee".as_ptr() as *const c_char, 0);
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc = ctx.world.entity(self_).NPC;
     unsafe {
         (*npc).squadState = SQUAD_IDLE;
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
     }
-    G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
+    G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;?
     unsafe {
         (*npc).investigateCount = 0;
     }
@@ -111,7 +110,8 @@ pub fn NPC_Grenadier_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // The deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     unsafe {
         (*npc).localState = LSTATE_UNDERFIRE;
@@ -128,7 +128,7 @@ pub fn NPC_Grenadier_Pain(
             .bg_state
             .rng
             .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int);
-        // FIXME: better way to know I was pushed (Raven comment).
+        // FIXME: better way to know I was pushed
         G_AddVoiceEvent(ctx, self_, pushed_event, 2000);
     }
 }
@@ -137,7 +137,8 @@ pub fn NPC_Grenadier_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:111-121`
 pub fn Grenadier_HoldPosition(ctx: &mut GameContext) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if !npc_info_ptr.is_null() {
@@ -154,7 +155,8 @@ pub fn Grenadier_HoldPosition(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:129-182`
 pub fn Grenadier_Move(ctx: &mut GameContext) -> qboolean {
     let npc_ptr = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if npc_info_ptr.is_null() || npc_ptr.is_null() {
@@ -182,8 +184,8 @@ pub fn Grenadier_Move(ctx: &mut GameContext) -> qboolean {
 
     // If our move failed, then reset
     if moved == qfalse {
-        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
-        // raw via the safe entity borrow, per trap 2b.
+        // FLAG: NPC carries a BG_Alloc'd pool client, not level.clients.
+        // The deref goes through the safe entity borrow.
         let client = ctx.world.entity(npc_id).client;
         let enemy = ctx.world.entity(npc_id).enemy;
         // couldn't get to enemy
@@ -242,7 +244,8 @@ pub fn Grenadier_Move(ctx: &mut GameContext) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:190-277`
 pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
     let npc_ptr = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if npc_info_ptr.is_null() || npc_ptr.is_null() {
@@ -287,8 +290,8 @@ pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
                         == alertEventLevel_e::AEL_DISCOVERED
                     {
                         let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
-                        // FLAG: pool clients (owner may be an NPC) — deref raw via
-                        // the safe entity borrow, per trap 2b.
+                        // FLAG: pool clients (owner may be an NPC).
+                        // The deref goes through the safe entity borrow.
                         let is_enemy = if owner.is_null() {
                             false
                         } else {
@@ -343,8 +346,8 @@ pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
                 let (o_yaw, o_pitch) =
                     unsafe { ((*npc_info_ptr).desiredYaw, (*npc_info_ptr).desiredPitch) };
 
-                // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via the
-                // safe entity borrow, per trap 2b.
+                // FLAG: NPC carries a BG_Alloc'd pool client.
+                // The deref goes through the safe entity borrow.
                 let npc_client = ctx.world.entity(npc_id).client;
                 let (investigate_goal, eye_point) = unsafe {
                     (
@@ -386,7 +389,8 @@ pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:307-391`
 pub fn Grenadier_CheckMoveState(ctx: &mut GameContext) {
     let npc_ptr = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if npc_info_ptr.is_null() || npc_ptr.is_null() {
@@ -419,7 +423,7 @@ pub fn Grenadier_CheckMoveState(ctx: &mut GameContext) {
         let origin = ctx.world.entity(npc_id).r.currentOrigin;
         let mins = ctx.world.entity(npc_id).r.mins;
         let maxs = ctx.world.entity(npc_id).r.maxs;
-        // guarded by `!goalEntity.is_none()` above.
+        // Guarded by `!goalEntity.is_none()` above.
         let goal_origin = ctx.world.entity(goal_entity.unwrap()).r.currentOrigin;
         let flying = FlyingCreature(ctx.world.entity(npc_id));
         let squad_state = unsafe { (*npc_info_ptr).squadState };
@@ -428,15 +432,16 @@ pub fn Grenadier_CheckMoveState(ctx: &mut GameContext) {
                 && ctx.world.globals.enemyLOS3 != qfalse
                 && ctx.world.globals.enemyDist3 <= 10000.0)
         {
-            // Oracle assigns the dead local `newSquadState` here (never written back
-            // to NPCInfo->squadState), so squadState stays SQUAD_RETREAT and the later
-            // `== SQUAD_RETREAT` flee/IDLE reset fires. Preserve that quirk (§20).
+            // Oracle assigns the dead local `newSquadState` here and never writes it back to
+            // NPCInfo->squadState.
+            // squadState stays SQUAD_RETREAT, so the later `== SQUAD_RETREAT` flee/IDLE reset fires.
+            // This quirk is intentional (§20).
             let mut newSquadState = SQUAD_STAND_AND_SHOOT;
             // we got where we wanted to go, set timers based on why we were running
             match squad_state {
                 SQUAD_RETREAT => {
-                    // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via
-                    // the safe entity borrow, per trap 2b.
+                    // FLAG: NPC carries a BG_Alloc'd pool client.
+                    // The deref goes through the safe entity borrow.
                     let client = ctx.world.entity(npc_id).client;
                     let health = ctx.world.entity(npc_id).health;
                     // was running away
@@ -537,7 +542,8 @@ pub fn Grenadier_CheckFireState(ctx: &mut GameContext) {
         return;
     }
 
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
     if npc_info_ptr.is_null() || npc_ptr.is_null() {
         return;
@@ -553,8 +559,8 @@ pub fn Grenadier_CheckFireState(ctx: &mut GameContext) {
         return;
     }
 
-    // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via the safe entity
-    // borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client.
+    // The deref goes through the safe entity borrow.
     let client = ctx.world.entity(npc_id).client;
     if !VectorCompare(unsafe { (*client).ps.velocity }, vec3_origin) {
         // if moving at all, don't do this
@@ -582,8 +588,8 @@ pub fn Grenadier_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
         return qtrue;
     }
 
-    // §19: oracle indexes `g_entities[hit]` unguarded (`&g_entities[hit] != NULL`
-    // is always true); the bounds check avoids a panic on a bad index.
+    // §19: oracle indexes `g_entities[hit]` unguarded (`&g_entities[hit] != NULL` is always true).
+    // The bounds check avoids a panic on a bad index.
     // Source: oracle/codemp/game/NPC_AI_Grenadier.c:448
     if hit >= 0 && (hit as usize) < mp_qshared::shared::MAX_GENTITIES {
         let hit_ent = &ctx.world.g_entities[hit as usize];
@@ -601,7 +607,8 @@ pub fn Grenadier_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:461-662`
 pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
     let npc_ptr = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if npc_info_ptr.is_null() || npc_ptr.is_null() {
@@ -622,8 +629,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
         return;
     }
 
-    // Oracle short-circuit: NPC_CheckAlertEvents (side-effectful) runs only
-    // when the flee timer is done (NPC_AI_Grenadier.c:461-478).
+    // Oracle runs the side-effectful NPC_CheckAlertEvents call only when the flee timer is done.
+    // Source: `oracle/codemp/game/NPC_AI_Grenadier.c:461-478`
     if TIMER_Done(ctx, Some(npc_id), c"flee".as_ptr() as *const c_char) != qfalse && {
         let alert_event = NPC_CheckAlertEvents(
             ctx,
@@ -658,8 +665,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
     ctx.world.globals.enemyDist3 = DistanceSquared(enemy_origin, npc_origin);
 
-    // FLAG: NPC/enemy carry BG_Alloc'd pool clients — deref raw via the safe
-    // entity borrow, per trap 2b.
+    // FLAG: NPC/enemy carry BG_Alloc'd pool clients.
+    // The derefs go through the safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     let enemy_client = ctx.world.entity(enemy_id).client;
     // See if we should switch to melee attack
@@ -728,8 +735,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
         }
         ctx.world.globals.enemyLOS3 = qtrue;
 
-        // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via the safe
-        // entity borrow, per trap 2b.
+        // FLAG: NPC carries a BG_Alloc'd pool client.
+        // The deref goes through the safe entity borrow.
         let npc_client = ctx.world.entity(npc_id).client;
         if unsafe { (*npc_client).ps.weapon } == WP_STUN_BATON {
             let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
@@ -757,7 +764,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
                 let hit_matches = if hit == enemy_num {
                     true
                 } else {
-                    // FLAG: hit entity may be an NPC — pool client deref raw, per trap 2b.
+                    // FLAG: hit entity may be an NPC.
+                    // The pool client deref stays raw.
                     let hit_client = ctx.world.g_entities[hit as usize].client;
                     let npc_client2 = ctx.world.entity(npc_id).client;
                     !hit_client.is_null()
@@ -793,8 +801,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
 
     if ctx.world.globals.enemyCS3 != qfalse {
         ctx.world.globals.shoot3 = qtrue;
-        // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via the safe
-        // entity borrow, per trap 2b.
+        // FLAG: NPC carries a BG_Alloc'd pool client.
+        // The deref goes through the safe entity borrow.
         let npc_client = ctx.world.entity(npc_id).client;
         let weapon = unsafe { (*npc_client).ps.weapon };
         if weapon == WP_THERMAL {
@@ -880,7 +888,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:664-679`
 pub fn NPC_BSGrenadier_Default(ctx: &mut GameContext) {
     let npc_ptr = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor.
+    // Derefs stay raw.
     let npc_info_ptr = ctx.world.globals.NPCInfo;
 
     if npc_info_ptr.is_null() || npc_ptr.is_null() {

@@ -1,17 +1,11 @@
-// PORT-COMPLETE: NPC_AI_Interrogator.c
-//! Faithful port of `oracle/codemp/game/NPC_AI_Interrogator.c` (jampgame mega-pass).
+//! Port of `oracle/codemp/game/NPC_AI_Interrogator.c`.
 //!
 //! Interrogator droid NPC AI behavior: idle, patrol, hunt, strafe, melee attack.
 //!
-//! All functions are now filled per pass-3 rulings: ai-context globals (NPC, NPCInfo, ucmd, level)
-//! are threaded via GameContext; stored enemy/goalEntity fields use Option<EntityId>; traps via
-//! ctx.engine; RNG via BgState; vec3 helpers use reshaped q_math signatures.
-//!
-//! Safe-state 2c: the NPC entity half is converted to `ctx.world.entity(npc_id)` /
-//! `entity_mut` accessor borrows. Two irreducible raw-deref regimes remain (FLAGged
-//! inline, task #7): `NPCInfo` is a `*mut gNPC_t` with no safe accessor, and `NPC`s
-//! carry a `BG_Alloc`'d pool `gclient_t` (`gClPtrs`) that is not a `level.clients`
-//! slot, so `NPC->client` is dereffed raw exactly as Raven does.
+//! The entity accessors use `ctx.world.entity(npc_id)` and `entity_mut` borrows.
+//! `NPCInfo` is a `*mut gNPC_t` with no safe accessor.
+//! `NPC`s carry a `BG_Alloc`'d pool `gclient_t` (`gClPtrs`) that is not a `level.clients` slot,
+//! so `NPC->client` is dereffed raw, as Raven does.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_combat::G_Damage;
@@ -72,7 +66,7 @@ const MIN_DISTANCE: c_int = 64;
 /// Precache sounds and effects for the Interrogator NPC.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
 pub fn NPC_Interrogator_Precache(ctx: &mut GameContext, self_: Option<EntityId>) {
-    // STAGE-1: EntityId param (unused by the body; caller may pass null/`None`).
+    // `self_` is unused. Raven's signature takes it, and the caller may pass null.
     G_SoundIndex(ctx, "sound/chars/interrogator/misc/torture_droid_lp");
     G_SoundIndex(ctx, "sound/chars/mark1/misc/anger.wav");
     G_SoundIndex(ctx, "sound/chars/probe/misc/talk");
@@ -95,13 +89,12 @@ pub fn Interrogator_die(
     dFlags: c_int,
     hitLoc: c_int,
 ) {
-    // STAGE-1: EntityId params; only `self_` is read (inflictor/attacker unused, as in Raven).
+    // Only `self_` is read. `inflictor` and `attacker` are unused, the same as Raven.
     let Some(self_id) = self_ else {
         return;
     };
-    // FLAG (task #7): NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
-    // `level.clients` slot; the pointer is read via the safe entity borrow and
-    // dereffed raw exactly as Raven does.
+    // FLAG: NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) is not a `level.clients` slot.
+    // The pointer is read via the safe entity borrow and dereffed raw, as Raven does.
     let client = ctx.world.entity(self_id).client;
     if !client.is_null() {
         unsafe {
@@ -110,8 +103,8 @@ pub fn Interrogator_die(
 
             // Clear flying flag and set random horizontal velocity
             c.ps.eFlags2 &= !(EF2_FLYING as c_int);
-            // Raven passes the range reversed — `Q_irand(-10, -20)` — and irand's
-            // arithmetic gives different values for a reversed range; keep it verbatim.
+            // Raven passes the range reversed as `Q_irand(-10, -20)`.
+            // The irand arithmetic gives different values for a reversed range, so this stays as Raven wrote it.
             // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:49-50`
             c.ps.velocity[0] = ctx.world.bg_state.rng.Q_irand(-10, -20) as f32;
             c.ps.velocity[1] = ctx.world.bg_state.rng.Q_irand(-10, -20) as f32;
@@ -153,8 +146,9 @@ pub fn Interrogator_PartsMove(ctx: &mut GameContext) {
     // Scalpel
     if TIMER_Done(ctx, Some(npc_id), c"scalpelDelay".as_ptr()) != 0 {
         let mut p2 = ctx.world.entity(npc_id).pos2[0];
-        // Change pitch. FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor;
-        // localState read/write stays a raw deref.
+        // Change pitch
+        // FLAG: `NPCInfo` (`gNPC_t`) has no safe accessor.
+        // The localState read and write stay a raw deref.
         if unsafe { (*npc_info).localState } == LSTATE_BLADEDOWN {
             // Blade is moving down
             p2 -= 30.0;
@@ -212,7 +206,7 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
 
     let mut dif: f32;
 
-    // FLAG (task #7): NPC pool `gclient_t` — dereffed raw for every velocity op.
+    // FLAG: NPC pool `gclient_t` is dereffed raw for every velocity op.
     let client = ctx.world.entity(npc_id).client;
     let npc_origin_z = ctx.world.entity(npc_id).r.currentOrigin[2];
     let enemy = ctx.world.entity(npc_id).enemy;
@@ -234,7 +228,7 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
             }
         }
     } else {
-        // FLAG (task #7): NPCInfo (gNPC_t) goalEntity/lastGoalEntity — raw reads.
+        // FLAG: `NPCInfo` (`gNPC_t`) `goalEntity`/`lastGoalEntity` are raw reads.
         let goal: Option<EntityId> = unsafe {
             if (*npc_info).goalEntity.is_some() {
                 // Is there a goal?
@@ -312,7 +306,7 @@ pub fn Interrogator_Strafe(ctx: &mut GameContext) {
     let mut right: vec3_t = [0.0; 3];
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
 
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for eyeAngles / velocity.
+    // FLAG: NPC pool `gclient_t` is a raw deref for eyeAngles and velocity.
     let client = ctx.world.entity(npc_id).client;
     let eye_angles = unsafe { (*client).renderInfo.eyeAngles };
     AngleVectors(eye_angles, None, Some(&mut right), None);
@@ -380,7 +374,8 @@ pub fn Interrogator_Strafe(ctx: &mut GameContext) {
             }
         }
 
-        // Set the strafe start time. FLAG (task #7): NPCInfo (gNPC_t) standTime — raw write.
+        // Set the strafe start time
+        // FLAG: `NPCInfo` (`gNPC_t`) `standTime` is a raw write.
         let stand =
             ctx.world.level.time + 3000 + (ctx.world.bg_state.rng.random() * 500.0) as c_int;
         unsafe {
@@ -402,8 +397,8 @@ pub fn Interrogator_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboo
 
     NPC_FaceEnemy(ctx, 0);
 
-    // If we're not supposed to stand still, pursue the player.
-    // FLAG (task #7): NPCInfo (gNPC_t) standTime — raw reads.
+    // If we're not supposed to stand still, pursue the player
+    // FLAG: `NPCInfo` (`gNPC_t`) `standTime` is a raw read.
     if unsafe { (*npc_info).standTime } < ctx.world.level.time {
         // Only strafe when we can see the player
         if visible != 0 {
@@ -425,7 +420,8 @@ pub fn Interrogator_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboo
 
     // Only try and navigate if the player is visible
     if visible == 0 {
-        // Move towards our goal. FLAG (task #7): NPCInfo (gNPC_t) goalEntity/goalRadius — raw writes.
+        // Move towards our goal
+        // FLAG: `NPCInfo` (`gNPC_t`) `goalEntity`/`goalRadius` are raw writes.
         let enemy = ctx.world.entity(npc_id).enemy;
         unsafe {
             (*npc_info).goalEntity = enemy;
@@ -449,7 +445,7 @@ pub fn Interrogator_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboo
 
     let speed = HUNTER_FORWARD_BASE_SPEED as f32
         + (HUNTER_FORWARD_MULTIPLIER as f32) * ctx.world.cvars.g_spskill.integer as f32;
-    // FLAG (task #7): NPC pool `gclient_t` — raw deref for velocity.
+    // FLAG: NPC pool `gclient_t` is a raw deref for velocity.
     let client = ctx.world.entity(npc_id).client;
     unsafe {
         let vel = (*client).ps.velocity;
@@ -499,7 +495,7 @@ pub fn Interrogator_Melee(ctx: &mut GameContext, visible: qboolean, advance: qbo
         }
     }
 
-    // FLAG (task #7): NPCInfo (gNPC_t) scriptFlags — raw read.
+    // FLAG: `NPCInfo` (`gNPC_t`) `scriptFlags` is a raw read.
     if unsafe { (*npc_info).scriptFlags } & SCF_CHASE_ENEMIES != 0 {
         Interrogator_Hunt(ctx, visible, advance);
     }
@@ -520,9 +516,10 @@ pub fn Interrogator_Attack(ctx: &mut GameContext) {
     // randomly talk
     if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
         if TIMER_Done(ctx, Some(npc_id), c"angerNoise".as_ptr()) != 0 {
-            // Raven: `va("sound/chars/probe/misc/talk.wav", Q_irand(1, 3))` — the
-            // format string has no specifier, so the value is discarded, but the
-            // Q_irand still advances the holdrand stream; keep the draw.
+            // Raven: `va("sound/chars/probe/misc/talk.wav", Q_irand(1, 3))`.
+            // The format string has no specifier, so the value is discarded.
+            // The Q_irand call still advances the holdrand stream.
+            // This code keeps the draw.
             // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:395`
             let _ = ctx.world.bg_state.rng.Q_irand(1, 3);
             G_SoundOnEnt(
@@ -542,7 +539,7 @@ pub fn Interrogator_Attack(ctx: &mut GameContext) {
         return;
     }
 
-    // Rate our distance to the target, and our visibility
+    // Rate our distance to the target, and our visibilty
     let enemy = ctx.world.entity(npc_id).enemy;
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
     let enemy_origin = match enemy {
@@ -563,7 +560,7 @@ pub fn Interrogator_Attack(ctx: &mut GameContext) {
         advance = 1;
     }
 
-    // FLAG (task #7): NPCInfo (gNPC_t) scriptFlags — raw read.
+    // FLAG: `NPCInfo` (`gNPC_t`) `scriptFlags` is a raw read.
     if unsafe { (*npc_info).scriptFlags } & SCF_CHASE_ENEMIES != 0 {
         Interrogator_Hunt(ctx, visible, advance);
     }

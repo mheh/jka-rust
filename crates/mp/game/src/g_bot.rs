@@ -1,5 +1,3 @@
-// PORT-COMPLETE: g_bot.c
-//! FAITHFUL port of `oracle/codemp/game/g_bot.c`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::client_connected::CON_CONNECTED;
@@ -88,7 +86,7 @@ pub fn G_ParseInfos(ctx: &mut GameContext, buf: &[u8], max: c_int) -> Vec<String
     infos
 }
 
-// Raven `g_bot.c` file-scope `#define`s (verified against the owning TU).
+// Raven `g_bot.c` file-scope `#define`s.
 // Source: `oracle/codemp/game/g_bot.c:9,13,19`
 const MAX_ARENAS: c_int = 1024;
 const MAX_BOTS: c_int = 1024;
@@ -248,9 +246,9 @@ pub fn G_RefreshNextMap(
     let mut n = thisLevel + 1;
     let mut loopingUp = qfalse;
     while n != thisLevel {
-        // Oracle indexes one past the array (real, silent UB reading adjacent static
-        // storage) when n reaches MAX_ARENAS on entry; we choose the defined behavior
-        // of treating out-of-range n as null/wrap immediately (porting-rules §19).
+        // Raven indexes one past the array when n reaches MAX_ARENAS on entry.
+        // This reads adjacent static storage, which is undefined behavior in the oracle.
+        // This code treats an out-of-range n as null and wraps immediately (porting-rules §19).
         if n >= MAX_ARENAS
             || n as usize >= ctx.world.globals.g_arenaInfos.len()
             || n >= ctx.world.globals.g_numArenas
@@ -408,8 +406,8 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                     } else {
                         ""
                     };
-                    // Raven truncates `value` to sizeof(netname)-1 (35 bytes)
-                    // before cleaning, so keep that bound.
+                    // Raven truncates `value` to sizeof(netname)-1 (35 bytes) before cleaning.
+                    // This code keeps that bound.
                     let netname = Q_CleanStr(&strncpyz_string(value.as_bytes(), 36));
                     let cmd = format!("addbot \"{}\" {} {} {}\n", netname, skill, teamstr, 0);
                     trap::SendConsoleCommand(ctx.engine, cbufExec_t::EXEC_INSERT as c_int, &cmd);
@@ -441,8 +439,8 @@ pub fn G_RemoveRandomBot(ctx: &mut GameContext, team: c_int) -> bool {
                 continue;
             }
 
-            // `pers.netname` is already <= 35 bytes (MAX_NETNAME), so cleaning
-            // it directly matches Raven's `strcpy(netname, ...)` + Q_CleanStr.
+            // `pers.netname` is already <= 35 bytes (MAX_NETNAME).
+            // Cleaning it directly matches Raven's `strcpy(netname, ...)` + Q_CleanStr.
             let netname = Q_CleanStr(&cl.pers.netname);
             let cmd = format!("kick \"{}\"\n", netname);
             trap::SendConsoleCommand(ctx.engine, cbufExec_t::EXEC_INSERT as c_int, &cmd);
@@ -511,9 +509,8 @@ pub fn G_CountBotPlayers(ctx: &mut GameContext, team: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:569-690`
 ///
-/// The `#if 0`-guarded team-balance tail (g_bot.c:611-688) is Raven-dead
-/// code (never compiled); not transcribed, matching the active-code-only
-/// faithful-port convention.
+/// The `#if 0`-guarded team-balance tail (g_bot.c:611-688) is dead code that never compiles.
+/// This code does not transcribe it.
 pub fn G_CheckMinimumPlayers(ctx: &mut GameContext) {
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
         return;
@@ -521,7 +518,7 @@ pub fn G_CheckMinimumPlayers(ctx: &mut GameContext) {
     if ctx.world.level.intermissiontime != 0 {
         return;
     }
-    // only check once each 10 seconds
+    //only check once each 10 seconds
     if ctx.world.globals.checkminimumplayers_time > ctx.world.level.time - 10000 {
         return;
     }
@@ -611,10 +608,9 @@ pub fn G_BotConnect(ctx: &mut GameContext, clientNum: c_int, restart: bool) -> b
         let mut settings = bot_settings_t::default();
         let userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING);
 
-        // `personalityfile`/`team` are owned `String`s now; take the userinfo
-        // values whole. Raven's `char[144]` truncated at 143 bytes, but that was
-        // a fixed-buffer overflow guard — userinfo "personality"/"team" values
-        // never approach it and no reader depends on the truncated length.
+        // `personalityfile` and `team` are owned `String`s, so this code takes the userinfo values whole.
+        // Raven's `char[144]` truncated at 143 bytes as a fixed-buffer overflow guard.
+        // The userinfo "personality" and "team" values never approach that length, and no reader depends on the truncated length.
         settings.personalityfile = Info_ValueForKey(&userinfo, "personality");
         settings.skill = atof(&Info_ValueForKey(&userinfo, "skill")) as f32;
         settings.team = Info_ValueForKey(&userinfo, "team");
@@ -754,9 +750,9 @@ pub fn G_AddBot(
         Info_SetValueForKey(&mut userinfo, "skill", &format!("{:5.2}", skill));
         Info_SetValueForKey(&mut userinfo, "team", &team_owned);
 
-        // The bot entity lives at `g_entities[clientNum]`; its `.client`
-        // back-pointer aliases `clients[clientNum]` (Raven wires this at
-        // `G_InitGame`), so client access re-indexes by `ci = clientNum`.
+        // The bot entity lives at `g_entities[clientNum]`.
+        // Its `.client` back-pointer aliases `clients[clientNum]`, which Raven wires at `G_InitGame`.
+        // Client access re-indexes by `ci = clientNum`.
         let bot_id = EntityId::from_num(clientNum).unwrap();
         let ci = clientNum as usize;
         {
