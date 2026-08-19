@@ -13,7 +13,7 @@ use mp_qshared::shared::MAX_GENTITIES;
 // Keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
-/// Raven `gtimer_t` - a single timer with a name, an expiration time, and a link to the next timer.
+/// Raven `gtimer_t`: a single timer with a name, an expiration time, and a link to the next timer.
 ///
 /// Type definition source: `oracle/codemp/game/g_timer.c:10-15`
 #[repr(C)]

@@ -23,8 +23,8 @@ pub struct reference_tag_t {
     pub name: [core::ffi::c_char; MAX_REFNAME],
     pub origin: vec3_t,
     pub angles: vec3_t,
-    pub flags: c_int,  // Just in case
-    pub radius: c_int, // For nav goals
+    pub flags: c_int,  //Just in case
+    pub radius: c_int, //For nav goals
     pub inuse: qboolean,
 }
 const _: () = assert!(core::mem::size_of::<reference_tag_t>() == 68);

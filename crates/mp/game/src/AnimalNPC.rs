@@ -10,7 +10,7 @@
 use crate::g_main::level_time;
 use crate::prelude::*;
 
-/// Raven `DeathUpdate` - update death sequence.
+/// Raven `DeathUpdate`: update death sequence.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:97-148`
 pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
@@ -26,7 +26,7 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `Update` - like a think or move command, this updates various
+/// Raven `Update`: like a think or move command, this updates various
 /// vehicle properties.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
@@ -35,7 +35,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
     crate::g_vehicles::Update(ctx, pVeh, pUcmd)
 }
 
-/// Raven `AnimalProcessOri` - temp hack til mp speeder controls are sorted
+/// Raven `AnimalProcessOri`: temp hack til mp speeder controls are sorted
 /// (`_JK2MP` only). The `ProcessOrientCommands` body it forwards to moved to bg.
 /// This game-tier adapter builds a `pm`-null `PmoveContext` to reach it.
 /// Raven only `extern`-declares it, so it has no live caller.
@@ -193,7 +193,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `AnimateRiders` - makes sure the riders in this vehicle are
+/// Raven `AnimateRiders`: makes sure the riders in this vehicle are
 /// properly animated.
 ///
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
@@ -375,7 +375,7 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 // Vehicle dispatch is `vehicleType_t`-keyed in `crate::veh_dispatch`.
 // Source: `oracle/codemp/game/AnimalNPC.c:857-885`
 
-/// Raven `G_CreateAnimalNPC` - create/allocate a new Animal Vehicle
+/// Raven `G_CreateAnimalNPC`: create/allocate a new Animal Vehicle
 /// (initializing it as well).
 ///
 /// Raven: this is a BG function too in MP so don't un-bg-compatibilify it -rww

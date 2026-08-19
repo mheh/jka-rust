@@ -291,56 +291,56 @@ pub struct GameCvars {
     pub g_powerDuelStartHealth: vmCvar_t,
     /// `"g_powerDuelEndHealth"` - default `"90"`.
     pub g_powerDuelEndHealth: vmCvar_t,
-    /// Raven `bot_wp_info` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_wp_info`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_wp_info"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.h:377`, registration `ai_main.c:7593`.
     pub bot_wp_info: vmCvar_t,
-    /// Raven `bot_wp_edit` - file-scope `vmCvar_t`, not in `gameCvarTable`.
+    /// Raven `bot_wp_edit`: file-scope `vmCvar_t`, not in `gameCvarTable`.
     /// `"bot_wp_edit"` - default `"0"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.h:378`, registration `ai_main.c:7594`.
     pub bot_wp_edit: vmCvar_t,
-    /// Raven `bot_wp_clearweight` - file-scope `vmCvar_t`, not in `gameCvarTable`.
+    /// Raven `bot_wp_clearweight`: file-scope `vmCvar_t`, not in `gameCvarTable`.
     /// `"bot_wp_clearweight"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.h:379`, registration `ai_main.c:7595`.
     pub bot_wp_clearweight: vmCvar_t,
-    /// Raven `bot_wp_distconnect` - file-scope `vmCvar_t`, not in `gameCvarTable`.
+    /// Raven `bot_wp_distconnect`: file-scope `vmCvar_t`, not in `gameCvarTable`.
     /// `"bot_wp_distconnect"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.h:380`, registration `ai_main.c:7596`.
     pub bot_wp_distconnect: vmCvar_t,
-    /// Raven `bot_wp_visconnect` - file-scope `vmCvar_t`, not in `gameCvarTable`.
+    /// Raven `bot_wp_visconnect`: file-scope `vmCvar_t`, not in `gameCvarTable`.
     /// `"bot_wp_visconnect"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.h:381`, registration `ai_main.c:7597`.
     pub bot_wp_visconnect: vmCvar_t,
-    /// Raven `bot_normgpath` - file-scope `vmCvar_t` declared in `ai_main.c`, `extern`'d locally in `ai_wpnav.c`.
+    /// Raven `bot_normgpath`: file-scope `vmCvar_t` declared in `ai_main.c`, `extern`'d locally in `ai_wpnav.c`.
     /// Not in `gameCvarTable`, registered ad hoc on first use in `ai_wpnav.c`.
     /// `"bot_normgpath"` - default `"1"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.c:66`, registration `ai_wpnav.c:3360`.
     pub bot_normgpath: vmCvar_t,
-    /// Raven `bot_pvstype` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_pvstype`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_pvstype"` - default `"1"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.c:7575-7616` (registration `:7580`).
     pub bot_pvstype: vmCvar_t,
-    /// Raven `bot_camp` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_camp`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_camp"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.c:7575-7616`.
     pub bot_camp: vmCvar_t,
-    /// Raven `bot_attachments` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_attachments`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_attachments"` - default `"1"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.c:7575-7616`.
     pub bot_attachments: vmCvar_t,
-    /// Raven `bot_forcepowers` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_forcepowers`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_forcepowers"` - default `"1"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.c:62`, registration `ai_main.c:7577`.
     pub bot_forcepowers: vmCvar_t,
-    /// Raven `bot_forgimmick` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_forgimmick`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_forgimmick"` - default `"0"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.c:63`, registration `ai_main.c:7578`.
     pub bot_forgimmick: vmCvar_t,
-    /// Raven `bot_honorableduelacceptance` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
+    /// Raven `bot_honorableduelacceptance`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`.
     /// `"bot_honorableduelacceptance"` - default `"0"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/codemp/game/ai_main.c:64`, registration `ai_main.c:7579`.
     pub bot_honorableduelacceptance: vmCvar_t,
-    /// Raven `bot_getinthecarrr` - file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`, `#ifndef FINAL_BUILD` only.
+    /// Raven `bot_getinthecarrr`: file-scope `vmCvar_t`, not in `gameCvarTable`, registered ad hoc by `BotAISetup`, `#ifndef FINAL_BUILD` only.
     /// `"bot_getinthecarrr"` - default `"0"`, flags `0`.
     /// Source: `oracle/codemp/game/ai_main.c:68`, registration `ai_main.c:7582`.
     pub bot_getinthecarrr: vmCvar_t,

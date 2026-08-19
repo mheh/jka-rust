@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `evasionType_t` — saber evasion/parry/dodge types.
+/// Raven `evasionType_t`: the saber evasion, parry, and dodge types.
 ///
 /// Type definition source: `oracle/codemp/game/w_saber.h:44-57`
 #[repr(i32)]

@@ -4,7 +4,7 @@ use crate::entity::gentity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::vec3_t;
 
-/// Raven `navInfo_t` — navigation query result/state for NPC path movement.
+/// Raven `navInfo_t`: the result and state of a navigation query for NPC path movement.
 ///
 /// Type definition source: `oracle/codemp/game/b_local.h:314-322`
 #[repr(C)]
@@ -43,11 +43,11 @@ const _: () = {
 // Source: `oracle/codemp/game/b_local.h:302-306`
 /// Raven `NIF_NONE`.
 pub const NIF_NONE: i32 = 0x00000000;
-/// Raven `NIF_FAILED` — failed to find a way to the goal.
+/// Raven `NIF_FAILED`: failed to find a way to the goal.
 pub const NIF_FAILED: i32 = 0x00000001;
-/// Raven `NIF_MACRO_NAV` — using macro navigation.
+/// Raven `NIF_MACRO_NAV`: using macro navigation.
 pub const NIF_MACRO_NAV: i32 = 0x00000002;
-/// Raven `NIF_COLLISION` — resolving collision with an entity.
+/// Raven `NIF_COLLISION`: resolving collision with an entity.
 pub const NIF_COLLISION: i32 = 0x00000004;
-/// Raven `NIF_BLOCKED` — blocked from moving.
+/// Raven `NIF_BLOCKED`: blocked from moving.
 pub const NIF_BLOCKED: i32 = 0x00000008;

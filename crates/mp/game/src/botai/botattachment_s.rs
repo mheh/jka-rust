@@ -6,7 +6,7 @@ use core::ffi::c_int;
 // Source: `oracle/codemp/game/ai_main.h:18`
 pub const MAX_ATTACHMENT_NAME: usize = 64;
 
-/// Raven `botattachment_t` — a named bot attachment level.
+/// Raven `botattachment_t`: a named bot attachment level.
 ///
 /// Type definition source: `oracle/codemp/game/ai_main.h:109-113`
 #[repr(C)]

@@ -2,10 +2,9 @@
 
 use core::ffi::c_int;
 
-/// Raven `BWEAPONRANGE_*` — bot preferred-engagement-range classes for the
-/// current weapon.
+/// Raven `BWEAPONRANGE_*`: bot preferred-engagement-range classes for the current weapon.
 ///
-/// Raven: plain `#define`s, not an enum; ported as loose consts.
+/// These are plain `#define`s, not an enum, so rule §C8 makes them `const`s directly.
 /// Source: `oracle/codemp/game/ai_main.h:46-49`
 pub const BWEAPONRANGE_MELEE: c_int = 1;
 pub const BWEAPONRANGE_MID: c_int = 2;

@@ -1,7 +1,8 @@
 //! MP hit-location constants (`HL_*`).
 //!
-//! Raven anonymous enum ending in `HL_MAX`; sizes `gentity_t::locationDamage`
-//! (qshared also exposes `HL_MAX` as a `usize` for that array).
+//! Raven anonymous enum ending in `HL_MAX`.
+//! It sizes `gentity_t::locationDamage`.
+//! qshared also exposes `HL_MAX` as a `usize` for that array.
 //! Source: `oracle/codemp/game/g_local.h:98-123`
 
 use core::ffi::c_int;
@@ -29,6 +30,5 @@ pub const HL_GENERIC3: c_int = 19;
 pub const HL_GENERIC4: c_int = 20;
 pub const HL_GENERIC5: c_int = 21;
 pub const HL_GENERIC6: c_int = 22;
-/// `c_int`-typed dual of the canonical `mp_qshared::common::mp::gentity::HL_MAX`
-/// (`usize`), feeding `HL_*` enum-index match arms.
+/// `c_int`-typed dual of the canonical `mp_qshared::common::mp::gentity::HL_MAX` (`usize`), feeding `HL_*` enum-index match arms.
 pub const HL_MAX: c_int = mp_qshared::common::mp::gentity::HL_MAX as c_int;

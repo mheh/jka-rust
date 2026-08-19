@@ -2,7 +2,7 @@
 
 use core::ffi::c_int;
 
-/// Raven `botskills_t` — per-bot difficulty/skill tuning values.
+/// Raven `botskills_t`: per-bot difficulty/skill tuning values.
 ///
 /// Type definition source: `oracle/codemp/game/ai_main.h:137-145`
 #[repr(C)]

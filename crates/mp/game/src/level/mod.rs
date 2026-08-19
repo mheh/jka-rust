@@ -1,4 +1,4 @@
-//! MP world container and level-scope types (`g_local.h`). Ported fresh from oracle.
+//! MP world container and level-scope types (`g_local.h`).
 
 pub mod alert_event;
 pub mod bot_settings;

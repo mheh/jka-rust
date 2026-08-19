@@ -10,7 +10,7 @@ pub const MAX_FRAME_GROUPS: usize = 32;
 /// Source: `oracle/codemp/game/ai.h:95`
 pub const MAX_GROUP_MEMBERS: usize = 32;
 
-/// Raven `NUM_SQUAD_STATES` — count from the anonymous `SQUAD_*` enum.
+/// Raven `NUM_SQUAD_STATES`: the count from the anonymous `SQUAD_*` enum.
 ///
 /// Source: `oracle/codemp/game/ai.h:19-29`
 pub const NUM_SQUAD_STATES: usize = 7;

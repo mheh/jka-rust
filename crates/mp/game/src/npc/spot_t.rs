@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-/// Raven `spot_t` — body spot enum for targeting.
+/// Raven `spot_t`: body spot enum for targeting.
 ///
 /// Type definition source: `oracle/codemp/game/b_public.h:69-69`
 #[repr(i32)]

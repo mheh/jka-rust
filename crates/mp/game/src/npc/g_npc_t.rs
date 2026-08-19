@@ -29,7 +29,7 @@ pub const ENEMY_POS_LAG_INTERVAL: i32 = 100;
 /// Definition source: `oracle/codemp/game/b_public.h:115`
 pub const ENEMY_POS_LAG_STEPS: usize = (MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL) as usize;
 
-/// Raven `gNPC_t` - per-entity NPC/behavior state.
+/// Raven `gNPC_t`: per-entity NPC/behavior state.
 ///
 /// Type definition source: `oracle/codemp/game/b_public.h:116-264`
 #[repr(C)]

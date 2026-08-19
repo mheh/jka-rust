@@ -28,11 +28,11 @@ pub enum alertEventType_e {
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum alertEventLevel_e {
-    AEL_MINOR = 0,    // Enemy responds to the sound, but only by looking
-    AEL_SUSPICIOUS,   // Enemy looks at the sound, and will also investigate it
-    AEL_DISCOVERED,   // Enemy knows the player is around, and will actively hunt
-    AEL_DANGER,       // Enemy should try to find cover
-    AEL_DANGER_GREAT, // Enemy should run like hell!
+    AEL_MINOR = 0,    //Enemy responds to the sound, but only by looking
+    AEL_SUSPICIOUS,   //Enemy looks at the sound, and will also investigate it
+    AEL_DISCOVERED,   //Enemy knows the player is around, and will actively hunt
+    AEL_DANGER,       //Enemy should try to find cover
+    AEL_DANGER_GREAT, //Enemy should run like hell!
 }
 
 /// Raven `alertEvent_t`. Pointer-bearing (`owner`) => arch-dependent.
@@ -41,18 +41,19 @@ pub enum alertEventLevel_e {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct alertEvent_t {
-    pub position: vec3_t,         // Where the event is located
-    pub radius: f32,              // Consideration radius
-    pub level: alertEventLevel_e, // Priority level of the event
-    pub r#type: alertEventType_e, // Event type (sound, sight)
-    pub owner: *mut gentity_t,    // Who made the sound
-    pub light: f32,               // ambient light level at point
-    pub addLight: f32,            // additional light — more noticeable, even in darkness
-    pub ID: c_int,                // unique id (wraps, but only used for comparison)
-    pub timestamp: c_int,         // when it was created
+    pub position: vec3_t,         //Where the event is located
+    pub radius: f32,              //Consideration radius
+    pub level: alertEventLevel_e, //Priority level of the event
+    pub r#type: alertEventType_e, //Event type (sound,sight)
+    pub owner: *mut gentity_t,    //Who made the sound
+    pub light: f32,               //ambient light level at point
+    pub addLight: f32,            //additional light- makes it more noticable, even in darkness
+    //unique... if get a ridiculous number, this will repeat, but should not be a problem as it's just comparing it to your lastAlertID
+    pub ID: c_int,
+    pub timestamp: c_int, //when it was created
 }
-// Manual `Default` (not `derive`) since `alertEventLevel_e`/`alertEventType_e`
-// don't derive it; zero-valued first variants match Raven's zero-init idiom.
+// This impl is written by hand, not derived, because `alertEventLevel_e` and `alertEventType_e` do not implement `Default`.
+// The zero-valued first variants match Raven's zero-initialization idiom.
 impl Default for alertEvent_t {
     fn default() -> Self {
         alertEvent_t {

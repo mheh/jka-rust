@@ -1,9 +1,8 @@
-//! MP `class_t` — NPC class enumeration.
+//! MP `class_t`: NPC class enumeration.
 //!
-//! `teams.h` is included by `q_shared.h`, so `class_t` is shared server<->game
-//! surface: moved to `mp_qshared::common::mp::game::class_t` (Q3_INFINITE
-//! migration precedent) so the engine server can reach it, and re-exported here
-//! so `mp_game`'s own call sites (and the `prelude` glob) keep resolving.
+//! `teams.h` is included by `q_shared.h`, so `class_t` is shared server and game surface.
+//! The type moved to `mp_qshared::common::mp::game::class_t` (the Q3_INFINITE migration precedent) so the engine server can reach it.
+//! This module re-exports it so `mp_game`'s own call sites, and the `prelude` glob, keep resolving.
 //!
 //! Type definition source: `oracle/codemp/game/teams.h:17-77`
 

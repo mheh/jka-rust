@@ -27,6 +27,8 @@ Where a prior pass merged, paraphrased, or "corrected" a Raven comment, restore 
 - Inter-token whitespace inside restored C text. `gi.Printf (...)` keeps its space, and alignment tabs inside a restored declaration stay literal tabs.
 - The spacing between the comment token and the text: Raven's `//text` stays `//text`, and `// text` stays `// text`. The one normalization: a tab in this first gap becomes one space (`//<TAB>text` becomes `// text`). The normalization never touches whitespace inside the text.
 
+The `Raven:` prefix marks verbatim Raven text and only that. A verbatim Raven quote inside a doc comment carries the prefix, and port prose never wears it.
+
 Verification byte-diffs each restored comment against its cited oracle line, because prose reads miss whitespace drift.
 
 ## CB-3 - cite-shaped doc templates are port prose
