@@ -1,21 +1,13 @@
-// PORT-COMPLETE: NPC_AI_MineMonster.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` +
-//! `QAGAME` compile path).
+//! Port of `oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` and `QAGAME` compile path).
 //!
-//! Filled by the jampgame mega-pass.
+//! This file reads the file-static ambient globals `NPC`, `NPCInfo`, and `ucmd`, the same way as `NPC_AI_Stormtrooper.rs`.
+//! These globals become `GameWorld` fields, but this signature does not thread a `GameContext` to reach them.
+//! The file also reads `level.time` for timer operations and the LCG-based `random()`.
+//! An owned threaded RNG is not available here.
 //!
-//! Parking pattern (mirrors `NPC_AI_Stormtrooper.rs`):
-//! - `ai-context`: reads the file-static ambient globals `NPC`, `NPCInfo`,
-//!   `ucmd` (these become GameWorld fields, but no `GameContext` is
-//!   threaded into this faithful skeleton signature to access them). Also
-//!   reads `level.time` for timer operations and the LCG-based `random()`
-//!   (owned threaded Rng, unavailable here).
-//!
-//! Safe-state campaign 2c: entity (`gentity_t`) derefs of the ambient `NPC`
-//! (and the `self_` handle) reads/writes route through the `GameWorld`/`GameContext`
-//! accessors (`ctx.world.entity()`/`entity_mut()`) instead of raw pointers. The
-//! `NPCInfo` (`gNPC_t`) and `.client` (`gclient_t`) derefs stay raw — those two
-//! regimes are task #7 territory and remain in isolated `unsafe` blocks.
+//! Entity (`gentity_t`) derefs of the ambient `NPC` (and the `self_` handle) route through `GameWorld`/`GameContext` accessors.
+//! These are `ctx.world.entity()` and `entity_mut()`, instead of raw pointers.
+//! The `NPCInfo` (`gNPC_t`) and `.client` (`gclient_t`) derefs stay raw, in isolated `unsafe` blocks.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_combat::G_Damage;
@@ -36,7 +28,7 @@ use crate::NPC_utils::{
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::entity_event::entity_event_t;
 
-// Raven's working combat range defines (NPC_AI_MineMonster.c:3-8):
+// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:3-8`
 // These define the working combat range for these suckers
 const MIN_DISTANCE: c_int = 54;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
@@ -44,12 +36,11 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 pub const MAX_DISTANCE: c_int = 128;
 const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 
-// Raven's file-scope local state (NPC_AI_MineMonster.c:10-11):
+// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:10-11`
 const LSTATE_CLEAR: i32 = 0;
 const LSTATE_WAITING: i32 = 1;
 
-// `VectorLengthSquared` is the canonical `crate::q_math::VectorLengthSquared`,
-// reached via the prelude glob (the former per-file copy was unused).
+// `VectorLengthSquared` comes from `crate::q_math::VectorLengthSquared`, reached through the prelude glob.
 
 /// Raven `NPC_MineMonster_Precache`.
 ///
@@ -83,7 +74,7 @@ pub fn MineMonster_Patrol(ctx: &mut GameContext) {
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
     unsafe {
         (*npc_info).localState = LSTATE_CLEAR;
     }
@@ -121,7 +112,7 @@ pub fn MineMonster_Move(ctx: &mut GameContext, visible: qboolean) {
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
-    // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: These are NPC info pointer (`gNPC_t*`) derefs. They stay raw.
     if unsafe { (*npc_info).localState } != LSTATE_WAITING {
         let npc_enemy = ctx.world.entity(npc_id).enemy;
         unsafe {
@@ -151,7 +142,7 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
     let origin = vec3_origin;
     let start = ctx.world.entity(npc_id).r.currentOrigin;
 
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: This is the client pointer (`gclient_t*`). The deref stays raw.
     let client = ctx.world.entity(npc_id).client;
     let viewangles = unsafe { (*client).ps.viewangles };
     AngleVectors(viewangles, Some(&mut dir), None, None);
@@ -299,7 +290,7 @@ pub fn MineMonster_Combat(ctx: &mut GameContext) {
 
     if !can_see || !UpdateGoal(ctx).is_null() {
         let e = ctx.world.entity(npc_id).enemy;
-        // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: These are NPC info pointer (`gNPC_t*`) derefs. They stay raw.
         unsafe {
             (*npc_info).combatMove = qtrue;
             (*npc_info).goalEntity = e;
@@ -322,12 +313,12 @@ pub fn MineMonster_Combat(ctx: &mut GameContext) {
 
     let advance = distance > (MIN_DISTANCE_SQR as f32);
 
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
     if (advance || unsafe { (*npc_info).localState } == LSTATE_WAITING)
         && TIMER_Done(ctx, Some(npc_id), cstr("attacking").as_ptr()) != 0
     {
         if TIMER_Done2(ctx, Some(npc_id), cstr("takingPain").as_ptr(), qtrue) != 0 {
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
             unsafe {
                 (*npc_info).localState = LSTATE_CLEAR;
             }
@@ -350,7 +341,7 @@ pub fn NPC_MineMonster_Pain(
     damage: c_int,
 ) {
     let health = ctx.world.entity(self_).health;
-    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    // FLAG: This is the client pointer (`gclient_t*`). The deref stays raw.
     let client = ctx.world.entity(self_).client;
     let max_health = unsafe { (*client).pers.maxHealth };
     let parm = (((health as f32) / (max_health as f32)) * 100.0).floor() as c_int;
@@ -362,7 +353,7 @@ pub fn NPC_MineMonster_Pain(
         TIMER_Remove(ctx, Some(self_), cstr("attacking2_dmg").as_ptr());
         TIMER_Set(ctx, Some(self_), cstr("takingPain").as_ptr(), 1350);
 
-        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
         let npc_ptr = ctx.world.entity(self_).NPC;
         let last_path_angles = unsafe { (*npc_ptr).lastPathAngles };
         _VectorCopy(last_path_angles, &mut ctx.world.entity_mut(self_).s.angles);
@@ -377,7 +368,7 @@ pub fn NPC_MineMonster_Pain(
 
         let npc_ptr = ctx.world.entity(self_).NPC;
         if !npc_ptr.is_null() {
-            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
             unsafe {
                 (*npc_ptr).localState = LSTATE_WAITING;
             }
@@ -395,7 +386,7 @@ pub fn NPC_BSMineMonster_Default(ctx: &mut GameContext) {
 
     if ctx.world.entity(npc_id).enemy.is_some() {
         MineMonster_Combat(ctx);
-    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    // FLAG: This is the NPC info pointer (`gNPC_t*`). The deref stays raw.
     } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
         MineMonster_Patrol(ctx);
     } else {

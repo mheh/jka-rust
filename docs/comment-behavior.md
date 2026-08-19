@@ -1,6 +1,6 @@
 # The comment-behavior ledger
 
-The current law for the DEC-68 comment pass. Each rule below is stated once, in its ratified form, with all amendments folded in. Every wave brief carries this ledger verbatim, workers report uncertain calls, and the post-wave ratification walk amends the rules in place. Provenance lives in this file's git history and the walk records, not in the rule text. DEC-68 in `docs/decisions.md` is the canonical ruling and names this file its executable appendix. At campaign end the durable rules graduate into `docs/porting-rules.md` and this ledger freezes as the campaign record.
+The law for the DEC-68 comment pass. DEC-68 in `docs/decisions.md` is the canonical ruling and names this file its executable appendix. Every wave brief carries this ledger verbatim, and workers report uncertain calls. The post-wave ratification walk amends the rules in place: each rule below is one current statement with its amendments folded in, and provenance lives in this file's git history and the walk records, never in the rule text. At campaign end the durable rules graduate into `docs/porting-rules.md` and this ledger freezes as the campaign record.
 
 ## CB-0 - the constitution
 
@@ -24,11 +24,9 @@ Where a prior pass merged, paraphrased, or "corrected" a Raven comment, restore 
 
 - Casing and terminal punctuation. There is no separate transcription-convention layer, and file-internal uniformity never overrides oracle fidelity.
 - Inter-token whitespace inside restored C call text (`gi.Printf (...)` keeps its space).
-- The spacing between the comment token and the text: Raven's `//text` stays `//text`, and `// text` stays `// text`.
+- The spacing between the comment token and the text: Raven's `//text` stays `//text`, and `// text` stays `// text`. The one normalization: a tab after the comment token becomes one space (`//<TAB>text` becomes `// text`).
 
 Verification byte-diffs each restored comment against its cited oracle line, because prose reads miss whitespace drift.
-
-One normalization applies: a tab after the comment token normalizes to one space (`//<TAB>text` becomes `// text`). The space-vs-no-space distinction stays byte-exact.
 
 ## CB-3 - cite-shaped doc templates are port prose
 
@@ -44,7 +42,7 @@ Raven comment content that was never transcribed into the Rust file (untranscrib
 
 ## CB-6 - durable comment prefixes
 
-`FLAG:` (~557 sites crate-wide) and `CLIENT-POINTER TRAP:` (6 sites) are stable repo-wide markers, not campaign residue. Treat each like `SAFETY:`: keep the prefix and the restyled fact, drop any campaign-shorthand parenthetical. "One fact" does not mean one line: a second sentence at a prefix site goes on its own line, per the one-sentence-per-line law. The rule binds the prefix and the facts, not a uniform body length: a one-line site and a four-line site are both legal, and each site keeps the facts it needs. Shape uniformity binds DEC-anchored families only (CB-8).
+`FLAG:` (~557 sites crate-wide) and `CLIENT-POINTER TRAP:` (6 sites) are stable repo-wide markers, not campaign residue. Treat each like `SAFETY:`: keep the prefix and the restyled fact, and drop any campaign-shorthand parenthetical. The rule binds the prefix and the facts, not the body shape: a second sentence goes on its own line per the one-sentence-per-line law, a one-line site and a four-line site are both legal, and each site keeps the facts it needs. Shape uniformity binds DEC-anchored families only (CB-8).
 
 ## CB-7 - process citations are residue, fabricated citations are removed
 
@@ -52,11 +50,11 @@ Raven comment content that was never transcribed into the Rust file (untranscrib
 
 `DEC-nn` is the only citation family that stays by identity, because the DEC ledger is the live in-repo decision store. Where a task or recipe resolved into a DEC, the DEC cite stands in its place if the site needs an anchor. A `docs/`-anchorable cite (`§19`, `§B5`, a real file-and-section pointer) stays in its established crate-wide form.
 
-Fabricated and confirmed citations are always removed, never repaired into a valid-looking form. A citation a worker cannot anchor in `docs/` is residue. Note the numbering convention: porting-rules cites use the section letter plus the global rule number (1-21) - a section-local number (`§F5`, `§F19`) is a fabrication.
+Fabricated and confirmed citations are always removed, never repaired into a valid-looking form. A citation a worker cannot anchor in `docs/` is residue. Porting-rules cites use the section letter plus the global rule number (1-21). A section-local number (`§F5`, `§F19`) is a fabrication.
 
 ## CB-8 - DEC-anchored named invariants read as one family
 
-A named invariant with a ledger anchor, for example `SEAM-BG-REENTRY (DEC-28, sanctioned)`, is uniform: every member site carries the same named tag in the same shape, so the family greps as one. A member hiding under anonymous prose restyles into the house shape. The protection covers the named tag and its anchor only - the surrounding prose restyles like any port prose, em dashes stripped. This rule covers DEC-anchored families only: task-number and plain prefix families restyle under CB-6.
+A named invariant with a ledger anchor, for example `SEAM-BG-REENTRY (DEC-28, sanctioned)`, is uniform: every member site carries the same named tag in the same shape, so the family greps as one. A member hiding under anonymous prose, or under a retired campaign tag, retags into the family shape, never into ordinary prose. Before restyling a site that carries a retired tag (`STAGE-2b` and kin), grep the crate for the tag and check the DEC ledger for the superseding family. The protection covers the named tag and its anchor only - the surrounding prose restyles like any port prose, em dashes stripped. This rule covers DEC-anchored families only: task-number and plain prefix families restyle under CB-6.
 
 ## CB-9 - deletion beats rewording when CB-0 rule 1 fails
 
@@ -85,3 +83,7 @@ Internal campaign nouns - "mega-pass", "Land phase", "SPINE", "packet", "referee
 ## CB-14 - port-status notes state the constraint, not the progress
 
 A comment that describes the port's project status - "never wired to use it", "still-parked", "not resolved" - restyles to the constraint the next reader needs, or deletes when no constraint remains. Where the unwired or parked state is itself the load-bearing fact, state it minimally as a fact about the code, without progress framing.
+
+## CB-15 - "seam" names the ABI boundary only
+
+"Seam" stays only where it names the ABI/FFI boundary that `docs/porting-rules.md` §D defines (the variadic syscall choke point, the unsafe-confinement boundary) or where it is part of a DEC-anchored family name like `SEAM-BG-REENTRY`. Every other use - "engine cell seam", "bg-seam field", "the two seam traits" - is generic jargon and restyles into plain words.

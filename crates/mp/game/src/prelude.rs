@@ -1,36 +1,36 @@
-//! `prelude` — the landing prelude for the jampgame function-skeleton modules.
+//! `prelude` re-exports the types the jampgame function-skeleton modules need.
 //!
-//! The staged skeletons (`fnskel.py`) carry faithful signatures whose parameter
-//! and return types resolve against already-ported crates, but the generator
-//! emits them WITHOUT `use` statements. This module re-exports every such type
-//! at one legal import path (routed through `mp_game`'s frozen dependency set:
-//! `mp_qshared`, `mp_bg`, `mp_abi`, plus the crate's own `world`/`client`/…
-//! modules); each landed skeleton opens with `use crate::prelude::*;`.
+//! `fnskel.py` generates function skeletons with parameter and return types that resolve against
+//! already-ported crates, but it emits them without `use` statements.
+//! This module re-exports every such type at one import path, routed through `mp_game`'s dependency
+//! set (`mp_qshared`, `mp_bg`, `mp_abi`, plus the crate's own `world`, `client`, and other modules).
+//! Each skeleton module opens with `use crate::prelude::*;`.
 //!
-//! No new behavior lives here — only re-exports. The `//TODO: Port` markers for
-//! the still-unported parameter types stay at their call sites in the skeletons.
+//! This module holds no behavior, only re-exports.
+//! The `//TODO: Port` markers for still-unported parameter types stay at their call sites in the
+//! skeletons.
 
-// safe-state (2c): this module is pure re-exports — no code, no unsafe.
+// This module is pure re-exports, with no code and no unsafe blocks.
 #![deny(unsafe_code)]
 
-// Raven scalar / handle / ffi primitives. `native_*` is not a direct dependency
-// of `mp_game`; the cross-mode primitives are reached through `mp_qshared`'s
-// re-export umbrella, exactly as the live modules already spell them.
+// Raven scalar, handle, and FFI primitives.
+// `native_*` is not a direct dependency of `mp_game`.
+// The cross-mode primitives come through `mp_qshared`'s re-export umbrella, the same path the other
+// modules use.
 pub use core::ffi::{
     c_char, c_double, c_float, c_int, c_long, c_schar, c_short, c_uchar, c_uint, c_ulong, c_ushort,
     c_void,
 };
 
-// Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`).
+// Raven `byte`: `typedef unsigned char byte`.
 // Source: `oracle/codemp/game/q_shared.h:349`
 pub use native_types::byte;
 
-// Integration round-1 addendum: the fnskel packets transcribe Raven constant
-// spellings verbatim (per each file's own "integration-deferred" note) without
-// enumerating their owning module's `use`; these glob-imports resolve them
-// against the same crates already named above. Explicit single-item imports
-// below (e.g. `holdable_t`) are unaffected — Rust lets an explicit import
-// shadow a glob without ambiguity.
+// The fnskel packets transcribe Raven constant spellings verbatim, without enumerating their owning
+// module's `use`.
+// These glob-imports resolve them against the same crates already named above.
+// Explicit single-item imports below, for example `holdable_t`, are unaffected.
+// Rust lets an explicit import shadow a glob without ambiguity.
 pub use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 pub use mp_bg::public::configstring::*;
 pub use mp_bg::public::dm_flags::*;
@@ -67,13 +67,12 @@ pub use mp_qshared::shared::limits::*;
 pub use mp_qshared::shared::sound_channel::*;
 pub use mp_qshared::shared::surface_flags::*;
 
-// Pass-3 symbol backfill: game-crate-local const families that were ported
-// but never wired into the prelude glob (see `docs/porting-rules.md` §E13).
+// Game-crate-local const families that were ported but never wired into the prelude glob.
+// See `docs/porting-rules.md` §E13.
 pub use mp_bg::bg_misc::{
     bgForcePowerCost, bgForcePowerCostSaberThrow, forceMasteryPoints, forcePowerDarkLight,
     forcePowerSorted,
 };
-// Canonical seam string helpers (porting-rules pass-3 packet primer contract).
 pub use crate::ai_main_consts::*;
 pub use crate::anim_table::animTable;
 pub use crate::cstr_util::{cstr, cstr_from_chars, cstr_to_str, write_cstr_field};
@@ -101,17 +100,17 @@ pub use mp_bg::bg_vehicleLoad_tables::*;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
 pub use mp_qshared::shared::RAND_MAX;
 pub use native_string::sscanf_f32s;
-// `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
-// `bg_misc.c:736`); the canonical export for bare-use sites.
+// `BG_GiveMeVectorFromMatrix` lives in `bg_misc.c:736`.
+// This is the export for bare-use sites.
 pub use crate::saber::w_saber_consts::*;
 pub use crate::teams::npcteam::*;
 pub use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
 
-// Enum types transcribed as `#[repr(i32)] enum` per porting-rules'
-// enum-vs-alias fidelity rule; the fnskel packets carry their bare Raven
-// variant spellings (e.g. `STAT_MAX_HEALTH`, not `statIndex_t::STAT_MAX_HEALTH`),
-// so both the type name (for sites that do qualify) and a variant glob (for
-// the far more common bare spelling) are re-exported here.
+// Enum types transcribed as `#[repr(i32)] enum`, per porting-rules' enum-vs-alias fidelity rule.
+// The fnskel packets carry their bare Raven variant spellings, for example `STAT_MAX_HEALTH`, not
+// `statIndex_t::STAT_MAX_HEALTH`.
+// So this file re-exports both the type name, for sites that do qualify it, and a variant glob, for
+// the more common bare spelling.
 pub use mp_bg::public::anim_number::{animNumber_t, animNumber_t::*};
 pub use mp_bg::public::broken_limb::{brokenLimb_t, brokenLimb_t::*};
 pub use mp_bg::public::effect_types::{effectTypes_t, effectTypes_t::*};
@@ -138,40 +137,37 @@ pub use mp_qshared::shared::trackchan::{trackchan_t, trackchan_t::*};
 pub use mp_qshared::shared::trajectory::trType_t::*;
 pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 
-// Pass-2 ctx threading: the module-island dispatch receiver, injected
-// as the first param of every game-tier needs-ctx fn.
+// The module-island dispatch receiver, injected as the first param of every game-tier needs-ctx fn.
 // See `world/game_context.rs`.
 pub use crate::world::GameContext;
 
-// Pass-3 prep riders: the entity handle, the spawn fn-ID enum, and the
-// bg-channel state/trait set — hoisted into the prelude so the pass-3 porter
-// bodies name them unqualified.
+// The entity handle, the spawn fn-ID enum, and the bg-channel state/trait set, hoisted into the
+// prelude so porter bodies can name them unqualified.
 // - `EntityId`: the `Option<EntityId>` stored-field handle.
-// - `EntSpawn` (agenda C13): the `spawns[]` classname->fn dispatch enum.
-// - `BgState`/`PmoveContext`/`BgTraps`/`GameCallbacks`: the bg
-//   session/per-call state + the two seam traits.
-// - `pml_t`: bg pmove local working-set type.
+// - `EntSpawn`: the `spawns[]` classname-to-fn dispatch enum.
+// - `BgState`, `PmoveContext`, `BgTraps`, `GameCallbacks`: the bg session and per-call state, plus
+//   the two boundary traits, `BgTraps` and `GameCallbacks`.
+// - `pml_t`: the bg pmove local working-set type.
 pub use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
 pub use crate::ent_fn_enums::EntSpawn;
-// `EntityId` + the `ent - g_entities` seam helpers: `Some(ent_id(base,
-// p))` / `ent_id_opt(base, p)` fill the `Option<EntityId>` stored fields at
-// pointer-assignment sites; `field.is_none()` / id-equality replace NULL/address
-// compares.
+// `EntityId` and the `ent - g_entities` helper functions.
+// `Some(ent_id(base, p))` and `ent_id_opt(base, p)` fill the `Option<EntityId>` stored fields at
+// pointer-assignment sites.
+// `field.is_none()` and id-equality replace NULL and address compares.
 pub use crate::world::{ent_id, ent_id_opt, to_num, EntityId};
-// Index->pointer counterpart: `crate::ent_id::resolve` re-derives a
-// live `gentity_t*` from a stored `Option<EntityId>` field.
+// The index-to-pointer counterpart.
+// `crate::ent_id::resolve` re-derives a `gentity_t*` pointer from a stored `Option<EntityId>` field.
 pub use crate::ent_id;
 pub use mp_bg::local::pml_t::pml_t;
 
-// Pass-3 prep C1 (agenda B10 porter-instruction rider): the `crate::trap` seam
-// module, spelled bare `trap::X` throughout the pass-2 bodies. Re-exported so the
-// `use crate::prelude::*` glob resolves those call sites.
+// The `crate::trap` seam module, spelled bare `trap::X` throughout porter bodies.
+// Re-exported so the `use crate::prelude::*` glob resolves those call sites.
 pub use crate::trap;
-// Raven `trap_R_RegisterSkin` re-export with Raven name for pass-3 bodies
-// that transcribe the bare Raven spelling (oracle/codemp/game/g_syscalls.c:1179-1182)
+// Raven `trap_R_RegisterSkin` (`g_syscalls.c:1179-1182`): re-exported under the Raven name for porter
+// bodies that transcribe the bare spelling.
 pub use crate::trap::R_RegisterSkin as trap_R_RegisterSkin;
-// Raven `trap_G2API_*` re-exports with Raven names for pass-3 bodies that
-// transcribe the bare Raven spellings (oracle/codemp/game/g_syscalls.c)
+// Raven `trap_G2API_*` re-exports under Raven names for porter bodies that transcribe the bare
+// spellings, from `oracle/codemp/game/g_syscalls.c`.
 pub use crate::trap::G2API_AnimateG2Models as trap_G2API_AnimateG2Models;
 pub use crate::trap::G2API_CleanGhoul2Models as trap_G2API_CleanGhoul2Models;
 pub use crate::trap::G2API_GetBoltMatrix as trap_G2API_GetBoltMatrix;
@@ -187,8 +183,8 @@ pub use crate::trap::G2API_SetRagDoll as trap_G2API_SetRagDoll;
 pub use crate::trap::TrueFree as trap_TrueFree;
 pub use crate::trap::TrueMalloc as trap_TrueMalloc;
 
-// The entity fn-ID dispatch enums (`ent_fn_enums`), named bare in the
-// spawn/think/touch/… assignment sites.
+// The entity fn-ID dispatch enums (`ent_fn_enums`), named bare at spawn, think, touch, and other
+// assignment sites.
 pub use crate::ent_fn_enums::{
     EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
@@ -248,7 +244,8 @@ pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 pub use mp_qshared::common::mp::botlib::print_type::{
     PRT_ERROR, PRT_EXIT, PRT_FATAL, PRT_MESSAGE, PRT_WARNING,
 };
-// `gentity_t` moved to `mp_game` (DEC-26); its constants/typedefs stay in qshared.
+// `gentity_t` moved to `mp_game` (DEC-26).
+// Its constants and typedefs stay in qshared.
 pub use crate::entity::{gentity_t, PrefixSet, PrefixSlot};
 pub use mp_qshared::common::mp::gentity::{
     material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
@@ -257,11 +254,12 @@ pub use mp_qshared::common::mp::gentity::{
     MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2, NUM_MATERIALS,
 };
 
-// Raven `#define bgEntity_t gentity_t` in jampgame source files (g_vehicles.c, FighterNPC.c, etc).
-// In the oracle, this macro makes bgEntity_t and gentity_t interchangeable at call sites that
-// need to access server-side fields like spawnflags. For game-code bodies that have gentity_t
-// parameters cast through bgEntity_t, we re-export gentity_t under the bgEntity_t name to allow
-// those accesses (e.g. `(*bgEntity).spawnflags`).
+// Raven `#define bgEntity_t gentity_t` appears in jampgame source files, for example `g_vehicles.c`
+// and `FighterNPC.c`.
+// In the oracle, this macro makes `bgEntity_t` and `gentity_t` interchangeable at call sites that
+// need server-side fields like `spawnflags`.
+// For game-code bodies that cast `gentity_t` parameters through `bgEntity_t`, we re-export
+// `gentity_t` under the `bgEntity_t` name, for example `(*bgEntity).spawnflags`.
 // Source: oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
 pub use crate::entity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
@@ -298,9 +296,9 @@ pub use mp_qshared::shared::{
     Eorientations, MAX_QPATH,
 };
 
-// Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns
-// spelled bare in pass-2 porter bodies but never wired into the prelude.
-// Each resolves to a single `pub fn`/`const` definition (scripted).
+// A batch re-export of game-crate-local fns spelled bare in porter bodies but never wired into the
+// prelude.
+// Each resolves to a single `pub fn` or `const` definition.
 pub use crate::cstr_util::atoi;
 pub use crate::g_client::SpotWouldTelefrag2;
 pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};
@@ -363,105 +361,105 @@ pub use mp_bg::bg_pmove::BG_SabersOff;
 pub use mp_bg::vehicles::fighter_npc::FighterIsLanded;
 pub use native_string::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
 
-// preflight.py: file-level symbol re-exports (aggregate re-export plan)
-pub use crate::ai::consts::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs
-pub use crate::ai::distance::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/distance.rs
+// A file-level symbol re-export block, generated by `preflight.py`.
+pub use crate::ai::consts::*;
+pub use crate::ai::distance::*;
 pub use crate::ai::rank::*;
-pub use crate::ai_wpnav::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai_wpnav.rs
-pub use crate::botai::bweaponrange::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/botai/bweaponrange.rs
-pub use crate::client::client_connected::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_connected.rs
-pub use crate::client::client_persistant::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_persistant.rs
-pub use crate::g_active::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_active.rs
-pub use crate::g_client::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_client.rs
-pub use crate::g_cmds::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
-pub use crate::g_icarus_set_type::{setTable, setType_t, setType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_icarus_set_type.rs
-pub use crate::g_items::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_items.rs
-pub use crate::g_mem::G_Alloc; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs
-pub use crate::g_mover::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mover.rs
-pub use crate::g_spawn::MAX_AMBIENT_SETS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
-pub use crate::g_spawn::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
-pub use crate::g_svcmds::MAX_IPFILTERS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_svcmds.rs
-pub use crate::g_team::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_team.rs
-pub use crate::g_timer::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_timer.rs
-pub use crate::g_trigger::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_trigger.rs
-pub use crate::g_turret::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_turret.rs
-pub use crate::g_turret_G2::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_turret_G2.rs
-pub use crate::g_vehicles::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicles.rs
-pub use crate::game_globals::MAX_ITEMS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/game_globals.rs
-pub use crate::level::alert_event::MAX_ALERT_EVENTS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/alert_event.rs
-pub use crate::level::combat_point::MAX_COMBAT_POINTS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/combat_point.rs
-pub use crate::level::interest_point::MAX_INTEREST_POINTS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/interest_point.rs
-pub use crate::level::level_locals::BODY_QUEUE_SIZE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/level_locals.rs
-pub use crate::level::reference_tag::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/reference_tag.rs
-pub use crate::level::tag_owner::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/tag_owner.rs
-pub use crate::npc_c::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/npc_c.rs
-pub use crate::q_math::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/q_math.rs
-pub use crate::saber::saber_flags::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/saber/saber_flags.rs
-pub use crate::tri_coll_test::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/tri_coll_test.rs
-pub use crate::NPC_AI_Atst::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Atst.rs
-pub use crate::NPC_AI_Droid::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Droid.rs
-pub use crate::NPC_AI_GalakMech::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_GalakMech.rs
-pub use crate::NPC_AI_Grenadier::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Grenadier.rs
-pub use crate::NPC_AI_Howler::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Howler.rs
-pub use crate::NPC_AI_ImperialProbe::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_ImperialProbe.rs
-pub use crate::NPC_AI_Interrogator::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Interrogator.rs
-pub use crate::NPC_AI_Mark1::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Mark1.rs
-pub use crate::NPC_AI_Mark2::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Mark2.rs
-pub use crate::NPC_AI_MineMonster::MAX_DISTANCE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs
-pub use crate::NPC_AI_Seeker::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs
-pub use crate::NPC_AI_Sentry::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Sentry.rs
-pub use crate::NPC_AI_Stormtrooper::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Stormtrooper.rs
-pub use crate::NPC_AI_Utils::MAX_RADIUS_ENTS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Utils.rs
-pub use crate::NPC_behavior::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_behavior.rs
-pub use crate::NPC_combat::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_combat.rs
-pub use crate::NPC_senses::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_senses.rs
-pub use crate::NPC_spawn::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_spawn.rs
-pub use crate::NPC_stats::BSTable; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_stats.rs
-pub use crate::NPC_utils::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_utils.rs
-pub use mp_bg::bg_misc::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_misc.rs
-pub use mp_bg::bg_pmove::MIN_WALK_NORMAL; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
-pub use mp_bg::bg_pmove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
-pub use mp_bg::bg_saber::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saber.rs
-pub use mp_bg::bg_saberLoad::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saberLoad.rs
-pub use mp_bg::bg_saga::{WPTable, SIEGECHAR_TAB}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
-pub use mp_bg::bg_slidemove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_slidemove.rs
+pub use crate::ai_wpnav::*;
+pub use crate::botai::bweaponrange::*;
+pub use crate::client::client_connected::*;
+pub use crate::client::client_persistant::*;
+pub use crate::g_active::*;
+pub use crate::g_client::*;
+pub use crate::g_cmds::*;
+pub use crate::g_icarus_set_type::{setTable, setType_t, setType_t::*};
+pub use crate::g_items::*;
+pub use crate::g_mem::G_Alloc;
+pub use crate::g_mover::*;
+pub use crate::g_spawn::MAX_AMBIENT_SETS;
+pub use crate::g_spawn::*;
+pub use crate::g_svcmds::MAX_IPFILTERS;
+pub use crate::g_team::*;
+pub use crate::g_timer::*;
+pub use crate::g_trigger::*;
+pub use crate::g_turret::*;
+pub use crate::g_turret_G2::*;
+pub use crate::g_vehicles::*;
+pub use crate::game_globals::MAX_ITEMS;
+pub use crate::level::alert_event::MAX_ALERT_EVENTS;
+pub use crate::level::combat_point::MAX_COMBAT_POINTS;
+pub use crate::level::interest_point::MAX_INTEREST_POINTS;
+pub use crate::level::level_locals::BODY_QUEUE_SIZE;
+pub use crate::level::reference_tag::*;
+pub use crate::level::tag_owner::*;
+pub use crate::npc_c::*;
+pub use crate::q_math::*;
+pub use crate::saber::saber_flags::*;
+pub use crate::tri_coll_test::*;
+pub use crate::NPC_AI_Atst::*;
+pub use crate::NPC_AI_Droid::*;
+pub use crate::NPC_AI_GalakMech::*;
+pub use crate::NPC_AI_Grenadier::*;
+pub use crate::NPC_AI_Howler::*;
+pub use crate::NPC_AI_ImperialProbe::*;
+pub use crate::NPC_AI_Interrogator::*;
+pub use crate::NPC_AI_Mark1::*;
+pub use crate::NPC_AI_Mark2::*;
+pub use crate::NPC_AI_MineMonster::MAX_DISTANCE;
+pub use crate::NPC_AI_Seeker::*;
+pub use crate::NPC_AI_Sentry::*;
+pub use crate::NPC_AI_Stormtrooper::*;
+pub use crate::NPC_AI_Utils::MAX_RADIUS_ENTS;
+pub use crate::NPC_behavior::*;
+pub use crate::NPC_combat::*;
+pub use crate::NPC_senses::*;
+pub use crate::NPC_spawn::*;
+pub use crate::NPC_stats::BSTable;
+pub use crate::NPC_utils::*;
+pub use mp_bg::bg_misc::*;
+pub use mp_bg::bg_pmove::MIN_WALK_NORMAL;
+pub use mp_bg::bg_pmove::*;
+pub use mp_bg::bg_saber::*;
+pub use mp_bg::bg_saberLoad::*;
+pub use mp_bg::bg_saga::{WPTable, SIEGECHAR_TAB};
+pub use mp_bg::bg_slidemove::*;
 pub use mp_bg::bg_vehicleLoad::BG_VehicleGetIndex;
-pub use mp_bg::local::bg_toggleable_surfaces::bgToggleableSurfaces; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/bg_toggleable_surfaces.rs
-pub use mp_bg::local::force_levels::forceJumpStrength; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs
-pub use mp_bg::local::force_levels::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs
-pub use mp_bg::local::force_power_needed::forcePowerNeeded; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_power_needed.rs
-pub use mp_bg::public::dm_flags::DF_NO_FALLING; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/dm_flags.rs
-pub use mp_bg::public::saber_move_data_table::saberMoveData; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
-pub use mp_bg::public::saber_move_data_table::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
-pub use mp_bg::public::saberlock::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saberlock.rs
-pub use mp_bg::public::spawn::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/spawn.rs
-pub use mp_bg::vehicles::turret_stats_t::MAX_VEHICLE_TURRET_MUZZLES; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
-pub use mp_bg::vehicles::vehicle_s::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_s.rs
-pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_type_t.rs
-pub use mp_bg::weapons::ammo_data::ammoData; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_data.rs
-pub use mp_qshared::common::mp::gentity::NUM_BSETS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
-pub use mp_qshared::common::mp::gentity::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
-pub use mp_qshared::common::mp::qcommon::parms::{parms_t, MAX_PARMS}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/parms.rs
-pub use mp_qshared::common::mp::qcommon::player_state::NUM_FORCE_POWERS; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
-pub use mp_qshared::common::mp::qcommon::player_state::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
-pub use mp_qshared::common::mp::qcommon::saber::blade_info::MAX_BLADES; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/saber/blade_info.rs
-pub use mp_qshared::common::mp::qcommon::saber::saber_colors::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/saber/saber_colors.rs
-pub use mp_qshared::shared::cbuf_exec::{cbufExec_t, cbufExec_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/cbuf_exec.rs
-pub use mp_qshared::shared::file_mode::{FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/fsMode_t.rs
-pub use mp_qshared::shared::flag_status::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/flag_status.rs
-pub use mp_qshared::shared::q_color::Q_COLOR_ESCAPE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs
-pub use mp_qshared::shared::saber_blocked_type::{saberBlockedType_t, saberBlockedType_t::*}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/saber_blocked_type.rs
-pub use mp_qshared::shared::wpobject::MAX_NEIGHBOR_SIZE; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/wpobject.rs // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_vehicleLoad.rs
+pub use mp_bg::local::bg_toggleable_surfaces::bgToggleableSurfaces;
+pub use mp_bg::local::force_levels::forceJumpStrength;
+pub use mp_bg::local::force_levels::*;
+pub use mp_bg::local::force_power_needed::forcePowerNeeded;
+pub use mp_bg::public::dm_flags::DF_NO_FALLING;
+pub use mp_bg::public::saber_move_data_table::saberMoveData;
+pub use mp_bg::public::saber_move_data_table::*;
+pub use mp_bg::public::saberlock::*;
+pub use mp_bg::public::spawn::*;
+pub use mp_bg::vehicles::turret_stats_t::MAX_VEHICLE_TURRET_MUZZLES;
+pub use mp_bg::vehicles::vehicle_s::*;
+pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
+pub use mp_bg::weapons::ammo_data::ammoData;
+pub use mp_qshared::common::mp::gentity::NUM_BSETS;
+pub use mp_qshared::common::mp::gentity::*;
+pub use mp_qshared::common::mp::qcommon::parms::{parms_t, MAX_PARMS};
+pub use mp_qshared::common::mp::qcommon::player_state::NUM_FORCE_POWERS;
+pub use mp_qshared::common::mp::qcommon::player_state::*;
+pub use mp_qshared::common::mp::qcommon::saber::blade_info::MAX_BLADES;
+pub use mp_qshared::common::mp::qcommon::saber::saber_colors::*;
+pub use mp_qshared::shared::cbuf_exec::{cbufExec_t, cbufExec_t::*};
+pub use mp_qshared::shared::file_mode::{FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+pub use mp_qshared::shared::flag_status::*;
+pub use mp_qshared::shared::q_color::Q_COLOR_ESCAPE;
+pub use mp_qshared::shared::saber_blocked_type::{saberBlockedType_t, saberBlockedType_t::*};
+pub use mp_qshared::shared::wpobject::MAX_NEIGHBOR_SIZE;
 
-// Pin the first-winner definition of consts that are transcribed identically in
-// two modules (same values) so the glob re-exports above are unambiguous, until
-// the duplicate-const consolidation sweep removes one copy of each.
+// These lines pin the first-winner definition of consts that two modules transcribe with the same
+// values, so the glob re-exports above stay unambiguous.
+// A future duplicate-const consolidation pass removes one copy of each.
 pub use crate::npc::squad_state::NUM_SQUAD_STATES;
 pub use mp_bg::public::configstring::{CS_CLIENT_JEDIMASTER, CS_ITEMS};
 pub use mp_qshared::common::mp::qcommon::task_id_t::taskID_t::NUM_TIDS;
 
-// Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled
-// `GICARUSTaskIDPendingArgs` spelling that `NPC_sounds.rs` transcribes bare;
-// the canonical camelCase port is `GIcarusTaskidpendingArgs`.
+// Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled `GICARUSTaskIDPendingArgs`
+// spelling that `NPC_sounds.rs` transcribes bare.
+// The camelCase port name is `GIcarusTaskidpendingArgs`.
 // Source: oracle/codemp/game/g_syscalls.c:329-332
 pub use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs as GICARUSTaskIDPendingArgs;

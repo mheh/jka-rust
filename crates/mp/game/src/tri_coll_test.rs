@@ -1,12 +1,7 @@
-// PORT-COMPLETE: tri_coll_test.c
-
-//! Triangle/triangle intersection test routine, by Tomas Moller, 1997.
+//! Triangle/triangle intersection test routine,
+//! by Tomas Moller, 1997.
 //! See article "A Fast Triangle-Triangle Intersection Test",
 //! Journal of Graphics Tools, 2(2), 1997
-//!
-//! FAITHFUL port of `oracle/codemp/game/tri_coll_test.c`.
-//!
-//! Filled by the jampgame mega-pass.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -36,8 +31,8 @@ pub fn coplanar_tri_tri(
     let mut i0: usize;
     let mut i1: usize;
 
-    // First project onto an axis-aligned plane, that maximizes the area
-    // of the triangles, compute indices: i0, i1.
+    // first project onto an axis-aligned plane, that maximizes the area
+    // of the triangles, compute indices: i0,i1.
     A[0] = N[0].abs();
     A[1] = N[1].abs();
     A[2] = N[2].abs();
@@ -51,7 +46,7 @@ pub fn coplanar_tri_tri(
             i1 = 1;
         }
     } else {
-        // A[0] <= A[1]
+        // A[0]<=A[1]
         if A[2] > A[1] {
             i0 = 0; // A[2] is greatest
             i1 = 1;
@@ -61,8 +56,7 @@ pub fn coplanar_tri_tri(
         }
     }
 
-    // Test all edges of triangle 1 against the edges of triangle 2
-    // EDGE_AGAINST_TRI_EDGES(V0, V1, U0, U1, U2)
+    // test all edges of triangle 1 against the edges of triangle 2
     {
         let Ax = V1[i0] - V0[i0];
         let Ay = V1[i1] - V0[i1];
@@ -134,7 +128,6 @@ pub fn coplanar_tri_tri(
         }
     }
 
-    // EDGE_AGAINST_TRI_EDGES(V1, V2, U0, U1, U2)
     {
         let Ax = V2[i0] - V1[i0];
         let Ay = V2[i1] - V1[i1];
@@ -206,7 +199,6 @@ pub fn coplanar_tri_tri(
         }
     }
 
-    // EDGE_AGAINST_TRI_EDGES(V2, V0, U0, U1, U2)
     {
         let Ax = V0[i0] - V2[i0];
         let Ay = V0[i1] - V2[i1];
@@ -278,8 +270,7 @@ pub fn coplanar_tri_tri(
         }
     }
 
-    // Finally, test if tri1 is totally contained in tri2 or vice versa
-    // POINT_IN_TRI(V0, U0, U1, U2)
+    // finally, test if tri1 is totally contained in tri2 or vice versa
     {
         let a = U1[i1] - U0[i1];
         let b = -(U1[i0] - U0[i0]);
@@ -303,7 +294,6 @@ pub fn coplanar_tri_tri(
         }
     }
 
-    // POINT_IN_TRI(U0, V0, V1, V2)
     {
         let a = V1[i1] - V0[i1];
         let b = -(V1[i0] - V0[i0]);
@@ -353,7 +343,7 @@ pub fn tri_tri_intersect(
     let mut isect1 = [0.0f32; 2];
     let mut isect2 = [0.0f32; 2];
 
-    // Compute plane equation of triangle(V0, V1, V2)
+    // compute plane equation of triangle(V0,V1,V2)
     E1[0] = V1[0] - V0[0];
     E1[1] = V1[1] - V0[1];
     E1[2] = V1[2] - V0[2];
@@ -362,21 +352,19 @@ pub fn tri_tri_intersect(
     E2[1] = V2[1] - V0[1];
     E2[2] = V2[2] - V0[2];
 
-    // CROSS(N1, E1, E2)
     N1[0] = E1[1] * E2[2] - E1[2] * E2[1];
     N1[1] = E1[2] * E2[0] - E1[0] * E2[2];
     N1[2] = E1[0] * E2[1] - E1[1] * E2[0];
 
-    // DOT(N1, V0)
     let d1 = -(N1[0] * V0[0] + N1[1] * V0[1] + N1[2] * V0[2]);
-    // Plane equation 1: N1.X+d1=0
+    // plane equation 1: N1.X+d1=0
 
-    // Put U0, U1, U2 into plane equation 1 to compute signed distances to the plane
+    // put U0,U1,U2 into plane equation 1 to compute signed distances to the plane
     let mut du0 = N1[0] * U0[0] + N1[1] * U0[1] + N1[2] * U0[2] + d1;
     let mut du1 = N1[0] * U1[0] + N1[1] * U1[1] + N1[2] * U1[2] + d1;
     let mut du2 = N1[0] * U2[0] + N1[1] * U2[1] + N1[2] * U2[2] + d1;
 
-    // Coplanarity robustness check
+    // coplanarity robustness check
     if USE_EPSILON_TEST {
         if (du0 as f64).abs() < EPSILON {
             du0 = 0.0;
@@ -393,11 +381,11 @@ pub fn tri_tri_intersect(
     let du0du2 = du0 * du2;
 
     if du0du1 > 0.0 && du0du2 > 0.0 {
-        // Same sign on all of them + not equal 0?
-        return 0; // No intersection occurs
+        // same sign on all of them + not equal 0 ?
+        return 0; // no intersection occurs
     }
 
-    // Compute plane of triangle (U0, U1, U2)
+    // compute plane of triangle (U0,U1,U2)
     E1[0] = U1[0] - U0[0];
     E1[1] = U1[1] - U0[1];
     E1[2] = U1[2] - U0[2];
@@ -406,16 +394,14 @@ pub fn tri_tri_intersect(
     E2[1] = U2[1] - U0[1];
     E2[2] = U2[2] - U0[2];
 
-    // CROSS(N2, E1, E2)
     N2[0] = E1[1] * E2[2] - E1[2] * E2[1];
     N2[1] = E1[2] * E2[0] - E1[0] * E2[2];
     N2[2] = E1[0] * E2[1] - E1[1] * E2[0];
 
-    // DOT(N2, U0)
     let d2 = -(N2[0] * U0[0] + N2[1] * U0[1] + N2[2] * U0[2]);
-    // Plane equation 2: N2.X+d2=0
+    // plane equation 2: N2.X+d2=0
 
-    // Put V0, V1, V2 into plane equation 2
+    // put V0,V1,V2 into plane equation 2
     let mut dv0 = N2[0] * V0[0] + N2[1] * V0[1] + N2[2] * V0[2] + d2;
     let mut dv1 = N2[0] * V1[0] + N2[1] * V1[1] + N2[2] * V1[2] + d2;
     let mut dv2 = N2[0] * V2[0] + N2[1] * V2[1] + N2[2] * V2[2] + d2;
@@ -436,16 +422,16 @@ pub fn tri_tri_intersect(
     let dv0dv2 = dv0 * dv2;
 
     if dv0dv1 > 0.0 && dv0dv2 > 0.0 {
-        // Same sign on all of them + not equal 0?
-        return 0; // No intersection occurs
+        // same sign on all of them + not equal 0 ?
+        return 0; // no intersection occurs
     }
 
-    // Compute direction of intersection line
+    // compute direction of intersection line
     D[0] = N1[1] * N2[2] - N1[2] * N2[1];
     D[1] = N1[2] * N2[0] - N1[0] * N2[2];
     D[2] = N1[0] * N2[1] - N1[1] * N2[0];
 
-    // Compute and index to the largest component of D
+    // compute and index to the largest component of D
     let mut max = D[0].abs();
     let mut index = 0;
     let b = D[1].abs();
@@ -459,7 +445,7 @@ pub fn tri_tri_intersect(
         index = 2;
     }
 
-    // This is the simplified projection onto L
+    // this is the simplified projection onto L
     let vp0 = V0[index];
     let vp1 = V1[index];
     let vp2 = V2[index];
@@ -468,80 +454,66 @@ pub fn tri_tri_intersect(
     let up1 = U1[index];
     let up2 = U2[index];
 
-    // Compute interval for triangle 1
-    // COMPUTE_INTERVALS(vp0, vp1, vp2, dv0, dv1, dv2, dv0dv1, dv0dv2, isect1[0], isect1[1])
+    // compute interval for triangle 1
     {
         if dv0dv1 > 0.0 {
-            // Here we know that dv0dv2 <= 0.0
-            // That is dv0, dv1 are on the same side, dv2 on the other or on the plane
-            // ISECT(vp2, vp0, vp1, dv2, dv0, dv1, isect1[0], isect1[1])
+            // here we know that dv0dv2<=0.0
+            // that is dv0, dv1 are on the same side, dv2 on the other or on the plane
             isect1[0] = vp2 + (vp0 - vp2) * dv2 / (dv2 - dv0);
             isect1[1] = vp2 + (vp1 - vp2) * dv2 / (dv2 - dv1);
         } else if dv0dv2 > 0.0 {
-            // Here we know that dv0dv1 <= 0.0
-            // ISECT(vp1, vp0, vp2, dv1, dv0, dv2, isect1[0], isect1[1])
+            // here we know that dv0dv1<=0.0
             isect1[0] = vp1 + (vp0 - vp1) * dv1 / (dv1 - dv0);
             isect1[1] = vp1 + (vp2 - vp1) * dv1 / (dv1 - dv2);
         } else if dv1 * dv2 > 0.0 || dv0 != 0.0 {
-            // Here we know that dv0dv1 <= 0.0 or that dv0 != 0.0
-            // ISECT(vp0, vp1, vp2, dv0, dv1, dv2, isect1[0], isect1[1])
+            // here we know that dv0dv1<=0.0 or that dv0!=0.0
             isect1[0] = vp0 + (vp1 - vp0) * dv0 / (dv0 - dv1);
             isect1[1] = vp0 + (vp2 - vp0) * dv0 / (dv0 - dv2);
         } else if dv1 != 0.0 {
-            // ISECT(vp1, vp0, vp2, dv1, dv0, dv2, isect1[0], isect1[1])
             isect1[0] = vp1 + (vp0 - vp1) * dv1 / (dv1 - dv0);
             isect1[1] = vp1 + (vp2 - vp1) * dv1 / (dv1 - dv2);
         } else if dv2 != 0.0 {
-            // ISECT(vp2, vp0, vp1, dv2, dv0, dv1, isect1[0], isect1[1])
             isect1[0] = vp2 + (vp0 - vp2) * dv2 / (dv2 - dv0);
             isect1[1] = vp2 + (vp1 - vp2) * dv2 / (dv2 - dv1);
         } else {
-            // Triangles are coplanar
+            // triangles are coplanar
             return coplanar_tri_tri(N1, V0, V1, V2, U0, U1, U2);
         }
     }
 
-    // Compute interval for triangle 2
-    // COMPUTE_INTERVALS(up0, up1, up2, du0, du1, du2, du0du1, du0du2, isect2[0], isect2[1])
+    // compute interval for triangle 2
     {
         if du0du1 > 0.0 {
-            // Here we know that du0du2 <= 0.0
-            // ISECT(up2, up0, up1, du2, du0, du1, isect2[0], isect2[1])
+            // here we know that du0du2<=0.0
             isect2[0] = up2 + (up0 - up2) * du2 / (du2 - du0);
             isect2[1] = up2 + (up1 - up2) * du2 / (du2 - du1);
         } else if du0du2 > 0.0 {
-            // Here we know that du0du1 <= 0.0
-            // ISECT(up1, up0, up2, du1, du0, du2, isect2[0], isect2[1])
+            // here we know that du0du1<=0.0
             isect2[0] = up1 + (up0 - up1) * du1 / (du1 - du0);
             isect2[1] = up1 + (up2 - up1) * du1 / (du1 - du2);
         } else if du1 * du2 > 0.0 || du0 != 0.0 {
-            // Here we know that du0du1 <= 0.0 or that du0 != 0.0
-            // ISECT(up0, up1, up2, du0, du1, du2, isect2[0], isect2[1])
+            // here we know that du0du1<=0.0 or that du0!=0.0
             isect2[0] = up0 + (up1 - up0) * du0 / (du0 - du1);
             isect2[1] = up0 + (up2 - up0) * du0 / (du0 - du2);
         } else if du1 != 0.0 {
-            // ISECT(up1, up0, up2, du1, du0, du2, isect2[0], isect2[1])
             isect2[0] = up1 + (up0 - up1) * du1 / (du1 - du0);
             isect2[1] = up1 + (up2 - up1) * du1 / (du1 - du2);
         } else if du2 != 0.0 {
-            // ISECT(up2, up0, up1, du2, du0, du1, isect2[0], isect2[1])
             isect2[0] = up2 + (up0 - up2) * du2 / (du2 - du0);
             isect2[1] = up2 + (up1 - up2) * du2 / (du2 - du1);
         } else {
-            // Triangles are coplanar. The COMPUTE_INTERVALS macro hardcodes N1 in
-            // both expansions, so this branch passes N1, not N2.
+            // triangles are coplanar
+            // The COMPUTE_INTERVALS macro hardcodes N1 in both expansions, so this branch passes N1, not N2.
             return coplanar_tri_tri(N1, V0, V1, V2, U0, U1, U2);
         }
     }
 
-    // SORT(isect1[0], isect1[1])
     if isect1[0] > isect1[1] {
         let tmp = isect1[0];
         isect1[0] = isect1[1];
         isect1[1] = tmp;
     }
 
-    // SORT(isect2[0], isect2[1])
     if isect2[0] > isect2[1] {
         let tmp = isect2[0];
         isect2[0] = isect2[1];

@@ -1,9 +1,6 @@
-// PORT-COMPLETE: NPC_AI_Atst.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Atst.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Atst.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and engine traps through the `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_items::RegisterItem;
@@ -46,7 +43,6 @@ pub const RIGHT_ARM_HEALTH: c_int = 40;
 /// Precache weapon and effect resources.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:20-34`
 pub fn NPC_ATST_Precache(ctx: &mut GameContext) {
-    // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
     G_SoundIndex(ctx, "sound/chars/atst/atst_damaged1");
     G_SoundIndex(ctx, "sound/chars/atst/atst_damaged2");
 
@@ -103,11 +99,12 @@ pub fn NPC_ATST_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:130-142`
 pub fn ATST_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    // FLAG: NPCInfo (gNPC_t) has no accessor.
+    // The deref stays raw.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if unsafe { (*npc_info).goalEntity.is_none() } {
-        // hunt
+        //hunt
         let npc_id = ctx.entity_id_of(npc).unwrap();
         let enemy = ctx.entity(npc_id).enemy;
         unsafe { (*npc_info).goalEntity = enemy };
@@ -130,6 +127,7 @@ pub fn ATST_Ranged(
 ) {
     let npc = ctx.world.globals.NPC;
 
+    // Attack?
     if TIMER_Done(
         ctx,
         ctx.entity_id_of(npc),
@@ -139,7 +137,6 @@ pub fn ATST_Ranged(
     {
         let npc_id = ctx.entity_id_of(npc);
         let delay = ctx.world.bg_state.rng.Q_irand(500, 3000);
-        // Attack?
         TIMER_Set(ctx, npc_id, b"atkDelay\0".as_ptr() as *const c_char, delay);
 
         if altAttack != qfalse {
@@ -149,7 +146,8 @@ pub fn ATST_Ranged(
         }
     }
 
-    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    // FLAG: NPCInfo (gNPC_t) has no accessor.
+    // The deref stays raw.
     if (unsafe { (*ctx.world.globals.NPCInfo).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
         ATST_Hunt(ctx, visible, advance);
     }
@@ -180,7 +178,7 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
 
     NPC_FaceEnemy(ctx, qtrue);
 
-    // Rate our distance to the target, and our visibility
+    // Rate our distance to the target, and our visibilty
     let npc_id = ctx.entity_id_of(npc).unwrap();
     let enemy_id = ctx.entity(npc_id).enemy.unwrap();
     let npc_origin = ctx.entity(npc_id).r.currentOrigin;
@@ -200,7 +198,8 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
 
     // If we cannot see our target, move to see it
     if visible == qfalse {
-        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+        // FLAG: NPCInfo (gNPC_t) has no accessor.
+        // The deref stays raw.
         if (unsafe { (*ctx.world.globals.NPCInfo).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
             ATST_Hunt(ctx, visible, advance);
             return;
@@ -215,7 +214,7 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
 
         DIST_LONG => {
             // NPC_ChangeWeapon( WP_ATST_SIDE );
-            // rwwFIXMEFIXME: make atst weaps work.
+            //rwwFIXMEFIXME: make atst weaps work.
 
             // See if the side weapons are there
             blaster_test = trap::G2API_GetSurfaceRenderStatus(ctx.engine, ctx.entity(npc_id).ghoul2, 0, "head_light_blaster_cann");
@@ -239,7 +238,7 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
                 // Blaster is on
                 alt_attack = qfalse;
             } else if charger_test != -1 && (charger_test & TURN_OFF) == 0 {
-                // Charger is on
+                // Blaster is on
                 alt_attack = qtrue;
             } else {
                 NPC_ChangeWeapon(WP_NONE);
@@ -267,7 +266,7 @@ pub fn ATST_Patrol(ctx: &mut GameContext) {
         return;
     }
 
-    // If we have somewhere to go, then do that
+    //If we have somewhere to go, then do that
     let npc_id = ctx.entity_id_of(npc).unwrap();
     if ctx.entity(npc_id).enemy.is_none() {
         if UpdateGoal(ctx) != core::ptr::null_mut() {
@@ -304,7 +303,8 @@ pub fn ATST_Idle(ctx: &mut GameContext) {
 pub fn NPC_BSATST_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    // FLAG: NPCInfo (gNPC_t) has no accessor.
+    // The deref stays raw.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if ctx.entity(npc_id).enemy.is_some() {
