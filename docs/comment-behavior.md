@@ -28,6 +28,8 @@ Where a prior pass merged, paraphrased, or "corrected" a Raven comment, restore 
 
 Verification byte-diffs each restored comment against its cited oracle line, because prose reads miss whitespace drift.
 
+One normalization applies: a tab after the comment token normalizes to one space (`//<TAB>text` becomes `// text`). The space-vs-no-space distinction stays byte-exact.
+
 ## CB-3 - cite-shaped doc templates are port prose
 
 Doc templates that cite the oracle without the literal protected `Source:` prefix are port-authored and restyle. The house separator is the colon: `` Raven `trap_X` (`g_syscalls.c:NNN`): `SYSCALL_NAME`. `` Uniformity across a template family is part of the value - restyle the template once and apply it identically. An unprotected inline location parenthetical that duplicates a protected `Source:` line at the same site is redundant and drops.
@@ -42,7 +44,7 @@ Raven comment content that was never transcribed into the Rust file (untranscrib
 
 ## CB-6 - durable comment prefixes
 
-`FLAG:` (~557 sites crate-wide) and `CLIENT-POINTER TRAP:` (7 sites) are stable repo-wide markers, not campaign residue. Treat each like `SAFETY:`: keep the prefix and the restyled fact, drop any campaign-shorthand parenthetical. "One fact" does not mean one line: a second sentence at a prefix site goes on its own line, per the one-sentence-per-line law.
+`FLAG:` (~557 sites crate-wide) and `CLIENT-POINTER TRAP:` (6 sites) are stable repo-wide markers, not campaign residue. Treat each like `SAFETY:`: keep the prefix and the restyled fact, drop any campaign-shorthand parenthetical. "One fact" does not mean one line: a second sentence at a prefix site goes on its own line, per the one-sentence-per-line law. The rule binds the prefix and the facts, not a uniform body length: a one-line site and a four-line site are both legal, and each site keeps the facts it needs. Shape uniformity binds DEC-anchored families only (CB-8).
 
 ## CB-7 - process citations are residue, fabricated citations are removed
 

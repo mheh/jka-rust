@@ -73,3 +73,5 @@ Untranscribed Raven comment content found by the pilot (CB-5): the `ai_main_cons
 Retroactive CB-12/CB-13/CB-14 sweep (rules ratified 2026-08-18, batch-4 walk): the 40 files committed in the pilot and waves 1-3 predate the assurance-voice, campaign-vocabulary, and port-status rules, so they still carry "faithful"/"preserved" assurance, "SPINE"/"mega-pass"/"packet" nouns, and progress-framed status notes. One dedicated sweep lane over those 40 files after the forward waves finish, same verification shape.
 
 The `NPC_AI_Sniper.rs` single-space `WTF?` drift (oracle has a double space, site untouched by wave 4) rides the same sweep.
+
+Wave 6 grew the CB-5 inventory further: untranscribed Raven inline comments and dead-code comment blocks across `NPC_AI_Mark1` (the largest set, ~20 sites), `NPC_AI_Droid` (~15 sites), `NPC_AI_Sentry` (7), `NPC_AI_ImperialProbe` (4), `g_object` (4), `g_timer` (3), and `g_vehicleTurret` (1) - the per-file oracle line lists live in the wave-6 worker reports.

@@ -1,18 +1,14 @@
-// PORT-COMPLETE: NPC_AI_Remote.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Remote.c`.
+//! Raven `NPC_AI_Remote.c`.
 //!
-//! One function ported; ten parked due to ambient-state infrastructure.
 //! All functions except `NPC_Remote_Precache` rely on file-scope globals set
-//! up by `SetNPCGlobals()` (NPC, NPCInfo, ucmd) or read other ambient state
-//! (level, g_spskill). The faithful signatures carry no context parameter
-//! (`&Engine`, `&mut GameWorld`), and porting-rules §B3 forbids inventing
-//! `static mut` globals. How these threadless faithful signatures access the
-//! ambient state is an unsettled architectural question.
+//! up by `SetNPCGlobals()` (`NPC`, `NPCInfo`, `ucmd`) or read other ambient
+//! state (`level`, `g_spskill`).
 //!
-//! safe-state 2c: the entity half is converted to accessor borrows
-//! (`ctx.world.entity(npc_id)`); the gNPC_t (`NPCInfo`) half and the NPC's
-//! BG_Alloc'd pool client (`gClPtrs`, CLIENT-POINTER TRAP) stay raw in tight
-//! unsafe blocks, exactly as Raven derefs them.
+//! The entity half of that ambient state comes through accessor borrows
+//! (`ctx.world.entity(npc_id)`).
+//! The gNPC_t (`NPCInfo`) half and the NPC's BG_Alloc'd pool client
+//! (`gClPtrs`, CLIENT-POINTER TRAP) stay raw in tight unsafe blocks, exactly
+//! as Raven derefs them.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_missile::CreateMissile;
@@ -68,9 +64,10 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // CLIENT-POINTER TRAP (2c/2b): the NPC carries a BG_Alloc'd pool client
-    // (`gClPtrs`), not a `level.clients` slot — read the pointer through the
-    // entity accessor, then deref it raw exactly as Raven does.
+    // CLIENT-POINTER TRAP: the NPC carries a BG_Alloc'd pool client
+    // (`gClPtrs`), not a `level.clients` slot.
+    // The code reads the pointer through the entity accessor, then
+    // dereferences it raw, exactly as Raven does.
     let client = ctx.world.entity(npc_id).client;
 
     // Update our angles regardless
@@ -119,7 +116,7 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
             }
         }
     } else {
-        // `goalEntity`/`lastGoalEntity` live on gNPC_t (NPCInfo) — deref raw (2c).
+        // `goalEntity`/`lastGoalEntity` live on gNPC_t (NPCInfo), read via a raw deref.
         let goal_id: Option<EntityId> = unsafe {
             if (*npc_info).goalEntity.is_some() {
                 (*npc_info).goalEntity
@@ -169,7 +166,10 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // CLIENT-POINTER TRAP (2c/2b): NPC pool client — ptr via accessor, deref raw.
+    // CLIENT-POINTER TRAP: the NPC carries a BG_Alloc'd pool client
+    // (`gClPtrs`), not a `level.clients` slot.
+    // The code reads the pointer through the entity accessor, then
+    // dereferences it raw, exactly as Raven does.
     let client = ctx.world.entity(npc_id).client;
 
     let mut dir: c_int;
@@ -231,7 +231,8 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
             // Add a slight upward push
             (*client).ps.velocity[2] += REMOTE_UPWARD_PUSH;
 
-            // Set the strafe start time so we can do a controlled roll (NPCInfo, raw 2c)
+            // Set the strafe start time so we can do a controlled roll
+            // `standTime` lives on gNPC_t (NPCInfo), read via a raw deref.
             (*npc_info).standTime =
                 ctx.world.level.time + 3000 + (ctx.world.bg_state.rng.random() * 500.0) as c_int;
         }
@@ -245,14 +246,18 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
     let npc = ctx.world.globals.NPC;
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // CLIENT-POINTER TRAP (2c/2b): NPC pool client — ptr via accessor, deref raw.
+    // CLIENT-POINTER TRAP: the NPC carries a BG_Alloc'd pool client
+    // (`gClPtrs`), not a `level.clients` slot.
+    // The code reads the pointer through the entity accessor, then
+    // dereferences it raw, exactly as Raven does.
     let client = ctx.world.entity(npc_id).client;
 
     let mut distance: f32 = 0.0;
     let mut speed: f32;
     let mut forward: vec3_t = [0.0; 3];
 
-    // If we're not supposed to stand still, pursue the player (standTime, NPCInfo raw 2c)
+    //If we're not supposed to stand still, pursue the player
+    // `standTime` lives on gNPC_t (NPCInfo), read via a raw deref.
     if unsafe { (*npc_info).standTime } < ctx.world.level.time {
         // Only strafe when we can see the player
         if visible != 0 {
@@ -261,12 +266,12 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
         }
     }
 
-    // If we don't want to advance, stop here
+    //If we don't want to advance, stop here
     if advance == 0 && visible != 0 {
         return;
     }
 
-    // Only try and navigate if the player is visible
+    //Only try and navigate if the player is visible
     if visible == 0 {
         // Move towards our goal
         let enemy = ctx.world.entity(npc_id).enemy;
@@ -275,7 +280,7 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
             (*npc_info).goalRadius = 12;
         }
 
-        // Get our direction from the navigator if we can't see our target
+        //Get our direction from the navigator if we can't see our target
         if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance as *mut f32) == 0
         {
             return;
@@ -325,8 +330,9 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
     let mut up: vec3_t = [0.0; 3];
 
     // Oracle's `static vec3_t forward/vright/up`/`muzzle` carry no cross-call
-    // state (rewritten every call / unused), so plain locals are byte-faithful
-    // (§B3); `enemy_id: Option` mirrors CalcEntitySpot's null-ent early return.
+    // state. Each is rewritten every call, and `muzzle` is unused.
+    // Plain locals are behaviorally equivalent (§B3).
+    // `enemy_id: Option` mirrors `CalcEntitySpot`'s null-entity early return.
     let enemy_id = ctx.world.entity(npc_id).enemy;
     crate::NPC_utils::CalcEntitySpot(ctx, enemy_id, SPOT_HEAD, &mut enemy_org1);
 
@@ -388,7 +394,7 @@ pub fn Remote_Ranged(
         Remote_Fire(ctx);
     }
 
-    // scriptFlags lives on gNPC_t (NPCInfo) — deref raw (2c).
+    // `scriptFlags` lives on gNPC_t (NPCInfo), read via a raw deref.
     if unsafe { (*npc_info).scriptFlags & SCF_CHASE_ENEMIES } != 0 {
         Remote_Hunt(ctx, visible, advance, retreat);
     }
@@ -413,7 +419,7 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
         let npc_id_opt = ctx.entity_id_of(npc);
         let delay = ctx.world.bg_state.rng.Q_irand(250, 1500);
         crate::g_timer::TIMER_Set(ctx, npc_id_opt, c"spin".as_ptr(), delay);
-        // desiredYaw lives on gNPC_t (NPCInfo) — deref raw (2c).
+        // `desiredYaw` lives on gNPC_t (NPCInfo), read via a raw deref.
         unsafe {
             (*npc_info).desiredYaw += ctx.world.bg_state.rng.Q_irand(-200, 200) as f32;
         }
@@ -428,7 +434,7 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
         return;
     }
 
-    // Rate our distance to the target, and our visibility
+    // Rate our distance to the target, and our visibilty
     if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
         let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
         let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
@@ -445,8 +451,9 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
     }
 
     idealDist = MIN_DISTANCE_SQR + (MIN_DISTANCE_SQR * ctx.world.bg_state.rng.flrand(0.0, 1.0));
-    // C: `distance`(int) compared against `idealDist`(float)*1.25/0.75(double);
-    // the products promote to double and the compare is in double.
+    // Oracle compares `distance` (int) against `idealDist` (float) times the
+    // double literals 1.25 and 0.75.
+    // The multiplication promotes to double, and the comparison runs in double.
     // Source: oracle/codemp/game/NPC_AI_Remote.c:317-318
     advance = if (distance as f64) > idealDist as f64 * 1.25 {
         qtrue
@@ -459,7 +466,8 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
         qfalse
     };
 
-    // If we cannot see our target, move to see it (scriptFlags, NPCInfo raw 2c)
+    // If we cannot see our target, move to see it
+    // `scriptFlags` lives on gNPC_t (NPCInfo), read via a raw deref.
     if visible == qfalse {
         if unsafe { (*npc_info).scriptFlags & SCF_CHASE_ENEMIES } != 0 {
             Remote_Hunt(ctx, visible, advance, retreat);
@@ -487,11 +495,11 @@ pub fn Remote_Patrol(ctx: &mut GameContext) {
 
     Remote_MaintainHeight(ctx);
 
-    // If we have somewhere to go, then do that
+    //If we have somewhere to go, then do that
     if ctx.world.entity(npc_id).enemy.is_none() {
         let goal = crate::NPC_goal::UpdateGoal(ctx);
         if !goal.is_null() {
-            // start loop sound once we move
+            //start loop sound once we move
             ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         }
