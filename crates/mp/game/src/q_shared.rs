@@ -1,16 +1,10 @@
-// PORT-COMPLETE: q_shared.c
-//! FAITHFUL port of `oracle/codemp/game/q_shared.c`.
+//! Port of `oracle/codemp/game/q_shared.c`.
 //!
-//! Filled by the jampgame mega-pass.
-//!
-//! `Com_Error(ERR_DROP/ERR_FATAL, ...)` call sites resolve directly to
-//! `panic!` (frozen Group A: "Com_Error→panic + EntityId + GameContext"),
-//! matching the bless-appendix ruling in the file packet — they do not
-//! route through the still-parked `crate::g_main::Com_Error` variadic
-//! stub. `Com_Printf` call sites route through `crate::g_main::Com_Printf`
-//! directly (same precedent as `bg_saberLoad.rs`), with any interpolated
-//! text pre-formatted into a single `CString` (the multi-arg variadic
-//! entry point itself is not invoked).
+//! `Com_Error(ERR_DROP/ERR_FATAL, ...)` call sites resolve directly to `panic!` (frozen Group A).
+//! They do not route through the `crate::g_main::Com_Error` variadic stub.
+//! `Com_Printf` call sites route through `crate::g_main::Com_Printf` directly, the same precedent as `bg_saberLoad.rs`.
+//! Any interpolated text is pre-formatted into a single `CString`.
+//! The multi-arg variadic entry point itself is not invoked.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::CStr;
@@ -22,21 +16,19 @@ use native_string::atoi_bytes;
 use native_string::latin1_to_string;
 use native_string::InfoSetResult;
 
-// S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
-// `COM_Parse*` family are canonical in `mp_qshared` now (below the bg tier so
-// bg can retarget). Re-export them so this file's ~44 game-side importers (and
-// the game parse helpers below — `COM_ParseString`/`Int`/`Float`,
-// `COM_MatchToken`, `Parse{1,2,3}DMatrix`) keep compiling unchanged.
+// The `QSharedScratch` type and the `QSharedScratch`-threaded `COM_Parse*` family are canonical in `mp_qshared` now.
+// This sits below the bg tier so bg can retarget.
+// This file re-exports them so its ~44 game-side importers, and the game parse helpers below
+// (`COM_ParseString`/`Int`/`Float`, `COM_MatchToken`, `Parse{1,2,3}DMatrix`), keep compiling unchanged.
 pub use mp_qshared::shared::com_parse::{
     COM_BeginParseSession, COM_GetCurrentParseLine, COM_Parse, COM_ParseExt, QSharedScratch,
     SkipBracedSection, SkipRestOfLine,
 };
 
 // ---------------------------------------------------------------------
-// Local helpers mirroring libc, faithful to the unchecked C semantics used
-// throughout this file (`strlen`/`strchr`/`strcmp`/`tolower`/`toupper`/
-// `atoi` — house rule: libc/other symbols use the Rust std equivalent, no
-// resolved signature needed).
+// These are local helpers that mirror libc, with the unchecked C semantics used throughout this file.
+// This covers `strlen`/`strchr`/`strcmp`/`tolower`/`toupper`/`atoi`.
+// House rule: libc and other symbols use the Rust std equivalent, with no resolved signature needed.
 // ---------------------------------------------------------------------
 
 unsafe fn c_strlen(s: *const c_char) -> usize {
@@ -52,9 +44,8 @@ unsafe fn com_printf_lit(msg: &str) {
     crate::g_main::Com_Printf(msg);
 }
 
-// `GetIDForString` is canonical in `mp_qshared` (the shared-tier
-// `q_string.rs`); re-exported here so this file's importers keep resolving
-// `GetIDForString`.
+// `GetIDForString` is canonical in `mp_qshared` (the shared-tier `q_string.rs`).
+// It is re-exported here so this file's importers keep resolving `GetIDForString`.
 pub use mp_qshared::shared::q_string::GetIDForString;
 
 /// Raven `GetStringForID`.
@@ -112,18 +103,17 @@ pub fn COM_StripExtension(r#in: *const c_char, out: *mut c_char) {
 
 /// Raven `COM_DefaultExtension`.
 ///
-/// Uses a fixed `"%s%s"` pattern (`oldPath`, `extension`) — inlined directly
-/// rather than routed through the still-parked generic `Com_sprintf` seam
-/// (porting-rules §A2: no invented behavior, but a statically-known format
-/// with known args is a mechanical identity, not a design choice).
+/// Uses a fixed `"%s%s"` pattern (`oldPath`, `extension`), inlined directly rather than routed through the
+/// generic `Com_sprintf` seam.
+/// A statically known format with known args is a mechanical identity, not a design choice (porting-rules §A2).
 /// Source: `oracle/codemp/game/q_shared.c:112-131`
 pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const c_char) {
     unsafe {
         let len = c_strlen(path);
         if len == 0 {
-            // src = path - 1 with src != path never true; faithful edge case
-            // not reachable in practice (Raven never calls this with an
-            // empty path). No special-case needed beyond the loop below.
+            // src = path - 1 with src != path is never true here.
+            // This edge case is not reachable in practice, because Raven never calls this with an empty path.
+            // No special case is needed beyond the loop below.
         }
         let mut src = path.offset(len as isize - 1);
         while *src != b'/' as c_char && src != path {
@@ -226,8 +216,8 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 
 /// Raven `COM_ParseError`.
 ///
-// Varargs not threaded (prints the format string as-is): zero callers in the
-// entire MP oracle, so no call site ever supplies args to expand.
+// Varargs are not threaded, so this prints the format string as-is.
+// This oracle function has zero callers in the entire MP codebase, so no call site ever supplies args to expand.
 /// Source: `oracle/codemp/game/q_shared.c:300-310`
 pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -241,7 +231,8 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
 
 /// Raven `COM_ParseWarning`.
 ///
-// Varargs not threaded — zero oracle callers, same as COM_ParseError.
+// Varargs are not threaded.
+// This has zero oracle callers, the same as `COM_ParseError`.
 /// Source: `oracle/codemp/game/q_shared.c:312-322`
 pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -338,9 +329,9 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
 
 /// Raven `COM_ParseString`.
 ///
-/// Raven's guard is `if ( s[0] == 0 )` where `s` is `const char **`, so `s[0]`
-/// is the (always non-NULL) `com_token` pointer, not the first token byte — the
-/// EOF branch is dead and `COM_ParseString` never returns `qtrue`. Preserved.
+/// Raven's guard is `if ( s[0] == 0 )` where `s` is `const char **`, so `s[0]` is the (always non-NULL) `com_token`
+/// pointer, not the first token byte.
+/// The EOF branch is dead, and `COM_ParseString` never returns `qtrue`.
 /// Source: `oracle/codemp/game/q_shared.c:588-598`
 pub fn COM_ParseString(
     qs: &mut QSharedScratch,
@@ -530,10 +521,9 @@ pub fn Q_strrchr(string: *const c_char, c: c_int) -> *mut c_char {
     }
 }
 
-/// C standard-library `strcmp` (case-sensitive), as called bare (not via a
-/// `Q_*` wrapper) at various `q_shared.c` sites (e.g. lines 548, 565, 670,
-/// 1185, 1240). Housed alongside the other `q_shared.c` string helpers per
-/// the file's existing string-fn family.
+/// C standard-library `strcmp` (case-sensitive), as called bare (not through a `Q_*` wrapper) at various `q_shared.c`
+/// sites, for example lines 548, 565, 670, 1185, 1240.
+/// This is housed alongside the other `q_shared.c` string helpers, per the file's existing string-fn family.
 ///
 /// Source: `oracle/codemp/game/q_shared.c` (bare `strcmp` call sites).
 pub fn Q_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
@@ -556,11 +546,9 @@ pub fn Q_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
     }
 }
 
-/// C standard-library `strchr` (first-occurrence character search), as
-/// called bare (not via a `Q_*` wrapper) at various `q_shared.c` sites (e.g.
-/// lines 1157, 1212, 1264, 1267, 1287, 1293, 1299, 1335, 1341, 1347). Housed
-/// alongside the other `q_shared.c` string helpers per the file's existing
-/// string-fn family.
+/// C standard-library `strchr` (first-occurrence character search), as called bare (not through a `Q_*` wrapper) at
+/// various `q_shared.c` sites, for example lines 1157, 1212, 1264, 1267, 1287, 1293, 1299, 1335, 1341, 1347.
+/// This is housed alongside the other `q_shared.c` string helpers, per the file's existing string-fn family.
 ///
 /// Source: `oracle/codemp/game/q_shared.c` (bare `strchr` call sites).
 pub fn Q_strchr(string: *const c_char, c: c_int) -> *mut c_char {
@@ -579,11 +567,11 @@ pub fn Q_strchr(string: *const c_char, c: c_int) -> *mut c_char {
     }
 }
 
-/// Raven bare `strstr` call sites (e.g. `g_client.c` GLA-name matching).
+/// Raven bare `strstr` call sites, for example `g_client.c` GLA-name matching.
 ///
-/// House-authored wrapper, not a named Raven `Q_` fn: mirrors `Q_strchr`
-/// above — ported to this canonical string-fn home since call sites need a
-/// C-string `strstr` and none existed yet.
+/// This is a house-authored wrapper, not a named Raven `Q_` fn.
+/// It mirrors `Q_strchr` above, ported to this canonical string-fn home since call sites needed a C-string `strstr`
+/// and none existed yet.
 ///
 /// Source: `oracle/codemp/game/g_client.c` (bare `strstr` call sites).
 pub fn Q_strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char {
@@ -632,8 +620,8 @@ pub fn Q_strncpyz(dest: *mut c_char, src: *const c_char, destsize: c_int) {
             let c = *src.offset(i as isize);
             *dest.offset(i as isize) = c;
             if c == 0 {
-                // strncpy pads the remainder with NULs; faithful behavior
-                // (destsize-1 bytes total, all writes below are zero anyway).
+                // `strncpy` pads the remainder with NULs.
+                // This is `destsize-1` bytes total, and all writes below are zero anyway.
                 i += 1;
                 while i < n {
                     *dest.offset(i as isize) = 0;
@@ -784,11 +772,10 @@ pub fn Q_strcat(dest: *mut c_char, size: c_int, src: *const c_char) {
 
 /// Raven `Q_PrintStrlen`.
 ///
-/// Note: Raven's `Q_IsColorString` is a `q_shared.h` inline predicate; no
-/// resolved cross-file signature was provided for this file's packet
-/// (0 header-inline helpers listed), so the color-escape skip (`^` + digit,
-/// 2-byte stride) is inlined directly here rather than invoking an
-/// unresolved symbol.
+/// Note: Raven's `Q_IsColorString` is a `q_shared.h` inline predicate.
+/// No resolved cross-file signature was provided for this file (0 header-inline helpers listed).
+/// So the color-escape skip (`^` + digit, 2-byte stride) is inlined directly here rather than invoking an unresolved
+/// symbol.
 /// Source: `oracle/codemp/game/q_shared.c:940-960`
 pub fn Q_PrintStrlen(string: *const c_char) -> c_int {
     unsafe {
@@ -798,9 +785,9 @@ pub fn Q_PrintStrlen(string: *const c_char) -> c_int {
         let mut len: c_int = 0;
         let mut p = string;
         while *p != 0 {
-            // `Q_IsColorString(p)` = `^` followed by a digit '0'..='7' (and not
-            // '^'); the port previously accepted any non-NUL follower, which
-            // over-counted `^^`/`^8...` escapes (caught by the oracle slice).
+            // `Q_IsColorString(p)` equals `^` followed by a digit '0'..='7' and not `^`.
+            // The port previously accepted any non-NUL follower, which over-counted `^^`/`^8...` escapes.
+            // The oracle slice caught this.
             let n = *p.offset(1);
             if *p == b'^' as c_char
                 && n != 0
@@ -830,9 +817,9 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
             if c == 0 {
                 break;
             }
-            // `Q_IsColorString(s)` = `^` followed by a digit '0'..='7' (see
-            // Q_PrintStrlen); the port previously skipped on any non-NUL
-            // follower, wrongly stripping `^^`/`^8...` (caught by the slice).
+            // `Q_IsColorString(s)` equals `^` followed by a digit '0'..='7', see `Q_PrintStrlen`.
+            // The port previously skipped on any non-NUL follower, wrongly stripping `^^`/`^8...`.
+            // The slice caught this.
             let n = *s.offset(1);
             if c == b'^' as c_char
                 && n != 0
@@ -855,7 +842,7 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
 /// Raven `Com_sprintf`.
 ///
 /// Raven's `...` is an explicit `&[FmtArg]` channel formatted by `c_format::c_vsprintf`.
-/// The `ERR_FATAL` bigbuffer overflow (→ panic, frozen Group A) is reproduced exactly.
+/// This reproduces the `ERR_FATAL` bigbuffer overflow exactly as a panic (frozen Group A).
 /// Source: `oracle/codemp/game/q_shared.c:985-1005`
 pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[FmtArg]) {
     unsafe {
@@ -870,8 +857,8 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[F
             let msg = format!("Com_sprintf: overflow of {} in {}\n", len, size);
             crate::g_main::Com_Printf(&msg);
         }
-        // Q_strncpyz needs a NUL-terminated source; `bigbuffer` has no interior
-        // NUL (the formatter never emits one), so append the terminator here.
+        // `Q_strncpyz` needs a NUL-terminated source.
+        // `bigbuffer` has no interior NUL, because the formatter never emits one, so this appends the terminator here.
         let mut cbig = bigbuffer;
         cbig.push(0);
         Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
@@ -880,8 +867,9 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[F
 
 /// Raven `va`.
 ///
-/// Raven's `...` is an explicit `&[FmtArg]` channel (`c_format::c_vsprintf`), 2-slot rotating
-/// buffer reproduced; Raven overruns past 32000 bytes (its own FIXME), the port truncates instead (§19).
+/// Raven's `...` is an explicit `&[FmtArg]` channel (`c_format::c_vsprintf`).
+/// The 2-slot rotating buffer is reproduced.
+/// Raven overruns past 32000 bytes, its own FIXME, and the port truncates instead (§19).
 /// Source: `oracle/codemp/game/q_shared.c:1017-1031`
 pub fn va(qs: &mut QSharedScratch, format: *const c_char, args: &[FmtArg]) -> *mut c_char {
     unsafe {
@@ -898,8 +886,10 @@ pub fn va(qs: &mut QSharedScratch, format: *const c_char, args: &[FmtArg]) -> *m
     }
 }
 
-/// Raven `Info_SetValueForKey` — value logic in [`native_string::info`];
-/// this shim reproduces the `Com_Printf` a rejected set emits.
+/// Raven `Info_SetValueForKey`.
+///
+/// The value logic lives in [`native_string::info`].
+/// This shim reproduces the `Com_Printf` a rejected set emits.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1280-1319`
 pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) {
@@ -907,8 +897,10 @@ pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) {
     print_info_set_result(result, "Info string length exceeded\n");
 }
 
-/// Raven `Info_SetValueForKey_Big` — value logic in [`native_string::info`]
-/// (appends where the non-Big form prepends); `Com_Printf` shim as above.
+/// Raven `Info_SetValueForKey_Big`.
+///
+/// The value logic lives in [`native_string::info`], and it appends where the non-Big form prepends.
+/// The `Com_Printf` shim is the same as above.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:1328-1366`
 pub fn Info_SetValueForKey_Big(s: &mut String, key: &str, value: &str) {
@@ -916,8 +908,8 @@ pub fn Info_SetValueForKey_Big(s: &mut String, key: &str, value: &str) {
     print_info_set_result(result, "BIG Info string length exceeded\n");
 }
 
-/// The `Com_Printf` messages Raven prints on a rejected `Info_SetValueForKey`;
-/// only the length-exceeded text differs between the Big/non-Big forms.
+/// These are the `Com_Printf` messages Raven prints on a rejected `Info_SetValueForKey`.
+/// Only the length-exceeded text differs between the Big and non-Big forms.
 fn print_info_set_result(result: InfoSetResult, exceeded_msg: &str) {
     unsafe {
         match result {

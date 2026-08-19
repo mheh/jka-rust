@@ -1,20 +1,17 @@
-// PORT-COMPLETE: NPC_AI_Rancor.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Rancor.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Rancor.c`.
 //!
-//! Safe-state migration **Campaign 2c** (deref regime): entity access is a
-//! checked `ctx.world.entity(id)`/`entity_mut(id)` borrow at the point of use.
-//! The gNPC_t (`NPCInfo`/`gentity_t.NPC`) and BG_Alloc'd pool-client
-//! (`gentity_t.client`) derefs have no accessor, so they stay raw inside tight
-//! `unsafe` blocks through a copied pointer value (`// FLAG:` sites). RNG/trap
-//! ordering is preserved by hoisting entity reads into role-named locals in
-//! source order. This file is referee-blind — parity rests on the compile +
-//! golden suite.
+//! Entity access uses a checked `ctx.world.entity(id)`/`entity_mut(id)` borrow at the point of use.
+//! The gNPC_t (`NPCInfo`/`gentity_t.NPC`) and BG_Alloc'd pool-client (`gentity_t.client`) derefs have no accessor.
+//! They stay raw inside tight `unsafe` blocks through a copied pointer value (`// FLAG:` sites).
+//! Hoisting entity reads into role-named locals in source order keeps RNG and trap ordering the same as reading in place.
+//! No referee scenario covers this file.
+//! Parity rests on the compile and the golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 use crate::g_utils::G_SoundIndex;
 
-// These define the working combat range for these suckers (`NPC_AI_Rancor.c:10-17`).
+// These define the working combat range for these suckers
 const MIN_DISTANCE: c_int = 128;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const MAX_DISTANCE: c_int = 1024;
@@ -22,9 +19,8 @@ const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 const LSTATE_CLEAR: c_int = 0;
 const LSTATE_WAITING: c_int = 1;
 
-// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
-// via the prelude glob (no per-file copy). Cross-module callers that referenced
-// `crate::NPC_AI_Rancor::DistanceSquared` now use `crate::q_math::DistanceSquared`.
+// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached via the prelude glob.
+// There is no per-file copy.
 
 /// Raven `Rancor_SetBolts`.
 ///
@@ -33,8 +29,7 @@ pub fn Rancor_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
     let Some(self_id) = self_ else {
         return;
     };
-    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
-    // via the safe entity borrow, per trap 2b.
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw via the safe entity borrow.
     let client = ctx.world.entity(self_id).client;
     if client.is_null() {
         return;
@@ -66,7 +61,7 @@ pub fn NPC_Rancor_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:53-63`
 pub fn Rancor_Idle(ctx: &mut GameContext) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     if !npc_info.is_null() {
         unsafe {
@@ -88,7 +83,7 @@ pub fn Rancor_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     if ctx.world.entity(self_).wait == 0.0 {
         //haven't ever gotten mad yet
         ctx.world.entity_mut(self_).wait = 1.0; //do this only once
-                                                // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                                                // FLAG: pool client, deref raw via safe entity borrow.
         let client = ctx.world.entity(self_).client;
         unsafe {
             (*client).ps.eFlags2 |= EF2_ALERTED;
@@ -112,7 +107,7 @@ pub fn Rancor_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:83-108`
 pub fn Rancor_Patrol(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
@@ -152,7 +147,7 @@ pub fn Rancor_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:115-130`
 pub fn Rancor_Move(ctx: &mut GameContext, visible: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
@@ -176,7 +171,7 @@ pub fn Rancor_DropVictim(ctx: &mut GameContext, self_: EntityId) {
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
     if let Some(activator_id) = ctx.world.entity(self_).activator {
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let activator_client = ctx.world.entity(activator_id).client;
         unsafe {
             if !activator_client.is_null() {
@@ -211,7 +206,7 @@ pub fn Rancor_DropVictim(ctx: &mut GameContext, self_: EntityId) {
                     }
                 }
             } else {
-                // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                // FLAG: gNPC_t has no accessor; deref stays raw.
                 let activator_npc = ctx.world.entity(activator_id).NPC;
                 if !activator_npc.is_null() {
                     //start thinking again
@@ -238,7 +233,7 @@ pub fn Rancor_DropVictim(ctx: &mut GameContext, self_: EntityId) {
 pub fn Rancor_Swing(ctx: &mut GameContext, tryGrab: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     let mut radiusEntNums: [c_int; 128] = [0; 128];
     let radius = 88.0;
@@ -265,7 +260,7 @@ pub fn Rancor_Swing(ctx: &mut GameContext, tryGrab: qboolean) {
             continue;
         }
 
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let radiusEnt_client = ctx.world.entity(radiusEnt_id).client;
         if radiusEnt_client.is_null() {
             //must be a client
@@ -394,7 +389,7 @@ pub fn Rancor_Swing(ctx: &mut GameContext, tryGrab: qboolean) {
 pub fn Rancor_Smash(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     let mut radiusEntNums: [c_int; 128] = [0; 128];
     let radius = 128.0;
@@ -425,7 +420,7 @@ pub fn Rancor_Smash(ctx: &mut GameContext) {
             continue;
         }
 
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let radiusEnt_client = ctx.world.entity(radiusEnt_id).client;
         if radiusEnt_client.is_null() {
             //must be a client
@@ -482,7 +477,7 @@ pub fn Rancor_Smash(ctx: &mut GameContext) {
 pub fn Rancor_Bite(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     let mut radiusEntNums: [c_int; 128] = [0; 128];
     let radius = 100.0;
@@ -509,7 +504,7 @@ pub fn Rancor_Bite(ctx: &mut GameContext) {
             continue;
         }
 
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let radiusEnt_client = ctx.world.entity(radiusEnt_id).client;
         if radiusEnt_client.is_null() {
             //must be a client
@@ -596,7 +591,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
     let ent_base = ctx.world.g_entities.as_mut_ptr();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
 
     unsafe {
@@ -646,7 +641,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             BOTH_FALLDEATH1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                         );
-                        // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                        // FLAG: gNPC_t has no accessor; deref stays raw.
                         let activator_npc = ctx.world.entity(activator_id).NPC;
                         if !activator_npc.is_null() {
                             //no more thinking for you
@@ -656,8 +651,8 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                     }
                 }
             } else if
-            // FLAG: enemy resolved raw to keep Raven's unconditional
-            // NPC->enemy->health deref (null-deref UB path faithful); recipe 2c raw + FLAG.
+            // FLAG: enemy resolved raw to keep Raven's unconditional NPC->enemy->health deref.
+            // This is the same null-deref UB path Raven has.
             (*crate::ent_id::resolve(ent_base, ctx.world.entity(npc_id).enemy)).health > 0
                 && doCharge != 0
             {
@@ -699,8 +694,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                 crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"attack_dmg".as_ptr(), 1000);
             }
 
-            // Oracle computes this LAST — after the attack-type Q_irand draws and
-            // after NPC_SetAnim updated legsTimer.
+            // Oracle computes this last, after the attack-type Q_irand draws and after NPC_SetAnim updated legsTimer.
             // Source: oracle/codemp/game/NPC_AI_Rancor.c:485
             let attacking = ((*npc_client).ps.legsTimer as f32
                 + ctx.world.bg_state.rng.random() * 200.0) as c_int;
@@ -751,7 +745,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             //killed him
                             //make it look like we bit his head off
                             //NPC->activator->client->dismembered = qfalse;
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let activator_client = ctx.world.entity(activator_id).client;
                             let activator_origin2 = ctx.world.entity(activator_id).r.currentOrigin;
                             let activator_torsoAnim = (*activator_client).ps.torsoAnim;
@@ -793,7 +787,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         //cut in half
                         if !ctx.world.entity(activator_id).client.is_null() {
                             //NPC->activator->client->dismembered = qfalse;
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let activator_client = ctx.world.entity(activator_id).client;
                             let activator_origin = ctx.world.entity(activator_id).r.currentOrigin;
                             let activator_torsoAnim = (*activator_client).ps.torsoAnim;
@@ -812,8 +806,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         }
                         //KILL
                         let activator_origin2 = ctx.world.entity(activator_id).r.currentOrigin;
-                        // FLAG: enemy resolved raw to keep Raven's unconditional
-                        // NPC->enemy->health deref (recipe 2c raw + FLAG).
+                        // FLAG: enemy resolved raw to keep Raven's unconditional NPC->enemy->health deref.
                         let enemy_health =
                             (*crate::ent_id::resolve(ent_base, ctx.world.entity(npc_id).enemy))
                                 .health;
@@ -832,7 +825,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             MOD_MELEE as c_int,
                         ); //, HL_NONE );//
                         if !ctx.world.entity(activator_id).client.is_null() {
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let activator_client = ctx.world.entity(activator_id).client;
                             (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                             (*activator_client).ps.forceHandExtendTime = 0;
@@ -880,7 +873,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         if ctx.world.entity(activator_id).health > 0 {
                             //cut in half
                             //NPC->activator->client->dismembered = qfalse;
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let activator_client = ctx.world.entity(activator_id).client;
                             let activator_origin = ctx.world.entity(activator_id).r.currentOrigin;
                             let activator_torsoAnim = (*activator_client).ps.torsoAnim;
@@ -898,8 +891,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             //G_DoDismemberment( NPC->activator, NPC->enemy->r.currentOrigin, MOD_SABER, 1000, HL_WAIST, qtrue );
                             //KILL
                             let activator_origin2 = ctx.world.entity(activator_id).r.currentOrigin;
-                            // FLAG: enemy resolved raw to keep Raven's unconditional
-                            // NPC->enemy->health deref (recipe 2c raw + FLAG).
+                            // FLAG: enemy resolved raw to keep Raven's unconditional NPC->enemy->health deref.
                             let enemy_health =
                                 (*crate::ent_id::resolve(ent_base, ctx.world.entity(npc_id).enemy))
                                     .health;
@@ -935,7 +927,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         }
                         if !ctx.world.entity(activator_id).client.is_null() {
                             //*sigh*, can't get tags right, just remove them?
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let activator_client = ctx.world.entity(activator_id).client;
                             (*activator_client).ps.eFlags |= EF_NODRAW;
                         }
@@ -972,7 +964,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:617-695`
 pub fn Rancor_Combat(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
 
@@ -1076,12 +1068,12 @@ pub fn NPC_Rancor_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let self_client = ctx.world.entity(self_).client;
 
     let mut hitByRancor = qfalse;
     if let Some(attacker_id) = attacker {
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let attacker_client = ctx.world.entity(attacker_id).client;
         if !attacker_client.is_null() && unsafe { (*attacker_client).NPC_class } == CLASS_RANCOR {
             hitByRancor = qtrue;
@@ -1108,14 +1100,14 @@ pub fn NPC_Rancor_Pain(
                         if ctx.world.entity(self_enemy).health == 0 {
                             true
                         } else if {
-                            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                            // FLAG: pool client, deref raw via safe entity borrow.
                             let se_client = ctx.world.entity(self_enemy).client;
                             !se_client.is_null()
                                 && unsafe { (*se_client).NPC_class } == CLASS_RANCOR
                         } {
                             true
                         } else {
-                            // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                            // FLAG: gNPC_t has no accessor; deref stays raw.
                             let self_npc = ctx.world.entity(self_).NPC;
                             !self_npc.is_null()
                                 && unsafe { (*self_npc).consecutiveBlockedMoves } >= 10
@@ -1181,7 +1173,7 @@ pub fn NPC_Rancor_Pain(
                     if ctx.world.entity(self_).health > 100 || hitByRancor != 0 {
                         crate::g_timer::TIMER_Remove(ctx, Some(self_), c"attacking".as_ptr());
 
-                        // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                        // FLAG: gNPC_t has no accessor; deref stays raw.
                         let self_npc = ctx.world.entity(self_).NPC;
                         let lastPathAngles = unsafe { (*self_npc).lastPathAngles };
                         crate::q_math::_VectorCopy(
@@ -1215,7 +1207,7 @@ pub fn NPC_Rancor_Pain(
                             taking_pain,
                         );
 
-                        // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                        // FLAG: gNPC_t has no accessor; deref stays raw.
                         let self_npc2 = ctx.world.entity(self_).NPC;
                         if !self_npc2.is_null() {
                             unsafe {
@@ -1272,7 +1264,7 @@ pub fn Rancor_Crush(ctx: &mut GameContext) {
         return;
     }
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
     if npc_client.is_null() {
         //nothing to crush
@@ -1285,7 +1277,7 @@ pub fn Rancor_Crush(ctx: &mut GameContext) {
     }
 
     let crush_id = EntityId(ground as u32);
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let crush_client = ctx.world.entity(crush_id).client;
     if ctx.world.entity(crush_id).inuse != 0
         && !crush_client.is_null()
@@ -1312,10 +1304,10 @@ pub fn Rancor_Crush(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:828-955`
 pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw.
     let npc_info = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+    // FLAG: pool client, deref raw via safe entity borrow.
     let npc_client = ctx.world.entity(npc_id).client;
 
     let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
@@ -1408,7 +1400,7 @@ pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
         }
         //else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
         let npc_enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
-        // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+        // FLAG: pool client, deref raw via safe entity borrow.
         let npc_enemy_client = ctx.world.entity(npc_enemy_id).client;
         if !npc_enemy_client.is_null() && unsafe { (*npc_enemy_client).NPC_class } == CLASS_RANCOR {
             //got mad at another Rancor, look for a valid enemy
@@ -1435,7 +1427,7 @@ pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
             if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"lookForNewEnemy".as_ptr()) != 0 {
                 let sav_enemy = ctx.world.entity(npc_id).enemy;
                 ctx.world.entity_mut(npc_id).enemy = None;
-                // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
+                // FLAG: gNPC_t has no accessor; deref stays raw.
                 let check_all =
                     (unsafe { (*npc_info).confusionTime } < ctx.world.level.time) as c_int;
                 let newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, check_all, qfalse, qfalse);

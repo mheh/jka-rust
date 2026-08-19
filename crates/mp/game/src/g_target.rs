@@ -1,9 +1,6 @@
-// PORT-COMPLETE: g_target.c
-//! FAITHFUL port of `oracle/codemp/game/g_target.c`.
+//! Port of `oracle/codemp/game/g_target.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions that reach file-scope game state (`level`, `g_entities`, cvars) or an engine trap thread the `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -49,8 +46,7 @@ pub fn Use_Target_Give(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // Raven derefs `activator->client` unconditionally (no NULL guard), so the
-    // handler treats activator as present.
+    // Raven derefs `activator->client` unconditionally (no NULL guard), so the handler treats activator as present.
     let activator = activator.expect("Use_Target_Give: null activator");
     if ctx.entity(activator).client.is_null() {
         return;
@@ -61,7 +57,8 @@ pub fn Use_Target_Give(
         return;
     };
 
-    // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
+    // `trace_t` has no zeroing constructor.
+    // The `mem::zeroed` call is a plain POD init.
     let mut trace: trace_t = unsafe { core::mem::zeroed() };
     let mut t: *mut gentity_t = core::ptr::null_mut();
     loop {
@@ -156,13 +153,11 @@ pub fn Use_Target_Delay(
     let crand = ctx.world.bg_state.rng.crandom();
     let level_time = ctx.world.level.time;
     let e = ctx.entity_mut(ent);
-    // C computes the whole RHS in `double` (`crand` is `double`) and truncates
-    // once into the `int` nextthink.
+    // C computes the whole RHS in `double` (`crand` is `double`) and truncates once into the `int` nextthink.
     e.nextthink = (level_time as f64 + (e.wait as f64 + e.random as f64 * crand) * 1000.0) as c_int;
     e.think = Some(EntThink::Think_Target_Delay).into();
-    // C stored the raw `activator` pointer (NULL stays NULL and
-    // Think_Target_Delay's G_UseTargets tolerates a NULL activator); the
-    // `Option<EntityId>` handle carries the same nullability directly.
+    // C stored the raw `activator` pointer, and NULL stayed NULL.
+    // `Think_Target_Delay`'s `G_UseTargets` tolerates a NULL activator, so the `Option<EntityId>` handle carries the same nullability directly.
     e.activator = activator;
 }
 
@@ -171,7 +166,7 @@ pub fn Use_Target_Delay(
 /// Source: `oracle/codemp/game/g_target.c:93-103`
 pub fn SP_target_delay(ctx: &mut GameContext, ent: EntityId) {
     let delay_ptr: *mut f32 = &mut ctx.entity_mut(ent).wait;
-    // check delay for backwards compatibility
+    // check delay for backwards compatability
     if G_SpawnFloat(
         ctx,
         b"delay\0".as_ptr() as *const c_char,
@@ -230,8 +225,7 @@ pub fn Use_Target_Print(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // Raven's `if (!ent || !ent->inuse)` — the receiver handle is never NULL,
-    // so only the inuse arm can fire.
+    // Raven's `if (!ent || !ent->inuse)`: the receiver handle is never NULL, so only the inuse arm can fire.
     if ctx.entity(ent).inuse == 0 {
         // Com_Printf("ERROR: Bad ent in Use_Target_Print");
         return;
@@ -246,9 +240,9 @@ pub fn Use_Target_Print(
         ctx.entity_mut(ent).genericValue14 = (level_time as f32 + wait) as c_int;
     }
 
-    // `#ifndef FINAL_BUILD` block — LIVE in the referee build (FINAL_BUILD is
-    // undefined). The `!ent || !ent->inuse` arm is dead (receiver handle is never
-    // null and inuse was checked above), so only the else-if activator arm fires.
+    // The `#ifndef FINAL_BUILD` block is live in the referee build, because FINAL_BUILD is undefined.
+    // The `!ent || !ent->inuse` arm is dead, because the receiver handle is never null and inuse was checked above.
+    // Only the else-if activator arm fires.
     // Source: `oracle/codemp/game/g_target.c:149-181`
     if activator.is_none() || ctx.entity(activator.unwrap()).inuse == 0 {
         Com_Error(
@@ -302,8 +296,8 @@ pub fn Use_Target_Print(
         if activator.is_none() || ctx.entity(activator.unwrap()).inuse == 0 {
             // Com_Printf("ERROR: Bad activator in Use_Target_Print");
         }
-        // Oracle gates the send only on `activator && activator->client`
-        // (no inuse check). g_target.c:190.
+        // Oracle gates the send only on `activator && activator->client`, with no inuse check.
+        // Source: `oracle/codemp/game/g_target.c:190`
         if let Some(activator) = activator {
             if !ctx.entity(activator).client.is_null() {
                 // make sure there's a valid client ent to send it to
@@ -404,9 +398,8 @@ pub fn Use_Target_Speaker(
         // normal sound
         let noise_index = ctx.entity(ent).noise_index;
         if spawnflags & 8 != 0 {
-            // C derefs `activator` unconditionally here (would UB-deref NULL);
-            // the handle carries the same nullability, so `expect` is the one
-            // defined behavior (§19).
+            // C derefs `activator` unconditionally here, which would UB-deref NULL.
+            // The handle carries the same nullability, so `expect` is the one defined behavior (§19).
             let activator_id = activator.expect("Use_Target_Speaker: null activator speaker");
             G_AddEvent(
                 ctx.entity_mut(activator_id),
@@ -469,17 +462,19 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     let present;
     (present, s) = G_SpawnString(ctx, "noise", "NOSOUND");
     if present == 0 {
-        // G_Error is PARKED, so we can't call it properly
+        // This site does not call `G_Error`, which exists in g_main.rs.
+        // The dropped call's text is shown below.
         // G_Error(ctx, "target_speaker without a noise key at %s", vtos(ctx, ent.s.origin));
     }
 
-    // force all client relative sounds to be "activator" speakers
+    // force all client reletive sounds to be "activator" speakers that
+    // play on the entity that activates it
     if s.as_bytes().first() == Some(&b'*') {
         ctx.entity_mut(ent).spawnflags |= 8;
     }
 
-    // `s` is the owned soundSet/noise value; `Q_strncpyz`-bound it
-    // (`MAX_QPATH-1` bytes) for the sound-index lookup.
+    // `s` is the owned soundSet/noise value.
+    // It is `Q_strncpyz`-bound to `MAX_QPATH-1` bytes for the sound-index lookup.
     let buffer = strncpyz_string(s.as_bytes(), MAX_QPATH as usize);
 
     let noise_index = G_SoundIndex(ctx, &buffer);
@@ -506,7 +501,8 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
 
     e.s.pos.trBase = e.s.origin;
 
-    // must link the entity so we get areas and clusters
+    // must link the entity so we get areas and clusters so
+    // the server can determine who to send updates to
     trap::LinkEntity(
         ctx.engine,
         GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
@@ -518,7 +514,8 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_target.c:349-377`
 pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
     let mut end: vec3_t = [0.0; 3];
-    // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
+    // `trace_t` has no zeroing constructor.
+    // The `mem::zeroed` call is a plain POD init.
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut point: vec3_t = [0.0; 3];
 
@@ -526,17 +523,14 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
     if let Some(enemy_id) = ctx.entity(self_).enemy {
         let enemy = ctx.entity(enemy_id);
         let (e_origin, e_mins, e_maxs) = (enemy.s.origin, enemy.r.mins, enemy.r.maxs);
-        // VectorMA(self->enemy->s.origin, 0.5, self->enemy->r.mins, point)
         point[0] = e_origin[0] + 0.5 * e_mins[0];
         point[1] = e_origin[1] + 0.5 * e_mins[1];
         point[2] = e_origin[2] + 0.5 * e_mins[2];
 
-        // VectorMA(point, 0.5, self->enemy->r.maxs, point)
         point[0] += 0.5 * e_maxs[0];
         point[1] += 0.5 * e_maxs[1];
         point[2] += 0.5 * e_maxs[2];
 
-        // VectorSubtract(point, self->s.origin, self->movedir)
         let s = ctx.entity_mut(self_);
         s.movedir[0] = point[0] - s.s.origin[0];
         s.movedir[1] = point[1] - s.s.origin[1];
@@ -570,10 +564,10 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
         let targ_id = EntityId(tr.entityNum as u32);
         let activator = ctx.entity(self_).activator;
         let damage = ctx.entity(self_).damage;
-        // `G_Damage` normalizes `dir` in place (g_combat.rs:5078); C passes
-        // `&self->movedir` so the normalized value lands back on the entity.
-        // Copy the field out, hand `G_Damage` a `&mut` to the local (the only
-        // channel it touches movedir through), then copy the result back.
+        // `G_Damage` normalizes `dir` in place (g_combat.rs:5078).
+        // C passes `&self->movedir`, so the normalized value lands back on the entity.
+        // The code copies the field out, hands `G_Damage` a `&mut` to the local
+        // (the only channel it touches movedir through), then copies the result back.
         let mut movedir = ctx.entity(self_).movedir;
         G_Damage(
             ctx,
@@ -589,7 +583,6 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(self_).movedir = movedir;
     }
 
-    // VectorCopy(tr.endpos, self->s.origin2)
     let s = ctx.entity_mut(self_);
     s.s.origin2[0] = tr.endpos[0];
     s.s.origin2[1] = tr.endpos[1];
@@ -607,7 +600,7 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/g_target.c:379-384`
 pub fn target_laser_on(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).activator.is_none() {
-        // C: `self->activator = self` — the receiver handle is never NULL.
+        // C: `self->activator = self`. The receiver handle is never NULL.
         ctx.entity_mut(self_).activator = Some(self_);
     }
     target_laser_think(ctx, self_);
@@ -709,9 +702,8 @@ pub fn target_teleporter_use(
     let target = ctx.entity(self_).target.clone();
     let dest = G_PickTarget(ctx, target.as_deref());
     let Some(dest_id) = ctx.entity_id_of(dest) else {
-        // G_Printf(ctx, "Couldn't find teleporter destination\n") — the
-        // staged signature has no engine handle to route the outbound
-        // print through; dropped here (informational only).
+        // G_Printf(ctx, "Couldn't find teleporter destination\n") is dropped here, informational only.
+        // The staged signature has no engine handle to route the outbound print through.
         return;
     };
 
@@ -727,7 +719,7 @@ pub fn target_teleporter_use(
 /// Source: `oracle/codemp/game/g_target.c:460-465`
 pub fn SP_target_teleporter(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).targetname_str().is_none() {
-        // Informational print; dropped.
+        // Informational print, dropped.
     }
 
     ctx.entity_mut(self_).use_ = Some(EntUse::target_teleporter_use).into();
@@ -742,8 +734,7 @@ pub fn target_relay_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // Raven derefs `activator->client` only inside the spawnflag-guarded `&&`
-    // chains, so it assumes activator is present there.
+    // Raven derefs `activator->client` only inside the spawnflag-guarded `&&` chains, so it assumes activator is present there.
     if ctx.entity(self_).spawnflags & 1 != 0 {
         let a = ctx.entity(activator.expect("target_relay_use: null activator"));
         if !a.client.is_null() && unsafe { (*(a.client)).sess.sessionTeam } != TEAM_RED {
@@ -839,7 +830,6 @@ pub fn target_kill_use(
 /// Raven `SP_target_kill`.
 ///
 /// Source: `oracle/codemp/game/g_target.c:539-541`
-/// Source: `oracle/codemp/game/g_target.c:539-541`
 pub fn SP_target_kill(self_: &mut gentity_t) {
     self_.use_ = Some(EntUse::target_kill_use).into();
 }
@@ -881,8 +871,8 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
                 message.as_deref().unwrap_or(""),
             );
             n += 1;
-            // `level.locationHead` is a raw `gentity_t*` seam field (§D5); the
-            // intrusive `nextTrain` chain stores each node's `Option<EntityId>`.
+            // `level.locationHead` is a raw `gentity_t*` seam field.
+            // The intrusive `nextTrain` chain stores each node's `Option<EntityId>`.
             let head = ctx.world.level.locationHead;
             ctx.entity_mut(id).nextTrain = if head.is_null() {
                 None
@@ -924,8 +914,9 @@ pub fn target_counter_use(
 
     // G_DebugPrint(ctx, WL_VERBOSE, "target_counter %s used by %s (%d/%d)\n",
     // self->targetname, activator->targetname, self->genericValue1 -
-    // self->count, self->genericValue1) — debug-only console spam;
-    // dropped here (informational only, no observable game-state effect).
+    // self->count, self->genericValue1)
+    // This is debug-only console spam, dropped here.
+    // It is informational only, with no observable game-state effect.
 
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
@@ -1000,9 +991,8 @@ pub fn target_random_use(
         ctx.entity_mut(self_).use_ = FnId::NONE;
     }
 
-    // Raven's `self->target` (possibly NULL) feeds G_Find, where a NULL match
-    // never compares equal; read it as `Option<String>` so a NULL target yields
-    // no matches instead of dereferencing NULL.
+    // Raven's `self->target` (possibly NULL) feeds G_Find, where a NULL match never compares equal.
+    // The code reads it as `Option<String>`, so a NULL target yields no matches instead of dereferencing NULL.
     let target = ctx.entity(self_).target.clone();
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
@@ -1050,7 +1040,7 @@ pub fn target_random_use(
 
         let t_id = ctx.entity_id_of(t).unwrap();
         if t_id == self_ {
-            // WARNING: Entity used itself (shouldn't happen)
+            // gi.Printf ("WARNING: Entity used itself.\n");
         } else if t_count == pick {
             if ctx.entity(t_id).use_.is_some() {
                 // check can be omitted
@@ -1096,12 +1086,11 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
         if ctx.entity(self_).spawnflags & 1 != 0 {
             if ctx.entity(self_).activator.is_none() {
                 if ctx.world.cvars.g_developer.integer != 0 {
-                    // Informational debug message
+                    // Com_Printf("target_scriptrunner tried to run on invalid entity!\n");
                 }
                 return;
             }
 
-            // activator is Option<EntityId>; dereferenced via arena lookup.
             let activator_id = ctx.entity(self_).activator.unwrap();
 
             if trap::ICARUS_IsInitialized(
@@ -1111,6 +1100,7 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
             {
                 let stn = ctx.entity(activator_id).script_targetname_str();
                 if stn.as_deref().map_or(true, |s| s.is_empty()) {
+                    // We don't have a script_targetname, so create a new one.
                     // DIVERGENCE: store owned string instead of va() pointer
                     let name = format!("newICARUSEnt{}", ctx.world.globals.numNewICARUSEnts);
                     ctx.world.globals.numNewICARUSEnts += 1;
@@ -1132,14 +1122,14 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
                     );
                 } else {
                     if ctx.world.cvars.g_developer.integer != 0 {
-                        // Informational debug message
+                        // Com_Printf("target_scriptrunner tried to run on invalid ICARUS activator!\n");
                     }
                     return;
                 }
             }
 
             if ctx.world.cvars.g_developer.integer != 0 {
-                // Informational debug message
+                // Com_Printf( "target_scriptrunner running %s on activator %s\n", self->behaviorSet[BSET_USE], self->activator->targetname );
             }
             let behavior = ctx
                 .entity(self_)
@@ -1159,7 +1149,7 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
             let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
             let self_id = ctx.entity_id_of(self_ptr);
             if ctx.world.cvars.g_developer.integer != 0 && ctx.entity(self_).activator.is_some() {
-                // Informational debug message
+                // Com_Printf( "target_scriptrunner %s used by %s\n", self->targetname, self->activator->targetname );
             }
             G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
         }
@@ -1226,9 +1216,8 @@ pub fn SP_target_scriptrunner(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_target.c:900-907`
 pub fn G_SetActiveState(ctx: &mut GameContext, targetstring: Option<&str>, actState: qboolean) {
-    // Raven passes `targetstring` (possibly NULL) to G_Find, where a NULL match
-    // never compares equal; a `None` string yields no matches instead of
-    // dereferencing NULL.
+    // Raven passes `targetstring` (possibly NULL) to G_Find, where a NULL match never compares equal.
+    // A `None` string yields no matches instead of dereferencing NULL.
     let mut target: *mut gentity_t = core::ptr::null_mut();
     loop {
         target = match targetstring {
@@ -1366,7 +1355,7 @@ pub fn SP_target_play_music(ctx: &mut GameContext, self_: EntityId) {
     G_SetOrigin(ctx.entity_mut(self_), origin);
     let (present, s) = G_SpawnString(ctx, "music", "");
     if present == 0 {
-        // Error case; informational message dropped.
+        // G_Error( "target_play_music without a music key at %s", vtos( self->s.origin ) );
     }
 
     ctx.entity_mut(self_).message = Some(translate_newlines(&s));

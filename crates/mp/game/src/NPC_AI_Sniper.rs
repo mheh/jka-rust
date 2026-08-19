@@ -1,10 +1,9 @@
-// PORT-COMPLETE: NPC_AI_Sniper.c
-//! FAITHFUL port of `oracle/codemp/game/NPC_AI_Sniper.c`.
+//! Port of `oracle/codemp/game/NPC_AI_Sniper.c`.
 //!
-//! All functions reach file-scope game state (`level`, `g_entities`, the
-//! file-statics `enemyLOS2`/`enemyCS2`/`faceEnemy2`/`move2`/`shoot2`/
-//! `enemyDist2` — genuine cross-frame state, `GameWorld` fields) and engine
-//! traps through the threaded `GameContext`/`GameWorld` handle.
+//! All functions reach file-scope game state: `level`, `g_entities`, and the file-statics
+//! `enemyLOS2`/`enemyCS2`/`faceEnemy2`/`move2`/`shoot2`/`enemyDist2`.
+//! These file-statics are genuine cross-frame state, stored as `GameWorld` fields.
+//! The functions also reach engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::NPC_SetMoveGoal;
@@ -38,15 +37,15 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_WALKING,
 };
 
-// Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
-// (file-scope local state, `gNPC_t::localState`) — not a central type, ported
-// as file-local consts matching the C values.
+// Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }` is
+// file-scope local state (`gNPC_t::localState`), not a central type.
+// The port keeps it as file-local consts that match the C values.
 // Source: `oracle/codemp/game/NPC_AI_Sniper.c:37-42`
 const LSTATE_NONE: i32 = 0;
 const LSTATE_UNDERFIRE: i32 = 1;
 const LSTATE_INVESTIGATE: i32 = 2;
 
-// Squad behavior states (from oracle/codemp/game/NPC_behavior.c)
+// Raven's squad behavior states.
 // Source: `oracle/codemp/game/NPC_behavior.c`
 const SQUAD_IDLE: i32 = 0;
 const SQUAD_STAND_AND_SHOOT: i32 = 1;
@@ -59,15 +58,14 @@ const SQUAD_SCOUT: i32 = 6;
 // Combat point search flags (`combatPoint_t` request bits):
 // `crate::npc::combat_point_flags` (`b_local.h:244-259`).
 
-// Enemy position lagging for sniper targeting. MAX_ENEMY_POS_LAG /
-// ENEMY_POS_LAG_INTERVAL imported from `crate::npc::g_npc_t`. STEPS is kept
-// local as `i32` (g_npc_t's is `usize`, for array sizing) since it is used in
-// signed arithmetic here.
+// Enemy position lagging for sniper targeting.
+// `MAX_ENEMY_POS_LAG` and `ENEMY_POS_LAG_INTERVAL` come from `crate::npc::g_npc_t`.
+// `STEPS` stays local as `i32`, because this file uses it in signed arithmetic.
+// `g_npc_t`'s version is `usize`, for array sizing.
 // Source: `oracle/codemp/game/b_public.h:113-115`
 const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 24
 
-// `MASK_SHOT` (`bg_public.h:1177`) now resolves via the crate prelude
-// (pass-3 symbol backfill, `mp_qshared::shared::surface_flags`).
+// `MASK_SHOT` (`bg_public.h:1177`) resolves via the crate prelude, from `mp_qshared::shared::surface_flags`.
 
 /// Raven `Sniper_ClearTimers`.
 ///
@@ -81,7 +79,7 @@ pub fn Sniper_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
     TIMER_Set(ctx, Some(ent), c"enemyLastVisible".as_ptr(), 0);
     TIMER_Set(ctx, Some(ent), c"roamTime".as_ptr(), 0);
     TIMER_Set(ctx, Some(ent), c"hideTime".as_ptr(), 0);
-    // FIXME: Slant for difficulty levels (Raven comment).
+    // FIXME: Slant for difficulty levels
     TIMER_Set(ctx, Some(ent), c"attackDelay".as_ptr(), 0);
     TIMER_Set(ctx, Some(ent), c"stick".as_ptr(), 0);
     TIMER_Set(ctx, Some(ent), c"scoutTime".as_ptr(), 0);
@@ -104,7 +102,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
     TIMER_Set(ctx, Some(self_), c"enemyLastVisible".as_ptr(), 0);
     TIMER_Set(ctx, Some(self_), c"flee".as_ptr(), 0);
 
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let npc = ctx.world.entity(self_).NPC;
     unsafe {
         (*npc).squadState = SQUAD_IDLE;
@@ -112,7 +110,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
     }
 
     // Clear the enemy
-    G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
+    G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;?
 
     unsafe {
         (*npc).investigateCount = 0;
@@ -128,7 +126,7 @@ pub fn NPC_Sniper_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so this deref stays raw.
     let npc = ctx.world.entity(self_).NPC;
     unsafe {
         (*npc).localState = LSTATE_UNDERFIRE;
@@ -145,7 +143,7 @@ pub fn NPC_Sniper_Pain(
             .bg_state
             .rng
             .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int);
-        // FIXME: better way to know I was pushed (Raven comment).
+        // FIXME: better way to know I was pushed
         G_AddVoiceEvent(ctx, self_, voice_event, 2000);
     }
 }
@@ -154,7 +152,7 @@ pub fn NPC_Sniper_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:106-116`
 pub fn Sniper_HoldPosition(ctx: &mut GameContext) {
-    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
     let NPCInfo = ctx.world.globals.NPCInfo;
     let combatPoint = unsafe { (*NPCInfo).combatPoint };
     NPC_FreeCombatPoint(ctx, combatPoint, qtrue);
@@ -169,7 +167,7 @@ pub fn Sniper_HoldPosition(ctx: &mut GameContext) {
 pub fn Sniper_Move(ctx: &mut GameContext) -> qboolean {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -252,7 +250,7 @@ pub fn Sniper_Move(ctx: &mut GameContext) -> qboolean {
 pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -286,8 +284,8 @@ pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
                         // AEL_DISCOVERED = 2
                         let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
                         let owner_id = ctx.entity_id_of(owner);
-                        // FLAG: owner/NPC pool `gclient_t` (gClPtrs) — read the
-                        // pointer via the safe entity borrow, deref raw (recipe 2c).
+                        // FLAG: the owner/NPC pool's `gclient_t` (gClPtrs) has no accessor.
+                        // The pointers are read through the safe entity borrow, then dereferenced raw.
                         let enemy_match = if let Some(oid) = owner_id {
                             let owner_client = ctx.world.entity(oid).client;
                             let owner_health = ctx.world.entity(oid).health;
@@ -334,8 +332,8 @@ pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
                 let mut dir = [0.0f32; 3];
                 let mut angles = [0.0f32; 3];
 
-                // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the
-                // safe entity borrow, deref raw (recipe 2c).
+                // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+                // The pointer is read through the safe entity borrow, then dereferenced raw.
                 let npc_client = ctx.world.entity(npc_id).client;
                 _VectorSubtract(
                     (*NPCInfo).investigateGoal,
@@ -373,7 +371,7 @@ pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
 pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -419,8 +417,8 @@ pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
                 match (*NPCInfo).squadState {
                     2 => {
                         // SQUAD_RETREAT=2: was running away
-                        // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer
-                        // via the safe entity borrow, deref raw (recipe 2c).
+                        // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+                        // The pointer is read through the safe entity borrow, then dereferenced raw.
                         let npc_client = ctx.world.entity(npc_id).client;
                         let npc_health = ctx.world.entity(npc_id).health;
                         let duck_val = ((*npc_client).pers.maxHealth - npc_health) * 100;
@@ -471,7 +469,7 @@ pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
 pub fn Sniper_ResolveBlockedShot(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -544,7 +542,7 @@ pub fn Sniper_ResolveBlockedShot(ctx: &mut GameContext) {
 pub fn Sniper_CheckFireState(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -562,8 +560,8 @@ pub fn Sniper_CheckFireState(ctx: &mut GameContext) {
         }
 
         // Check if velocity is zero (not moving)
-        // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the safe
-        // entity borrow, deref raw (recipe 2c).
+        // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+        // The pointer is read through the safe entity borrow, then dereferenced raw.
         let npc_client = ctx.world.entity(npc_id).client;
         if (*npc_client).ps.velocity[0] != 0.0
             || (*npc_client).ps.velocity[1] != 0.0
@@ -627,8 +625,8 @@ pub fn Sniper_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
         let hit_takedamage = ctx.world.g_entities[hit as usize].takedamage;
         let hit_svFlags = ctx.world.g_entities[hit as usize].r.svFlags;
         let hit_health = ctx.world.g_entities[hit as usize].health;
-        // FLAG: NPC/hit pool `gclient_t` (gClPtrs) — read the pointers via the
-        // safe entity borrow, deref raw (recipe 2c).
+        // FLAG: the NPC/hit pool's `gclient_t` (gClPtrs) has no accessor.
+        // The pointers are read through the safe entity borrow, then dereferenced raw.
         let npc_client = ctx.world.entity(npc_id).client;
         let npc_weapon = ctx.world.entity(npc_id).s.weapon;
         if hit == enemy_number
@@ -653,7 +651,7 @@ pub fn Sniper_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
 pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -671,8 +669,8 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
         let mut up = [0.0f32; 3];
 
         // Get the positions
-        // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the safe
-        // entity borrow, deref raw (recipe 2c).
+        // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+        // The pointer is read through the safe entity borrow, then dereferenced raw.
         let npc_client = ctx.world.entity(npc_id).client;
         AngleVectors(
             (*npc_client).ps.viewangles,
@@ -705,9 +703,9 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
                         tryMissCount += 1;
                         let enemy_maxs2 = ctx.world.entity(enemy_id).r.maxs[2];
                         let enemy_mins2 = ctx.world.entity(enemy_id).r.mins[2];
-                        // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
-                        // flrand-bearing scale expression substitutes per component —
-                        // THREE draws per call, distinct offsets, all f32.
+                        // VectorMA is the live `#if 1` macro (q_shared.h:1365).
+                        // The flrand-bearing scale expression substitutes per component.
+                        // The call draws THREE times, at distinct offsets, all f32.
                         // Source: `oracle/codemp/game/NPC_AI_Sniper.c:544-559`
                         if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                             aimError = qtrue;
@@ -767,9 +765,10 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
                 } else {
                     missFactor
                 };
-                // §19: C clamps missFactor to ENEMY_POS_LAG_STEPS (24) then reads
-                // enemyLaggedPos[24], one past the 24-elem array (UB). We guard <24 and
-                // skip; unreachable in practice since missFactor = 8-(aim+skill)*3 <= 8.
+                // §19: Raven's C clamps missFactor to ENEMY_POS_LAG_STEPS (24), then reads enemyLaggedPos[24].
+                // That index is one past the 24-element array, so the read is undefined behavior.
+                // The code checks the index against 24 and skips the read otherwise.
+                // The guard is unreachable in practice, because missFactor = 8-(aim+skill)*3 is always at most 8.
                 if missFactor >= 0 && (missFactor as usize) < ENEMY_POS_LAG_STEPS as usize {
                     target[0] = (*NPCInfo).enemyLaggedPos[missFactor as usize][0];
                     target[1] = (*NPCInfo).enemyLaggedPos[missFactor as usize][1];
@@ -796,7 +795,7 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
 pub fn Sniper_UpdateEnemyPos(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -841,7 +840,7 @@ pub fn Sniper_StartHide(ctx: &mut GameContext) {
 pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC;
-        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        // FLAG: gNPC_t (NPCInfo) has no accessor, so derefs stay raw.
         let NPCInfo = ctx.world.globals.NPCInfo;
         let npc_id = ctx.entity_id_of(NPC).unwrap();
 
@@ -858,8 +857,8 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             return;
         }
 
-        // Oracle short-circuit: NPC_CheckAlertEvents (side-effectful) runs only
-        // when the flee timer is done (NPC_AI_Sniper.c:658).
+        // Raven's `&&` short-circuits, so the side-effectful `NPC_CheckAlertEvents` runs only when the flee timer is done.
+        // Source: `oracle/codemp/game/NPC_AI_Sniper.c:658`
         if TIMER_Done(ctx, Some(npc_id), c"flee".as_ptr()) != 0 && {
             let alert_event = NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4);
             NPC_CheckForDanger(ctx, alert_event) != 0
@@ -888,8 +887,8 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
 
         if ctx.world.globals.enemyDist2 < 16384.0 {
             // 128 squared, too close, so switch to primary fire
-            // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the safe
-            // entity borrow, deref raw (recipe 2c).
+            // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+            // The pointer is read through the safe entity borrow, then dereferenced raw.
             let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).ps.weapon == 6 {
                 // WP_DISRUPTOR = 6
@@ -933,8 +932,8 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             }
         } else if ctx.world.globals.enemyDist2 > 65536.0 {
             // 256 squared
-            // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the safe
-            // entity borrow, deref raw (recipe 2c).
+            // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+            // The pointer is read through the safe entity borrow, then dereferenced raw.
             let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).ps.weapon == 6 {
                 // WP_DISRUPTOR = 6
@@ -972,8 +971,8 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
                 let mut tr: trace_t = core::mem::zeroed();
                 let hit;
 
-                // FLAG: NPC pool `gclient_t` (gClPtrs) — read the pointer via the
-                // safe entity borrow, deref raw (recipe 2c).
+                // FLAG: the NPC pool's `gclient_t` (gClPtrs) has no accessor.
+                // The pointer is read through the safe entity borrow, then dereferenced raw.
                 let npc_client = ctx.world.entity(npc_id).client;
                 AngleVectors(
                     (*npc_client).ps.viewangles,
