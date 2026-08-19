@@ -68,4 +68,8 @@ Lessons for the waves:
 
 ## Parked follow-up
 
-Untranscribed Raven comment content found by the pilot (CB-5): the `ai_main_consts.rs` header glosses, the 13 `g_mover.c` QUAKED blocks, the `w_saber.rs:8506` trailing clause, the commented-out `VectorCopy` under the `g_utils` WTF block. A candidate transcription wave after this campaign, verified against the oracle side, not by token identity.
+Untranscribed Raven comment content found by the pilot (CB-5): the `ai_main_consts.rs` header glosses, the 13 `g_mover.c` QUAKED blocks, the `w_saber.rs:8506` trailing clause, the commented-out `VectorCopy` under the `g_utils` WTF block. A candidate transcription wave after this campaign, verified against the oracle side, not by token identity. The wave-1 through wave-4 reviews grew this inventory heavily: QUAKED blocks are missing across `g_team` (4), `g_target` (15), `NPC_spawn` (~50), `g_trigger` (12), `g_saga` (5), `g_nav` waypoints, and Raven FIXME/dead-code comment clusters are missing across the NPC AI files (`NPC_AI_GalakMech`, `NPC_AI_Sniper`, `NPC_reactions`, `NPC_senses`, `NPC_AI_Utils`, `g_turret_G2`, `g_log`, `g_navnew`, `NPC_stats`, `g_spawn`) - each wave's worker reports hold the per-file oracle line lists.
+
+Retroactive CB-12/CB-13/CB-14 sweep (rules ratified 2026-08-18, batch-4 walk): the 40 files committed in the pilot and waves 1-3 predate the assurance-voice, campaign-vocabulary, and port-status rules, so they still carry "faithful"/"preserved" assurance, "SPINE"/"mega-pass"/"packet" nouns, and progress-framed status notes. One dedicated sweep lane over those 40 files after the forward waves finish, same verification shape.
+
+The `NPC_AI_Sniper.rs` single-space `WTF?` drift (oracle has a double space, site untouched by wave 4) rides the same sweep.
