@@ -29,6 +29,7 @@
 //! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
 use core::f64::consts::PI;
+use core::ffi::c_int;
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -43,13 +44,13 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::tr_types::{
     RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
-    RF_FORCE_ENT_ALPHA, RF_NODEPTH, RF_RGB_TINT, RF_VOLUMETRIC,
+    RF_FORCE_ENT_ALPHA, RF_FORKED, RF_GROW, RF_NODEPTH, RF_RGB_TINT, RF_TAPERED, RF_VOLUMETRIC,
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
-    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, RotatePointAroundVector,
-    VectorCompare, VectorNormalize,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, Q_random,
+    RotatePointAroundVector, VectorCompare, VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{SURF_NODLIGHT, SURF_SKY};
 use mp_qshared::shared::vec3_t;
@@ -94,13 +95,15 @@ use mp_renderer::tr_shader::{
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
-use mp_renderer::tr_surface::{LodErrorForVolume, TrSurfaceShapeState};
+use mp_renderer::tr_surface::{
+    LodErrorForVolume, TrSurfaceShapeState, LIGHTNING_RECURSION_LEVEL,
+};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
-use native_math::qmath::{MakeNormalVectors, Q_rsqrt};
+use native_math::qmath::{MakeNormalVectors, Q_crandom, Q_rsqrt};
 use native_math::rng::Rng;
 
 use crate::stage2d::{
@@ -4544,6 +4547,266 @@ fn do_line(
     indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
 }
 
+/// Raven `DoLine2` - one tapered quad from `start` to `end`, `span_width` wide at the start edge and `span_width2` at the end edge.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:658-710`
+#[allow(clippy::too_many_arguments)]
+fn do_line2(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    span_width2: f32,
+    color: [u8; 4],
+) {
+    let vbase = verts.len() as u32;
+
+    for (base, width, st) in [
+        (start, span_width, [0.0f32, 0.0f32]),
+        (start, -span_width, [1.0, 0.0]),
+        (end, span_width2, [0.0, 1.0]),
+        (end, -span_width2, [1.0, 1.0]),
+    ] {
+        let mut xyz: vec3_t = [0.0; 3];
+        VectorMA(base, width, up, &mut xyz);
+        verts.push(WorldVertex {
+            position: xyz,
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
+}
+
+/// Raven `CreateShape` - redraws the two fractal offset vectors from the backend stream.
+/// The six draws run in source order, and `sh2` reads `sh1` back, so the two vectors share one home.
+///
+/// `crandom()` is `double` in C, so each constant widens rather than the call narrowing.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:976-987`
+fn create_shape(shape: &mut TrSurfaceShapeState, rng: &mut Rng) {
+    shape.sh1 = [
+        // fwd
+        (0.66f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+    ];
+
+    // it seems to look best to have a point on one side of the ideal line, then the other point on the other side.
+    shape.sh2 = [
+        // fwd
+        (0.33f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        // forcing point to be on the opposite side of the line -- right
+        ((-shape.sh1[1]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+        // up
+        ((-shape.sh1[2]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+    ];
+}
+
+/// Raven `ApplyShape` - splits one bolt segment into three jagged sub-segments, or emits it as a tapered quad at the base case.
+///
+/// `sh2` is read after the first recursive call, which is where Raven reads it, so a deeper recursion level would see the redrawn value.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:990-1036`
+#[allow(clippy::too_many_arguments)]
+fn apply_shape(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    sradius: f32,
+    eradius: f32,
+    count: c_int,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    if count < 1 {
+        // done recursing
+        do_line2(verts, indices, start, end, right, sradius, eradius, color);
+        return;
+    }
+
+    create_shape(shape, rng);
+
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd) * 0.7;
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut perc = shape.sh1[0];
+
+    let mut point1: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point1);
+    VectorMA(point1, 1.0 - perc, end, &mut point1);
+    VectorMA(point1, dis * shape.sh1[1], rt, &mut point1);
+    VectorMA(point1, dis * shape.sh1[2], up, &mut point1);
+
+    // do a quick and dirty interpolation of the radius at that point
+    let rads1 = sradius * 0.666 + eradius * 0.333;
+    let rads2 = sradius * 0.333 + eradius * 0.666;
+
+    // recursion
+    apply_shape(
+        verts, indices, start, point1, right, sradius, rads1, count - 1, color, shape, rng,
+    );
+
+    perc = shape.sh2[0];
+
+    let mut point2: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point2);
+    VectorMA(point2, 1.0 - perc, end, &mut point2);
+    VectorMA(point2, dis * shape.sh2[1], rt, &mut point2);
+    VectorMA(point2, dis * shape.sh2[2], up, &mut point2);
+
+    // recursion
+    apply_shape(
+        verts, indices, point2, point1, right, rads1, rads2, count - 1, color, shape, rng,
+    );
+    apply_shape(
+        verts, indices, point2, end, right, rads2, eradius, count - 1, color, shape, rng,
+    );
+}
+
+/// Raven `DoBoltSeg` - steps `start` to `end` in 20-unit chunks, jitters each step off the entity's own seed, and shapes each chunk.
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2, because the oracle's seed write never outlives one draw chain.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
+#[allow(clippy::too_many_arguments)]
+fn do_bolt_seg(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    e: &refEntity_t,
+    seed: &mut c_int,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    radius: f32,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd);
+
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut old = start;
+    let mut off: vec3_t = [10.0, 10.0, 10.0];
+
+    let mut old_perc = 0.0f32;
+    let mut old_radius = radius;
+    let mut new_radius = radius;
+
+    let mut i: c_int = 20;
+    while i as f32 <= dis {
+        // because of our large step size, we may not actually draw to the end.  In this case, fudge our percent so that we are basically complete
+        let perc = if (i + 20) as f32 > dis {
+            1.0
+        } else {
+            // percentage of the amount of line completed
+            i as f32 / dis
+        };
+
+        // create our level of deviation for this point
+        //
+        // Raven writes these three lines as `VectorScale` and `VectorMA` macros, and each macro expands its scale argument once per component.
+        // Every component therefore draws its own value, nine per step, and hoisting any draw into a local would change both the stream and the shape.
+        let mut temp: vec3_t = [0.0; 3];
+        // move less in fwd direction, chaos also does not affect this
+        temp[0] = fwd[0] * (Q_crandom(seed) * 3.0);
+        temp[1] = fwd[1] * (Q_crandom(seed) * 3.0);
+        temp[2] = fwd[2] * (Q_crandom(seed) * 3.0);
+
+        // move more in direction perpendicular to line, angles is really the chaos
+        temp[0] += rt[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += rt[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += rt[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // move more in direction perpendicular to line
+        temp[0] += up[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += up[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += up[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // track our total level of offset from the ideal line
+        VectorAdd(off, temp, &mut off);
+
+        // Move from start to end, always adding our current level of offset from the ideal line
+        //	Even though we are adding a random offset.....by nature, we always move from exactly start....to end
+        let mut cur: vec3_t = [0.0; 3];
+        VectorAdd(start, off, &mut cur);
+        VectorScale(cur, 1.0 - perc, &mut cur);
+        VectorMA(cur, perc, end, &mut cur);
+
+        if (e.renderfx & RF_TAPERED) != 0 {
+            // This does pretty close to perfect tapering since apply shape interpolates the old and new as it goes along.
+            //	by using one minus the square, the radius stays fairly constant, then drops off quickly at the very point of the bolt
+            old_radius = radius * (1.0 - old_perc * old_perc);
+            new_radius = radius * (1.0 - perc * perc);
+        }
+
+        // Apply the random shape to our line seg to give it some micro-detail-jaggy-coolness.
+        apply_shape(
+            verts,
+            indices,
+            cur,
+            old,
+            right,
+            new_radius,
+            old_radius,
+            LIGHTNING_RECURSION_LEVEL,
+            color,
+            shape,
+            rng,
+        );
+
+        // randomly split off to create little tendrils, but don't do it too close to the end and especially if we are not even of the forked variety
+        //
+        // MP never assigns `f_count`, so this branch is dead here. SP sets it to 3 right before its own `DoBoltSeg` call, which is what makes the fork live there.
+        // The `&&` chain keeps its short-circuit, because an eager `Q_random` draw would advance the seed on every step.
+        // Source: oracle/code/renderer/tr_surface.cpp:844
+        if (e.renderfx & RF_FORKED) != 0
+            && shape.f_count > 0.0
+            && Q_random(seed) > 0.94
+            && radius * (1.0 - perc) > 0.2
+        {
+            shape.f_count -= 1.0;
+
+            // Pick a point somewhere between the current point and the final endpoint
+            let mut new_dest: vec3_t = [0.0; 3];
+            VectorAdd(cur, e.oldorigin, &mut new_dest);
+            VectorScale(new_dest, 0.5, &mut new_dest);
+
+            // And then add some crazy offset
+            for t in 0..3 {
+                new_dest[t] += Q_crandom(seed) * 80.0;
+            }
+
+            // we could branch off using OLD and NEWDEST, but that would allow multiple forks...whereas, we just want simpler brancing
+            do_bolt_seg(
+                verts, indices, e, seed, cur, new_dest, right, new_radius, color, shape, rng,
+            );
+        }
+
+        // Current point along the line becomes our new old attach point
+        old = cur;
+        old_perc = perc;
+
+        i += 20;
+    }
+}
+
 /// Raven `DoCylinderPart` - one four-corner ring segment, emitted with the cylinder's own index winding.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:818-847`
@@ -4830,6 +5093,65 @@ fn build_entity_geometry(
 
                 do_cylinder_part(&mut verts, &mut indices, &quad);
             }
+        }
+
+        // `RB_SurfaceElectricity`: one jagged bolt from `origin` to `oldorigin`.
+        //
+        // `axis[0][1]` and `axis[0][2]` are not axis components here. Raven's own inline comments name them the duration and the end
+        // time, and the FX submitter fills them that way.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:1127-1169
+        refEntityType_t::RT_ELECTRICITY => {
+            let radius = e.radius;
+
+            let start = e.origin;
+
+            let mut fwd: vec3_t = [0.0; 3];
+            VectorSubtract(e.oldorigin, start, &mut fwd);
+            let dis = VectorNormalize(&mut fwd);
+
+            // see if we should grow from start to end
+            let mut perc = 1.0f32;
+            if (e.renderfx & RF_GROW) != 0 {
+                perc = 1.0 - (e.axis[0][2] - refdef_time as f32) / e.axis[0][1];
+
+                if perc > 1.0 {
+                    perc = 1.0;
+                } else if perc < 0.0 {
+                    perc = 0.0;
+                }
+            }
+
+            // The oracle writes the grown endpoint back into the shared entity array and reads it straight back.
+            // The write lands in a local here, an accepted divergence a portal or a mirror view would make visible.
+            // Source: oracle/codemp/renderer/tr_surface.cpp:1159
+            let mut end: vec3_t = [0.0; 3];
+            VectorMA(start, perc * dis, fwd, &mut end);
+
+            // compute side vector
+            let mut v1: vec3_t = [0.0; 3];
+            let mut v2: vec3_t = [0.0; 3];
+            VectorSubtract(start, view.ori.origin, &mut v1);
+            VectorSubtract(end, view.ori.origin, &mut v2);
+            let mut right: vec3_t = [0.0; 3];
+            CrossProduct(v1, v2, &mut right);
+            VectorNormalize(&mut right);
+
+            // DEC-66 ruling 2 threads the entity's own seed as a local, because the oracle's seed write never outlives one draw chain.
+            let mut seed: c_int = e.frame;
+            do_bolt_seg(
+                &mut verts,
+                &mut indices,
+                e,
+                &mut seed,
+                start,
+                end,
+                right,
+                radius,
+                color,
+                shape,
+                rng,
+            );
         }
 
         _ => {}
