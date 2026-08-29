@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 use core::f64::consts::PI;
+use core::ffi::c_int;
 
 use mp_engine_qcommon::common::{com_printf, Common};
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
@@ -38,19 +39,22 @@ use crate::tr_local::surface_type_t::surfaceType_t;
 use crate::tr_local::view_parms_t::viewParms_t;
 use crate::tr_main::{R_TransformClipToWindow, R_TransformModelToClip};
 
-/// Per-subsystem render-thread state for `CreateShape`'s file-scope
-/// `sh1`/`sh2` vectors (random per-call shape-color vectors read by this
-/// file's higher-wave shape-drawing fns, not yet ported). Named here per
-/// DEC-37 A13.3: this wave (`tr_surface.cpp` wave 0) is where the subsystem's
-/// globals first land.
+/// Raven's `sh1`, `sh2` and `f_count` file statics, the electricity chain's shared home.
+/// The render-side backend owns one instance beside its own frame-to-frame state, per DEC-66 ruling 1.
 ///
-/// Source: `oracle/codemp/renderer/tr_surface.cpp` (`sh1`/`sh2` file-scope
-/// statics, read/written by `CreateShape`,
-/// `oracle/codemp/renderer/tr_surface.cpp:976-987`)
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:955-956`
+#[derive(Default)]
 pub struct TrSurfaceShapeState {
     pub sh1: vec3_t,
     pub sh2: vec3_t,
+    pub f_count: f32,
 }
+
+/// Raven `LIGHTNING_RECURSION_LEVEL`, the `ApplyShape` recursion depth `DoBoltSeg` passes.
+/// At 1 every recursive call lands in the base case, so one `ApplyShape` call emits three tapered quads.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:958`
+pub const LIGHTNING_RECURSION_LEVEL: c_int = 1;
 
 /// Raven `ComputeFinalVertexColor` — folds a vertex's base color with the
 /// surface's lightstyle table entries (or forces full-bright), returning the

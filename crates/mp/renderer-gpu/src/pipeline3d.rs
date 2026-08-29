@@ -94,13 +94,14 @@ use mp_renderer::tr_shader::{
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
-use mp_renderer::tr_surface::LodErrorForVolume;
+use mp_renderer::tr_surface::{LodErrorForVolume, TrSurfaceShapeState};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
 use native_math::qmath::Q_rsqrt;
+use native_math::rng::Rng;
 
 use crate::stage2d::{
     apply_alpha_gen, apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime,
@@ -951,6 +952,13 @@ pub struct Pipeline3d {
     ///
     /// [`FrameExecutor::set_ghoul2_capture`]: crate::FrameExecutor::set_ghoul2_capture
     ghoul2_capture: Option<Vec<Ghoul2SurfaceCapture>>,
+
+    /// The render-side C runtime stream, per DEC-66 ruling 1.
+    /// It persists across frames, because a per-frame reset would replay the same jitter every frame and freeze the bolt shimmer.
+    rng: Rng,
+
+    /// Raven's `sh1`, `sh2` and `f_count` file statics, per DEC-66 ruling 1.
+    shape: TrSurfaceShapeState,
 }
 
 /// One captured Ghoul2 surface vertex stream: the decoded vertices, the triangle
@@ -1100,6 +1108,8 @@ impl Pipeline3d {
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
             ghoul2_capture: None,
+            rng: Rng::new(),
+            shape: TrSurfaceShapeState::default(),
         }
     }
 
@@ -1758,7 +1768,13 @@ impl Pipeline3d {
             return;
         };
 
-        let (verts, index_block) = build_entity_geometry(&entity.e, view);
+        let (verts, index_block) = build_entity_geometry(
+            &entity.e,
+            view,
+            refdef_time,
+            &mut self.rng,
+            &mut self.shape,
+        );
         if index_block.is_empty() {
             self.warn_once(Warned::EntitySurface);
             stats.skipped_non_world += 1;
@@ -4548,7 +4564,13 @@ fn do_line(
 // Source: oracle/codemp/renderer/tr_surface.cpp:854-985
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
-fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVertex>, Vec<u32>) {
+fn build_entity_geometry(
+    e: &refEntity_t,
+    view: &viewParms_t,
+    refdef_time: i32,
+    rng: &mut Rng,
+    shape: &mut TrSurfaceShapeState,
+) -> (Vec<WorldVertex>, Vec<u32>) {
     let mut verts: Vec<WorldVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let color = e.shaderRGBA;
