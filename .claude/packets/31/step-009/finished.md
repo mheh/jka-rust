@@ -72,3 +72,22 @@ The saber-glow re-bless moved 22 pixels, all inside one 10 by 10 box, all backgr
 **Two stale doc comments left alone.** `CreateShape` (`crates/mp/renderer/src/tr_surface.rs:108-116`) and `RB_SurfaceSaberGlow` (`:1217-1243`) still say the renderer has no RNG receiver, which DEC-66 ruling 1 superseded. The audit flagged them as optional and the packet's contract does not list them, so they stayed untouched rather than widening scope. They are a one-line fix for a later comment pass.
 
 **`mp_renderer::tr_surface` is still the dead `tess` twin.** Every leaf its electricity, cylinder and oriented-quad bodies would call is a `todo!()`, and this step removed none of them. Row 1 ruled the live arms into `pipeline3d.rs` and left that file to the `tess` backend, if it is ever built.
+
+## Fix round, 2026-08-29
+
+The lane-review walk ruled on the vet report (`.claude/packets/31/step-009/vet.md`, ten findings). Two commits carry the result.
+
+`32db25ab` executes the four verdicts that touch text and changes no code. The diff is comment and doc lines only, proven by a filter over the source hunks.
+
+- Finding 2. The row-6 site note gains one line: the dead `RF_FORKED` branch would also read the un-grown `e.oldorigin`, where the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
+- Finding 4. The two comments saying the seed write "never outlives one draw chain" now carry the row-6 amendment's mechanism. The packet body carried the same sentence and is corrected with them.
+- Findings 6, 7 and 8. The quoted comment lines re-break to one sentence per line, all under 150 columns, with no wrap at width. The break inside the noun phrase "end time" is gone. No wording changed. One 153-column line was left alone: it is a preserved Raven comment, which the vet excluded and the porting rules protect.
+- Finding 10. The word "ride" is struck from the packet's reusable wording at commit bundle item 5. The commit history stands.
+
+Two verdicts needed no edit. Finding 1, the two unlisted imports, is accepted, because both are private `use` declarations inside write-scope files. Finding 9, "seam" in the module doc, stands as entrenched repo vocabulary. Finding 3, the segment clamp, and finding 5, the two extra stale sentences, were already declared above.
+
+A dated Amendment in `packet.md` records all six verdicts.
+
+Gates on the fix round: `cargo build --workspace` at zero warnings after a forced rebuild of both touched crates, `cargo test --workspace -- --test-threads=1` green, and all five golden suites green serially. Every one of the eighteen committed fixtures stayed byte-identical, which is what a comment-only change must produce.
+
+The vet report itself is committed with this section, so the packet directory holds the whole record.
