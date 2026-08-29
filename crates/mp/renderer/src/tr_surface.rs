@@ -1089,21 +1089,20 @@ pub fn DoSprite(
 /// dispatch shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent,
 /// this file) is immutable, so there is still nowhere to commit the mutation
 /// across the loop's repeated calls.
-/// DEC-66 ruling 2 closes that gap without a rewire: the dispatch stays immutable and the seed threads as a local, which is what the live arm does.
-/// The `RF_FORKED`
-/// branch's `f_count--` write is this packet's STATE HOMES row
+/// DEC-66 ruling 2 closes that gap without a rewire:
+/// the dispatch stays immutable and the seed threads as a local, which is what the live arm does.
+/// The `RF_FORKED` branch's `f_count--` write is this packet's STATE HOMES row
 /// `DoBoltSeg`/`f_count`: "per-subsystem owned state struct, NAMED BY THIS
 /// WAVE if this file's wave is where the subsystem lands" — this file
 /// already names that carrier (`TrSurfaceShapeState`, `CreateShape`'s doc
-/// comment), and `f_count` now sits on it as the `float` file-scope value
-/// oracle declares alongside `sh1`/`sh2` (`static float f_count;`,
-/// `tr_surface.cpp:956`). The loop also reads `e->renderfx & RF_TAPERED`
+/// comment), and `f_count` now sits on it as the `float` file-scope value oracle declares alongside `sh1`/`sh2`
+/// (`static float f_count;`, `tr_surface.cpp:956`).
+/// The loop also reads `e->renderfx & RF_TAPERED`
 /// (`:1088`) — `RF_TAPERED`/`RF_FORKED`/`RF_GROW` are now ported in the
 /// crate's canonical flag home (`tr_public::ref_flags`), so the masks are no
-/// longer a blocker. `LIGHTNING_RECURSION_LEVEL` now sits beside
-/// `TrSurfaceShapeState` in this file
-/// (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`). The
-/// loop's two in-module callees (`ApplyShape`, the self-recursive
+/// longer a blocker.
+/// `LIGHTNING_RECURSION_LEVEL` now sits beside `TrSurfaceShapeState` in this file (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`).
+/// The loop's two in-module callees (`ApplyShape`, the self-recursive
 /// `DoBoltSeg`) are both blocked by the same gaps.
 ///
 /// The live arm is `do_bolt_seg` beside `build_entity_geometry` in `mp_renderer_gpu::pipeline3d`, per gh#31 step-009.

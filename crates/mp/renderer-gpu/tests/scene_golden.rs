@@ -751,8 +751,10 @@ fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhand
     record_entities(host, frame_data, &out);
 }
 
-/// The FX module's `RT_ORIENTED_QUAD` submissions, which the trap census never saw because `COrientedParticle::Draw` builds the entity inside the engine.
-/// Three quads at one radius, each on its own orthonormal `axis[1]`/`axis[2]` pair and its own rotation, so the arm reads the entity's axis rather than the view's.
+/// The FX module's `RT_ORIENTED_QUAD` submissions,
+/// which the trap census never saw because `COrientedParticle::Draw` builds the entity inside the engine.
+/// Three quads at one radius, each on its own orthonormal `axis[1]`/`axis[2]` pair and its own rotation,
+/// so the arm reads the entity's axis rather than the view's.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:177-220`
 fn scene_fx_oriented_quad(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
@@ -836,7 +838,8 @@ fn scene_fx_cylinder(host: &mut UiHost, frame_data: &mut FrameData, shader: qhan
     record_entities(host, frame_data, &out);
 }
 
-/// The FX module's `RT_ELECTRICITY` submissions, which the trap census sees only as the `fx/AddElectricity` row because `CElectricity::Draw` builds the entity inside the engine.
+/// The FX module's `RT_ELECTRICITY` submissions,
+/// which the trap census sees only as the `fx/AddElectricity` row because `CElectricity::Draw` builds the entity inside the engine.
 /// Two bolts on different `frame` seeds, one plain and one tapered, so the per-entity seed and the taper are both visible.
 ///
 /// Neither carries `RF_GROW`, so the frozen scene clock never enters the geometry.

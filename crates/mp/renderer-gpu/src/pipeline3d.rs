@@ -4677,7 +4677,8 @@ fn apply_shape(
 }
 
 /// Raven `DoBoltSeg` - steps `start` to `end` in 20-unit chunks, jitters each step off the entity's own seed, and shapes each chunk.
-/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2, because the oracle's seed write never outlives one draw chain.
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2.
+/// The oracle's seed write is unobservable until portal or mirror views draw, because a second view of the same frame would read the mutated seed.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
 #[allow(clippy::too_many_arguments)]
@@ -4722,7 +4723,8 @@ fn do_bolt_seg(
         // create our level of deviation for this point
         //
         // Raven writes these three lines as `VectorScale` and `VectorMA` macros, and each macro expands its scale argument once per component.
-        // Every component therefore draws its own value, nine per step, and hoisting any draw into a local would change both the stream and the shape.
+        // Every component therefore draws its own value, nine per step,
+        // and hoisting any draw into a local would change both the stream and the shape.
         let mut temp: vec3_t = [0.0; 3];
         // move less in fwd direction, chaos also does not affect this
         temp[0] = fwd[0] * (Q_crandom(seed) * 3.0);
@@ -4773,7 +4775,8 @@ fn do_bolt_seg(
 
         // randomly split off to create little tendrils, but don't do it too close to the end and especially if we are not even of the forked variety
         //
-        // MP never assigns `f_count`, so this branch is dead here. SP sets it to 3 right before its own `DoBoltSeg` call, which is what makes the fork live there.
+        // MP never assigns `f_count`, so this branch is dead here.
+        // SP sets it to 3 right before its own `DoBoltSeg` call, which is what makes the fork live there.
         // The `&&` chain keeps its short-circuit, because an eager `Q_random` draw would advance the seed on every step.
         // Source: oracle/code/renderer/tr_surface.cpp:844
         if (e.renderfx & RF_FORKED) != 0
@@ -4826,8 +4829,10 @@ fn do_cylinder_part(verts: &mut Vec<WorldVertex>, indices: &mut Vec<u32>, quad: 
     indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 3, vbase]);
 }
 
-/// Builds one generated entity surface's world-space vertices and triangle indices, the `RB_SurfaceEntity` dispatch restricted to the kinds this backend draws.
-/// Those are the DEC-54 census set, `RT_SPRITE`, `RT_LINE` and `RT_SABER_GLOW`, plus the three the FX module submits, `RT_ORIENTED_QUAD`, `RT_CYLINDER` and `RT_ELECTRICITY`.
+/// Builds one generated entity surface's world-space vertices and triangle indices,
+/// the `RB_SurfaceEntity` dispatch restricted to the kinds this backend draws.
+/// Those are the DEC-54 census set, `RT_SPRITE`, `RT_LINE` and `RT_SABER_GLOW`,
+/// plus the three the FX module submits, `RT_ORIENTED_QUAD`, `RT_CYLINDER` and `RT_ELECTRICITY`.
 ///
 /// Every other `reType` returns empty, which the caller counts as a skip.
 /// `RT_BEAM` and `RT_ORIENTEDLINE` are census-complement fog, so they stay unbuilt rather than guessed at.
@@ -4888,8 +4893,7 @@ fn build_entity_geometry(
             );
         }
 
-        // `RB_SurfaceOrientedQuad`: the quad spans the entity's own `axis[1]`
-        // and `axis[2]`, not the view's, so it keeps its world orientation.
+        // `RB_SurfaceOrientedQuad`: the quad spans the entity's own `axis[1]` and `axis[2]`, not the view's, so it keeps its world orientation.
         //
         // The MP tree reads the two axis rows directly.
         // The SP tree derives both from `axis[0]` through `MakeNormalVectors`, which MP leaves commented out.
@@ -5000,8 +5004,8 @@ fn build_entity_geometry(
             );
         }
 
-        // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined
-        // into a closed ring of quads. The segment count drops with distance.
+        // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined into a closed ring of quads.
+        // The segment count drops with distance.
         //
         // `e.radius` scales the ring that translates to `e.oldorigin`, and `e.rotation` scales the ring that translates to `e.origin`.
         // Raven's own `upper_points` and `lower_points` names run the other way from its header comment, so the code is the authority here.
@@ -5101,8 +5105,8 @@ fn build_entity_geometry(
 
         // `RB_SurfaceElectricity`: one jagged bolt from `origin` to `oldorigin`.
         //
-        // `axis[0][1]` and `axis[0][2]` are not axis components here. Raven's own inline comments name them the duration and the end
-        // time, and the FX submitter fills them that way.
+        // `axis[0][1]` and `axis[0][2]` are not axis components here.
+        // Raven's own inline comments name them the duration and the end time, and the FX submitter fills them that way.
         //
         // Source: oracle/codemp/renderer/tr_surface.cpp:1127-1169
         refEntityType_t::RT_ELECTRICITY => {
@@ -5128,6 +5132,8 @@ fn build_entity_geometry(
 
             // The oracle writes the grown endpoint back into the shared entity array and reads it straight back.
             // The write lands in a local here, an accepted divergence a portal or a mirror view would make visible.
+            // The dead `RF_FORKED` branch would also read the un-grown `e.oldorigin`,
+            // where the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
             // Source: oracle/codemp/renderer/tr_surface.cpp:1159
             let mut end: vec3_t = [0.0; 3];
             VectorMA(start, perc * dis, fwd, &mut end);
@@ -5141,7 +5147,9 @@ fn build_entity_geometry(
             CrossProduct(v1, v2, &mut right);
             VectorNormalize(&mut right);
 
-            // DEC-66 ruling 2 threads the entity's own seed as a local, because the oracle's seed write never outlives one draw chain.
+            // DEC-66 ruling 2 threads the entity's own seed as a local.
+            // The dropped write is unobservable until portal or mirror views draw,
+            // because a second view of the same frame would read the mutated `oldorigin` and seed.
             let mut seed: c_int = e.frame;
             do_bolt_seg(
                 &mut verts,

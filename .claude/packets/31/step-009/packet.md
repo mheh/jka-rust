@@ -207,7 +207,8 @@ fn apply_shape(
 )
 
 /// Raven `DoBoltSeg` - steps `start` to `end` in 20-unit chunks, jitters each step off the entity's own seed, and shapes each chunk.
-/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2, because the oracle's seed write never outlives one draw chain.
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2.
+/// The oracle's seed write is unobservable until portal or mirror views draw, because a second view of the same frame would read the mutated seed.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
 #[allow(clippy::too_many_arguments)]
@@ -320,7 +321,7 @@ Every golden run is serial with `--test-threads=1`, each as one foreground comma
 
 4. **The electricity arm.** `create_shape`, `apply_shape`, `do_line2`, `do_bolt_seg`, the `RT_ELECTRICITY` arm, and the `tr_surface.rs` note edits DEC-66 ruling 2 calls for. Files: `crates/mp/renderer-gpu/src/pipeline3d.rs`, `crates/mp/renderer/src/tr_surface.rs`. Subject: `feat(gh#31 s009): the electricity arm`. Gates: the full battery. No committed scene submits `RT_ELECTRICITY`, so all seventeen fixtures stay byte-identical.
 
-5. **The saber-glow hilt radius.** The one expression at `pipeline3d.rs:4646`, the marker deletion, and the re-blessed `scene_saber_glow.png`, after its own row-3 STOP. The code and the PNG ride in one commit, because either alone leaves the scene suite red. Files: `crates/mp/renderer-gpu/src/pipeline3d.rs` and `crates/mp/renderer-gpu/tests/goldens/scene_saber_glow.png`. Subject: `feat(gh#31 s009): the saber-glow hilt radius`. Gates: the full battery, with `scene_saber_glow.png` the only fixture that moved.
+5. **The saber-glow hilt radius.** The one expression at `pipeline3d.rs:4646`, the marker deletion, and the re-blessed `scene_saber_glow.png`, after its own row-3 STOP. The code and the PNG land in one commit, because either alone leaves the scene suite red. Files: `crates/mp/renderer-gpu/src/pipeline3d.rs` and `crates/mp/renderer-gpu/tests/goldens/scene_saber_glow.png`. Subject: `feat(gh#31 s009): the saber-glow hilt radius`. Gates: the full battery, with `scene_saber_glow.png` the only fixture that moved.
 
 6. **The electricity golden.** `scene_fx_electricity` and its PNG, after its own row-3 STOP. Files: `crates/mp/renderer-gpu/tests/scene_golden.rs` and the new PNG. Subject: `test(gh#31 s009): the electricity golden`. Gates: the full battery, with the new golden green at tolerance zero.
 
@@ -357,3 +358,12 @@ After a clean lane-review, per DEC-67: open the pull request from `gh31-step-009
 - The cylinder radius mapping: ratified as proposed. The packet prose now follows the code, not Raven's ring names. `e->radius` scales the `v1` ring that translates to `e->oldorigin`, the top point, and `e->rotation` scales the `vu` ring that translates to `e->origin`, the bottom point (`:892-906` against `:849-851`).
 - The commit-bundle warning gap: user ruling, verbatim, "warnings are fine. at the end of the packet we should be back to no warnings". The per-commit gate now allows warnings on an intermediate commit and requires zero warnings in the bundle's final state.
 - The census cites: ratified as proposed. Corrected to `scene-trap-census.md:147` and `:149`.
+
+**2026-08-29 - the lane-review walk ruled on the vet report.** The vet is at `.claude/packets/31/step-009/vet.md`. Six verdicts, each executed on `gh31-step-009-fx-minirefents`.
+
+- Finding 1, the two unlisted imports: accepted, no code change. `_VectorAdd as VectorAdd` in `pipeline3d.rs` and `RF_TAPERED` in `scene_golden.rs` are private `use` declarations inside write-scope files, and the row-8 import sentence is not a closed list.
+- Finding 2, the fork branch's un-grown `e.oldorigin`: the row-6 site note in `pipeline3d.rs` gains one line naming it, because the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
+- Finding 4, the packet-internal contradiction: the two comments saying the seed write "never outlives one draw chain" are reworded to the row-6 amendment's mechanism, and the same sentence is corrected in this packet body so it stops contradicting its own amendment.
+- Findings 6, 7 and 8, the comment layout: the quoted added lines re-break to one sentence per line, every line under 150 columns, no column wrap at width, no content change.
+- Finding 9, "seam" in the module doc: stands. The word is entrenched repo vocabulary in `CLAUDE.md` and the porting rules.
+- Finding 10, "ride" in a commit body: the commit history stands. The word is struck from this packet's reusable wording at commit bundle item 5.
