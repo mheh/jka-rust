@@ -60,7 +60,9 @@ use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::model_blocks::ModelBlocks;
-use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
+use mp_renderer::render_state::placeholders::{
+    RefEntity, SkyParms, TrRefdef, WorldAsset, FUNCTABLE_SIZE,
+};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
@@ -974,6 +976,22 @@ pub struct Pipeline3d {
 
     /// Raven's `sh1`, `sh2` and `f_count` file statics, per DEC-66 ruling 1.
     shape: TrSurfaceShapeState,
+
+    /// Raven's `tr.screenImage`, the square of the frame a distortion stage samples instead of its own texture.
+    /// `qglCopyTexImage2D` re-specifies the oracle's texture per capture, so this rebuilds whenever the requested side length changes.
+    /// One slot serves every distortion entity, because each capture is drawn in the pass that immediately follows it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1337`
+    screen_image: Option<ScreenImage>,
+}
+
+/// One capture of the frame into a square texture, held across frames and rebuilt on a side-length change.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1200-1205`
+struct ScreenImage {
+    side: u32,
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
 }
 
 /// One captured Ghoul2 surface vertex stream: the decoded vertices, the triangle
@@ -1125,6 +1143,7 @@ impl Pipeline3d {
             ghoul2_capture: None,
             rng: Rng::new(),
             shape: TrSurfaceShapeState::default(),
+            screen_image: None,
         }
     }
 
@@ -1426,11 +1445,45 @@ impl Pipeline3d {
             );
         }
 
+        // Raven's `lastPostEnt`, a compare against the entity of the last successful capture rather than a set of every entity captured.
+        // A deferred order of A, B, A therefore captures A twice, and a projection behind the eye leaves the value alone so the next surface retries.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1006,1144-1145,1207
+        let mut last_post_ent: i32 = -1;
+        // A rebuilt screen image replaces the texture an already-encoded pass binds, so the replaced one lives here until the submit.
+        let mut keep_alive: Vec<ScreenImage> = Vec::new();
+        let vid_width = target_texture.width() as i32;
+        let vid_height = target_texture.height() as i32;
+
         // The drain is last in first out, so the deferred surfaces replay in reverse submission order.
         // Each surface takes its own pass, which loads both attachments and therefore composites over the sorted draw.
+        // The capture is encoded before that pass, so capture N reads a frame holding the deferred draws 1 through N-1.
         // Source: oracle/codemp/renderer/tr_backend.cpp:1003-1214
         for range in post_surfaces.iter().rev() {
             let order: Vec<usize> = range.clone().collect();
+
+            // The capture runs once per run of one entity's deferred surfaces, and it reads the entity back by the stored index.
+            // Source: oracle/codemp/renderer/tr_backend.cpp:1144-1173
+            let entity_num = items[range.start]
+                .post_render_ent
+                .expect("a deferred surface's items carry their entity number");
+            if let Some(ent) = entities.get(entity_num as usize) {
+                if ent.e.renderfx & RF_DISTORTION != 0 && last_post_ent != entity_num {
+                    if let Some(rect) =
+                        screen_capture_rect(&ent.e, &frame.refdef, vid_width, vid_height)
+                    {
+                        capture_screen_image(
+                            gpu,
+                            &mut encoder,
+                            target_texture,
+                            &mut self.screen_image,
+                            &mut keep_alive,
+                            rect,
+                        );
+                        last_post_ent = entity_num;
+                    }
+                }
+            }
+
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("mp_renderer_gpu post-render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -4499,6 +4552,167 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
         .get(entity_num as usize)
         .map(|ent| ent.e.shaderTime)
         .unwrap_or(0.0)
+}
+
+/// Raven `R_WorldCoordToScreenCoordFloat` - projects a world point onto the screen in top-down pixel coordinates.
+/// It returns `None` where the point sits at or behind the eye plane, Raven's `transformed[2] < 0.01` early return.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:597-635`
+fn world_coord_to_screen_coord_float(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(f32, f32)> {
+    let xcenter = vid_width / 2;
+    let ycenter = vid_height / 2;
+
+    let vfwd = refdef.view_axis[0];
+    let vright = refdef.view_axis[1];
+    let vup = refdef.view_axis[2];
+
+    let mut local = vec3_origin;
+    VectorSubtract(world_coord, refdef.view_origin, &mut local);
+
+    let transformed = [
+        _DotProduct(local, vright),
+        _DotProduct(local, vup),
+        _DotProduct(local, vfwd),
+    ];
+
+    // The point sits at or behind the eye plane, so it projects nowhere on the screen.
+    if (transformed[2] as f64) < 0.01 {
+        return None;
+    }
+
+    // The two scale terms divide by a double `90.0` and land back in a float, which is the C promotion here.
+    let xzi = ((xcenter as f32 / transformed[2]) as f64 * (90.0 / refdef.fov_x as f64)) as f32;
+    let yzi = ((ycenter as f32 / transformed[2]) as f64 * (90.0 / refdef.fov_y as f64)) as f32;
+
+    let x = xcenter as f32 + xzi * transformed[0];
+    // The y counts down from the top of the screen, because the up component subtracts.
+    let y = ycenter as f32 - yzi * transformed[1];
+    Some((x, y))
+}
+
+/// Raven `R_WorldCoordToScreenCoord` - the integer wrapper, truncating both components.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:637-645`
+fn world_coord_to_screen_coord(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(i32, i32)> {
+    let (x, y) = world_coord_to_screen_coord_float(world_coord, refdef, vid_width, vid_height)?;
+    Some((x as i32, y as i32))
+}
+
+/// The source rectangle one distortion capture copies, as `(x, y, side)` in the target texture's top-down coordinates.
+/// Raven's `cY` counts from the framebuffer's bottom edge, and the flip back to a top-down origin happens here.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1172-1198`
+fn screen_capture_rect(
+    e: &refEntity_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(u32, u32, u32)> {
+    let (x, y) = world_coord_to_screen_coord(e.origin, refdef, vid_width, vid_height)?;
+    let rad = e.radius as i32;
+    // A zero or negative radius leaves the oracle an unsampleable texture and wgpu rejects the copy outright.
+    // The port takes the defined answer and skips the capture, so the stage binds its own diffuse.
+    if rad <= 0 {
+        return None;
+    }
+    // Raven's clamp turns negative once `rad` passes a target dimension, and the copy then reads outside the frame.
+    // The side length clamps to the smaller dimension first, which keeps the rect inside the target.
+    let rad = rad.min(vid_width).min(vid_height);
+
+    let mut c_x = vid_width - x - (rad / 2);
+    let mut c_y = vid_height - y - (rad / 2);
+    if c_x + rad > vid_width {
+        c_x = vid_width - rad;
+    } else if c_x < 0 {
+        c_x = 0;
+    }
+    if c_y + rad > vid_height {
+        c_y = vid_height - rad;
+    } else if c_y < 0 {
+        c_y = 0;
+    }
+
+    // The `vid_width - x` term mirrors the square about the vertical centreline. That is Raven's own behavior and it ports as written.
+    // The `vid_height - y` term converts a top-down y to the framebuffer's bottom-up origin, so the row flips back here.
+    let top = vid_height - c_y - rad;
+    Some((c_x as u32, top as u32, rad as u32))
+}
+
+/// Encodes one distortion entity's capture into `screen_image`, rebuilding the texture when the side length changed.
+/// The oracle re-specifies its texture on every copy, so a rebuild here is the faithful shape rather than a cache miss.
+/// A rebuild moves the replaced texture into `keep_alive`, which the caller holds until the submit so an already-encoded pass keeps its binding.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1144-1209`
+fn capture_screen_image(
+    gpu: &Gpu,
+    encoder: &mut wgpu::CommandEncoder,
+    target_texture: &wgpu::Texture,
+    screen_image: &mut Option<ScreenImage>,
+    keep_alive: &mut Vec<ScreenImage>,
+    rect: (u32, u32, u32),
+) {
+    let (x, y, side) = rect;
+    let stale = screen_image
+        .as_ref()
+        .map(|image| image.side != side)
+        .unwrap_or(true);
+    if stale {
+        let texture = gpu.device().create_texture(&wgpu::TextureDescriptor {
+            label: Some("mp_renderer_gpu screen image"),
+            size: wgpu::Extent3d {
+                width: side,
+                height: side,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: target_texture.format(),
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        if let Some(old) = screen_image.replace(ScreenImage {
+            side,
+            texture,
+            view,
+        }) {
+            keep_alive.push(old);
+        }
+    }
+
+    let image = screen_image
+        .as_ref()
+        .expect("the screen image is built above when the side length changed");
+    encoder.copy_texture_to_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: target_texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d { x, y, z: 0 },
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyTextureInfo {
+            texture: &image.texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::Extent3d {
+            width: side,
+            height: side,
+            depth_or_array_layers: 1,
+        },
+    );
 }
 
 /// The renderfx overrides the current entity applies to every stage of its
