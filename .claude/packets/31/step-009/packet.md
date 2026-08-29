@@ -367,3 +367,4 @@ After a clean lane-review, per DEC-67: open the pull request from `gh31-step-009
 - Findings 6, 7 and 8, the comment layout: the quoted added lines re-break to one sentence per line, every line under 150 columns, no column wrap at width, no content change.
 - Finding 9, "seam" in the module doc: stands. The word is entrenched repo vocabulary in `CLAUDE.md` and the porting rules.
 - Finding 10, "ride" in a commit body: the commit history stands. The word is struck from this packet's reusable wording at commit bundle item 5.
+- Finding F1, the half-re-flowed `DoBoltSeg` deferred note: the bounded widening is authorized. The whole paragraph in `crates/mp/renderer/src/tr_surface.rs` re-flows per sentence, one sentence per line, under 150 columns, with the wording unchanged.

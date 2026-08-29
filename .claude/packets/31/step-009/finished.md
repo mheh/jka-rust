@@ -91,3 +91,5 @@ A dated Amendment in `packet.md` records all six verdicts.
 Gates on the fix round: `cargo build --workspace` at zero warnings after a forced rebuild of both touched crates, `cargo test --workspace -- --test-threads=1` green, and all five golden suites green serially. Every one of the eighteen committed fixtures stayed byte-identical, which is what a comment-only change must produce.
 
 The vet report itself is committed with this section, so the packet directory holds the whole record.
+
+The fix-round vet then raised finding F1: three of those re-broken lines still interlocked with the untouched legacy wrap around them, so a third commit re-flows the whole `DoBoltSeg` deferred paragraph per sentence, under 150 columns, with the wording proven unchanged by a whitespace-insensitive comparison against the previous text.

@@ -1076,34 +1076,28 @@ pub fn DoSprite(
 /// the initial radii) needs none of the blocked inputs below and is real CPU
 /// logic, so it is transcribed.
 ///
-/// DEFERRED: engine seam — every statement inside the `for ( i = 20; i <=
-/// dis; i += 20 )` stepping loop reads `Q_crandom(&e->frame)`/
-/// `Q_random(&e->frame)` (`tr_surface.cpp:1075-1077,1100,1113`): both seed
-/// from **the current entity's own `frame` field**, not an ambient/global
-/// LCG (`Q_crandom`/`Q_random` are already ported, `native_math::qmath
-/// ::{Q_crandom, Q_random}`, `*mut c_int` seed param). Blocker (1) — no
-/// `frame` field to seed from — is now closed: `RefEntity::frame` exists
-/// (campaign #41 batch 1,
-/// `render_state/placeholders.rs`) — but (2) stands: each call also *writes*
-/// the seed in-place through that pointer, and this fn's `Option<&RefEntity>`
-/// dispatch shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent,
-/// this file) is immutable, so there is still nowhere to commit the mutation
-/// across the loop's repeated calls.
+/// DEFERRED: engine seam —
+/// every statement inside the `for ( i = 20; i <= dis; i += 20 )` stepping loop
+/// reads `Q_crandom(&e->frame)`/`Q_random(&e->frame)` (`tr_surface.cpp:1075-1077,1100,1113`):
+/// both seed from **the current entity's own `frame` field**, not an ambient/global LCG
+/// (`Q_crandom`/`Q_random` are already ported, `native_math::qmath::{Q_crandom, Q_random}`, `*mut c_int` seed param).
+/// Blocker (1) — no `frame` field to seed from — is now closed:
+/// `RefEntity::frame` exists (campaign #41 batch 1, `render_state/placeholders.rs`) — but (2) stands:
+/// each call also *writes* the seed in-place through that pointer,
+/// and this fn's `Option<&RefEntity>` dispatch shape (the `RB_SurfaceElectricity`/`RB_SurfaceFlare` precedent, this file) is immutable,
+/// so there is still nowhere to commit the mutation across the loop's repeated calls.
 /// DEC-66 ruling 2 closes that gap without a rewire:
 /// the dispatch stays immutable and the seed threads as a local, which is what the live arm does.
-/// The `RF_FORKED` branch's `f_count--` write is this packet's STATE HOMES row
-/// `DoBoltSeg`/`f_count`: "per-subsystem owned state struct, NAMED BY THIS
-/// WAVE if this file's wave is where the subsystem lands" — this file
-/// already names that carrier (`TrSurfaceShapeState`, `CreateShape`'s doc
-/// comment), and `f_count` now sits on it as the `float` file-scope value oracle declares alongside `sh1`/`sh2`
+/// The `RF_FORKED` branch's `f_count--` write is this packet's STATE HOMES row `DoBoltSeg`/`f_count`:
+/// "per-subsystem owned state struct, NAMED BY THIS WAVE if this file's wave is where the subsystem lands" —
+/// this file already names that carrier (`TrSurfaceShapeState`, `CreateShape`'s doc comment),
+/// and `f_count` now sits on it as the `float` file-scope value oracle declares alongside `sh1`/`sh2`
 /// (`static float f_count;`, `tr_surface.cpp:956`).
-/// The loop also reads `e->renderfx & RF_TAPERED`
-/// (`:1088`) — `RF_TAPERED`/`RF_FORKED`/`RF_GROW` are now ported in the
-/// crate's canonical flag home (`tr_public::ref_flags`), so the masks are no
-/// longer a blocker.
+/// The loop also reads `e->renderfx & RF_TAPERED` (`:1088`) —
+/// `RF_TAPERED`/`RF_FORKED`/`RF_GROW` are now ported in the crate's canonical flag home (`tr_public::ref_flags`),
+/// so the masks are no longer a blocker.
 /// `LIGHTNING_RECURSION_LEVEL` now sits beside `TrSurfaceShapeState` in this file (`:958`, `#define LIGHTNING_RECURSION_LEVEL 1`).
-/// The loop's two in-module callees (`ApplyShape`, the self-recursive
-/// `DoBoltSeg`) are both blocked by the same gaps.
+/// The loop's two in-module callees (`ApplyShape`, the self-recursive `DoBoltSeg`) are both blocked by the same gaps.
 ///
 /// The live arm is `do_bolt_seg` beside `build_entity_geometry` in `mp_renderer_gpu::pipeline3d`, per gh#31 step-009.
 ///
