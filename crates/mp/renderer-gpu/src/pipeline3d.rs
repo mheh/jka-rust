@@ -4986,14 +4986,18 @@ fn build_entity_geometry(
 
             // Big hilt sprite
             //
-            //TODO: Port RB_SurfaceSaberGlow's random hilt radius
+            // The quarter-unit pulse draws from the backend's own C runtime stream, per DEC-66 ruling 1.
+            // Retail runs one process-wide stream instead, and ruling 3 accepts the split as a divergence on cosmetic geometry.
             // Source: oracle/codemp/renderer/tr_surface.cpp:579
-            // The oracle radius is `5.5f + random() * 0.25f`. `random()` is
-            // `rand()/32768` off the ambient C generator, which the render
-            // thread does not own and which no image golden can pin. The low
-            // end of the same quarter-unit span stands in until a render-side
-            // generator lands.
-            do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+            do_sprite(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                5.5 + rng.random() * 0.25,
+                0.0,
+                color,
+                view,
+            );
         }
 
         // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined
