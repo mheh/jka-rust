@@ -793,6 +793,47 @@ fn scene_fx_oriented_quad(host: &mut UiHost, frame_data: &mut FrameData, shader:
     record_entities(host, frame_data, &out);
 }
 
+/// The FX module's `RT_CYLINDER` submissions, which the trap census never saw because `CCylinder::Draw` builds the entity inside the engine.
+/// One straight tube and one cone tilted off the view axis, so the two ring radii and the `RotatePointAroundVector` step are both visible.
+///
+/// `radius` scales the ring at `oldorigin` and `rotation` scales the ring at `origin`, so the cone's wide end is its `oldorigin`.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:853-953`
+fn scene_fx_cylinder(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (origin, oldorigin, axis, radius, rotation, rgba) in [
+        (
+            [110.0f32, -35.0, -30.0],
+            [110.0f32, -35.0, 30.0],
+            [0.0f32, 0.0, 1.0],
+            8.0f32,
+            8.0f32,
+            [255u8, 255, 255, 255],
+        ),
+        (
+            [110.0, 35.0, -30.0],
+            [130.0, 20.0, 30.0],
+            [0.30769232, -0.23076923, 0.9230769],
+            12.0,
+            2.0,
+            [64, 255, 96, 255],
+        ),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_CYLINDER;
+        re.customShader = shader;
+        re.origin = origin;
+        re.oldorigin = oldorigin;
+        // `axis[0]` is the cylinder axis the rings turn around, the direction the FX submitter fills.
+        re.axis[0] = axis;
+        re.radius = radius;
+        re.rotation = rotation;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -869,6 +910,16 @@ fn golden_scene_fx_oriented_quad() {
         stem: "scene_fx_oriented_quad",
         eye: [0.0, 0.0, 0.0],
         record: scene_fx_oriented_quad,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_fx_cylinder() {
+    run_scene(&Scene {
+        stem: "scene_fx_cylinder",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_cylinder,
         expect_dlights: 0,
     });
 }
