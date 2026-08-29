@@ -1,0 +1,414 @@
+# Packet gh#31 step-010 - the renderfx closure
+
+## Scope
+
+This step closes the last dark row of the DEC-54 renderfx census, `RF_DISTORTION`, and puts the already-live disintegrate and volumetric arms under image goldens. It also rules and records the `RF_NOSHADOW` disposition, which needs no port.
+
+The census counts twelve renderfx flags across the four traces (`docs/plans/2026-07-24-client-port/scene-trap-census.md:161-172`). After step-009 every one of the twelve draws except `RF_DISTORTION`.
+
+- Live in the GPU backend: `RF_DEPTHHACK` and `RF_NODEPTH` through `DepthRange::resolve` (`crates/mp/renderer-gpu/src/pipeline3d.rs:868,870`), `RF_RGB_TINT` (`:4141`), `RF_FORCE_ENT_ALPHA` (`:4203`), `RF_DISINTEGRATE1` and `RF_DISINTEGRATE2` (`:4121-4128`), `RF_VOLUMETRIC` (`:4130`).
+- Live in the frontend, which `frame_exec.rs:851` calls through `R_RenderView`: `RF_MINLIGHT` (`crates/mp/renderer/src/tr_light.rs:494`), `RF_LIGHTING_ORIGIN`, `RF_FIRST_PERSON` (`tr_light.rs:271`), `RF_THIRD_PERSON` (`crates/mp/renderer/src/tr_mesh.rs:369`).
+- Resolved but inert: `RF_DISTORTION`. `EntityFx::resolve` reads the bit (`pipeline3d.rs:4403`), the stage logs once through `Warned::Distortion` (`:2766`, `:2960`), and the draw is unchanged. The open marker is `//TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm` (`:4378`).
+- No gate to answer: `RF_NOSHADOW`. Both oracle reads sit behind `r_shadows->integer == 2`, the stencil-shadow surface add (`oracle/codemp/renderer/tr_mesh.cpp:391-396`, `oracle/codemp/renderer/tr_ghoul2.cpp:2586-2611`). The retail default is `cg_shadows` 1 (`oracle/codemp/renderer/tr_init.cpp:1139`), and this workspace has no shadow backend at all. Every body in `crates/mp/renderer/src/tr_shadows.rs` is a deferred no-op.
+
+So this step delivers three things. It ports the `RF_DISTORTION` chain end to end, it gives the disintegrate pair and the volumetric arm their first goldens, and it converts the two `RF_NOSHADOW` deferral notes to the greppable marker convention with the MP-versus-SP asymmetry recorded.
+
+The step does not touch the FX module, the sim side, `cgame`, `ui`, the 2D path, the sky path, the mark path, or the dlight passes. It adds no cvar, no `FrameEvent` variant, and no ABI surface. It ports no shadow backend and no dynamic-glow pass.
+
+**Carried from step-009, and relevant here.** The per-surface vertex cap against the oracle's `tess` batching is a standing backend architecture fact and this step does not change it. The `oldorigin` portal-view divergence note (step-009 finished file, open gaps) stands untouched. The two stale `tr_surface.rs` doc comments step-009 flagged as a later one-line fix (`crates/mp/renderer/src/tr_surface.rs:108-116` and `:1217-1243`) are still out of contract and stay untouched here.
+
+## The oracle, cited
+
+### The renderfx block
+
+`oracle/codemp/cgame/tr_types.h:17-54` holds twenty-one flags. `RF_DISTORTION` is `0x02000` (`:41`, Raven: "area distortion effect -rww"), `RF_FORCEPOST` is `0x200000` (`:54`), `RF_FORCE_ENT_ALPHA` is `0x00400` (`:36`), `RF_NOSHADOW` is `0x00040` (`:26`), `RF_VOLUMETRIC` is `0x00020` (`:24`), and the disintegrate pair is `0x20000` and `0x40000` (`:47-48`).
+
+SP uses a different bit layout entirely: SP `RF_DISTORTION` is `0x400000` (`oracle/code/renderer/tr_types.h:51`) and SP defines `RF_ALPHA_FADE` (`:34`), which MP has no definition for anywhere. Port the MP constants and never an SP one.
+
+### The post-render list (`oracle/codemp/renderer/tr_backend.cpp`)
+
+`RB_RenderDrawSurfList` defers three flags out of the sorted draw and replays them after the whole list.
+
+**The enqueue** (`:778-837`). For every draw surf whose entity is not `TR_WORLDENT`, and while `g_numPostRenders < MAX_POST_RENDERS`, the test is a three-way or: `RF_DISTORTION`, `RF_FORCEPOST`, or `RF_FORCE_ENT_ALPHA` (`:781-783`). A match stores `depthRange`, `entNum`, `drawSurf`, `dlighted`, `fogNum`, and `shader` into `g_postRenders[g_numPostRenders++]` (`:786-823`), restores the four old batch values (`:827-830`), sets `oldSort = -20` so the next surface of the same sort still enters (`:832`), and `continue`s without opening a draw surf (`:835`). Past the 128 cap the surface falls through to the normal path.
+
+`MAX_POST_RENDERS` is 128 (`:655`), `postRender_t` is at `:657-666`, and the two file statics are at `:668-669`. Raven's own comment says the post-render path "lacks much of the optimization that the standard sort-render crap does, so it's slower" (`:653-654`), which is the statement that each entry draws as its own batch with no merging.
+
+**The drain** (`:1003-1214`). The loop is LIFO: `while (g_numPostRenders > 0) { g_numPostRenders--; pRender = &g_postRenders[g_numPostRenders]; ... }` (`:1008-1011`). So the deferred surfaces draw in reverse submission order. Each iteration opens its own `RB_BeginSurface` (`:1013`), sets `backEnd.currentEntity` and the entity transform (`:1032-1049`), applies the stored depth range (`:1055-1071`), captures the screen when the entity is a distortion entity (`:1144-1209`), draws the one surface (`:1211`), and closes with `RB_EndSurface` (`:1212`).
+
+The `eValid` false arm at `:1141-1143` is an empty block, and the world-surface branch it belonged to is commented out (`:1015-1030`, `:838-875`), so `eValid` is always true in the retail build.
+
+**The dead branches.** `tr.distortionShader` is created once as the marker shader `internal_distortion` (`oracle/codemp/renderer/tr_shader.cpp:4166`) and is never assigned to a real surface. The two `shader == tr.distortionShader` tests in `RB_RenderDrawSurfList` (`:816`, `:839`) are inside `/* */` comment blocks. The 2048-square full-screen capture (`:1073-1140`) is inside a comment block too. Port none of them.
+
+### The per-entity screen capture (`oracle/codemp/renderer/tr_backend.cpp:1144-1209`)
+
+The gate is `(entities[pRender->entNum].e.renderfx & RF_DISTORTION) && lastPostEnt != pRender->entNum` (`:1144-1145`), so one capture per distinct entity per frame. `lastPostEnt` starts at `-1` (`:1006`) and takes the entity number after a successful capture (`:1207`).
+
+The rect comes from the entity itself: `r = R_WorldCoordToScreenCoord(backEnd.currentEntity->e.origin, &x, &y)` and `rad = backEnd.currentEntity->e.radius` (`:1172-1173`). On a false return the capture is skipped and `lastPostEnt` stays put, so a later surface of the same entity retries.
+
+`R_WorldCoordToScreenCoordFloat` (`:597-635`) projects a world point onto the screen. It reads `glConfig.vidWidth/2` and `vidHeight/2` as the center (`:608-609`), copies the three `tr.refdef.viewaxis` rows as forward, right, and up (`:612-614`), subtracts `tr.refdef.vieworg` (`:616`), builds `transformed` as the three dot products in the order right, up, forward (`:618-620`), returns false when `transformed[2] < 0.01` (`:623-626`), and otherwise computes `xzi = xcenter / transformed[2] * (90.0 / tr.refdef.fov_x)` and `yzi = ycenter / transformed[2] * (90.0 / tr.refdef.fov_y)` (`:628-629`) before `*x = xcenter + xzi * transformed[0]` and `*y = ycenter - yzi * transformed[1]` (`:631-632`). The `y` it returns therefore counts down from the top of the screen. `R_WorldCoordToScreenCoord` (`:637-645`) is the integer wrapper and truncates both through `(int)`.
+
+The clamp (`:1178-1198`) is `cX = glConfig.vidWidth - x - (rad/2)` and `cY = glConfig.vidHeight - y - (rad/2)`, each then pushed back to `vidWidth - rad` or `vidHeight - rad` when the box would run off the far edge, and to `0` when it goes negative. The `vidHeight - y` term converts Raven's top-down `y` to the GL framebuffer's bottom-up origin. The `vidWidth - x` term has no such justification and mirrors the box horizontally. It is Raven's own behavior and it ports as written.
+
+The copy is `qglCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, cX, cY, rad, rad, 0)` (`:1204`). `qglCopyTexImage2D` re-specifies the texture, so `tr.screenImage` becomes a `rad` by `rad` texture on every capture. Its declaration is `image_t *screenImage;` (`oracle/codemp/renderer/tr_local.h:1337`, Raven: "reserve us a gl texnum to use with RF_DISTORTION") and `R_CreateBuiltinImages` allocates it as an 8 by 8 white placeholder (`oracle/codemp/renderer/tr_image.cpp:2776`).
+
+### The distortion stage arm (`oracle/codemp/renderer/tr_shade.cpp:2163-2169`)
+
+```c
+if ( (tess.shader == tr.distortionShader) ||
+     (backEnd.currentEntity && (backEnd.currentEntity->e.renderfx & RF_DISTORTION)) )
+{ //special distortion effect -rww
+    //tr.screenImage should have been set for this specific entity before we got in here.
+    GL_Bind( tr.screenImage );
+    GL_Cull(CT_TWO_SIDED);
+}
+```
+
+The whole arm is a texture bind plus a cull change. It computes nothing per vertex. `ComputeColors` and `ComputeTexCoords` already ran at `:2081` and `:2083`, so the stage keeps its own colours and texture coordinates and only swaps which image they sample.
+
+The arm is the head of an `else if` chain, so a distortion stage never reaches `R_BindAnimatedImage` (`:2175`). It sits inside the single-texture branch: a multitextured stage diverts to `DrawMultitextured` at `:2147-2150`, which has no distortion handling.
+
+The second test at `:2177-2189` is the stencil-cutout path and is keyed on `tess.shader == tr.distortionShader` only, so `RF_DISTORTION` never reaches it. `tr_stencilled` is written there and nowhere else, which makes `RB_DistortionFill` and the full-screen `RB_CaptureScreenImage` unreachable through the entity path. Neither is in scope.
+
+The state bits are unchanged by the arm. `GL_State(stateBits)` runs in the default `else` at `:2203-2206`, which a distortion stage skips, so a distortion stage draws under whatever GL state the previous stage left. That is the same behavior the `RF_FORCE_ENT_ALPHA` arm and the `RF_DISINTEGRATE1` override produce, and this backend has no leaked-state model. Open row 6 rules the disposition.
+
+### The disintegrate pair
+
+`ComputeColors` short-circuits both flags together (`oracle/codemp/renderer/tr_shade.cpp:1536-1543`) and sets `killGen`, so the normal rgbGen switch is skipped. `RB_CalcDisintegrateColors` (`oracle/codemp/renderer/tr_shade_calc.cpp:1545-1637`) computes `threshold = (backEnd.refdef.time - ent->endTime) * 0.045f` and, per vertex, `dis = VectorLengthSquared(e.oldorigin - xyz)`. `RF_DISINTEGRATE1` maps `dis` to five bands, `RF_DISINTEGRATE2` to two. `RB_CalcDisintegrateVertDeform` (`:1640-1671`) fires for `RF_DISINTEGRATE2` alone and pushes each vertex along its normal.
+
+Both are already ported and live: `crates/mp/renderer/src/tr_shade_calc.rs:588-640` and `:648-674`, called from `crates/mp/renderer-gpu/src/pipeline3d.rs:4122` and `:4127`. `RF_DISINTEGRATE1` also forces the stage state bits (`tr_shade.cpp:2043-2047`), ported at `pipeline3d.rs:4413-4417`. This step adds no code for them, only a gate.
+
+The vert deform reads the surface normals, so it fires only on a surface that decodes them. In this backend that is an MD3 or a Ghoul2 surface (`pipeline3d.rs:4126`, and the two normal producers at `:2295` and `:2472`). A CPU-built sprite has no normals and keeps its vertices.
+
+### The volumetric arm
+
+`ComputeColors` short-circuits it at `oracle/codemp/renderer/tr_shade.cpp:1554-1581`, with Raven's own note that "this should also be a CGEN type, but that would entail adding new shader commands....which is too much work for one thing". Per vertex it takes `dot = DotProduct(normal, backEnd.refdef.viewaxis[0])`, raises it to the fourth power, clamps anything under `0.2` to zero, and writes `myftol(e.shaderRGBA[0] * (1 - dot))` into all four channels.
+
+Ported and live at `crates/mp/renderer-gpu/src/pipeline3d.rs:4249-4273`. The single cgame submitter is the DEMP2 alt-fire detonation shell (`oracle/codemp/cgame/fx_demp2.c:248`), which is a model, so the census's 50 submissions all carry normals. A surface with no normals takes `dot = 0` and the entity's red channel flat, which proves only that the short-circuit fired.
+
+### `RF_NOSHADOW`
+
+Two renderer reads, both under `r_shadows->integer == 2`: `oracle/codemp/renderer/tr_mesh.cpp:391-396` and `oracle/codemp/renderer/tr_ghoul2.cpp:2586-2611`. One renderer write, the out-of-range Ghoul2 suppression at `oracle/codemp/renderer/tr_ghoul2.cpp:3521-3527`. The cgame side only ever sets the bit, and `CG_PlayerShadow` (`oracle/codemp/cgame/cg_players.c:4612-4707`) never reads it.
+
+The MP projection-shadow add (`r_shadows->integer == 3`) does **not** test `RF_NOSHADOW`. It tests `RF_SHADOW_PLANE` alone (`tr_mesh.cpp:400-405`, `tr_ghoul2.cpp:2614-2622`). SP does test it there (`oracle/code/renderer/tr_ghoul2.cpp:2801`). That asymmetry is load bearing and a port must keep MP's shape, per porting-rules §20.
+
+`r_shadows` is the same cvar as `cg_shadows`: the renderer registers its handle against the literal name (`oracle/codemp/renderer/tr_init.cpp:1139`, default `"1"`). At the retail default neither read runs.
+
+The two Rust sites carry `DEFERRED:` notes rather than the marker convention: `crates/mp/renderer/src/tr_mesh.rs:512-514` and `crates/mp/renderer/src/tr_ghoul2.rs:2459-2462`.
+
+### Random draws and the macro multi-eval trap
+
+None of the bodies this step transcribes draws a random number. `R_WorldCoordToScreenCoordFloat`, the capture clamp, the distortion stage arm, `RB_CalcDisintegrateColors`, `RB_CalcDisintegrateVertDeform`, and the volumetric block contain no `crandom`, `random`, `Q_crandom`, or `Q_random` call. The `VectorMA` and `VectorScale` macros expand their scale argument once per component (`oracle/codemp/game/q_shared.h:1361,1365`), which is why a random-drawing scale argument may never be hoisted, but no site in this step's scope has one. The lane must still not hoist a draw anywhere, and the `Pipeline3d::rng` stream step-009 landed is untouched here.
+
+## The backend gaps this step must bridge
+
+The oracle captures the screen with an immediate-mode GL call in the middle of a draw. This backend is wgpu, and three facts change the shape.
+
+**A render pass owns its attachment.** `Pipeline3d::draw` opens one render pass over the whole item list (`crates/mp/renderer-gpu/src/pipeline3d.rs:1338-1345`), and wgpu forbids a texture copy out of a live attachment. The capture therefore has to sit between two passes. The oracle's own structure hands that split over for free: every deferred surface already draws after the main list, so the main pass ends, the copies encode, and a second pass with `wgpu::LoadOp::Load` draws the post-render list.
+
+**The target texture is not reachable.** `execute_frame` and `Pipeline3d::draw` take `target: &TextureView` only. A copy needs the `wgpu::Texture`. Both surface arms already own one: the windowed caller holds `frame.texture` from `Gpu::begin_frame` (`crates/mp/client-app/src/render_thread.rs:129`), and the headless arm owns its offscreen texture inside `Gpu`. The windowed surface is configured `COPY_SRC` for `screenshot_tga` (`crates/mp/renderer-gpu/src/gpu.rs:116-118`) and the headless texture is `RENDER_ATTACHMENT | COPY_SRC` (`:380`), so both are already copy sources and no usage flag changes.
+
+**A wgpu texture cannot be re-specified.** `qglCopyTexImage2D` replaces `tr.screenImage`'s storage with a `rad` by `rad` image on every capture, and the stage then samples that image over the full `0..1` texture-coordinate range. A wgpu texture has a fixed size, so the port keeps one screen-image texture and rebuilds it whenever the requested `rad` differs from the one it holds. That reproduces the oracle's sampling exactly at the cost of an allocation on a radius change.
+
+**Culling is already off.** The pipeline sets `cull_mode: None` (`pipeline3d.rs:3191`), with the comment that the frontend has already culled and per-shader sidedness lands later. So `GL_Cull(CT_TWO_SIDED)` is already this backend's state and the arm's cull half needs no code. Record the fact at the site rather than writing a no-op.
+
+## Surface contract
+
+### `crates/mp/renderer/src/tr_backend.rs`
+
+One new const, in the twin that owns Raven's `tr_backend.cpp` statics, the same placement rule step-009 used for `LIGHTNING_RECURSION_LEVEL`:
+
+```rust
+/// Raven `MAX_POST_RENDERS` - the post-render queue depth `RB_RenderDrawSurfList` fills.
+/// A surface past the cap falls through to the normal sorted draw instead of deferring.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:655`
+pub const MAX_POST_RENDERS: usize = 128;
+```
+
+The deferred `RB_RenderDrawSurfList` note in this file gains one line naming `Pipeline3d::draw` as the live post-render home. No body in this file is ported, and no `todo!()` in it is removed.
+
+### `crates/mp/renderer-gpu/src/gpu.rs`
+
+One new accessor, the headless twin of the windowed caller's `frame.texture`:
+
+```rust
+/// The offscreen texture the headless target draws into, the copy source a mid-frame capture reads.
+/// Panics on the windowed path, which has no offscreen texture.
+pub fn headless_texture(&self) -> &wgpu::Texture
+```
+
+Nothing else in this file changes. No usage flag, no format, no resize behavior.
+
+### `crates/mp/renderer-gpu/src/gpu_images.rs`
+
+One new method beside `world_bind_group` (`:348`), which cannot serve here because it resolves its diffuse through an `ImageHandle` and the screen image has none:
+
+```rust
+/// Builds the world texture bind group with an explicit diffuse view, the shape the distortion stage needs.
+/// The screen image is render-thread scratch with no `ImageHandle`, so it binds by view and takes the clamping sampler.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:2167` (`GL_Bind( tr.screenImage )`)
+pub fn view_bind_group(
+    &self,
+    gpu: &Gpu,
+    layout: &BindGroupLayout,
+    diffuse: &TextureView,
+    lightmap: Option<ImageHandle>,
+) -> BindGroup
+```
+
+### `crates/mp/renderer-gpu/src/frame_exec.rs`
+
+`execute_frame` (`:403`) and `execute_package` (`:347`) each gain one parameter beside the existing `target`, and `render_world` (`:715`) forwards it:
+
+```rust
+        target_texture: &wgpu::Texture,
+```
+
+No other change. The event loop, the phase order, and the 2D pass are untouched.
+
+### `crates/mp/renderer-gpu/src/pipeline3d.rs`
+
+`Pipeline3d` (`:911-965`) gains one private field, built as `None` in `Pipeline3d::new`:
+
+```rust
+    /// Raven's `tr.screenImage`, the square of the frame a distortion stage samples instead of its own texture.
+    /// `qglCopyTexImage2D` re-specifies the oracle's texture per capture, so this rebuilds whenever the requested side length changes.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1337`
+    screen_image: Option<ScreenImage>,
+```
+
+One new private type beside it:
+
+```rust
+/// One capture of the frame into a square texture, held across frames and rebuilt on a side-length change.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1200-1205`
+struct ScreenImage {
+    side: u32,
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+}
+```
+
+`StageDrawItem` (`:810-843`) gains two fields:
+
+```rust
+    /// The entity number this item defers behind, Raven's `postRender_t::entNum`.
+    /// `Some` moves the item into the post-render pass, and the capture reads the entity back by this index.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:781-783,1011`
+    post_render_ent: Option<i32>,
+    /// Whether this stage binds the captured screen image instead of its own diffuse.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
+    screen_image: bool,
+```
+
+`Pipeline3d::draw` (`:1167`) gains one parameter:
+
+```rust
+        target_texture: &wgpu::Texture,
+```
+
+Four new private free functions:
+
+```rust
+/// Raven `R_WorldCoordToScreenCoordFloat` - projects a world point onto the screen in top-down pixel coordinates.
+/// It returns `None` where the point sits at or behind the eye plane, Raven's `transformed[2] < 0.01` early return.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:597-635`
+fn world_coord_to_screen_coord_float(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(f32, f32)>
+
+/// Raven `R_WorldCoordToScreenCoord` - the integer wrapper, truncating both components.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:637-645`
+fn world_coord_to_screen_coord(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(i32, i32)>
+
+/// The source rectangle one distortion capture copies, as `(x, y, side)` in the target texture's top-down coordinates.
+/// Raven's `cY` counts from the framebuffer's bottom edge, and the flip back to a top-down origin happens here.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1172-1198`
+fn screen_capture_rect(
+    e: &refEntity_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(u32, u32, u32)>
+
+/// Encodes one distortion entity's capture into `screen_image`, rebuilding the texture when the side length changed.
+/// The oracle re-specifies its texture on every copy, so a rebuild here is the faithful shape rather than a cache miss.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1144-1209`
+fn capture_screen_image(
+    gpu: &Gpu,
+    encoder: &mut wgpu::CommandEncoder,
+    target_texture: &wgpu::Texture,
+    screen_image: &mut Option<ScreenImage>,
+    rect: (u32, u32, u32),
+)
+```
+
+Behavior changes inside existing bodies, each written in the file's established shape and cited at the site:
+
+- `collect_stage_items` fills the two new `StageDrawItem` fields. `post_render_ent` is `Some(entity_num)` when the surface's entity is not the world entity and the entity carries `RF_DISTORTION`, `RF_FORCEPOST`, or `RF_FORCE_ENT_ALPHA`, and while fewer than `MAX_POST_RENDERS` distinct surfaces already deferred. `screen_image` is `EntityFx::resolve`'s `distortion` bit.
+- `Pipeline3d::draw` partitions `items` into the main list and the post-render list, keeping every stage of one surface together and reversing the order of the deferred surfaces, which is the oracle's LIFO drain. It draws the main list in the existing pass, encodes one capture per distinct deferred entity that carries `RF_DISTORTION`, then draws the post-render list in a second pass with `wgpu::LoadOp::Load` on the colour attachment and `wgpu::LoadOp::Load` on the depth attachment.
+- The bind-group cache key in `Pipeline3d::draw` (`:1270`) gains the `screen_image` flag, and a `screen_image` item builds its group through `GpuImages::view_bind_group` against the captured view. A distortion item with no capture this frame binds its own diffuse, which is the oracle's behavior when `R_WorldCoordToScreenCoord` returns false.
+- The `//TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm` marker and its stand-in note (`:4376-4383`) are deleted, and `EntityFx::distortion`'s doc records that the arm's cull half is already this backend's state.
+- `Warned::Distortion` (`:686`), its slot (`:701`), its description (`:716`), and the two `warn_once` calls (`:2766`, `:2960`) are deleted. `Warned::COUNT` (`:690`) drops from 8 to 7.
+
+New imports, merged into the file's existing use groups: `MAX_POST_RENDERS` from `mp_renderer::tr_backend`, `RF_FORCEPOST` from the `mp_qshared` `tr_types` group at `:44-47`, and `TrRefdef` from wherever the file already reaches `FrameState::refdef`. No `use` inside a function body, and no inline fully qualified path in an expression.
+
+### `crates/mp/renderer/src/tr_mesh.rs` and `crates/mp/renderer/src/tr_ghoul2.rs`
+
+Comment text only. The `DEFERRED:` note at `tr_mesh.rs:512-514` and the one at `tr_ghoul2.rs:2459-2462` each become a `//TODO: Port` marker with a `// Source:` cite, naming the missing stencil-shadow backend as the blocker and recording that MP's projection-shadow add does not test `RF_NOSHADOW` while SP's does. No code changes in either file.
+
+### `crates/mp/renderer-gpu/tests/scene_golden.rs`
+
+One new scene builder and one new test, in the shape of `scene_depthhack` and `golden_scene_depthhack` (`:726-752`, `:922-930`):
+
+```rust
+fn scene_distortion(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t)
+
+#[test] fn golden_scene_distortion()
+```
+
+No `#[ignore]`, matching every sibling in this file. `CHANNEL_TOLERANCE` stays 0.
+
+`scene_distortion` draws a backdrop of four opaque sprites in four different colours through `gfx/golden/opaque`, then one `RF_DISTORTION` sprite through `gfx/golden/vertex` over the middle of them, with a radius large enough for the capture square to span more than one backdrop colour. The distortion sprite must land in the post-render pass and sample the mirrored backdrop square rather than white.
+
+### `crates/mp/renderer-gpu/tests/entity_golden.rs`
+
+One new scene and one new test, sharing the file's existing boot recipe:
+
+```rust
+#[test] #[ignore] fn golden_entity_renderfx_duel1()
+```
+
+It draws the `twinpodcc.md3` map object three times in one duel1 frame at three fixed origins, one with `RF_DISINTEGRATE1`, one with `RF_DISINTEGRATE2`, and one with `RF_VOLUMETRIC`. The two disintegrate entities carry an `endTime` and an `oldorigin` chosen so the frozen clock puts the burn threshold inside the model's bounds, which is what makes the colour bands and the vert deform visible. `#[ignore]` matches the file's existing test, because the scene needs the retail assets.
+
+### Fixtures
+
+Two new PNGs under `crates/mp/renderer-gpu/tests/goldens/`: `scene_distortion.png` and `entity_renderfx_duel1.png`.
+
+One conditional re-bless: `scene_renderfx_tint.png`, only if the post-render deferral moves it. See open row 5.
+
+Anything not on this list is out of scope, and the agent must not add it. No new third-party crate, because a dependency of the DEC-49 kind is a user ruling and this packet may never grant one. No shadow backend, no `RB_DistortionFill`, no `RB_CaptureScreenImage` full-screen path, no dynamic-glow pass, no `tr.distortionShader` marker-shader path. No change to any file under `crates/mp/engine/`, `crates/mp/cgame/`, `crates/mp/ui/`, or `crates/mp/uishared/`. No change to `stage2d.rs`, `pipeline2d.rs`, `tr_shade.rs`, `tr_surface.rs`, `tr_shadows.rs`, or any WGSL shader. No new `FrameEvent` variant, no new cvar, no new stat field, no ABI change, and no `WorldVertex` change. No edit to `world_golden.rs`, `ghoul2_vertex_golden.rs`, or `hud_golden.rs`. Every committed fixture except `scene_renderfx_tint.png` is read-only, and the two new PNGs are the only fixtures this step may create.
+
+## Divergence notes, each ≤2 lines at its site
+
+- **A zero or negative capture radius draws plain.** `rad` comes from `(int)e.radius` and nothing guards it. GL accepts a zero-sized `qglCopyTexImage2D` and leaves an unsampleable texture, and wgpu rejects a zero-sized texture outright. This is rule-19 undefined behavior, so the port picks the defined answer: skip the capture and let the stage bind its own diffuse.
+- **A capture wider than the target is clamped.** Raven's clamp produces a negative `cX` when `rad > vidWidth`, and `qglCopyTexImage2D` then reads outside the framebuffer. The port clamps the side length to the smaller target dimension first, which is the same rule-19 choice.
+- **The horizontal mirror is preserved.** `cX = vidWidth - x - rad/2` mirrors the captured square, where `cY = vidHeight - y - rad/2` only converts a top-down `y` to GL's bottom-up origin. The mirror is Raven's behavior and it ports as written, with a site note so a reader does not read it as a port bug.
+- **The distortion stage keeps the previous stage's GL state.** The oracle's arm skips `GL_State(stateBits)` and inherits whatever the last stage set. This backend has no leaked-state model and every item carries its own pipeline key, so a distortion stage draws under its own shader state. See open row 6.
+
+## Open rows
+
+**Row 1 - the `RF_DISTORTION` scope (user ruling).** The census counts 2,125 `RF_DISTORTION` submissions across the four traces (`scene-trap-census.md:164`), and DEC-54's complement rule covers unexercised features, which this is not (`docs/decisions.md:1415`). So the flag is real live surface and a documented complement is not available to it. The question is how much lands now. **Proposed default: land the whole chain in this step, the post-render list, the per-entity capture, and the stage bind.** The three parts are not separable in behavior: the capture is meaningless without the deferral that orders it, and the bind is meaningless without the capture. The alternative is to land the post-render deferral alone for draw-order parity and open a ticket for the capture, which leaves the census's second-largest dark row open past the step the plan named as its closer.
+
+**Row 2 - the target texture reaches the backend (user ruling).** `Pipeline3d::draw` cannot copy out of a `TextureView`. **Proposed default: `execute_frame`, `execute_package`, `render_world`, and `Pipeline3d::draw` each gain a `target_texture: &wgpu::Texture` parameter beside the existing `target`, and `Gpu` gains a `headless_texture` accessor so the headless callers can pass one.** This touches all nine `execute_frame` call sites plus `execute_package`'s one, four of them in test files the step otherwise does not edit. The alternative shapes are worse: a `FrameTarget` struct that bundles the two is a wider contract change, and letting `Gpu` remember the last acquired surface texture hides a lifetime the caller already owns.
+
+**Row 3 - the screen-image texture shape (user ruling, new design).** A wgpu render-to-texture capture has no oracle equivalent shape, so this is a design choice and not a transcription. **Proposed default: `Pipeline3d` owns one `Option<ScreenImage>` holding a square texture at the target's own format, `TEXTURE_BINDING | COPY_DST`, rebuilt whenever the requested side length differs from the one it holds, and filled by `copy_texture_to_texture` between the two render passes.** That reproduces the oracle's sampling exactly, because a stage samples the captured square over the full `0..1` range in both worlds. The alternatives each need a divergence: a fixed full-target texture would need a texture-coordinate scale uniform the oracle has no equivalent for, and a fixed maximum size would sample the wrong sub-rect.
+
+**Row 4 - the two goldens (user ruling).** **Proposed default: two new PNGs, each through the step-007 procedure that step-008 and step-009 ratified.** Run once with `JKA_GOLDEN_BLESS=1`, re-run without it to confirm the byte-identical pass, then STOP before the commit that carries the PNG so the user looks at the image. Named defect conditions, one per image.
+
+`scene_distortion.png` must show the distortion sprite carrying a recognizable, horizontally mirrored square of the four-colour backdrop, not a flat white or flat coloured quad. A flat quad means the capture never ran or the bind fell back to the stage's own diffuse. A sprite showing the backdrop unmirrored means the `vidWidth - x` term was corrected away, which is a divergence this packet does not permit.
+
+`entity_renderfx_duel1.png` must show three copies of the same model that differ from each other. The `RF_DISINTEGRATE1` copy must carry visible grey and black bands with a hole, the `RF_DISINTEGRATE2` copy must carry a hard white-to-transparent edge with the surviving shell visibly pushed out along its normals, and the `RF_VOLUMETRIC` copy must carry a rim that brightens away from the view axis. Three identical models means the short-circuit never fired. A `RF_DISINTEGRATE2` copy with no vertex displacement means the normals never reached the deform.
+
+The alternative for the second image is a synthetic sprite scene, which needs no retail assets but has no normals, so it would gate neither the vert deform nor the volumetric fade. The disintegrate colour bands would still show on a sprite's four corners. That trade is the row's real content.
+
+**Row 5 - `scene_renderfx_tint.png` under the deferral (user ruling).** The post-render list defers `RF_FORCE_ENT_ALPHA`, which is already live and already gated. `scene_renderfx_tint` submits two entities carrying it (`scene_golden.rs:697-698`) among four sprites that do not overlap, so the reordering may or may not move a pixel. **Proposed default: the deferral lands exactly as the oracle writes it, and if the golden moves the lane STOPs and the image goes through the row-4 bless procedure before the commit lands.** The four sprites must still read as four sprites in the same four positions and colours. A sprite that changed colour or vanished is a defect, not a blessable golden, because a pure reordering of non-overlapping alpha quads cannot change either.
+
+**Row 6 - the distortion stage's inherited GL state (mechanical).** Proposed default: draw the distortion stage under its own shader state and record the gap in a `≤2`-line site note. The oracle's arm skips `GL_State(stateBits)`, so a distortion stage inherits whatever blend and depth state the previous stage set, which for the first stage of a surface is the previous surface's. This backend gives every item its own pipeline key by construction and has never modeled leaked GL state. Reproducing the leak would mean threading a running state value through the item list, which is a backend architecture change and out of scope.
+
+**Row 7 - the post-render partition and the LIFO order (mechanical).** Proposed default: partition at the surface, not at the stage. Every `StageDrawItem` a deferred surface produced moves together and keeps its own stage order, and the order of the deferred surfaces reverses to match the oracle's `while (g_numPostRenders > 0) { g_numPostRenders--; ... }` drain (`tr_backend.cpp:1008-1011`). A flat reversal of the item list would reverse the stages inside each surface too, which the oracle never does. The `MAX_POST_RENDERS` cap counts surfaces, not stages, and a surface past the cap draws in the main pass.
+
+**Row 8 - the `RF_NOSHADOW` disposition (user ruling).** **Proposed default: no port, a recorded disposition.** Both reads gate on `r_shadows->integer == 2`, the retail default is 1, and this workspace has no shadow backend to add a surface to. The two Rust sites convert their `DEFERRED:` notes to `//TODO: Port` markers with `// Source:` cites, which is what makes the row greppable, and each records that MP's projection-shadow add does not test the flag while SP's does. The flag graduates with the stencil-shadow backend, per DEC-54's complement rule. The alternative is to port the whole stencil-shadow chain, which is a step of its own and much larger than this one.
+
+**Row 9 - the capture dedup and its retry (mechanical).** Proposed default: transcribe `lastPostEnt` as written. It is set only after a successful copy (`tr_backend.cpp:1207`), so an entity whose first deferred surface projects behind the eye retries on its next surface. Reset it per frame, matching the local declared inside the drain (`:1006`), and never per view.
+
+**Row 10 - `MAX_POST_RENDERS`'s home (mechanical).** Proposed default: `mp_renderer::tr_backend`, beside the deferred `RB_RenderDrawSurfList` that owns Raven's `tr_backend.cpp` file statics. This is the step-009 precedent for `LIGHTNING_RECURSION_LEVEL` and `TrSurfaceShapeState`, which kept their canonical home in `mp_renderer::tr_surface` while the live arms landed in `pipeline3d.rs`.
+
+## Pause triggers, named for this step
+
+- Any committed fixture other than `scene_renderfx_tint.png` moves. STOP. Commits 1, 3, and 4 change no committed draw, and a moved pixel means something else changed.
+- `scene_renderfx_tint.png` moves in any commit other than commit 2. STOP. Only the deferral may touch it.
+- A committed fixture moves in commit 4. STOP. No committed scene submits `RF_DISTORTION`, so the stage arm must be inert on all of them.
+- The capture appears to need the frame's depth buffer, a second colour attachment, or a resolve target. STOP. The oracle copies colour only.
+- The distortion sprite draws white in the golden candidate. STOP before blessing. That is the capture failing, not a look to accept.
+- The horizontal mirror looks like a bug worth fixing. STOP. It is Raven's behavior, and the packet's capture section is the instruction.
+- The `RF_NOSHADOW` work appears to need a shadow surface, a `tr.shadowShader`, or a stencil pass. STOP, per row 8. This step ports no shadow path.
+- Any arm seems to need `tr.distortionShader`, `tr_stencilled`, `RB_DistortionFill`, or the 2048-square capture. STOP. All four are dead or unreachable in the retail MP build.
+- The post-render partition seems to need a mutable `refEntity_t` or a second entity walk. STOP. The capture reads the entity back by index out of the existing `entities` slice.
+- Verification is `cargo build` or `cargo check` plus the golden suites, never rust-analyzer, which is stale in this workspace.
+
+## Commit bundle
+
+The full gate battery, named once and referenced per commit:
+
+- `cargo build --workspace`. An intermediate commit may carry warnings, and the bundle's final state must build with zero warnings. Commit 1 leaves `target_texture` unread inside `Pipeline3d::draw`, because commit 3 is its first consumer, so one unused-parameter warning is expected there and needs no placeholder. Every commit from 3 onward builds clean.
+- `cargo test --workspace -- --test-threads=1`.
+- `cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1`, all four world goldens byte-identical.
+- `cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`, every scene golden byte-identical.
+- `cargo test -p mp_renderer_gpu --test entity_golden -- --ignored --test-threads=1`, byte-identical.
+- `cargo test -p mp_renderer_gpu --test ghoul2_vertex_golden -- --ignored --test-threads=1`, byte-identical.
+- `cargo test -p mp_renderer_gpu --test hud_golden -- --test-threads=1` and the same with `--ignored`, both byte-identical.
+
+Every golden run is serial with `--test-threads=1`, each as one foreground command with a long timeout. Two engine boots in parallel threads crash in the GPU init path, and the world-golden pk3 inflate aborts without it.
+
+1. **The target texture reaches the backend.** `Gpu::headless_texture`, the new parameter on `execute_package`, `execute_frame`, `render_world`, and `Pipeline3d::draw`, and every call site updated to pass it. No draw changes. Files: `crates/mp/renderer-gpu/src/gpu.rs`, `frame_exec.rs`, `pipeline3d.rs`, `crates/mp/client-app/src/render_thread.rs`, the three harness binaries, and the five test files. Subject: `feat(gh#31 s010): the frame target texture reaches the backend`. Gates: the full battery. All eighteen committed fixtures byte-identical is the proof that the threading is pure.
+
+2. **The post-render list.** `MAX_POST_RENDERS`, the two new `StageDrawItem` fields, the partition and the reversal in `Pipeline3d::draw`, and the second render pass. No capture and no screen bind yet, so a distortion entity still draws its own texture, just later. Files: `crates/mp/renderer/src/tr_backend.rs`, `crates/mp/renderer-gpu/src/pipeline3d.rs`. Subject: `feat(gh#31 s010): the post-render deferral`. Gates: the full battery. Seventeen fixtures byte-identical, and `scene_renderfx_tint.png` under row 5.
+
+3. **The screen capture.** `ScreenImage`, the `Pipeline3d` field, `world_coord_to_screen_coord_float`, `world_coord_to_screen_coord`, `screen_capture_rect`, `capture_screen_image`, and the encode between the two passes. Nothing binds the captured texture yet. Files: `crates/mp/renderer-gpu/src/pipeline3d.rs`. Subject: `feat(gh#31 s010): the per-entity screen capture`. Gates: the full battery. No committed scene submits `RF_DISTORTION`, so all eighteen fixtures stay byte-identical.
+
+4. **The distortion stage arm.** `GpuImages::view_bind_group`, the extended bind-group cache key, the `screen_image` bind, the marker deletion, and the `Warned::Distortion` removal. Files: `crates/mp/renderer-gpu/src/gpu_images.rs`, `pipeline3d.rs`. Subject: `feat(gh#31 s010): the RF_DISTORTION stage arm`. Gates: the full battery, all eighteen fixtures byte-identical.
+
+5. **The distortion golden.** `scene_distortion` and its PNG, after its own row-4 STOP. Files: `crates/mp/renderer-gpu/tests/scene_golden.rs` and the new PNG. Subject: `test(gh#31 s010): the distortion golden`. Gates: the full battery, with the new golden green at tolerance zero.
+
+6. **The disintegrate and volumetric golden.** `golden_entity_renderfx_duel1` and its PNG, after its own row-4 STOP. Files: `crates/mp/renderer-gpu/tests/entity_golden.rs` and the new PNG. Subject: `test(gh#31 s010): the disintegrate and volumetric golden`. Gates: the full battery, with the new golden green at tolerance zero.
+
+7. **The `RF_NOSHADOW` disposition.** The two marker conversions, comment text only. Files: `crates/mp/renderer/src/tr_mesh.rs`, `crates/mp/renderer/src/tr_ghoul2.rs`. Subject: `docs(gh#31 s010): the RF_NOSHADOW disposition`. Gates: the full battery, with every fixture byte-identical, which is what a comment-only change must produce.
+
+8. **The finished file**, per the packet skill: assumptions and choices keyed to their commits, deviations or the word "none", the commit list with gate results, and open gaps. File: `.claude/packets/31/step-010/finished.md`. Subject: `process(gh#31 s010): finished file`.
+
+Every commit uses `--no-gpg-sign`, a heading subject, an STE body, and no trailer of any kind: no `Co-Authored-By`, no generated-with footer. Gate results are written as plain sentences inside the body, so no line parses as a git trailer. The lockstep referee is not required, because no commit touches `mp_game`, the server, or any `jampded` link-set crate.
+
+## Write scopes
+
+Branch `gh31-step-010-renderfx`, cut from `gh31-step-009-fx-minirefents`. A worktree builder runs `git merge gh31-step-009-fx-minirefents --no-gpg-sign` as its first act, not a merge from master, because step-009 is not on master yet and its arms are this step's ground.
+
+- `crates/mp/renderer-gpu/src/pipeline3d.rs` - the field, `ScreenImage`, the two `StageDrawItem` fields, the four free functions, the partition, the second pass, the bind, the marker and warning deletions, the imports.
+- `crates/mp/renderer-gpu/src/gpu.rs` - `headless_texture` only.
+- `crates/mp/renderer-gpu/src/gpu_images.rs` - `view_bind_group` only.
+- `crates/mp/renderer-gpu/src/frame_exec.rs` - the new parameter on the three functions only.
+- `crates/mp/renderer/src/tr_backend.rs` - `MAX_POST_RENDERS` and one deferred-note line only.
+- `crates/mp/renderer/src/tr_mesh.rs`, `crates/mp/renderer/src/tr_ghoul2.rs` - the two marker conversions, comment text only.
+- `crates/mp/renderer-gpu/tests/scene_golden.rs` - `scene_distortion` and its test.
+- `crates/mp/renderer-gpu/tests/entity_golden.rs` - `golden_entity_renderfx_duel1` and its scene.
+- `crates/mp/renderer-gpu/tests/goldens/scene_distortion.png`, `entity_renderfx_duel1.png` - new, blessed under the row-4 STOP.
+- `crates/mp/renderer-gpu/tests/goldens/scene_renderfx_tint.png` - re-blessed under the row-4 STOP, in commit 2 only, and only if row 5 fires.
+- `crates/mp/client-app/src/render_thread.rs`, `crates/mp/renderer-gpu/src/bin/dev_harness.rs`, `ui_harness.rs`, `world_harness.rs`, `crates/mp/renderer-gpu/tests/world_golden.rs`, `ghoul2_vertex_golden.rs`, `hud_golden.rs` - edit-only, to pass the new `target_texture` argument. Any other caller `cargo check` shows broken by the same signature is in scope on the same edit-only terms.
+- `.claude/packets/31/step-010/` for `finished.md`.
+
+Everything else is read-only, including `oracle/`, every file under `crates/mp/engine/`, `crates/mp/cgame/`, `crates/mp/ui/`, `crates/mp/uishared/`, `crates/mp/renderer/src/tr_shade.rs`, `tr_surface.rs`, `tr_shadows.rs`, `crates/mp/renderer-gpu/src/stage2d.rs`, `pipeline2d.rs`, every WGSL shader, every other committed fixture, and `~/Developer/jka/` beyond read-only asset reads. Source files change through the Edit tool only.
+
+## Disposition
+
+After a clean lane-review: open the pull request from `gh31-step-010-renderfx` into the `wf/31-renderer-census` umbrella branch and merge it on GitHub with a merge commit. This follows the 2026-08-29 ruling that the census steps collect on the umbrella and reach master in one merge at the end, the same base step-009's pull request #48 uses. The pull request opens after #48 merges, so the diff carries this step's commits alone. Never squash, and never commit on master. The session never pushes or opens the pull request unprompted. It prepares the branch, asks, and the user rules on the push and on the merge.
+
+## Amendments
+
+None yet.
