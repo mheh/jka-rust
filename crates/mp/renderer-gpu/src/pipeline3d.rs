@@ -686,13 +686,10 @@ enum Warned {
     FogImageMissing,
     /// An `SF_ENTITY` draw surf whose `reType` builds no geometry yet.
     EntitySurface,
-    /// An `RF_DISTORTION` entity, which needs the screen-capture refraction
-    /// pass.
-    Distortion,
 }
 
 impl Warned {
-    const COUNT: usize = 8;
+    const COUNT: usize = 7;
 
     fn slot(self) -> usize {
         match self {
@@ -703,7 +700,6 @@ impl Warned {
             Warned::VideoMap => 4,
             Warned::FogImageMissing => 5,
             Warned::EntitySurface => 6,
-            Warned::Distortion => 7,
         }
     }
 
@@ -718,7 +714,6 @@ impl Warned {
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
             Warned::EntitySurface => "skips a generated entity surface whose reType is not ported",
-            Warned::Distortion => "draws an RF_DISTORTION entity plain - no screen capture yet",
         }
     }
 }
@@ -1302,12 +1297,14 @@ impl Pipeline3d {
         // share it. Most surfaces in a frame repeat the same diffuse-plus-lightmap
         // pair, so the cache holds the allocation count near surface count rather
         // than stage-times-surface count.
-        let mut group_cache: HashMap<(Option<ImageHandle>, Option<ImageHandle>), usize> =
+        // The `screen_image` flag joins the key, so a distortion stage never shares an entry with an ordinary stage of the same images.
+        // The entry it does get holds its own diffuse, which is what it binds on a frame where the capture did not run.
+        let mut group_cache: HashMap<(Option<ImageHandle>, Option<ImageHandle>, bool), usize> =
             HashMap::new();
         let mut bind_groups: Vec<wgpu::BindGroup> = Vec::new();
         let mut item_group: Vec<usize> = Vec::with_capacity(items.len());
         for item in &items {
-            let cache_key = (item.diffuse, item.lightmap);
+            let cache_key = (item.diffuse, item.lightmap, item.screen_image);
             let group_index = *group_cache.entry(cache_key).or_insert_with(|| {
                 // The `Faithful` arm builds the exact two-texture group the
                 // pre-seam path built. The `Pbr` arm builds the four-texture
@@ -1438,6 +1435,7 @@ impl Pipeline3d {
                 &main_order,
                 &bind_groups,
                 &item_group,
+                None,
                 geometry,
                 mode,
                 viewport,
@@ -1484,6 +1482,19 @@ impl Pipeline3d {
                 }
             }
 
+            // `RB_IterateStagesGeneric` binds `tr.screenImage` for every stage of a distortion entity.
+            // The view changes with each capture, so this group is built here rather than in the shared cache walk above.
+            // A surface whose capture did not run keeps its cached group and binds its own diffuse, which is the oracle's answer to a false projection.
+            // The PBR backend takes a four-texture layout this two-texture group does not fit, so it keeps its own diffuse as well.
+            // Source: oracle/codemp/renderer/tr_shade.cpp:2163-2169
+            let wants_screen = items[range.clone()].iter().any(|item| item.screen_image);
+            let screen_group = match (wants_screen && last_post_ent == entity_num, mode) {
+                (true, BackendMode::Faithful) => self.screen_image.as_ref().map(|image| {
+                    gpu_images.view_bind_group(gpu, &self.texture_layout, &image.view, None)
+                }),
+                _ => None,
+            };
+
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("mp_renderer_gpu post-render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1514,6 +1525,7 @@ impl Pipeline3d {
                 &order,
                 &bind_groups,
                 &item_group,
+                screen_group.as_ref(),
                 geometry,
                 mode,
                 viewport,
@@ -1527,6 +1539,7 @@ impl Pipeline3d {
 
     /// Draws the stage items `order` names, in that order, into an open pass.
     /// The depth window tracks per pass, so a run that never leaves the normal window sets no viewport and keeps the pass default.
+    /// `screen_group` is the captured-frame group a distortion stage binds in place of its cached one.
     ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158` (the per-stage draw)
     #[allow(clippy::too_many_arguments)]
@@ -1537,6 +1550,7 @@ impl Pipeline3d {
         order: &[usize],
         bind_groups: &[wgpu::BindGroup],
         item_group: &[usize],
+        screen_group: Option<&wgpu::BindGroup>,
         geometry: &WorldGeometry,
         mode: BackendMode,
         viewport: (f32, f32, f32, f32),
@@ -1586,10 +1600,16 @@ impl Pipeline3d {
             };
             pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
+            // A distortion stage samples the captured frame, and it falls back to its own diffuse where no capture stands behind it.
+            let texture_group = match (item.screen_image, screen_group) {
+                (true, Some(group)) => group,
+                _ => &bind_groups[item_group[draw_index]],
+            };
+
             pass.set_pipeline(pipeline);
             // Group 0 selects this surface's clip matrix by its entity slot.
             pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
-            pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
+            pass.set_bind_group(1, texture_group, &[]);
             pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
             pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             pass.draw_indexed(
@@ -2960,9 +2980,6 @@ impl Pipeline3d {
 
         // These stage kinds still draw as a plain stage, but each logs once so
         // the missing behavior stays visible.
-        if fx.distortion {
-            self.warn_once(Warned::Distortion);
-        }
         if stage.glow {
             self.warn_once(Warned::Glow);
         }
@@ -3037,7 +3054,9 @@ impl Pipeline3d {
                 depth_far: false,
                 depth_range,
                 post_render_ent: None,
-                screen_image: fx.distortion,
+                // A multitextured stage diverts to `DrawMultitextured`, which has no distortion arm, so it keeps its own diffuse.
+                // Source: oracle/codemp/renderer/tr_shade.cpp:2147-2150
+                screen_image: false,
             });
         }
 
@@ -3048,7 +3067,11 @@ impl Pipeline3d {
         }
         let reads_lightmap = source == StSource::Lightmap;
         let diffuse = stage_image(bundle0, time.shader_time);
-        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some() || fx.rewrites_colors();
+        // A screen-image stage carries the `v` flip on its evaluated texcoords, so it takes the dynamic path even where nothing else moves it.
+        let dynamic = stage_is_dynamic(stage, false)
+            || fog_mod.is_some()
+            || fx.rewrites_colors()
+            || fx.distortion;
 
         if dynamic {
             let base_vertex = build_dynamic_block(
@@ -3160,9 +3183,6 @@ impl Pipeline3d {
         // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
         let fx = EntityFx::resolve(entity);
         let depth_range = DepthRange::resolve(entity);
-        if fx.distortion {
-            self.warn_once(Warned::Distortion);
-        }
         let state_bits = fx.state_bits(stage.state_bits);
         let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
@@ -4308,6 +4328,15 @@ fn build_dynamic_block(
         warnings,
     );
 
+    // The two worlds store a copied rect in opposite row order: `glCopyTexImage2D` stores it bottom-up and `copy_texture_to_texture` top-down.
+    // A screen-image stage flips `v` here, which cancels that and leaves the sampling where the oracle puts it.
+    // Only the single-texture branch binds the screen image, so a two-texture collapse keeps its own coordinates.
+    if fx.distortion && !two_texture {
+        for coord in st.iter_mut() {
+            coord[1] = 1.0 - coord[1];
+        }
+    }
+
     // The `xyz` block the disintegrate and volumetric arms read, and the one
     // `RB_CalcDisintegrateVertDeform` moves.
     let mut xyz: Vec<[f32; 4]> = cpu
@@ -4743,13 +4772,10 @@ struct EntityFx {
     alpha_depth: bool,
     /// `RF_VOLUMETRIC`: the fake volumetric shading short-circuit.
     volumetric: bool,
-    /// `RF_DISTORTION`: the screen-capture refraction pass.
+    /// `RF_DISTORTION`: the stage samples the captured square of the frame instead of its own diffuse.
+    /// The arm's other half is `GL_Cull(CT_TWO_SIDED)`, and this pipeline already draws with `cull_mode: None`, so that half needs no code.
     ///
-    //TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm
-    // Source: oracle/codemp/renderer/tr_shade.cpp:2162-2168
-    // The arm binds `tr.screenImage` and switches to two-sided culling, so it
-    // needs a screen-capture pass (`RB_CaptureScreenImage`) that no wave has
-    // built. The flag is read only to log once, and the stage draws plain.
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
     distortion: bool,
     /// The entity's `shaderRGBA[3]`, the alpha `RF_FORCE_ENT_ALPHA` writes.
     ent_alpha: u8,
