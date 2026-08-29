@@ -747,6 +747,12 @@ pub fn RB_ShowImages(
     // Source: oracle/codemp/renderer/tr_backend.cpp:1825
 }
 
+/// Raven `MAX_POST_RENDERS` - the post-render queue depth `RB_RenderDrawSurfList` fills.
+/// A surface past the cap falls through to the normal sorted draw instead of deferring.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:655`
+pub const MAX_POST_RENDERS: usize = 128;
+
 /// Raven `RB_RenderDrawSurfList` — the core backend draw loop: walks a sorted
 /// `drawSurf_t` list, decomposing each surface's sort key into
 /// entity/shader/fog/dlight, batching consecutive surfaces that share a
@@ -808,6 +814,8 @@ pub fn RB_ShowImages(
 /// Whole-body deferral: no partial body survives, so this lands as a loud
 /// `todo!()` rather than a silent no-op (whole-fn-deferral convention —
 /// partial-body fns keep DEFERRED comments instead).
+///
+/// The post-render arm of this loop is live in the GPU backend: `Pipeline3d::draw` defers, reverses and replays those surfaces.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:705-1249`
 pub fn RB_RenderDrawSurfList(

@@ -30,6 +30,7 @@
 
 use core::f64::consts::PI;
 use core::ffi::c_int;
+use core::ops::Range;
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -44,7 +45,8 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::tr_types::{
     RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
-    RF_FORCE_ENT_ALPHA, RF_FORKED, RF_GROW, RF_NODEPTH, RF_RGB_TINT, RF_TAPERED, RF_VOLUMETRIC,
+    RF_FORCEPOST, RF_FORCE_ENT_ALPHA, RF_FORKED, RF_GROW, RF_NODEPTH, RF_RGB_TINT, RF_TAPERED,
+    RF_VOLUMETRIC,
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
@@ -64,6 +66,7 @@ use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::render_state::texture_bundle::TextureBundle;
+use mp_renderer::tr_backend::MAX_POST_RENDERS;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
 use mp_renderer::tr_curve::GridMesh;
 use mp_renderer::tr_local::acff_t::acff_t;
@@ -840,6 +843,15 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
     depth_range: DepthRange,
+    /// The entity number this item defers behind, Raven's `postRender_t::entNum`.
+    /// `Some` moves the item into the post-render pass, and the capture reads the entity back by this index.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:781-783,1011`
+    post_render_ent: Option<i32>,
+    /// Whether this stage binds the captured screen image instead of its own diffuse.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
+    screen_image: bool,
 }
 
 /// Raven's `depthRange` switch in `RB_RenderDrawSurfList`: the depth window a
@@ -1208,7 +1220,7 @@ impl Pipeline3d {
 
         let mut dynamic_vertices: Vec<WorldVertex> = Vec::new();
         let mut dynamic_indices: Vec<u32> = Vec::new();
-        let items = self.collect_stage_items(
+        let (items, post_surfaces) = self.collect_stage_items(
             draw_surfs,
             geometry,
             assets,
@@ -1339,6 +1351,38 @@ impl Pipeline3d {
             None => wgpu::LoadOp::Load,
         };
 
+        // The sky box and clouds draw at the far plane. wgpu forces that
+        // through the viewport depth range, not a fixed-function call, so the
+        // loop calls `set_viewport(.., 1.0, 1.0)` when it enters the sky run
+        // and restores `0.0..1.0` when it leaves. A frame with no sky never
+        // sets a viewport, keeping the default full-target range. The rect
+        // comes from the view, as the oracle's `qglViewport` does, so a
+        // future sub-rect view keeps its inset through the toggle.
+        // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
+        // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
+        let vp_x = view.viewportX as f32;
+        let vp_w = view.viewportWidth as f32;
+        let vp_h = view.viewportHeight as f32;
+        // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y that
+        // `R_RenderView` stores from `tr.refdef.y`. GL puts 0 at the bottom,
+        // so the oracle flips y when it sets the viewport. wgpu puts viewport
+        // y at the top like the refdef, so the oracle's GL flip has no
+        // counterpart here. We use the stored value straight.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:838
+        let vp_y = view.viewportY as f32;
+        let viewport = (vp_x, vp_y, vp_w, vp_h);
+
+        // The sorted pass draws everything the post-render enqueue left behind.
+        // A deferred surface reaches its own pass below, because the oracle continues past it without opening a draw surf.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:832-835
+        let mut deferred = vec![false; items.len()];
+        for range in &post_surfaces {
+            for flag in &mut deferred[range.clone()] {
+                *flag = true;
+            }
+        }
+        let main_order: Vec<usize> = (0..items.len()).filter(|index| !deferred[*index]).collect();
+
         let mut encoder = gpu
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -1369,88 +1413,143 @@ impl Pipeline3d {
                 multiview_mask: None,
             });
 
-            // The sky box and clouds draw at the far plane. wgpu forces that
-            // through the viewport depth range, not a fixed-function call, so the
-            // loop calls `set_viewport(.., 1.0, 1.0)` when it enters the sky run
-            // and restores `0.0..1.0` when it leaves. A frame with no sky never
-            // sets a viewport, keeping the default full-target range. The rect
-            // comes from the view, as the oracle's `qglViewport` does, so a
-            // future sub-rect view keeps its inset through the toggle.
-            // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
-            // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
-            let vp_x = view.viewportX as f32;
-            let vp_w = view.viewportWidth as f32;
-            let vp_h = view.viewportHeight as f32;
-            // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y that
-            // `R_RenderView` stores from `tr.refdef.y`. GL puts 0 at the bottom,
-            // so the oracle flips y when it sets the viewport. wgpu puts viewport
-            // y at the top like the refdef, so the oracle's GL flip has no
-            // counterpart here. We use the stored value straight.
-            // Source: oracle/codemp/renderer/tr_scene.cpp:838
-            let vp_y = view.viewportY as f32;
-            let mut depth_far = false;
-            let mut depth_range = DepthRange::Normal;
+            self.draw_items(
+                &mut pass,
+                &items,
+                &main_order,
+                &bind_groups,
+                &item_group,
+                geometry,
+                mode,
+                viewport,
+                &mut stats,
+            );
+        }
 
-            for (draw_index, item) in items.iter().enumerate() {
-                if item.depth_far != depth_far || item.depth_range != depth_range {
-                    depth_far = item.depth_far;
-                    depth_range = item.depth_range;
-                    // The sky's far-plane window overrides the entity hack: a
-                    // sky surface never belongs to a view-model entity.
-                    let (min_depth, max_depth) = if depth_far {
-                        (1.0, 1.0)
-                    } else {
-                        depth_range.window()
-                    };
-                    pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
-                }
+        // The drain is last in first out, so the deferred surfaces replay in reverse submission order.
+        // Each surface takes its own pass, which loads both attachments and therefore composites over the sorted draw.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1003-1214
+        for range in post_surfaces.iter().rev() {
+            let order: Vec<usize> = range.clone().collect();
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("mp_renderer_gpu post-render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
 
-                let pipeline = match mode {
-                    BackendMode::Faithful => &self.pipelines,
-                    BackendMode::Pbr => &self.pbr_pipelines,
-                }
-                .get(&item.key)
-                .expect("world pipeline was created for every item's key above");
-                let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
-
-                // A dynamic stage draws from the per-frame buffer, a static
-                // stage from the concatenated world buffer.
-                let vertex_buffer = if item.dynamic {
-                    &self.dynamic_buffer
-                } else {
-                    &geometry.vertex_buffer
-                };
-
-                // An MD3 entity surface indexes the per-frame index buffer, a
-                // world surface the static world index buffer.
-                let index_buffer = if item.index_dynamic {
-                    &self.dynamic_index_buffer
-                } else {
-                    &geometry.index_buffer
-                };
-                pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
-                pass.set_pipeline(pipeline);
-                // Group 0 selects this surface's clip matrix by its entity slot.
-                pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
-                pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
-                pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
-                pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                pass.draw_indexed(
-                    item.first_index..item.first_index + item.index_count,
-                    item.base_vertex,
-                    0..1,
-                );
-
-                stats.draw_calls += 1;
-                if item.reads_lightmap {
-                    stats.lightmapped += 1;
-                }
-            }
+            self.draw_items(
+                &mut pass,
+                &items,
+                &order,
+                &bind_groups,
+                &item_group,
+                geometry,
+                mode,
+                viewport,
+                &mut stats,
+            );
         }
         gpu.queue().submit(std::iter::once(encoder.finish()));
 
         stats
+    }
+
+    /// Draws the stage items `order` names, in that order, into an open pass.
+    /// The depth window tracks per pass, so a run that never leaves the normal window sets no viewport and keeps the pass default.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158` (the per-stage draw)
+    #[allow(clippy::too_many_arguments)]
+    fn draw_items(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        items: &[StageDrawItem],
+        order: &[usize],
+        bind_groups: &[wgpu::BindGroup],
+        item_group: &[usize],
+        geometry: &WorldGeometry,
+        mode: BackendMode,
+        viewport: (f32, f32, f32, f32),
+        stats: &mut WorldStats,
+    ) {
+        let (vp_x, vp_y, vp_w, vp_h) = viewport;
+        let mut depth_far = false;
+        let mut depth_range = DepthRange::Normal;
+
+        for &draw_index in order {
+            let item = &items[draw_index];
+            if item.depth_far != depth_far || item.depth_range != depth_range {
+                depth_far = item.depth_far;
+                depth_range = item.depth_range;
+                // The sky's far-plane window overrides the entity hack: a
+                // sky surface never belongs to a view-model entity.
+                let (min_depth, max_depth) = if depth_far {
+                    (1.0, 1.0)
+                } else {
+                    depth_range.window()
+                };
+                pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
+            }
+
+            let pipeline = match mode {
+                BackendMode::Faithful => &self.pipelines,
+                BackendMode::Pbr => &self.pbr_pipelines,
+            }
+            .get(&item.key)
+            .expect("world pipeline was created for every item's key above");
+            let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
+
+            // A dynamic stage draws from the per-frame buffer, a static
+            // stage from the concatenated world buffer.
+            let vertex_buffer = if item.dynamic {
+                &self.dynamic_buffer
+            } else {
+                &geometry.vertex_buffer
+            };
+
+            // An MD3 entity surface indexes the per-frame index buffer, a
+            // world surface the static world index buffer.
+            let index_buffer = if item.index_dynamic {
+                &self.dynamic_index_buffer
+            } else {
+                &geometry.index_buffer
+            };
+            pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+
+            pass.set_pipeline(pipeline);
+            // Group 0 selects this surface's clip matrix by its entity slot.
+            pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
+            pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
+            pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
+            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            pass.draw_indexed(
+                item.first_index..item.first_index + item.index_count,
+                item.base_vertex,
+                0..1,
+            );
+
+            stats.draw_calls += 1;
+            if item.reads_lightmap {
+                stats.lightmapped += 1;
+            }
+        }
     }
 
     /// Resolves every world draw surf into its per-stage [`StageDrawItem`]
@@ -1460,6 +1559,11 @@ impl Pipeline3d {
     ///
     /// `dlights` and `surf_dlight_bits` reach the world arm only, because no
     /// entity surface ever carries a dlight mask in the oracle.
+    ///
+    /// The second result holds one range per surface the post-render enqueue deferred, in submission order.
+    /// The caller draws those ranges after the sorted list, and the surface boundaries have to survive the walk because the drain reverses them.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:778-835`
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
@@ -1482,15 +1586,22 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
         dlights: &[dlight_t],
         surf_dlight_bits: &[i32],
-    ) -> Vec<StageDrawItem> {
+    ) -> (Vec<StageDrawItem>, Vec<Range<usize>>) {
         let mut items: Vec<StageDrawItem> = Vec::new();
+        // One range per deferred surface, in submission order, each covering that surface's own stage items.
+        let mut post_surfaces: Vec<Range<usize>> = Vec::new();
         // The two scene-wide inputs the renderfx colour overrides read: the
         // disintegrate threshold clock and the volumetric fade axis.
         // Source: oracle/codemp/renderer/tr_shade.cpp:1568,1596
         let refdef_time = frame.refdef.time;
         let view_axis = view.ori.axis[0];
+        // Raven's `g_numPostRenders`, the count of draw surfs already deferred out of the sorted draw.
+        // The oracle drains the queue at the end of the same call, so the count starts at zero per draw.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:669,1008-1011
+        let mut post_renders = 0usize;
 
         for surf in draw_surfs {
+            let first_item = items.len();
             match surf.surface {
                 SurfaceGeometry::World(world_ref) => {
                     self.collect_world_surface(
@@ -1608,9 +1719,35 @@ impl Pipeline3d {
                     stats.skipped_non_world += 1;
                 }
             }
+
+            // `RB_RenderDrawSurfList` takes a non-world entity's surface out of the sorted draw and replays it last.
+            // The test is a three-way or over the entity's renderfx, and it stops once the queue holds `MAX_POST_RENDERS` surfaces.
+            // Every stage this surface produced moves together, so the mark lands on the whole run rather than one item.
+            // Source: oracle/codemp/renderer/tr_backend.cpp:778-835
+            if post_renders >= MAX_POST_RENDERS {
+                continue;
+            }
+            let (entity_num, _shader, _fog, _dlighted) =
+                R_DecomposeSort(surf.sort, &assets.sorted_shaders);
+            if entity_num == TR_WORLDENT {
+                continue;
+            }
+            let Some(ent) = entities.get(entity_num as usize) else {
+                continue;
+            };
+            if ent.e.renderfx & (RF_DISTORTION | RF_FORCEPOST | RF_FORCE_ENT_ALPHA) == 0 {
+                continue;
+            }
+            post_renders += 1;
+            for item in &mut items[first_item..] {
+                item.post_render_ent = Some(entity_num);
+            }
+            if first_item < items.len() {
+                post_surfaces.push(first_item..items.len());
+            }
         }
 
-        items
+        (items, post_surfaces)
     }
 
     /// Resolves one `SF_POLY` draw surf: the scene polygon `RE_AddPolyToScene`
@@ -2178,6 +2315,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range: DepthRange::Normal,
+                post_render_ent: None,
+                screen_image: false,
             });
             stats.dlight_passes += 1;
         }
@@ -2633,6 +2772,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: true,
                 depth_range: DepthRange::Normal,
+                post_render_ent: None,
+                screen_image: false,
             });
         }
 
@@ -2842,6 +2983,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                screen_image: fx.distortion,
             });
         }
 
@@ -2893,6 +3036,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                screen_image: fx.distortion,
             })
         } else {
             Some(StageDrawItem {
@@ -2911,6 +3056,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                screen_image: fx.distortion,
             })
         }
     }
@@ -3031,6 +3178,8 @@ impl Pipeline3d {
             globals_offset,
             depth_far: false,
             depth_range,
+            post_render_ent: None,
+            screen_image: fx.distortion,
         })
     }
 
@@ -3117,6 +3266,9 @@ impl Pipeline3d {
             globals_offset,
             depth_far: false,
             depth_range,
+            post_render_ent: None,
+            // The fog pass binds the fog image, so a fogged distortion surface still takes its own diffuse here.
+            screen_image: false,
         })
     }
 
