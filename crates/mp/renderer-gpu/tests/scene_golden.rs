@@ -749,6 +749,50 @@ fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhand
     record_entities(host, frame_data, &out);
 }
 
+/// The FX module's `RT_ORIENTED_QUAD` submissions, which the trap census never saw because `COrientedParticle::Draw` builds the entity inside the engine.
+/// Three quads at one radius, each on its own orthonormal `axis[1]`/`axis[2]` pair and its own rotation, so the arm reads the entity's axis rather than the view's.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:177-220`
+fn scene_fx_oriented_quad(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (y, left, up, rotation, rgba) in [
+        (
+            -40.0f32,
+            [0.0f32, 1.0, 0.0],
+            [0.0f32, 0.0, 1.0],
+            0.0f32,
+            [255u8, 255, 255, 255],
+        ),
+        (
+            0.0,
+            [0.0, 0.70710678, 0.70710678],
+            [0.0, -0.70710678, 0.70710678],
+            30.0,
+            [255, 64, 64, 255],
+        ),
+        (
+            40.0,
+            [0.4472136, 0.8944272, 0.0],
+            [0.0, 0.0, 1.0],
+            45.0,
+            [64, 128, 255, 255],
+        ),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_ORIENTED_QUAD;
+        re.customShader = shader;
+        re.origin = [200.0, y, 0.0];
+        // The arm spans the quad from these two rows, so each entity carries its own orientation.
+        re.axis[1] = left;
+        re.axis[2] = up;
+        re.radius = 16.0;
+        re.rotation = rotation;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -816,5 +860,15 @@ fn golden_scene_dlights() {
         eye: [0.0, 0.0, 0.0],
         record: scene_dlights,
         expect_dlights: 3,
+    });
+}
+
+#[test]
+fn golden_scene_fx_oriented_quad() {
+    run_scene(&Scene {
+        stem: "scene_fx_oriented_quad",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_oriented_quad,
+        expect_dlights: 0,
     });
 }
