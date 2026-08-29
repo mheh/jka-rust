@@ -591,3 +591,83 @@ Two fixture claims verified beyond the gates. The re-blessed `scene_saber_glow.p
 - The "visible ring silhouettes" wording of the cylinder pass condition. The flat-shaded fixture shows two closed outlines and a taper. Interior ring facets are not resolvable at fixture size, and I could not mechanically count segments in the image.
 - The row-7 vertex-cap posture on a long bolt. The committed 100-unit bolts emit 60 vertices, far under any cap, and no cap or flush code was added. Behavior at a genuinely long bolt is untested by any committed gate.
 - Cross-stream interleaving of the backend `Rng` against retail's process-wide stream (DEC-66 ruling 3's accepted divergence). No gate observes it, as the packet states.
+
+# Fix-round vet - 2026-08-29, `d3c46ea9..gh31-step-009-fx-minirefents`
+
+Two new commits, walked whole: `32db25ab` (fix: the lane-review comment and packet corrections) and `9df6cab7` (process: the fix-round record). The first eight hashes are unchanged (`476930c1`, `fb868fb7`, `4a5ffa0d`, `abc7209c`, `232b4d11`, `4a1469da`, `bcc5bf76`, `d3c46ea9`), so no history was rewritten. Finding count: 1.
+
+## The ruled remedies, checked
+
+**Finding 2's remedy is present.** The row-6 site note in `pipeline3d.rs` gains the fork-branch sentence, one sentence over two lines broken at the comma because the joined sentence passes 150 columns:
+
+```rust
+            // The oracle writes the grown endpoint back into the shared entity array and reads it straight back.
+            // The write lands in a local here, an accepted divergence a portal or a mirror view would make visible.
+            // The dead `RF_FORKED` branch would also read the un-grown `e.oldorigin`,
+            // where the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
+            // Source: oracle/codemp/renderer/tr_surface.cpp:1159
+```
+
+The `:1107`/`:1159` cites match the oracle lines I walked in the first round.
+
+**Finding 4's remedy is present at all three sites.** The `do_bolt_seg` doc:
+
+```rust
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2.
+/// The oracle's seed write is unobservable until portal or mirror views draw, because a second view of the same frame would read the mutated seed.
+```
+
+The seed-hoist site note:
+
+```rust
+            // DEC-66 ruling 2 threads the entity's own seed as a local.
+            // The dropped write is unobservable until portal or mirror views draw,
+            // because a second view of the same frame would read the mutated `oldorigin` and seed.
+```
+
+The packet body's contracted `do_bolt_seg` doc carries the same replacement, so the packet no longer contradicts its own row-6 amendment. All three now state the amended mechanism.
+
+**Findings 6, 7 and 8's remedy is executed on every quoted line.** Each over-length or width-wrapped line I quoted in `pipeline3d.rs` and `scene_golden.rs` is re-broken to one sentence per line or at a clause boundary, no added line in `crates/` exceeds 150 columns (checked mechanically over the diff), the "end time" noun phrase is whole again, the fork note and the electricity head each hold one sentence per line, and a word-by-word comparison of each re-broken group against the first-round quotes shows no wording change outside the two finding-4 comments that were ruled to change.
+
+**Ruling 6 is executed.** The packet's commit bundle item 5 now reads "The code and the PNG land in one commit", the word "ride" is gone from the reusable wording, and the commit history stands unrewritten. The packet also gains a dated 2026-08-29 Amendment recording all six verdicts, including the no-edit verdicts on findings 1 and 9.
+
+**The commits are comment-and-doc only.** A mechanical filter over the `crates/` diff of `32db25ab` finds zero changed lines that are not `//` or `///` lines. No fixture moved, no `pub` item, signature, or other surface changed. `9df6cab7` touches only `.claude/packets/31/step-009/finished.md` and `vet.md`, and the committed `vet.md` is byte-identical to the report I wrote (verified with `diff`).
+
+**Commit messages.** Both carry a heading subject, a plain-sentence body with gate results as prose, and `%(trailers)` returns empty for both.
+
+## The finding
+
+**Finding F1 (minor, `32db25ab`, `crates/mp/renderer/src/tr_surface.rs`).** Three fix-round lines in the `DoBoltSeg` deferred note still interlock with the untouched legacy wrap around them, so their sentences still break at width across unchanged neighbor lines:
+
+```rust
+/// The `RF_FORKED` branch's `f_count--` write is this packet's STATE HOMES row
+/// `DoBoltSeg`/`f_count`: "per-subsystem owned state struct, NAMED BY THIS
+```
+
+(the changed first line ends mid noun phrase, and the unchanged second line continues the legacy wrap),
+
+```rust
+/// already names that carrier (`TrSurfaceShapeState`, `CreateShape`'s doc
+/// comment), and `f_count` now sits on it as the `float` file-scope value oracle declares alongside `sh1`/`sh2`
+```
+
+(the changed second line begins mid-sentence off the unchanged first), and
+
+```rust
+/// crate's canonical flag home (`tr_public::ref_flags`), so the masks are no
+/// longer a blocker.
+```
+
+(the changed `longer a blocker.` line is the tail of the legacy `no / longer` wrap). A full remedy needs a per-sentence re-flow of the unchanged legacy paragraph, which would widen the diff past the ruling's comment-only scope. The session rules whether the residual stands or the paragraph re-flows.
+
+## The gate battery, re-run at `9df6cab7`
+
+- `cargo build --workspace`: zero warnings, zero errors.
+- `cargo test --workspace -- --test-threads=1`: every suite `test result: ok`, no suite reports a nonzero failed count.
+- `cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1`: `ok. 4 passed; 0 failed` in 67.77s.
+- `cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`: `ok. 10 passed; 0 failed` in 5.81s.
+- `cargo test -p mp_renderer_gpu --test entity_golden -- --ignored --test-threads=1`: `ok. 1 passed; 0 failed` in 15.64s.
+- `cargo test -p mp_renderer_gpu --test ghoul2_vertex_golden -- --ignored --test-threads=1`: `ok. 1 passed; 0 failed` in 16.19s.
+- `cargo test -p mp_renderer_gpu --test hud_golden -- --test-threads=1`: `ok. 1 passed; 0 failed; 1 ignored`. With `--ignored`: `ok. 1 passed; 0 failed`.
+
+`git status` is clean after all runs, so all eighteen committed fixtures are byte-identical.
