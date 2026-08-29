@@ -955,6 +955,7 @@ impl App {
                     executor.execute_frame(
                         gpu,
                         &target,
+                        &frame.texture,
                         frame_data,
                         &pinned,
                         world_load,

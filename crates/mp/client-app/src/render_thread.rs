@@ -136,6 +136,7 @@ pub fn run(
                             executor.execute_package(
                                 &mut gpu,
                                 &target,
+                                &frame.texture,
                                 package,
                                 &mut images,
                                 &noise,

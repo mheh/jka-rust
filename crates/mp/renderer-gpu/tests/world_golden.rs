@@ -277,6 +277,8 @@ fn run_golden_scene(
 
     // ---- draw the frame into the offscreen target ----------------------
     let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
     // The world pass loads the color target, so clear it first. Otherwise the
     // golden captures wgpu zero-init in every uncovered pixel, not CLEAR_COLOR.
     gpu.clear_headless(&target);
@@ -316,6 +318,7 @@ fn run_golden_scene(
         let stats = executor.execute_frame(
             &mut gpu,
             &target,
+            &target_texture,
             &frame_data,
             &pinned,
             world_load,

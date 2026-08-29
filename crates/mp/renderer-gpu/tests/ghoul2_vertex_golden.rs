@@ -461,6 +461,8 @@ fn golden_ghoul2_verts_stormtrooper() {
 
     // ---- draw the frame with the capture sink armed --------------------
     let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
     gpu.clear_headless(&target);
     let float_time = FROZEN_TIME_MS as f32 * 0.001;
 
@@ -498,6 +500,7 @@ fn golden_ghoul2_verts_stormtrooper() {
         executor.execute_frame(
             &mut gpu,
             &target,
+            &target_texture,
             &frame_data,
             &pinned,
             world_load,

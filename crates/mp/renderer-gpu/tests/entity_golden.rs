@@ -323,6 +323,8 @@ fn golden_entity_duel1() {
 
     // ---- draw the frame into the offscreen target ----------------------
     let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
     // The world pass loads the color target, so clear it first.
     gpu.clear_headless(&target);
     let float_time = FROZEN_TIME_MS as f32 * 0.001;
@@ -357,6 +359,7 @@ fn golden_entity_duel1() {
         executor.execute_frame(
             &mut gpu,
             &target,
+            &target_texture,
             &frame_data,
             &pinned,
             world_load,

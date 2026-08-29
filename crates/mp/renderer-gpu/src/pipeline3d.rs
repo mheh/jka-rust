@@ -1163,11 +1163,15 @@ impl Pipeline3d {
     /// `dlights` holds the scene lights the caller already transformed into the
     /// world frame, and `surf_dlight_bits` holds the world walk's per-surface
     /// light mask, indexed by the world surface number.
+    ///
+    /// `target_texture` is the colour attachment's own texture.
+    /// A mid-frame screen capture copies out of it, and wgpu takes a texture for that copy rather than a view.
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gpu: &Gpu,
         target: &TextureView,
+        target_texture: &wgpu::Texture,
         draw_surfs: &[DrawSurf<SurfaceGeometry>],
         geometry: &WorldGeometry,
         assets: &RenderAssets,

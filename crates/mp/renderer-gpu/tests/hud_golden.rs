@@ -391,6 +391,8 @@ fn execute_2d_frame(
     let mut executor = FrameExecutor::new(gpu, &images);
 
     let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
     // The 2D pass loads the color target, so clear it first.
     // Otherwise the golden captures wgpu zero-init in every uncovered pixel.
     gpu.clear_headless(&target);
@@ -422,6 +424,7 @@ fn execute_2d_frame(
         executor.execute_frame(
             gpu,
             &target,
+            &target_texture,
             frame_data,
             &pinned,
             world_load,

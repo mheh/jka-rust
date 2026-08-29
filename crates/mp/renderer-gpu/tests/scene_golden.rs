@@ -396,6 +396,8 @@ fn run_scene(scene: &Scene) {
     let _land_scape = boot::init_terrain(&mut host);
 
     let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
     gpu.clear_headless(&target);
     let float_time = FROZEN_TIME_MS as f32 * 0.001;
 
@@ -427,6 +429,7 @@ fn run_scene(scene: &Scene) {
         executor.execute_frame(
             &mut gpu,
             &target,
+            &target_texture,
             &frame_data,
             &pinned,
             world_load,
