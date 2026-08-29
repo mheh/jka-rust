@@ -40,7 +40,9 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
-use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT};
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT, RF_TAPERED,
+};
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -749,6 +751,124 @@ fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhand
     record_entities(host, frame_data, &out);
 }
 
+/// The FX module's `RT_ORIENTED_QUAD` submissions,
+/// which the trap census never saw because `COrientedParticle::Draw` builds the entity inside the engine.
+/// Three quads at one radius, each on its own orthonormal `axis[1]`/`axis[2]` pair and its own rotation,
+/// so the arm reads the entity's axis rather than the view's.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:177-220`
+fn scene_fx_oriented_quad(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (y, left, up, rotation, rgba) in [
+        (
+            -40.0f32,
+            [0.0f32, 1.0, 0.0],
+            [0.0f32, 0.0, 1.0],
+            0.0f32,
+            [255u8, 255, 255, 255],
+        ),
+        (
+            0.0,
+            [0.0, 0.70710678, 0.70710678],
+            [0.0, -0.70710678, 0.70710678],
+            30.0,
+            [255, 64, 64, 255],
+        ),
+        (
+            40.0,
+            [0.4472136, 0.8944272, 0.0],
+            [0.0, 0.0, 1.0],
+            45.0,
+            [64, 128, 255, 255],
+        ),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_ORIENTED_QUAD;
+        re.customShader = shader;
+        re.origin = [200.0, y, 0.0];
+        // The arm spans the quad from these two rows, so each entity carries its own orientation.
+        re.axis[1] = left;
+        re.axis[2] = up;
+        re.radius = 16.0;
+        re.rotation = rotation;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
+/// The FX module's `RT_CYLINDER` submissions, which the trap census never saw because `CCylinder::Draw` builds the entity inside the engine.
+/// One straight tube and one cone tilted off the view axis, so the two ring radii and the `RotatePointAroundVector` step are both visible.
+///
+/// `radius` scales the ring at `oldorigin` and `rotation` scales the ring at `origin`, so the cone's wide end is its `oldorigin`.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:853-953`
+fn scene_fx_cylinder(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (origin, oldorigin, axis, radius, rotation, rgba) in [
+        (
+            [110.0f32, -35.0, -30.0],
+            [110.0f32, -35.0, 30.0],
+            [0.0f32, 0.0, 1.0],
+            8.0f32,
+            8.0f32,
+            [255u8, 255, 255, 255],
+        ),
+        (
+            [110.0, 35.0, -30.0],
+            [130.0, 20.0, 30.0],
+            [0.30769232, -0.23076923, 0.9230769],
+            12.0,
+            2.0,
+            [64, 255, 96, 255],
+        ),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_CYLINDER;
+        re.customShader = shader;
+        re.origin = origin;
+        re.oldorigin = oldorigin;
+        // `axis[0]` is the cylinder axis the rings turn around, the direction the FX submitter fills.
+        re.axis[0] = axis;
+        re.radius = radius;
+        re.rotation = rotation;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
+/// The FX module's `RT_ELECTRICITY` submissions,
+/// which the trap census sees only as the `fx/AddElectricity` row because `CElectricity::Draw` builds the entity inside the engine.
+/// Two bolts on different `frame` seeds, one plain and one tapered, so the per-entity seed and the taper are both visible.
+///
+/// Neither carries `RF_GROW`, so the frozen scene clock never enters the geometry.
+/// `axis[0][0]` is the chaos multiplier the deviation draws scale by.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1127-1169`
+fn scene_fx_electricity(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (y, radius, seed, renderfx, rgba) in [
+        (-40.0f32, 3.0f32, 12345, 0i32, [255u8, 255, 255, 255]),
+        (40.0, 5.0, 987654, RF_TAPERED, [64, 255, 96, 255]),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_ELECTRICITY;
+        re.customShader = shader;
+        re.origin = [180.0, y, -50.0];
+        re.oldorigin = [180.0, y, 50.0];
+        // `axis[0][0]` is the chaos multiplier, not an axis component.
+        re.axis[0] = [1.0, 0.0, 0.0];
+        re.radius = radius;
+        // `frame` is the bolt's own 69069 seed, the field the FX submitter fills with a scaled frame time.
+        re.frame = seed;
+        re.renderfx = renderfx;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -816,5 +936,35 @@ fn golden_scene_dlights() {
         eye: [0.0, 0.0, 0.0],
         record: scene_dlights,
         expect_dlights: 3,
+    });
+}
+
+#[test]
+fn golden_scene_fx_oriented_quad() {
+    run_scene(&Scene {
+        stem: "scene_fx_oriented_quad",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_oriented_quad,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_fx_cylinder() {
+    run_scene(&Scene {
+        stem: "scene_fx_cylinder",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_cylinder,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_fx_electricity() {
+    run_scene(&Scene {
+        stem: "scene_fx_electricity",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_electricity,
+        expect_dlights: 0,
     });
 }

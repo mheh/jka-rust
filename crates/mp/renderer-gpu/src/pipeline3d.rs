@@ -29,6 +29,7 @@
 //! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
 use core::f64::consts::PI;
+use core::ffi::c_int;
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -43,13 +44,13 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::tr_types::{
     RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
-    RF_FORCE_ENT_ALPHA, RF_NODEPTH, RF_RGB_TINT, RF_VOLUMETRIC,
+    RF_FORCE_ENT_ALPHA, RF_FORKED, RF_GROW, RF_NODEPTH, RF_RGB_TINT, RF_TAPERED, RF_VOLUMETRIC,
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA as VectorMA, _VectorScale as VectorScale,
-    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, VectorCompare,
-    VectorNormalize,
+    _DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, Q_random,
+    RotatePointAroundVector, VectorCompare, VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{SURF_NODLIGHT, SURF_SKY};
 use mp_qshared::shared::vec3_t;
@@ -94,13 +95,16 @@ use mp_renderer::tr_shader::{
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
-use mp_renderer::tr_surface::LodErrorForVolume;
+use mp_renderer::tr_surface::{
+    LodErrorForVolume, TrSurfaceShapeState, LIGHTNING_RECURSION_LEVEL,
+};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
-use native_math::qmath::Q_rsqrt;
+use native_math::qmath::{MakeNormalVectors, Q_crandom, Q_rsqrt};
+use native_math::rng::Rng;
 
 use crate::stage2d::{
     apply_alpha_gen, apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime,
@@ -951,6 +955,13 @@ pub struct Pipeline3d {
     ///
     /// [`FrameExecutor::set_ghoul2_capture`]: crate::FrameExecutor::set_ghoul2_capture
     ghoul2_capture: Option<Vec<Ghoul2SurfaceCapture>>,
+
+    /// The render-side C runtime stream, per DEC-66 ruling 1.
+    /// It persists across frames, because a per-frame reset would replay the same jitter every frame and freeze the bolt shimmer.
+    rng: Rng,
+
+    /// Raven's `sh1`, `sh2` and `f_count` file statics, per DEC-66 ruling 1.
+    shape: TrSurfaceShapeState,
 }
 
 /// One captured Ghoul2 surface vertex stream: the decoded vertices, the triangle
@@ -1100,6 +1111,8 @@ impl Pipeline3d {
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
             ghoul2_capture: None,
+            rng: Rng::new(),
+            shape: TrSurfaceShapeState::default(),
         }
     }
 
@@ -1758,7 +1771,13 @@ impl Pipeline3d {
             return;
         };
 
-        let (verts, index_block) = build_entity_geometry(&entity.e, view);
+        let (verts, index_block) = build_entity_geometry(
+            &entity.e,
+            view,
+            refdef_time,
+            &mut self.rng,
+            &mut self.shape,
+        );
         if index_block.is_empty() {
             self.warn_once(Warned::EntitySurface);
             stats.skipped_non_world += 1;
@@ -4528,27 +4547,310 @@ fn do_line(
     indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
 }
 
-/// Builds one generated entity surface's world-space vertices and triangle
-/// indices, the `RB_SurfaceEntity` dispatch restricted to the DEC-54 census
-/// set: `RT_SPRITE`, `RT_LINE`, and `RT_SABER_GLOW`.
+/// Raven `DoLine2` - one tapered quad from `start` to `end`, `span_width` wide at the start edge and `span_width2` at the end edge.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:658-710`
+#[allow(clippy::too_many_arguments)]
+fn do_line2(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    span_width2: f32,
+    color: [u8; 4],
+) {
+    let vbase = verts.len() as u32;
+
+    for (base, width, st) in [
+        (start, span_width, [0.0f32, 0.0f32]),
+        (start, -span_width, [1.0, 0.0]),
+        (end, span_width2, [0.0, 1.0]),
+        (end, -span_width2, [1.0, 1.0]),
+    ] {
+        let mut xyz: vec3_t = [0.0; 3];
+        VectorMA(base, width, up, &mut xyz);
+        verts.push(WorldVertex {
+            position: xyz,
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
+}
+
+/// Raven `CreateShape` - redraws the two fractal offset vectors from the backend stream.
+/// The six draws run in source order, and `sh2` reads `sh1` back, so the two vectors share one home.
+///
+/// `crandom()` is `double` in C, so each constant widens rather than the call narrowing.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:976-987`
+fn create_shape(shape: &mut TrSurfaceShapeState, rng: &mut Rng) {
+    shape.sh1 = [
+        // fwd
+        (0.66f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+    ];
+
+    // it seems to look best to have a point on one side of the ideal line, then the other point on the other side.
+    shape.sh2 = [
+        // fwd
+        (0.33f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        // forcing point to be on the opposite side of the line -- right
+        ((-shape.sh1[1]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+        // up
+        ((-shape.sh1[2]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+    ];
+}
+
+/// Raven `ApplyShape` - splits one bolt segment into three jagged sub-segments, or emits it as a tapered quad at the base case.
+///
+/// `sh2` is read after the first recursive call, which is where Raven reads it, so a deeper recursion level would see the redrawn value.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:990-1036`
+#[allow(clippy::too_many_arguments)]
+fn apply_shape(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    sradius: f32,
+    eradius: f32,
+    count: c_int,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    if count < 1 {
+        // done recursing
+        do_line2(verts, indices, start, end, right, sradius, eradius, color);
+        return;
+    }
+
+    create_shape(shape, rng);
+
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd) * 0.7;
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut perc = shape.sh1[0];
+
+    let mut point1: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point1);
+    VectorMA(point1, 1.0 - perc, end, &mut point1);
+    VectorMA(point1, dis * shape.sh1[1], rt, &mut point1);
+    VectorMA(point1, dis * shape.sh1[2], up, &mut point1);
+
+    // do a quick and dirty interpolation of the radius at that point
+    let rads1 = sradius * 0.666 + eradius * 0.333;
+    let rads2 = sradius * 0.333 + eradius * 0.666;
+
+    // recursion
+    apply_shape(
+        verts, indices, start, point1, right, sradius, rads1, count - 1, color, shape, rng,
+    );
+
+    perc = shape.sh2[0];
+
+    let mut point2: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point2);
+    VectorMA(point2, 1.0 - perc, end, &mut point2);
+    VectorMA(point2, dis * shape.sh2[1], rt, &mut point2);
+    VectorMA(point2, dis * shape.sh2[2], up, &mut point2);
+
+    // recursion
+    apply_shape(
+        verts, indices, point2, point1, right, rads1, rads2, count - 1, color, shape, rng,
+    );
+    apply_shape(
+        verts, indices, point2, end, right, rads2, eradius, count - 1, color, shape, rng,
+    );
+}
+
+/// Raven `DoBoltSeg` - steps `start` to `end` in 20-unit chunks, jitters each step off the entity's own seed, and shapes each chunk.
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2.
+/// The oracle's seed write is unobservable until portal or mirror views draw, because a second view of the same frame would read the mutated seed.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
+#[allow(clippy::too_many_arguments)]
+fn do_bolt_seg(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    e: &refEntity_t,
+    seed: &mut c_int,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    radius: f32,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd);
+
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut old = start;
+    let mut off: vec3_t = [10.0, 10.0, 10.0];
+
+    let mut old_perc = 0.0f32;
+    let mut old_radius = radius;
+    let mut new_radius = radius;
+
+    let mut i: c_int = 20;
+    while i as f32 <= dis {
+        // because of our large step size, we may not actually draw to the end.  In this case, fudge our percent so that we are basically complete
+        let perc = if (i + 20) as f32 > dis {
+            1.0
+        } else {
+            // percentage of the amount of line completed
+            i as f32 / dis
+        };
+
+        // create our level of deviation for this point
+        //
+        // Raven writes these three lines as `VectorScale` and `VectorMA` macros, and each macro expands its scale argument once per component.
+        // Every component therefore draws its own value, nine per step,
+        // and hoisting any draw into a local would change both the stream and the shape.
+        let mut temp: vec3_t = [0.0; 3];
+        // move less in fwd direction, chaos also does not affect this
+        temp[0] = fwd[0] * (Q_crandom(seed) * 3.0);
+        temp[1] = fwd[1] * (Q_crandom(seed) * 3.0);
+        temp[2] = fwd[2] * (Q_crandom(seed) * 3.0);
+
+        // move more in direction perpendicular to line, angles is really the chaos
+        temp[0] += rt[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += rt[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += rt[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // move more in direction perpendicular to line
+        temp[0] += up[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += up[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += up[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // track our total level of offset from the ideal line
+        VectorAdd(off, temp, &mut off);
+
+        // Move from start to end, always adding our current level of offset from the ideal line
+        //	Even though we are adding a random offset.....by nature, we always move from exactly start....to end
+        let mut cur: vec3_t = [0.0; 3];
+        VectorAdd(start, off, &mut cur);
+        VectorScale(cur, 1.0 - perc, &mut cur);
+        VectorMA(cur, perc, end, &mut cur);
+
+        if (e.renderfx & RF_TAPERED) != 0 {
+            // This does pretty close to perfect tapering since apply shape interpolates the old and new as it goes along.
+            //	by using one minus the square, the radius stays fairly constant, then drops off quickly at the very point of the bolt
+            old_radius = radius * (1.0 - old_perc * old_perc);
+            new_radius = radius * (1.0 - perc * perc);
+        }
+
+        // Apply the random shape to our line seg to give it some micro-detail-jaggy-coolness.
+        apply_shape(
+            verts,
+            indices,
+            cur,
+            old,
+            right,
+            new_radius,
+            old_radius,
+            LIGHTNING_RECURSION_LEVEL,
+            color,
+            shape,
+            rng,
+        );
+
+        // randomly split off to create little tendrils, but don't do it too close to the end and especially if we are not even of the forked variety
+        //
+        // MP never assigns `f_count`, so this branch is dead here.
+        // SP sets it to 3 right before its own `DoBoltSeg` call, which is what makes the fork live there.
+        // The `&&` chain keeps its short-circuit, because an eager `Q_random` draw would advance the seed on every step.
+        // Source: oracle/code/renderer/tr_surface.cpp:844
+        if (e.renderfx & RF_FORKED) != 0
+            && shape.f_count > 0.0
+            && Q_random(seed) > 0.94
+            && radius * (1.0 - perc) > 0.2
+        {
+            shape.f_count -= 1.0;
+
+            // Pick a point somewhere between the current point and the final endpoint
+            let mut new_dest: vec3_t = [0.0; 3];
+            VectorAdd(cur, e.oldorigin, &mut new_dest);
+            VectorScale(new_dest, 0.5, &mut new_dest);
+
+            // And then add some crazy offset
+            for t in 0..3 {
+                new_dest[t] += Q_crandom(seed) * 80.0;
+            }
+
+            // we could branch off using OLD and NEWDEST, but that would allow multiple forks...whereas, we just want simpler brancing
+            do_bolt_seg(
+                verts, indices, e, seed, cur, new_dest, right, new_radius, color, shape, rng,
+            );
+        }
+
+        // Current point along the line becomes our new old attach point
+        old = cur;
+        old_perc = perc;
+
+        i += 20;
+    }
+}
+
+/// Raven `DoCylinderPart` - one four-corner ring segment, emitted with the cylinder's own index winding.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:818-847`
+fn do_cylinder_part(verts: &mut Vec<WorldVertex>, indices: &mut Vec<u32>, quad: &[polyVert_t; 4]) {
+    let vbase = verts.len() as u32;
+
+    for corner in quad {
+        verts.push(WorldVertex {
+            position: corner.xyz,
+            st: corner.st,
+            lightmap_st: [0.0, 0.0],
+            color: corner.modulate,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 3, vbase]);
+}
+
+/// Builds one generated entity surface's world-space vertices and triangle indices,
+/// the `RB_SurfaceEntity` dispatch restricted to the kinds this backend draws.
+/// Those are the DEC-54 census set, `RT_SPRITE`, `RT_LINE` and `RT_SABER_GLOW`,
+/// plus the three the FX module submits, `RT_ORIENTED_QUAD`, `RT_CYLINDER` and `RT_ELECTRICITY`.
 ///
 /// Every other `reType` returns empty, which the caller counts as a skip.
-/// `RT_BEAM`, `RT_ORIENTED_QUAD`, `RT_ORIENTEDLINE`, `RT_ELECTRICITY`, and
-/// `RT_CYLINDER` are census-complement fog, so they stay unbuilt rather than
-/// guessed at.
+/// `RT_BEAM` and `RT_ORIENTEDLINE` are census-complement fog, so they stay unbuilt rather than guessed at.
+/// The census never saw the other three.
+/// The FX module builds their `refEntity_t` inside the engine and submits it from `FxHost::AddFxToScene`, behind the trap seam the census counts.
 //TODO: Port RB_SurfaceBeam
-// Source: oracle/codemp/renderer/tr_surface.cpp:226-283
-//TODO: Port RB_SurfaceOrientedQuad
-// Source: oracle/codemp/renderer/tr_surface.cpp:173-215
+// Source: oracle/codemp/renderer/tr_surface.cpp:478-528
 //TODO: Port RB_SurfaceOrientedLine
-// Source: oracle/codemp/renderer/tr_surface.cpp:786-806
-//TODO: Port RB_SurfaceElectricity
-// Source: oracle/codemp/renderer/tr_surface.cpp:1038-1090
-//TODO: Port RB_SurfaceCylinder
-// Source: oracle/codemp/renderer/tr_surface.cpp:854-985
+// Source: oracle/codemp/renderer/tr_surface.cpp:792-807
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
-fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVertex>, Vec<u32>) {
+fn build_entity_geometry(
+    e: &refEntity_t,
+    view: &viewParms_t,
+    refdef_time: i32,
+    rng: &mut Rng,
+    shape: &mut TrSurfaceShapeState,
+) -> (Vec<WorldVertex>, Vec<u32>) {
     let mut verts: Vec<WorldVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let color = e.shaderRGBA;
@@ -4577,6 +4879,58 @@ fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVerte
             if view.isMirror != 0 {
                 VectorSubtract(vec3_origin, left, &mut left);
             }
+            add_quad_stamp_ext(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                left,
+                up,
+                color,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            );
+        }
+
+        // `RB_SurfaceOrientedQuad`: the quad spans the entity's own `axis[1]` and `axis[2]`, not the view's, so it keeps its world orientation.
+        //
+        // The MP tree reads the two axis rows directly.
+        // The SP tree derives both from `axis[0]` through `MakeNormalVectors`, which MP leaves commented out.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:177-220
+        refEntityType_t::RT_ORIENTED_QUAD => {
+            let radius = e.radius;
+            //	MakeNormalVectors( backEnd.currentEntity->e.axis[0], left, up );
+            let mut left = e.axis[1];
+            let mut up = e.axis[2];
+
+            if e.rotation == 0.0 {
+                VectorScale(left, radius, &mut left);
+                VectorScale(up, radius, &mut up);
+            } else {
+                let ang = (PI * e.rotation as f64 / 180.0) as f32;
+                let s = ang.sin();
+                let c = ang.cos();
+
+                // Use a temp so we don't trash the values we'll need later
+                let mut temp_left: vec3_t = [0.0; 3];
+                VectorScale(left, c * radius, &mut temp_left);
+                VectorMA(temp_left, -s * radius, up, &mut temp_left);
+
+                let mut temp_up: vec3_t = [0.0; 3];
+                VectorScale(up, c * radius, &mut temp_up);
+                // no need to use the temp anymore, so copy into the dest vector ( up )
+                VectorMA(temp_up, s * radius, left, &mut up);
+
+                // This was copied for safekeeping, we're done, so we can move it back to left
+                left = temp_left;
+            }
+
+            if view.isMirror != 0 {
+                VectorSubtract(vec3_origin, left, &mut left);
+            }
+
             add_quad_stamp_ext(
                 &mut verts,
                 &mut indices,
@@ -4636,14 +4990,180 @@ fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVerte
 
             // Big hilt sprite
             //
-            //TODO: Port RB_SurfaceSaberGlow's random hilt radius
+            // The quarter-unit pulse draws from the backend's own C runtime stream, per DEC-66 ruling 1.
+            // Retail runs one process-wide stream instead, and ruling 3 accepts the split as a divergence on cosmetic geometry.
             // Source: oracle/codemp/renderer/tr_surface.cpp:579
-            // The oracle radius is `5.5f + random() * 0.25f`. `random()` is
-            // `rand()/32768` off the ambient C generator, which the render
-            // thread does not own and which no image golden can pin. The low
-            // end of the same quarter-unit span stands in until a render-side
-            // generator lands.
-            do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+            do_sprite(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                5.5 + rng.random() * 0.25,
+                0.0,
+                color,
+                view,
+            );
+        }
+
+        // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined into a closed ring of quads.
+        // The segment count drops with distance.
+        //
+        // `e.radius` scales the ring that translates to `e.oldorigin`, and `e.rotation` scales the ring that translates to `e.origin`.
+        // Raven's own `upper_points` and `lower_points` names run the other way from its header comment, so the code is the authority here.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:853-953
+        refEntityType_t::RT_CYLINDER => {
+            // `#define NUM_CYLINDER_SEGMENTS 32`
+            // Source: oracle/codemp/renderer/tr_surface.cpp:815
+            const NUM_CYLINDER_SEGMENTS: i32 = 32;
+
+            // Work out the detail level of this cylinder
+            let mut midpoint: vec3_t = [0.0; 3];
+            VectorAdd(e.origin, e.oldorigin, &mut midpoint);
+            VectorScale(midpoint, 0.5, &mut midpoint); // Average start and end
+
+            VectorSubtract(midpoint, view.ori.origin, &mut midpoint);
+            let mut length = VectorNormalize(&mut midpoint);
+
+            // this doesn't need to be perfect....just a rough compensation for zoom level is enough
+            length *= view.fovX / 90.0;
+
+            let mut detail = 1.0 - (length / 1024.0);
+            let mut segments = (NUM_CYLINDER_SEGMENTS as f32 * detail) as i32;
+
+            // 3 is the absolute minimum, but the pop between 3-8 is too noticeable
+            if segments < 8 {
+                segments = 8;
+            }
+
+            if segments > NUM_CYLINDER_SEGMENTS {
+                segments = NUM_CYLINDER_SEGMENTS;
+            }
+
+            // Get the direction vector
+            let mut vr: vec3_t = [0.0; 3];
+            let mut vu: vec3_t = [0.0; 3];
+            MakeNormalVectors(e.axis[0], &mut vr, &mut vu);
+
+            let mut v1: vec3_t = [0.0; 3];
+            VectorScale(vu, e.radius, &mut v1); // size1
+            VectorScale(vu, e.rotation, &mut vu); // size2
+
+            // Calculate the step around the cylinder
+            detail = 360.0 / segments as f32;
+
+            // Raven's two ring arrays are function-local statics, and every element is written before it is read on each call.
+            // They are per-call scratch, so they become owned locals here.
+            let mut upper_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+            let mut lower_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+
+            for i in 0..segments {
+                // Upper ring
+                let mut point: vec3_t = [0.0; 3];
+                RotatePointAroundVector(&mut point, e.axis[0], vu, detail * i as f32);
+                VectorAdd(point, e.origin, &mut upper_points[i as usize]);
+
+                // Lower ring
+                RotatePointAroundVector(&mut point, e.axis[0], v1, detail * i as f32);
+                VectorAdd(point, e.oldorigin, &mut lower_points[i as usize]);
+            }
+
+            // Calculate the texture coords so the texture can wrap around the whole cylinder
+            detail = 1.0 / segments as f32;
+
+            let mut quad = [polyVert_t {
+                xyz: [0.0; 3],
+                st: [0.0; 2],
+                modulate: [0; 4],
+            }; 4];
+
+            for i in 0..segments {
+                let next_segment = if i + 1 < segments { i + 1 } else { 0 };
+
+                quad[0].xyz = upper_points[i as usize];
+                quad[0].st[1] = 1.0;
+                quad[0].st[0] = detail * i as f32;
+                quad[0].modulate = e.shaderRGBA;
+
+                quad[1].xyz = lower_points[i as usize];
+                quad[1].st[1] = 0.0;
+                quad[1].st[0] = detail * i as f32;
+                quad[1].modulate = e.shaderRGBA;
+
+                quad[2].xyz = lower_points[next_segment as usize];
+                quad[2].st[1] = 0.0;
+                quad[2].st[0] = detail * (i + 1) as f32;
+                quad[2].modulate = e.shaderRGBA;
+
+                quad[3].xyz = upper_points[next_segment as usize];
+                quad[3].st[1] = 1.0;
+                quad[3].st[0] = detail * (i + 1) as f32;
+                quad[3].modulate = e.shaderRGBA;
+
+                do_cylinder_part(&mut verts, &mut indices, &quad);
+            }
+        }
+
+        // `RB_SurfaceElectricity`: one jagged bolt from `origin` to `oldorigin`.
+        //
+        // `axis[0][1]` and `axis[0][2]` are not axis components here.
+        // Raven's own inline comments name them the duration and the end time, and the FX submitter fills them that way.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:1127-1169
+        refEntityType_t::RT_ELECTRICITY => {
+            let radius = e.radius;
+
+            let start = e.origin;
+
+            let mut fwd: vec3_t = [0.0; 3];
+            VectorSubtract(e.oldorigin, start, &mut fwd);
+            let dis = VectorNormalize(&mut fwd);
+
+            // see if we should grow from start to end
+            let mut perc = 1.0f32;
+            if (e.renderfx & RF_GROW) != 0 {
+                perc = 1.0 - (e.axis[0][2] - refdef_time as f32) / e.axis[0][1];
+
+                if perc > 1.0 {
+                    perc = 1.0;
+                } else if perc < 0.0 {
+                    perc = 0.0;
+                }
+            }
+
+            // The oracle writes the grown endpoint back into the shared entity array and reads it straight back.
+            // The write lands in a local here, an accepted divergence a portal or a mirror view would make visible.
+            // The dead `RF_FORKED` branch would also read the un-grown `e.oldorigin`,
+            // where the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
+            // Source: oracle/codemp/renderer/tr_surface.cpp:1159
+            let mut end: vec3_t = [0.0; 3];
+            VectorMA(start, perc * dis, fwd, &mut end);
+
+            // compute side vector
+            let mut v1: vec3_t = [0.0; 3];
+            let mut v2: vec3_t = [0.0; 3];
+            VectorSubtract(start, view.ori.origin, &mut v1);
+            VectorSubtract(end, view.ori.origin, &mut v2);
+            let mut right: vec3_t = [0.0; 3];
+            CrossProduct(v1, v2, &mut right);
+            VectorNormalize(&mut right);
+
+            // DEC-66 ruling 2 threads the entity's own seed as a local.
+            // The dropped write is unobservable until portal or mirror views draw,
+            // because a second view of the same frame would read the mutated `oldorigin` and seed.
+            let mut seed: c_int = e.frame;
+            do_bolt_seg(
+                &mut verts,
+                &mut indices,
+                e,
+                &mut seed,
+                start,
+                end,
+                right,
+                radius,
+                color,
+                shape,
+                rng,
+            );
         }
 
         _ => {}
