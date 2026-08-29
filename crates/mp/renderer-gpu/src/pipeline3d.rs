@@ -47,9 +47,9 @@ use mp_qshared::common::mp::cgame::tr_types::{
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA as VectorMA, _VectorScale as VectorScale,
-    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, VectorCompare,
-    VectorNormalize,
+    _DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, RotatePointAroundVector,
+    VectorCompare, VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{SURF_NODLIGHT, SURF_SKY};
 use mp_qshared::shared::vec3_t;
@@ -100,7 +100,7 @@ use wgpu::{BlendState, RenderPipeline, TextureView};
 use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
-use native_math::qmath::Q_rsqrt;
+use native_math::qmath::{MakeNormalVectors, Q_rsqrt};
 use native_math::rng::Rng;
 
 use crate::stage2d::{
@@ -4544,24 +4544,36 @@ fn do_line(
     indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
 }
 
-/// Builds one generated entity surface's world-space vertices and triangle
-/// indices, the `RB_SurfaceEntity` dispatch restricted to the DEC-54 census
-/// set: `RT_SPRITE`, `RT_LINE`, and `RT_SABER_GLOW`.
+/// Raven `DoCylinderPart` - one four-corner ring segment, emitted with the cylinder's own index winding.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:818-847`
+fn do_cylinder_part(verts: &mut Vec<WorldVertex>, indices: &mut Vec<u32>, quad: &[polyVert_t; 4]) {
+    let vbase = verts.len() as u32;
+
+    for corner in quad {
+        verts.push(WorldVertex {
+            position: corner.xyz,
+            st: corner.st,
+            lightmap_st: [0.0, 0.0],
+            color: corner.modulate,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 3, vbase]);
+}
+
+/// Builds one generated entity surface's world-space vertices and triangle indices, the `RB_SurfaceEntity` dispatch restricted to the kinds this backend draws.
+/// Those are the DEC-54 census set, `RT_SPRITE`, `RT_LINE` and `RT_SABER_GLOW`, plus the three the FX module submits, `RT_ORIENTED_QUAD`, `RT_CYLINDER` and `RT_ELECTRICITY`.
 ///
 /// Every other `reType` returns empty, which the caller counts as a skip.
-/// `RT_BEAM`, `RT_ORIENTED_QUAD`, `RT_ORIENTEDLINE`, `RT_ELECTRICITY`, and
-/// `RT_CYLINDER` are census-complement fog, so they stay unbuilt rather than
-/// guessed at.
+/// `RT_BEAM` and `RT_ORIENTEDLINE` are census-complement fog, so they stay unbuilt rather than guessed at.
+/// The census never saw the other three.
+/// The FX module builds their `refEntity_t` inside the engine and submits it from `FxHost::AddFxToScene`, behind the trap seam the census counts.
 //TODO: Port RB_SurfaceBeam
-// Source: oracle/codemp/renderer/tr_surface.cpp:226-283
-//TODO: Port RB_SurfaceOrientedQuad
-// Source: oracle/codemp/renderer/tr_surface.cpp:173-215
+// Source: oracle/codemp/renderer/tr_surface.cpp:478-528
 //TODO: Port RB_SurfaceOrientedLine
-// Source: oracle/codemp/renderer/tr_surface.cpp:786-806
-//TODO: Port RB_SurfaceElectricity
-// Source: oracle/codemp/renderer/tr_surface.cpp:1038-1090
-//TODO: Port RB_SurfaceCylinder
-// Source: oracle/codemp/renderer/tr_surface.cpp:854-985
+// Source: oracle/codemp/renderer/tr_surface.cpp:792-807
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
 fn build_entity_geometry(
@@ -4599,6 +4611,59 @@ fn build_entity_geometry(
             if view.isMirror != 0 {
                 VectorSubtract(vec3_origin, left, &mut left);
             }
+            add_quad_stamp_ext(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                left,
+                up,
+                color,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            );
+        }
+
+        // `RB_SurfaceOrientedQuad`: the quad spans the entity's own `axis[1]`
+        // and `axis[2]`, not the view's, so it keeps its world orientation.
+        //
+        // The MP tree reads the two axis rows directly.
+        // The SP tree derives both from `axis[0]` through `MakeNormalVectors`, which MP leaves commented out.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:177-220
+        refEntityType_t::RT_ORIENTED_QUAD => {
+            let radius = e.radius;
+            //	MakeNormalVectors( backEnd.currentEntity->e.axis[0], left, up );
+            let mut left = e.axis[1];
+            let mut up = e.axis[2];
+
+            if e.rotation == 0.0 {
+                VectorScale(left, radius, &mut left);
+                VectorScale(up, radius, &mut up);
+            } else {
+                let ang = (PI * e.rotation as f64 / 180.0) as f32;
+                let s = ang.sin();
+                let c = ang.cos();
+
+                // Use a temp so we don't trash the values we'll need later
+                let mut temp_left: vec3_t = [0.0; 3];
+                VectorScale(left, c * radius, &mut temp_left);
+                VectorMA(temp_left, -s * radius, up, &mut temp_left);
+
+                let mut temp_up: vec3_t = [0.0; 3];
+                VectorScale(up, c * radius, &mut temp_up);
+                // no need to use the temp anymore, so copy into the dest vector ( up )
+                VectorMA(temp_up, s * radius, left, &mut up);
+
+                // This was copied for safekeeping, we're done, so we can move it back to left
+                left = temp_left;
+            }
+
+            if view.isMirror != 0 {
+                VectorSubtract(vec3_origin, left, &mut left);
+            }
+
             add_quad_stamp_ext(
                 &mut verts,
                 &mut indices,
@@ -4666,6 +4731,105 @@ fn build_entity_geometry(
             // end of the same quarter-unit span stands in until a render-side
             // generator lands.
             do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+        }
+
+        // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined
+        // into a closed ring of quads. The segment count drops with distance.
+        //
+        // `e.radius` scales the ring that translates to `e.oldorigin`, and `e.rotation` scales the ring that translates to `e.origin`.
+        // Raven's own `upper_points` and `lower_points` names run the other way from its header comment, so the code is the authority here.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:853-953
+        refEntityType_t::RT_CYLINDER => {
+            // `#define NUM_CYLINDER_SEGMENTS 32`
+            // Source: oracle/codemp/renderer/tr_surface.cpp:815
+            const NUM_CYLINDER_SEGMENTS: i32 = 32;
+
+            // Work out the detail level of this cylinder
+            let mut midpoint: vec3_t = [0.0; 3];
+            VectorAdd(e.origin, e.oldorigin, &mut midpoint);
+            VectorScale(midpoint, 0.5, &mut midpoint); // Average start and end
+
+            VectorSubtract(midpoint, view.ori.origin, &mut midpoint);
+            let mut length = VectorNormalize(&mut midpoint);
+
+            // this doesn't need to be perfect....just a rough compensation for zoom level is enough
+            length *= view.fovX / 90.0;
+
+            let mut detail = 1.0 - (length / 1024.0);
+            let mut segments = (NUM_CYLINDER_SEGMENTS as f32 * detail) as i32;
+
+            // 3 is the absolute minimum, but the pop between 3-8 is too noticeable
+            if segments < 8 {
+                segments = 8;
+            }
+
+            if segments > NUM_CYLINDER_SEGMENTS {
+                segments = NUM_CYLINDER_SEGMENTS;
+            }
+
+            // Get the direction vector
+            let mut vr: vec3_t = [0.0; 3];
+            let mut vu: vec3_t = [0.0; 3];
+            MakeNormalVectors(e.axis[0], &mut vr, &mut vu);
+
+            let mut v1: vec3_t = [0.0; 3];
+            VectorScale(vu, e.radius, &mut v1); // size1
+            VectorScale(vu, e.rotation, &mut vu); // size2
+
+            // Calculate the step around the cylinder
+            detail = 360.0 / segments as f32;
+
+            // Raven's two ring arrays are function-local statics, and every element is written before it is read on each call.
+            // They are per-call scratch, so they become owned locals here.
+            let mut upper_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+            let mut lower_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+
+            for i in 0..segments {
+                // Upper ring
+                let mut point: vec3_t = [0.0; 3];
+                RotatePointAroundVector(&mut point, e.axis[0], vu, detail * i as f32);
+                VectorAdd(point, e.origin, &mut upper_points[i as usize]);
+
+                // Lower ring
+                RotatePointAroundVector(&mut point, e.axis[0], v1, detail * i as f32);
+                VectorAdd(point, e.oldorigin, &mut lower_points[i as usize]);
+            }
+
+            // Calculate the texture coords so the texture can wrap around the whole cylinder
+            detail = 1.0 / segments as f32;
+
+            let mut quad = [polyVert_t {
+                xyz: [0.0; 3],
+                st: [0.0; 2],
+                modulate: [0; 4],
+            }; 4];
+
+            for i in 0..segments {
+                let next_segment = if i + 1 < segments { i + 1 } else { 0 };
+
+                quad[0].xyz = upper_points[i as usize];
+                quad[0].st[1] = 1.0;
+                quad[0].st[0] = detail * i as f32;
+                quad[0].modulate = e.shaderRGBA;
+
+                quad[1].xyz = lower_points[i as usize];
+                quad[1].st[1] = 0.0;
+                quad[1].st[0] = detail * i as f32;
+                quad[1].modulate = e.shaderRGBA;
+
+                quad[2].xyz = lower_points[next_segment as usize];
+                quad[2].st[1] = 0.0;
+                quad[2].st[0] = detail * (i + 1) as f32;
+                quad[2].modulate = e.shaderRGBA;
+
+                quad[3].xyz = upper_points[next_segment as usize];
+                quad[3].st[1] = 1.0;
+                quad[3].st[0] = detail * (i + 1) as f32;
+                quad[3].modulate = e.shaderRGBA;
+
+                do_cylinder_part(&mut verts, &mut indices, &quad);
+            }
         }
 
         _ => {}

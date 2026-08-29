@@ -827,6 +827,8 @@ pub fn RB_SurfaceLine(current_entity: Option<&RefEntity>, view: &viewParms_t) {
 /// `DoCylinderPart` is itself still a `todo!()` tess-dependent stub in this
 /// same file.
 ///
+/// The live arm is the `RT_CYLINDER` branch of `build_entity_geometry` in `mp_renderer_gpu::pipeline3d`, per gh#31 step-009.
+///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:853-953`
 pub fn RB_SurfaceCylinder(current_entity: Option<&RefEntity>, view: &viewParms_t) {
     // `#define NUM_CYLINDER_SEGMENTS 32` — packet FILE-SCOPE CONSTANTS,
@@ -993,6 +995,8 @@ pub fn RB_SurfaceSprite(
 /// (`render_state/placeholders.rs`) — a state home this packet marks
 /// mapped-but-not-yet-populated is an escalation, not an invention
 /// (preamble). `RB_AddQuadStamp` is not called.
+///
+/// The live arm is the `RT_ORIENTED_QUAD` branch of `build_entity_geometry` in `mp_renderer_gpu::pipeline3d`, per gh#31 step-009.
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:177-220`
 pub fn RB_SurfaceOrientedQuad(
