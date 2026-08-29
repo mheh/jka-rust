@@ -40,7 +40,9 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
-use mp_qshared::common::mp::cgame::tr_types::{RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT};
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT, RF_TAPERED,
+};
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
@@ -834,6 +836,36 @@ fn scene_fx_cylinder(host: &mut UiHost, frame_data: &mut FrameData, shader: qhan
     record_entities(host, frame_data, &out);
 }
 
+/// The FX module's `RT_ELECTRICITY` submissions, which the trap census sees only as the `fx/AddElectricity` row because `CElectricity::Draw` builds the entity inside the engine.
+/// Two bolts on different `frame` seeds, one plain and one tapered, so the per-entity seed and the taper are both visible.
+///
+/// Neither carries `RF_GROW`, so the frozen scene clock never enters the geometry.
+/// `axis[0][0]` is the chaos multiplier the deviation draws scale by.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1127-1169`
+fn scene_fx_electricity(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let mut out = Vec::new();
+    for (y, radius, seed, renderfx, rgba) in [
+        (-40.0f32, 3.0f32, 12345, 0i32, [255u8, 255, 255, 255]),
+        (40.0, 5.0, 987654, RF_TAPERED, [64, 255, 96, 255]),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_ELECTRICITY;
+        re.customShader = shader;
+        re.origin = [180.0, y, -50.0];
+        re.oldorigin = [180.0, y, 50.0];
+        // `axis[0][0]` is the chaos multiplier, not an axis component.
+        re.axis[0] = [1.0, 0.0, 0.0];
+        re.radius = radius;
+        // `frame` is the bolt's own 69069 seed, the field the FX submitter fills with a scaled frame time.
+        re.frame = seed;
+        re.renderfx = renderfx;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+    record_entities(host, frame_data, &out);
+}
+
 #[test]
 fn golden_scene_sprites() {
     run_scene(&Scene {
@@ -920,6 +952,16 @@ fn golden_scene_fx_cylinder() {
         stem: "scene_fx_cylinder",
         eye: [0.0, 0.0, 0.0],
         record: scene_fx_cylinder,
+        expect_dlights: 0,
+    });
+}
+
+#[test]
+fn golden_scene_fx_electricity() {
+    run_scene(&Scene {
+        stem: "scene_fx_electricity",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_fx_electricity,
         expect_dlights: 0,
     });
 }
