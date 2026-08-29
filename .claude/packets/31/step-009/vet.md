@@ -671,3 +671,14 @@ The packet body's contracted `do_bolt_seg` doc carries the same replacement, so 
 - `cargo test -p mp_renderer_gpu --test hud_golden -- --test-threads=1`: `ok. 1 passed; 0 failed; 1 ignored`. With `--ignored`: `ok. 1 passed; 0 failed`.
 
 `git status` is clean after all runs, so all eighteen committed fixtures are byte-identical.
+
+## F1 remedy verdict - 2026-08-29, `8572d500..gh31-step-009-fx-minirefents`
+
+One commit, `37422a67`, walked whole. Zero findings.
+
+- The diff is comment-and-doc only: a mechanical filter over the `crates/` hunks finds zero changed lines that are not `///` lines, and the other two files are `packet.md` (one dated Amendment line for the F1 ruling) and `finished.md` (the fix-round record line). No fixture moved and no surface changed.
+- All three F1 interlocks are gone. `STATE HOMES row `DoBoltSeg`/`f_count`:` sits whole on one line with the quotation on the next, `this file already names that carrier (...)` and `and `f_count` now sits on it ...` break at their clause commas, and `so the masks are no longer a blocker.` is whole, closing the legacy `no / longer` split.
+- Every added line is under 150 columns (checked mechanically over the diff), and every break in the re-flowed paragraph lands at a sentence end or a clause boundary of a sentence that passes 150 when joined.
+- The wording-unchanged claim re-verified: a fully whitespace-stripped comparison of the whole `DoBoltSeg` doc block between `8572d500` and `37422a67` returns a character-for-character match. The only word-level deltas are the two declared token joins, `Q_crandom(&e->frame)`/`Q_random(&e->frame)` and `native_math::qmath::{...}`, where the legacy wrap broke inside a token with no space.
+- The commit message carries a heading subject, a plain-sentence body with gate results as prose, and `%(trailers)` returns empty.
+- Gates: `cargo build --workspace` re-run at the head after touching `tr_surface.rs`, zero warnings, zero errors, and `git status` clean after. I did not re-run the test battery or the golden suites for this commit. I rely on the mechanical comment-and-doc-only proof above: no executable line changed, so no gate input changed.
