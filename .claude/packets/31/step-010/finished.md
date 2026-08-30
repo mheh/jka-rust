@@ -1,6 +1,8 @@
 # Finished gh#31 step-010 - the renderfx closure
 
-Branch `gh31-step-010-renderfx`, cut from `gh31-step-009-fx-minirefents`. Eleven commits. Every gate the packet names ran for every commit, with the exact invocations the packet gives.
+Branch `gh31-step-010-renderfx`, cut from `gh31-step-009-fx-minirefents`. Fourteen commits, twelve from the build and two from the lane-review fix round. Every gate the packet names ran for every commit, with the exact invocations the packet gives.
+
+The base branch no longer exists. Step-009 merged into `wf/31-renderer-census` as pull request #48, and its tip is `61a5062b`, which is the range the vet walked.
 
 ## Commits and gate results
 
@@ -17,8 +19,11 @@ Branch `gh31-step-010-renderfx`, cut from `gh31-step-009-fx-minirefents`. Eleven
 | 6 | `ee2693d5` | `test(gh#31 s010): the disintegrate and volumetric golden` |
 | — | `035334af` | `process(gh#31 s010): the renderfx golden bless amendment` |
 | 7 | `92641c97` | `docs(gh#31 s010): the RF_NOSHADOW disposition` |
+| 8 | `9f7e2ca4` | `process(gh#31 s010): finished file` |
+| — | `8adbfa9a` | `fix(gh#31 s010): the lane-review findings` |
+| — | `74480cdc` | `process(gh#31 s010): the lane-review walk amendment` |
 
-The packet's commit 8 is this file.
+The last two are the fix round the lane-review walk of 2026-08-30 ordered.
 
 Gate results, per commit:
 
@@ -30,6 +35,9 @@ Gate results, per commit:
 - **The fix commit.** Build green at zero warnings. Workspace tests passed. All nineteen fixtures byte-identical, as predicted, because no committed scene submits either disintegrate flag.
 - **Commit 6.** Build green at zero warnings. Workspace tests passed. All twenty fixtures byte-identical.
 - **Commit 7.** Build green at zero warnings. Workspace tests passed. All twenty fixtures byte-identical, which is what a comment-only change must produce.
+
+- **The fix round, `8adbfa9a`.** Build green at zero warnings. Workspace tests passed. All twenty fixtures byte-identical, and `git status --porcelain` was empty after the runs, so no `.actual.png` was written. Comment text and one arithmetic widening only, so no fixture could move.
+- **The walk amendment, `74480cdc`.** Packet folder only, no code.
 
 Golden invocations used throughout, each as one serial foreground run: `cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`, `--test world_golden -- --ignored --test-threads=1`, `--test entity_golden -- --ignored --test-threads=1`, `--test ghoul2_vertex_golden -- --ignored --test-threads=1`, and `--test hud_golden` both with and without `--ignored`.
 
@@ -73,6 +81,13 @@ Three, each ratified by the user mid-lane and folded into the packet's Amendment
 
 3. **Two of row 4's defect clauses are unattainable on this model.** The `RF_DISINTEGRATE1` band clause and the `RF_DISINTEGRATE2` deform clause were struck. `RB_CalcDisintegrateColors` puts its three bands in a shell about `90/threshold` units thick, and `twinpodcc.md3` carries 702 vertices over a 315 unit span, so vertices sit roughly 30 units apart. At the threshold of 120 that cuts a visible hole the shell is 0.75 units thick and catches almost no vertex, and a lower threshold shrinks the sphere until it cuts no hole at all. The vert deform moves the vertices inside the sphere, and those are the ones that turn transparent. The hole and the hard edge both landed and are locked.
 
+The lane-review walk of 2026-08-30 ratified four more, each recorded in the packet's Amendments.
+
+4. **`screen_image` is false at three of five construction sites.** The contract writes the bit as `EntityFx::resolve`'s `distortion` bit everywhere. The fog pass binds `tr.fogImage` and a multitextured stage diverts to `DrawMultitextured`, which has no distortion arm, so both take `false`. The third is the non-dynamic single-texture arm, which commit 4 made unreachable when the bit is set. The clause now scopes the bit to the single-texture path.
+5. **The PBR backend never binds the capture.** `view_bind_group` builds the two-texture world group and the PBR pipeline takes a four-texture layout, so a distortion stage under `BackendMode::Pbr` keeps its own diffuse. Ratified onto the divergence list.
+6. **Five markers, not four.** The `_G2_GORE` deferral shared the note the row-8 conversion replaced, so it took a marker of its own rather than lose its greppable subject.
+7. **Three forced surfaces.** `draw_items`, the paired return on `collect_stage_items`, and the two parameterized path helpers in `entity_golden.rs` are outside the contract's enumerated items and were accepted as mechanically forced.
+
 No other deviation. Every other row, scope line, write scope and gate stands as written.
 
 ## Open gaps
@@ -84,3 +99,4 @@ No other deviation. Every other row, scope line, write scope and gate stands as 
 - **`R_WorldCoordToScreenCoordFloat`'s vertical scale is Raven's own approximation.** It uses `90.0 / fov_y` where the real projection uses `tan(fov_y / 2)`, so a capture for an entity off the view centreline sits a pixel or two from the entity's rendered position. The port transcribes the approximation, and the distortion golden's sprite sits at `z = 0`, where the two agree.
 - **Two stale `tr_surface.rs` doc comments** (`:108-116` and `:1217-1243`) that step-009 flagged stay untouched, as the packet's carried-forward section requires.
 - **The `oldorigin` portal-view divergence note** from step-009's finished file stands untouched.
+- **The vet's unverified list stands.** `.claude/packets/31/step-010/vet.md` names thirteen items no fixture exercises, including the windowed capture path, two distortion entities in one frame, the `MAX_POST_RENDERS` cap, the screen-image rebuild, a false projection, and the PBR arm. The fix round changed no coverage.
