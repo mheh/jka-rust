@@ -22,8 +22,10 @@ The base branch no longer exists. Step-009 merged into `wf/31-renderer-census` a
 | 8 | `9f7e2ca4` | `process(gh#31 s010): finished file` |
 | — | `8adbfa9a` | `fix(gh#31 s010): the lane-review findings` |
 | — | `74480cdc` | `process(gh#31 s010): the lane-review walk amendment` |
+| — | `7187ec04` | `process(gh#31 s010): the finished file fix-round update` |
+| — | this commit | `process(gh#31 s010): the fix-round walk amendment` |
 
-The last two are the fix round the lane-review walk of 2026-08-30 ordered.
+The last four are the fix round the lane-review walk of 2026-08-30 ordered, and the two-row ledger its own walk returned.
 
 Gate results, per commit:
 
@@ -38,6 +40,7 @@ Gate results, per commit:
 
 - **The fix round, `8adbfa9a`.** Build green at zero warnings. Workspace tests passed. All twenty fixtures byte-identical, and `git status --porcelain` was empty after the runs, so no `.actual.png` was written. Comment text and one arithmetic widening only, so no fixture could move.
 - **The walk amendment, `74480cdc`.** Packet folder only, no code.
+- **The finished file update, `7187ec04`, and the fix-round walk amendment.** Packet folder only, no code. Both gate on `cargo build --workspace` and `cargo test --workspace -- --test-threads=1`, which the last entry confirms green and passing.
 
 Golden invocations used throughout, each as one serial foreground run: `cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`, `--test world_golden -- --ignored --test-threads=1`, `--test entity_golden -- --ignored --test-threads=1`, `--test ghoul2_vertex_golden -- --ignored --test-threads=1`, and `--test hud_golden` both with and without `--ignored`.
 
@@ -87,6 +90,11 @@ The lane-review walk of 2026-08-30 ratified four more, each recorded in the pack
 5. **The PBR backend never binds the capture.** `view_bind_group` builds the two-texture world group and the PBR pipeline takes a four-texture layout, so a distortion stage under `BackendMode::Pbr` keeps its own diffuse. Ratified onto the divergence list.
 6. **Five markers, not four.** The `_G2_GORE` deferral shared the note the row-8 conversion replaced, so it took a marker of its own rather than lose its greppable subject.
 7. **Three forced surfaces.** `draw_items`, the paired return on `collect_stage_items`, and the two parameterized path helpers in `entity_golden.rs` are outside the contract's enumerated items and were accepted as mechanically forced.
+
+The fix-round walk of 2026-08-30 ratified two more.
+
+8. **The F9 note runs to three lines.** The divergence section asks for two or fewer. This site is the one exception, because the ratified F9 ruling named three facts and they do not fit two lines under the 150 column rule.
+9. **The step-folder write scope covers `vet.md`.** The grant now reads `finished.md`, session-directed `packet.md` tail appends, and the vet's own record.
 
 No other deviation. Every other row, scope line, write scope and gate stands as written.
 

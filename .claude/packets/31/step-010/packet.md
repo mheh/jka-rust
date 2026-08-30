@@ -508,3 +508,10 @@ The remaining findings are closed by ruling, and the clauses below change with t
 - F6. Session-directed amendment appends to `packet.md` are inside the lane's write scope. The write-scope line granting the folder for `finished.md` alone did not anticipate a mid-lane ruling.
 - F11. The eight landed `Gates:` bodies stand. A future gate paragraph opens with prose, so no final paragraph starts with a bare token-colon line.
 - F12. The four unplanned commits are listed against their rulings. `9b47e5c9` is the disintegrate fix the user ratified in this lane, and `a09b8e38`, `c7da3493` and `035334af` are the three amendment appends F6 covers.
+
+**2026-08-30 - the fix-round walk closed two minor rows.**
+
+The vet walked the fix-round commits and returned two findings. The user ruled on both.
+
+- M1, the three-line F9 note. The divergence note at the all-zero colour buffer runs to three lines where the packet's divergence section asks for two or fewer. It stands as ratified wording, and this site is the one exception to that cap. The F9 ruling named three facts: the oracle's first band writes alpha only and leaves rgb at the previous surface's `tess` scratch, the port supplies zeros, and the difference is confined to the alpha-test border blend at no more than a quarter vertex weight. Three facts do not fit two lines under the 150 column rule.
+- M2, the step-folder write scope. The scope extends to `vet.md`, the lane-review skill's required artifact. The folder grant now reads: `finished.md`, session-directed `packet.md` tail appends, and the vet's `vet.md`.

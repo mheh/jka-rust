@@ -879,3 +879,313 @@ Named plainly. None of these is assumed fine.
 11. **`scene_renderfx_tint.png` under the deferral.** It did not move, which the commit body attributes to the four force-alpha sprites not overlapping. That the deferral in fact reordered them is asserted by the commit body ("A probe run of that scene showed the two force-alpha sprites deferring and draining in reverse") and not re-run here.
 12. **The lockstep referee.** The packet excuses it, because no commit touches `mp_game`, the server or a `jampded` link-set crate, and the diffstat confirms that. Not run.
 13. **The `finished.md` content.** Not opened, per the vet brief. Its claims are unchecked.
+
+---
+
+# Fix round - 2026-08-30
+
+Range `9f7e2ca4..gh31-step-010-renderfx`, head `7187ec04`, three commits, every hunk walked in order.
+
+- `8adbfa9a fix(gh#31 s010): the lane-review findings`
+- `74480cdc process(gh#31 s010): the lane-review walk amendment`
+- `7187ec04 process(gh#31 s010): the finished file fix-round update`
+
+**2 findings, both minor.** Every fix the coordinator named checks out. `finished.md` was not opened: `7187ec04` was read with `git show --stat --format=%B`, which shows the message and the stat and no patch.
+
+## The eight fixes, each checked against its finding
+
+### F7 - the divergence note is present and truthful
+
+The false clause is gone from the group-build site:
+
+```rust
+-            // A surface whose capture did not run keeps its cached group and binds its own diffuse, which is the oracle's answer to a false projection.
++            // A surface whose capture did not run keeps its cached group, which holds its own diffuse.
+```
+
+The note lands at the bind, two lines, one sentence per line:
+
+```rust
++            // Divergence: the oracle binds `tr.screenImage` unconditionally.
++            // A skipped capture there samples the last successful one or the built-in 8 by 8 white image, and the port binds the stage's own diffuse.
+             let texture_group = match (item.screen_image, screen_group) {
+```
+
+Both sentences check out. `oracle/codemp/renderer/tr_shade.cpp:2163-2169` binds `tr.screenImage` with no guard, and `oracle/codemp/renderer/tr_image.cpp:2776` allocates it as an 8 by 8 white placeholder. The behavior is unchanged, which is what the ruling ordered.
+
+### F8 and F15 - the mirror sentence is replaced by the no-mirror fact
+
+```rust
+-    // The `vid_width - x` term mirrors the square about the vertical centreline. That is Raven's own behavior and it ports as written.
++    // `AnglesToAxis` fills `viewaxis[1]` with the left vector, so the helper's `x` counts from the right edge of the screen.
++    // The `vid_width - x` term converts it back, which puts the capture on the entity's own screen position.
+     // The `vid_height - y` term converts a top-down y to the framebuffer's bottom-up origin, so the row flips back here.
+```
+
+Verified against the oracle rather than against the amendment's summary. `oracle/codemp/game/q_math.c:530-536` is `AngleVectors( angles, axis[0], right, axis[2] ); VectorSubtract( vec3_origin, right, axis[1] );`, so `viewaxis[1]` holds the negated right vector. `oracle/codemp/renderer/tr_backend.cpp:613,618` reads it as `vright` and writes `transformed[0] = DotProduct(local,vright)`, so a point to the left takes a larger `transformed[0]`, and `:631` gives it a larger `x`. The helper's `x` therefore counts from the right edge, and `vidWidth - x` converts it back. Both sentences are true. One sentence per line, and the `vid_height - y` sentence stands as ordered. F15 closes with it, because the two-sentence line is the line that was replaced.
+
+### F9 - the note and its quarter-weight bound
+
+```rust
++        // Divergence: `RF_DISINTEGRATE1`'s first band writes alpha only, so the oracle leaves rgb at the previous surface's `tess` scratch.
++        // This buffer supplies zeros instead, and the band's own alpha test discards those vertices.
++        // The difference therefore reaches only the border blend, at no more than a quarter vertex weight.
+         let mut evaluated = vec![[0u8; 4]; count];
+```
+
+Sentence one is right: `oracle/codemp/renderer/tr_shade_calc.cpp:1570-1574` writes `colors[i*4+3] = 0x00` and nothing else, and the port's `crates/mp/renderer/src/tr_shade_calc.rs:606-608` transcribes that as `c[3] = 0x00;` with the other three channels untouched.
+
+Sentence three's bound is right, and it is tight. `RF_DISINTEGRATE1` forces `GLS_ATEST_GE_C0` (`oracle/codemp/renderer/tr_shade.cpp:2046`, ported at `crates/mp/renderer-gpu/src/pipeline3d.rs:4831`), so a surviving fragment carries an interpolated alpha of at least `0xC0`. With `w0` the barycentric weight of a zero-alpha vertex and the other two vertices at most `0xff`, survival needs `255 * (1 - w0) >= 192`, which gives `w0 <= 0.2471`. That is under a quarter. See M1 for the note's length.
+
+### F10 - the `i64` widening
+
+```rust
++    let x = x as i64;
++    let y = y as i64;
++    let rad_wide = rad as i64;
++    let vid_width_wide = vid_width as i64;
++    let vid_height_wide = vid_height as i64;
++
++    let mut c_x = vid_width_wide - x - (rad_wide / 2);
++    let mut c_y = vid_height_wide - y - (rad_wide / 2);
++    if c_x + rad_wide > vid_width_wide {
++        c_x = vid_width_wide - rad_wide;
+     } else if c_x < 0 {
+         c_x = 0;
+     }
+```
+
+Bit-identical in range. Every input is an `i32` widened without loss, the operator order and the `if`/`else if` order are unchanged, and `rad_wide / 2` truncates the same way as `rad / 2` because the `rad <= 0` guard above it makes `rad` positive. Overflow is now impossible: the widest term is `vid_height_wide - i32::MIN - rad_wide`, about `6.4e9`, well inside `i64`. The two output casts stay exact, because both clamps leave `c_x` in `0..=vid_width - rad` and `c_y` in `0..=vid_height - rad`, so `c_x as u32` and `top as u32` never truncate.
+
+The rule-19 note is present and names the pick:
+
+```rust
++    // C's out-of-range float-to-int cast is undefined, and Rust's saturates to the `i32` bounds instead.
++    // The clamps below run in `i64` so a saturated projection cannot overflow, and every in-range input gives the same result either way.
+```
+
+The saturating cast itself still lives in `world_coord_to_screen_coord` one function above, and the note lives where the consequence lives. Readable either way, not a finding.
+
+### F14 - the 150-column limit
+
+Zero added comment lines in this range pass 150 columns. Measured over every touched file, no line this lane authored anywhere in the step now passes it:
+
+```
+crates/mp/renderer/src/tr_ghoul2.rs:1094 (218)  ... "Port G2_ConstructUsedBoneList bone-marking body ..."
+crates/mp/client-app/src/render_thread.rs:107 (161) // Latch `r_swapInterval` onto the surface ...
+crates/mp/client-app/src/render_thread.rs:109 (152) // The apply semantics port from the SP Mac glimp ...
+crates/mp/client-app/src/render_thread.rs:115 (155) // An unsynchronized surface presents as fast as the thread asks ...
+```
+
+All four are pre-existing. `tr_ghoul2.rs:1094` is a `todo!()` string, not a comment. The three `render_thread.rs` lines are the DEC-37 swap-interval work of an earlier step, and this step's only edit to that file is the one added `&frame.texture,` argument.
+
+Each of the eleven flagged lines broke at a clause boundary, and each break is semantic. Sample:
+
+```rust
+-/// The sprite draws at screen (220, 104) and spans 64 pixels, and its capture square is 40 pixels, so the sprite carries a magnified crop of the block.
++/// The sprite draws at screen (220, 104) and spans 64 pixels, and its capture square is 40 pixels.
++/// The sprite therefore carries a magnified crop of the block.
+```
+
+### F16 - the doc rewrite
+
+```rust
++/// Builds the small [`RefEntity`] the colour evaluators read from a `trRefEntity_t`.
++/// `R_SetupEntityLighting` folded the entity light into `lightDir`, `ambientLight` and `directedLight`, which the diffuse arms read.
++/// The colour short-circuits read `shaderRGBA`, and the two disintegrate arms additionally read `renderfx`, `oldorigin` and `endTime`.
++/// Those seven fields are what this builder carries, and every other field keeps its default.
+```
+
+The count is right: `light_dir`, `ambient_light`, `directed_light`, `shader_rgba`, `renderfx`, `old_origin`, `end_time` is seven. The claim now matches the body it heads, and the field list matches what `RB_CalcDisintegrateColors`, `RB_CalcDisintegrateVertDeform` and the volumetric block read at `oracle/codemp/renderer/tr_shade_calc.cpp:1553-1557,1566,1649` and `oracle/codemp/renderer/tr_shade.cpp:1577`.
+
+### F17 - 270
+
+```rust
+-/// This distance shrinks each copy to about 255 pixels, which is what lets three of them share one image.
++/// This distance shrinks each copy to about 270 pixels, which is what lets three of them share one image.
+```
+
+Now agrees with the `ee2693d5` body and with the packet's 2026-08-30 amendment. Which of the two numbers the blessed image actually measures is the lane's claim, not something I measured.
+
+### F18 - the wave rewording
+
+```rust
+-/// The `_G2_GORE` overlay chain is deferred in this arm too, and it lands with the gore backend wave.
++// The `_G2_GORE` overlay chain is deferred in this arm too, and its own marker sits at the push site below.
++// The gore fields (`scale`/`fade`/`impactTime`) stay off `G2SurfaceRef` until that backend lands.
+```
+
+```rust
+-        // The `RF_SHADOW_PLANE` and `RF_NOSHADOW` imports return with that wave.
++        // The `RF_SHADOW_PLANE` and `RF_NOSHADOW` imports return when that backend lands.
+```
+
+`grep -in "wave"` over the added lines of this range returns nothing. The remaining 50 hits in `tr_ghoul2.rs` are all pre-existing lines this step never touched.
+
+### The row-8 rider - exactly five markers
+
+`grep -n "TODO: Port"` over the two renderer files:
+
+```
+crates/mp/renderer/src/tr_mesh.rs:512:        //TODO: Port R_AddMD3Surfaces's stencil- and projection-shadow pushes
+crates/mp/renderer/src/tr_ghoul2.rs:845://TODO: Port RenderSurfaces's stencil- and projection-shadow pushes
+crates/mp/renderer/src/tr_ghoul2.rs:912:        //TODO: Port RenderSurfaces's stencil- and projection-shadow pushes
+crates/mp/renderer/src/tr_ghoul2.rs:920:        //TODO: Port RenderSurfaces's _G2_GORE overlay pushes
+crates/mp/renderer/src/tr_ghoul2.rs:2468:        //TODO: Port R_AddGhoulSurfaces's bInShadowRange RF_NOSHADOW adjust
+```
+
+Five, matching the ratified set. Every one takes the exact `//TODO: Port <subject>` form of `docs/porting-rules.md`, with no space after the slashes, and every one is followed immediately by its `// Source:` line. The `/// TODO: Port` doc-comment variant the first walk flagged is gone: the block moved below the doc comment and above `pub fn render_surfaces`, so the doc comment now ends at its own `/// Source: oracle/codemp/renderer/tr_ghoul2.cpp:2521-2735` and the deferral reads as plain `//` lines at the item. The SP asymmetry cite moved onto its own `// Source:` line in both ghoul2 blocks rather than sitting inline in a sentence, which is what took those two lines under 150 columns.
+
+## The amendment commit
+
+`74480cdc` writes `.claude/packets/31/step-010/packet.md` with `22 0` in `git show --numstat`, and `grep -c "^-[^-]"` over that file's portion returns `0`. The hunk header is `@@ -486,3 +486,25 @@`, so the whole entry appends below the previous amendment's last line. A pure tail append, and every line above it is untouched. The ten-row ledger reads consistently with the vet it answers: F7, F8/F15, F9, F10 and the F14/F16/F17/F18 group take code fixes, and F1, F2, F3, F4, F5, F6, F11, F12 and F13 close by ruling with four contract clauses changed.
+
+## The three commit messages
+
+| Commit | Subject | Body | `%G?` | `%(trailers)` |
+|---|---|---|---|---|
+| `8adbfa9a` | `fix(gh#31 s010): the lane-review findings` | STE, unwrapped, no em dash, no semicolon, no contraction | `N` | empty |
+| `74480cdc` | `process(gh#31 s010): the lane-review walk amendment` | same | `N` | empty |
+| `7187ec04` | `process(gh#31 s010): the finished file fix-round update` | same | `N` | empty |
+
+Every subject is a heading noun phrase with the `type(gh#31 s010):` prefix. The new gate-paragraph convention holds: `8adbfa9a`'s final paragraph opens "Every fixture held.", `74480cdc`'s opens "The vet record joins the packet folder in the same commit.", and `7187ec04` has no gate paragraph. `git log --format=%(trailers)` returns nothing for all three, so F11's fix is confirmed by git's own parser rather than by inspection. No commit is signed, and none carries a co-author trailer or a generated-with footer.
+
+## The only executable change
+
+`git diff 9f7e2ca4..gh31-step-010-renderfx -- crates/`, with comment and blank lines filtered out, returns the `i64` widening and nothing else:
+
+```
+-    let mut c_x = vid_width - x - (rad / 2);
+-    let mut c_y = vid_height - y - (rad / 2);
+-    if c_x + rad > vid_width {
+-        c_x = vid_width - rad;
++    let x = x as i64;
++    let y = y as i64;
++    let rad_wide = rad as i64;
++    let vid_width_wide = vid_width as i64;
++    let vid_height_wide = vid_height as i64;
++    let mut c_x = vid_width_wide - x - (rad_wide / 2);
++    let mut c_y = vid_height_wide - y - (rad_wide / 2);
++    if c_x + rad_wide > vid_width_wide {
++        c_x = vid_width_wide - rad_wide;
+-    if c_y + rad > vid_height {
+-        c_y = vid_height - rad;
++    if c_y + rad_wide > vid_height_wide {
++        c_y = vid_height_wide - rad_wide;
+-    let top = vid_height - c_y - rad;
++    let top = vid_height_wide - c_y - rad_wide;
+```
+
+Everything else in the round is comment text. Twenty byte-identical fixtures is exactly what that must produce, and it is what the battery returns.
+
+## Repo mechanics and house style on the round's added lines
+
+Clean. No `use` inside a function body, no `todo!()` or other placeholder, no new extern block, no `format!` building a wire string, no `unsafe`. No em dash, no en dash, no semicolon in prose, no comment line carrying two sentences, no pet vocabulary, no banned voice. Every added comment sits at the site of the fact it carries.
+
+## Findings
+
+### M1 - the F9 divergence note runs to three lines
+
+```rust
+        // Divergence: `RF_DISINTEGRATE1`'s first band writes alpha only, so the oracle leaves rgb at the previous surface's `tess` scratch.
+        // This buffer supplies zeros instead, and the band's own alpha test discards those vertices.
+        // The difference therefore reaches only the border blend, at no more than a quarter vertex weight.
+```
+
+Packet heading: "## Divergence notes, each ≤2 lines at its site". The walk's ledger changed four contract clauses and did not change this one, so the two-line cap still binds. The three facts the ledger's own F9 wording asks for do not compress into two lines without dropping one, so the cap and the ruling pull against each other. The note itself is accurate. Trivial, and it needs a ruling on which of the two clauses gives.
+
+The note also states the quarter bound without naming where it comes from. A reader cannot check it without finding `GLS_ATEST_GE_C0` at `pipeline3d.rs:4831`. Under the house KNOWLEDGE-LOCALITY rule that argues for a cite rather than a shorter note, which points the opposite way from the cap.
+
+### M2 - `vet.md` is a third file in the packet folder
+
+`74480cdc` adds `.claude/packets/31/step-010/vet.md`, 881 lines. The write scope grants the folder "for `finished.md`", and the walk's F6 ruling widened that to "Session-directed amendment appends to `packet.md`". Neither line names a vet record. The lane-review ceremony is what puts the file there and the coordinator directed it, so this is a gap in the written scope rather than an unsanctioned write.
+
+## The gate battery, re-run at `7187ec04`
+
+Working tree clean before and after. Every command as the packet writes it, each in the foreground, each serial.
+
+**`cargo build --workspace`**
+
+```
+   Compiling mp_renderer_gpu v0.1.0 (/Users/milohehmsoth/Developer/Milo/jka-rust/crates/mp/renderer-gpu)
+   Compiling mp_app v0.1.0 (/Users/milohehmsoth/Developer/Milo/jka-rust/crates/mp/app)
+   Compiling mp_client_app v0.1.0 (/Users/milohehmsoth/Developer/Milo/jka-rust/crates/mp/client-app)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.61s
+```
+
+Green, zero warnings. The `//TODO` block between the doc comment and `pub fn render_surfaces` draws no diagnostic.
+
+**`cargo test --workspace -- --test-threads=1`** - 137 `test result: ok`, 0 `test result: FAILED`, no error and no warning line.
+
+**`cargo test -p mp_renderer_gpu --test scene_golden -- --test-threads=1`**
+
+```
+running 11 tests
+test golden_scene_depthhack ... ok
+test golden_scene_distortion ... ok
+test golden_scene_dlights ... ok
+test golden_scene_fx_cylinder ... ok
+test golden_scene_fx_electricity ... ok
+test golden_scene_fx_oriented_quad ... ok
+test golden_scene_lines ... ok
+test golden_scene_polys ... ok
+test golden_scene_renderfx_tint ... ok
+test golden_scene_saber_glow ... ok
+test golden_scene_sprites ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.00s
+```
+
+**`cargo test -p mp_renderer_gpu --test world_golden -- --ignored --test-threads=1`**
+
+```
+running 4 tests
+test golden_world_dlights_duel1 ... ok
+test golden_world_duel1 ... ok
+test golden_world_ffa2 ... ok
+test golden_world_marks_duel1 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 68.66s
+```
+
+**`cargo test -p mp_renderer_gpu --test entity_golden -- --ignored --test-threads=1`**
+
+```
+running 2 tests
+test golden_entity_duel1 ... ok
+test golden_entity_renderfx_duel1 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.23s
+```
+
+**`cargo test -p mp_renderer_gpu --test ghoul2_vertex_golden -- --ignored --test-threads=1`**
+
+```
+running 1 test
+test golden_ghoul2_verts_stormtrooper ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.20s
+```
+
+**`cargo test -p mp_renderer_gpu --test hud_golden -- --test-threads=1`** and **`--ignored`**
+
+```
+test golden_hud_2d ... ok
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.63s
+
+test golden_hud_font ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 6.50s
+```
+
+Twenty committed fixtures byte-identical at `CHANNEL_TOLERANCE` 0. `git status --porcelain` empty after the runs, so no `.actual.png` was written and no fixture moved.
+
+## The unverified list, after the round
+
+The first walk's thirteen items all stand. The fix round changed one expression and no coverage, so it added no test and closed no gap. Two items change wording:
+
+- Item 8, the debug-build overflow, is now closed by construction rather than unverified: `i64` cannot overflow for any `i32` input, so no case exists to construct.
+- Item 9, the all-zero colour base, stays unverified as a rendered comparison. The quarter-weight bound is now derived from `GLS_ATEST_GE_C0` rather than asserted, and that derivation is arithmetic, not a measurement.
+
+One item is added.
+
+14. **The 270-pixel copy width.** F17 changed the doc from 255 to 270 to match the commit body and the packet. I did not measure the blessed image, so which number the image carries is unchecked.
