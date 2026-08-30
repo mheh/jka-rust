@@ -467,3 +467,11 @@ The lane found that the packet's mirror claim is false, and the coordinator rati
 - No code changes. `screen_capture_rect` transcribes both terms as written and was already correct.
 
 `scene_distortion.png` passed its eyes-on bless on 2026-08-30. The image shows the sprite carrying a magnified crop of the four-colour block behind it, with the two lower quadrant colours in a thin band across the sprite's upper edge, which is the row order the oracle produces.
+
+**2026-08-30 - a mid-lane amendment: the disintegrate arms were dead, and the fix lands in this lane.**
+
+The packet states that `RF_DISINTEGRATE1` and `RF_DISINTEGRATE2` are "already ported and live" and that "This step adds no code for them, only a gate". Both claims were false. The gate this step ordered exposed the fault on its first render.
+
+`lighting_ref_entity` (`crates/mp/renderer-gpu/src/pipeline3d.rs`) built the `RefEntity` the colour short-circuits read, and it filled four fields and defaulted every other one. `renderfx`, `old_origin` and `end_time` all fell to zero. `RB_CalcDisintegrateColors` branches on `renderfx` (`oracle/codemp/renderer/tr_shade_calc.cpp:1545-1636`), so neither branch ran and the colour buffer kept the zeros it was allocated with. `RB_CalcDisintegrateVertDeform` tests the same flag (`:1640-1671`), so the vert deform never fired. In the render the `RF_DISINTEGRATE1` copy vanished, because its forced alpha test discards a zero alpha, and the `RF_DISINTEGRATE2` copy drew as a black silhouette. `RF_VOLUMETRIC` was unaffected, because it reads `shaderRGBA` alone.
+
+The user ratified the one-hunk fix in this lane. `lighting_ref_entity` now carries `renderfx`, `old_origin` and `end_time`, and the change lands as its own commit ahead of the golden. All nineteen fixtures committed before it stayed byte-identical, because no committed scene submits either flag.
