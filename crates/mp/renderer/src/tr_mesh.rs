@@ -509,10 +509,12 @@ pub fn r_add_md3_surfaces<'a>(
             R_GetShaderByHandleQuiet(assets, shader_index, warnings)
         };
 
-        // DEFERRED: R_AddMD3Surfaces stencil-shadow and projection-shadow
-        // pushes — the `tr.shadowShader`/`tr.projectionShadowShader` arms
-        // (`r_shadows == 2`/`3`) need the shadow backend, which does not exist.
+        //TODO: Port R_AddMD3Surfaces's stencil- and projection-shadow pushes
         // Source: oracle/codemp/renderer/tr_mesh.cpp:388-405
+        // Both arms add a draw surf for `tr.shadowShader` or `tr.projectionShadowShader`, and this workspace has no shadow backend to add one to.
+        // The stencil arm gates on `r_shadows == 2` and is the only `RF_NOSHADOW` read here.
+        // The projection arm gates on `r_shadows == 3` and tests `RF_SHADOW_PLANE` alone, and SP agrees with MP at this site.
+        // The retail default is 1 (`oracle/codemp/renderer/tr_init.cpp:1139`), so neither arm runs at the shipped setting.
 
         // don't add third_person objects if not viewing through a portal
         if !personal_model {

@@ -243,6 +243,15 @@ impl Gpu {
         texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
+    /// The offscreen texture the headless target draws into, the copy source a mid-frame capture reads.
+    /// Panics on the windowed path, which has no offscreen texture.
+    pub fn headless_texture(&self) -> &wgpu::Texture {
+        let RenderTarget::Headless(texture) = &self.target else {
+            panic!("headless_texture: the gpu is windowed, so it has no offscreen texture");
+        };
+        texture
+    }
+
     /// Clears the offscreen target to [`CLEAR_COLOR`], the clear the windowed
     /// path gets from [`begin_frame`]. The world pass loads the color target,
     /// so a headless run must clear it first or uncovered pixels come from

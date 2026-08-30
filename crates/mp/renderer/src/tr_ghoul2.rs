@@ -837,16 +837,19 @@ pub fn g2_process_generated_surface_bolts(
 /// `current_model` is `RS.currentModel` as the published entry (DEC-65 ruling 3), and the hierarchy walk reads it through `mdxm_view()`.
 /// Raven's `currentModel->index` has no twin on the entry, so the caller passes the handle it already holds and `G2SurfaceRef` stores that.
 ///
-/// DEFERRED in this arm: the stencil- and projection-shadow pushes
-/// (`r_shadows == 2`/`3`) and the `_G2_GORE` overlay chain. Both build extra
-/// draw surfs from tier-2 fields and land with the shadow/gore backend waves.
-/// The gore fields (`scale`/`fade`/`impactTime`) stay off [`G2SurfaceRef`].
-///
 /// `RS.currentModel`/`RS.currentModel->mdxm` non-null asserts are dropped —
 /// compiled-out under this build's `-DNDEBUG` (house convention, e.g.
 /// `mp_engine_ghoul2::bolts`'s module doc comment).
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2521-2735`
+//TODO: Port RenderSurfaces's stencil- and projection-shadow pushes
+// Source: oracle/codemp/renderer/tr_ghoul2.cpp:2586-2622
+// Both arms add a draw surf for a shadow shader, and this workspace has no shadow backend to add one to.
+// MP's projection arm tests `RF_SHADOW_PLANE` alone, and SP's also tests `RF_NOSHADOW`.
+// Source: oracle/code/renderer/tr_ghoul2.cpp:2801
+// That asymmetry is load bearing, so a port keeps MP's shape.
+// The `_G2_GORE` overlay chain is deferred in this arm too, and its own marker sits at the push site below.
+// The gore fields (`scale`/`fade`/`impactTime`) stay off `G2SurfaceRef` until that backend lands.
 pub fn render_surfaces<'a>(
     rs: &mut CRenderSurface,
     current_model: &PublishedModel,
@@ -906,10 +909,16 @@ pub fn render_surfaces<'a>(
                 .unwrap_or_else(ShaderHandle::slot_zero)
         };
 
-        // DEFERRED: the stencil-shadow (`r_shadows == 2`), projection-shadow
-        // (`r_shadows == 3`), and `_G2_GORE` overlay pushes — see the doc
-        // comment above.
-        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:2586-2715
+        //TODO: Port RenderSurfaces's stencil- and projection-shadow pushes
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:2586-2622
+        // Both arms need the stencil-shadow backend, which this workspace does not have.
+        // The stencil arm gates on `r_shadows == 2` and is the only `RF_NOSHADOW` read here.
+        // The retail default is 1, so it never runs at the shipped setting.
+        // MP's projection arm gates on `r_shadows == 3` and tests `RF_SHADOW_PLANE` alone, while SP's also tests `RF_NOSHADOW`.
+        // Source: oracle/code/renderer/tr_ghoul2.cpp:2801
+        // That asymmetry is load bearing, so a port keeps MP's shape.
+        //TODO: Port RenderSurfaces's _G2_GORE overlay pushes
+        // Source: oracle/codemp/renderer/tr_ghoul2.cpp:2623-2715
 
         // don't add third_person objects if not viewing through a portal
         if !rs.personal_model {
@@ -2456,10 +2465,10 @@ pub fn r_add_ghoul_surfaces<'a>(
         // and stays `None`.
         let model_handle = None;
 
-        // DEFERRED: the `RF_SHADOW_PLANE`/`bInShadowRange` `RF_NOSHADOW` adjust
-        // (`:3525-3528`) — `bInShadowRange` needs the shadow backend. The
-        // `RF_SHADOW_PLANE`/`RF_NOSHADOW` imports return with that wave.
+        //TODO: Port R_AddGhoulSurfaces's bInShadowRange RF_NOSHADOW adjust
         // Source: oracle/codemp/renderer/tr_ghoul2.cpp:3525-3528
+        // This is the one renderer write of the flag, and `bInShadowRange` needs the stencil-shadow backend this workspace does not have.
+        // The `RF_SHADOW_PLANE` and `RF_NOSHADOW` imports return when that backend lands.
         let renderfx = ent.renderfx;
 
         let mut rs = CRenderSurface::new(

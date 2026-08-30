@@ -242,6 +242,7 @@ impl App {
                 let stats = executor.execute_frame(
                     gpu,
                     &view,
+                    &frame.texture,
                     &frame_data,
                     &self.host.re.sim.published,
                     &self.host.re.world_load,
