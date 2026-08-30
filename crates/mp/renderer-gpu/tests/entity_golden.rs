@@ -94,7 +94,7 @@ const GHOUL2_DROP: f32 = 40.0;
 
 /// The three renderfx copies stand this far in front of the eye and this far below it.
 /// The map object is 315 units deep and 303 wide, so at the `entity_duel1` distance one copy alone spans most of the frame.
-/// This distance shrinks each copy to about 255 pixels, which is what lets three of them share one image.
+/// This distance shrinks each copy to about 270 pixels, which is what lets three of them share one image.
 const RENDERFX_FORWARD_DIST: f32 = 600.0;
 const RENDERFX_DROP: f32 = 60.0;
 
@@ -102,13 +102,15 @@ const RENDERFX_DROP: f32 = 60.0;
 const RENDERFX_SIDE_OFFSETS: [f32; 3] = [340.0, 0.0, -340.0];
 
 /// The burn centre the two disintegrate copies carry, a model-space point.
-/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh, so a world-space origin would put the burn nowhere near the skin.
+/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh.
+/// A world-space origin would put the burn nowhere near the skin.
 /// This is the model vertex nearest the frame's bounding-box centre, so the burn sphere cuts real geometry rather than empty interior.
 const DISINTEGRATE_ORIGIN: [f32; 3] = [24.5, -20.703125, 54.34375];
 
 /// The burn clock the two disintegrate copies carry.
 /// `RB_CalcDisintegrateColors` reads `threshold = (refdef.time - endTime) * 0.045`, so this puts the threshold at 120 units.
-/// The model carries 702 vertices over a 315 unit span, and 184 of them fall inside that radius, so the burn takes a readable bite rather than one corner.
+/// The model carries 702 vertices over a 315 unit span, and 184 of them fall inside that radius.
+/// The burn therefore takes a readable bite rather than one corner.
 /// The colour bands are per vertex, so a radius near the vertex spacing would shade a couple of corners and interpolate away.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:1545-1560`
@@ -488,7 +490,8 @@ fn golden_entity_duel1() {
 /// The scene needs surface normals: the vert deform reads them and the volumetric fade reads them, so it draws an MD3 model rather than a sprite.
 ///
 /// The two disintegrate copies carry `endTime` and `oldorigin`, and the burn threshold sits inside the model's own bounds at the frozen clock.
-/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh, so the burn centre here is a model-space point.
+/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh.
+/// The burn centre here is therefore a model-space point.
 ///
 /// Source: `oracle/codemp/renderer/tr_shade.cpp:1536-1581`,
 /// `oracle/codemp/renderer/tr_shade_calc.cpp:1545-1671`

@@ -758,12 +758,15 @@ fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhand
 /// The sprite binds the square of the frame the capture rectangle names instead of its own texture.
 ///
 /// The backdrop is a two-by-two block of opaque sprites meeting at screen (220, 120), each quadrant 64 screen pixels square.
-/// The sprite draws at screen (220, 104) and spans 64 pixels, and its capture square is 40 pixels, so the sprite carries a magnified crop of the block.
+/// The sprite draws at screen (220, 104) and spans 64 pixels, and its capture square is 40 pixels.
+/// The sprite therefore carries a magnified crop of the block.
 /// The crop sits 16 pixels above the block's meeting point, so it holds 35 rows of the upper quadrants and 5 rows of the lower pair.
-/// Those 5 rows land at the top of the sprite, because the two worlds store a copied rect in opposite row order and the port reproduces the oracle's order.
+/// Those 5 rows land at the top of the sprite, because the two worlds store a copied rect in opposite row order.
+/// The port reproduces the oracle's order.
 ///
-/// `R_WorldCoordToScreenCoordFloat` projects against `viewaxis[1]`, which `AnglesToAxis` fills with the left vector, so its `x` counts from the right edge.
-/// Raven's `cX = vidWidth - x - rad/2` turns that back into a left-edge column, so the capture lands on the entity's own screen position and not a mirror of it.
+/// `R_WorldCoordToScreenCoordFloat` projects against `viewaxis[1]`, which `AnglesToAxis` fills with the left vector.
+/// Its `x` therefore counts from the right edge, and Raven's `cX = vidWidth - x - rad/2` turns that back into a left-edge column.
+/// The capture lands on the entity's own screen position and not a mirror of it.
 ///
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1144-1209`,
 /// `oracle/codemp/renderer/tr_shade.cpp:2163-2169`,

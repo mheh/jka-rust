@@ -1484,7 +1484,7 @@ impl Pipeline3d {
 
             // `RB_IterateStagesGeneric` binds `tr.screenImage` for every stage of a distortion entity.
             // The view changes with each capture, so this group is built here rather than in the shared cache walk above.
-            // A surface whose capture did not run keeps its cached group and binds its own diffuse, which is the oracle's answer to a false projection.
+            // A surface whose capture did not run keeps its cached group, which holds its own diffuse.
             // The PBR backend takes a four-texture layout this two-texture group does not fit, so it keeps its own diffuse as well.
             // Source: oracle/codemp/renderer/tr_shade.cpp:2163-2169
             let wants_screen = items[range.clone()].iter().any(|item| item.screen_image);
@@ -1600,7 +1600,8 @@ impl Pipeline3d {
             };
             pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
-            // A distortion stage samples the captured frame, and it falls back to its own diffuse where no capture stands behind it.
+            // Divergence: the oracle binds `tr.screenImage` unconditionally.
+            // A skipped capture there samples the last successful one or the built-in 8 by 8 white image, and the port binds the stage's own diffuse.
             let texture_group = match (item.screen_image, screen_group) {
                 (true, Some(group)) => group,
                 _ => &bind_groups[item_group[draw_index]],
@@ -4259,10 +4260,10 @@ fn is_modulate_collapse(shader: &ShaderAsset, stage: &ShaderStage) -> bool {
         && stage.bundle[1].is_lightmap
 }
 
-/// Builds the small [`RefEntity`] the diffuse-lighting evaluators read from a
-/// `trRefEntity_t`. `R_SetupEntityLighting` folded the entity light into
-/// `lightDir`/`ambientLight`/`directedLight`, and the evaluators read only
-/// those plus `shaderRGBA`, so the rest stays at its default.
+/// Builds the small [`RefEntity`] the colour evaluators read from a `trRefEntity_t`.
+/// `R_SetupEntityLighting` folded the entity light into `lightDir`, `ambientLight` and `directedLight`, which the diffuse arms read.
+/// The colour short-circuits read `shaderRGBA`, and the two disintegrate arms additionally read `renderfx`, `oldorigin` and `endTime`.
+/// Those seven fields are what this builder carries, and every other field keeps its default.
 fn lighting_ref_entity(ent: &trRefEntity_t) -> RefEntity {
     RefEntity {
         light_dir: ent.lightDir,
@@ -4361,6 +4362,9 @@ fn build_dynamic_block(
     // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
     // collapse keeps the input colour, which its shader path never reads.
     let mut colors: Vec<[u8; 4]> = if let Some(re) = short_circuit {
+        // Divergence: `RF_DISINTEGRATE1`'s first band writes alpha only, so the oracle leaves rgb at the previous surface's `tess` scratch.
+        // This buffer supplies zeros instead, and the band's own alpha test discards those vertices.
+        // The difference therefore reaches only the border blend, at no more than a quarter vertex weight.
         let mut evaluated = vec![[0u8; 4]; count];
         if fx.disintegrate1 || fx.disintegrate2 {
             RB_CalcDisintegrateColors(&mut evaluated, &xyz, &re, refdef_time);
@@ -4664,22 +4668,31 @@ fn screen_capture_rect(
     // The side length clamps to the smaller dimension first, which keeps the rect inside the target.
     let rad = rad.min(vid_width).min(vid_height);
 
-    let mut c_x = vid_width - x - (rad / 2);
-    let mut c_y = vid_height - y - (rad / 2);
-    if c_x + rad > vid_width {
-        c_x = vid_width - rad;
+    // C's out-of-range float-to-int cast is undefined, and Rust's saturates to the `i32` bounds instead.
+    // The clamps below run in `i64` so a saturated projection cannot overflow, and every in-range input gives the same result either way.
+    let x = x as i64;
+    let y = y as i64;
+    let rad_wide = rad as i64;
+    let vid_width_wide = vid_width as i64;
+    let vid_height_wide = vid_height as i64;
+
+    let mut c_x = vid_width_wide - x - (rad_wide / 2);
+    let mut c_y = vid_height_wide - y - (rad_wide / 2);
+    if c_x + rad_wide > vid_width_wide {
+        c_x = vid_width_wide - rad_wide;
     } else if c_x < 0 {
         c_x = 0;
     }
-    if c_y + rad > vid_height {
-        c_y = vid_height - rad;
+    if c_y + rad_wide > vid_height_wide {
+        c_y = vid_height_wide - rad_wide;
     } else if c_y < 0 {
         c_y = 0;
     }
 
-    // The `vid_width - x` term mirrors the square about the vertical centreline. That is Raven's own behavior and it ports as written.
+    // `AnglesToAxis` fills `viewaxis[1]` with the left vector, so the helper's `x` counts from the right edge of the screen.
+    // The `vid_width - x` term converts it back, which puts the capture on the entity's own screen position.
     // The `vid_height - y` term converts a top-down y to the framebuffer's bottom-up origin, so the row flips back here.
-    let top = vid_height - c_y - rad;
+    let top = vid_height_wide - c_y - rad_wide;
     Some((c_x as u32, top as u32, rad as u32))
 }
 
