@@ -456,3 +456,14 @@ Two rows the audit cleared were not walked and stand as drafted, with the audit'
 - Row 10, `MAX_POST_RENDERS`'s home: cleared.
 
 Three cite corrections from the audit's claim verification are folded in the same pass: `tr_types.h:17-54` holds twenty-two flag defines rather than twenty-one, `RF_FIRST_PERSON`'s live cull gate is `crates/mp/renderer/src/tr_main.rs:1887` rather than the light-logging gate the draft cited, and the out-of-scope line no longer forbids the row-2 argument change in the three otherwise-unedited test files.
+
+**2026-08-30 - a mid-lane amendment: the horizontal mirror does not exist, and the distortion golden passed.**
+
+The lane found that the packet's mirror claim is false, and the coordinator ratified the finding. `R_WorldCoordToScreenCoordFloat` projects onto `tr.refdef.viewaxis[1]`, and `AnglesToAxis` fills that row with the left vector (`oracle/codemp/game/q_math.c:530-536`, Raven's own comment "angle vectors returns right instead of y axis"). The GL view transform then maps our `y` to GL `-x` through `s_flipMatrix` (`oracle/codemp/renderer/tr_main.cpp:17-27`). So the helper's `x` counts from the right edge of the screen, and the entity renders at `vidWidth - x`. Raven's `cX = vidWidth - x - (rad/2)` converts the helper's value back into a left-edge column, so the capture square lands on the entity's own screen position. The lane confirmed this against a rendered frame: a backdrop sprite at world `y = -115` drew at screen x 252, not at 68.
+
+- Divergence note 3, "The horizontal mirror is preserved", is struck. There is no mirror, so there is nothing to note at the site.
+- Row 4 loses its mirror clause. The sentence requiring the sprite to show the colours at a mirrored screen position is struck, and so is the sentence naming a sprite that shows the colours directly behind it as a defect. The rationale for placing the sprite off the horizontal centre is struck with them, because the capture always centres on the entity, so a sprite that does not sit over the backdrop captures an empty frame.
+- Row 4's `v`-flip defect reading inverts. `glCopyTexImage2D` puts `t = 0` at the captured rect's bottom row, so the oracle's own sprite draws the crop upside down against the screen behind it. The port's `v` flip reproduces that, and bands that read the right way up mean the flip is missing.
+- No code changes. `screen_capture_rect` transcribes both terms as written and was already correct.
+
+`scene_distortion.png` passed its eyes-on bless on 2026-08-30. The image shows the sprite carrying a magnified crop of the four-colour block behind it, with the two lower quadrant colours in a thin band across the sprite's upper edge, which is the row order the oracle produces.
