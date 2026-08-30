@@ -486,3 +486,25 @@ The model also forced two scene changes, both recorded here as part of the ratif
 
 - The three copies stand 600 units from the eye at side offsets `[340, 0, -340]`. The map object is 315 units deep, so at the sibling test's 260 units one copy alone spans about 700 pixels of the 800 pixel frame. At 600 units each copy is about 270 pixels and three fit side by side.
 - The scene carries `RDF_NOWORLDMODEL`. At 600 units all three copies sit behind the duel1 wall. The sibling `golden_entity_duel1` keeps the world in frame, so the world and entity composition is still covered.
+
+**2026-08-30 - the lane-review walk closed all ten rows.**
+
+The vet is at `.claude/packets/31/step-010/vet.md`. It raised 18 findings over the range `61a5062b..gh31-step-010-renderfx`. The named base branch no longer exists, because step-009 merged into `wf/31-renderer-census` as pull request #48, and `61a5062b` is its tip. The user ruled on every row, and the rulings below are the ledger.
+
+Five findings take a code fix, and they land in one commit.
+
+- F7, the failed-capture fallback. The oracle binds `tr.screenImage` unconditionally (`oracle/codemp/renderer/tr_shade.cpp:2163-2169`), so a skipped capture samples the last successful capture or the 8 by 8 white placeholder (`oracle/codemp/renderer/tr_image.cpp:2776`). The port binds the stage's own diffuse. The fallback stays as written and now carries a divergence note. The Surface contract's clause "which is the oracle's behavior when `R_WorldCoordToScreenCoord` returns false" is struck, because those oracle lines do not support it.
+- F8 and F15, the struck mirror sentence. The comment at the capture rectangle still asserted the mirror the 2026-08-30 amendment struck. It is replaced by the proven fact, one sentence per line. The `vid_height - y` sentence stands.
+- F9, the all-zero colour buffer. The site now records that `RF_DISINTEGRATE1`'s first band writes alpha only and leaves rgb at the previous surface's `tess` scratch, that the port supplies zeros, and that the difference is confined to the alpha-test border blend at no more than a quarter vertex weight.
+- F10, the unguarded `i32` arithmetic. `screen_capture_rect` widens its clamp arithmetic to `i64`, so a saturated projection cannot overflow in a debug build. Results are bit-identical for every in-range input, and the site note records the rule-19 pick against C's undefined out-of-range cast.
+- F14, F16, F17, F18 and the row-8 rider. Eleven over-length comment lines break at clause boundaries. `lighting_ref_entity`'s doc names the seven fields the builder carries. The `entity_golden.rs` copy width reads 270 pixels, which is what the blessed image measures. Two `tr_ghoul2.rs` lines name the stencil-shadow backend and the gore backend instead of a wave. The doc-site marker takes the exact `//TODO: Port` form.
+
+The remaining findings are closed by ruling, and the clauses below change with them.
+
+- F1, F2 and F13. `Pipeline3d::draw_items`, the `(Vec<StageDrawItem>, Vec<Range<usize>>)` return on `collect_stage_items`, and the two parameterized path helpers in `entity_golden.rs` are accepted as forced surfaces. Row 7's per-surface replay needs two callers for one unchanged draw body, the surface boundaries cannot be rebuilt from `post_render_ent` alone because one entity contributes several adjacent draw surfs, and a second golden in one test file needs a stem parameter.
+- F3. The `screen_image` contract clause now reads that the bit applies on the single-texture path, with `false` at the fog site, the two-texture site, and the unreachable non-dynamic site. The fog pass binds `tr.fogImage` and a multitextured stage diverts to `DrawMultitextured`, which has no distortion arm, so both are oracle-correct.
+- F4. The PBR own-diffuse fallback joins the divergence list as ratified. A distortion stage under `BackendMode::Pbr` binds its own diffuse, because `view_bind_group` builds the two-texture group and the PBR pipeline takes a four-texture layout.
+- F5. The marker set is five sites, not four. The `_G2_GORE` split is ratified, because that deferral shared the note the row-8 conversion replaced and would otherwise have lost its greppable subject.
+- F6. Session-directed amendment appends to `packet.md` are inside the lane's write scope. The write-scope line granting the folder for `finished.md` alone did not anticipate a mid-lane ruling.
+- F11. The eight landed `Gates:` bodies stand. A future gate paragraph opens with prose, so no final paragraph starts with a bare token-colon line.
+- F12. The four unplanned commits are listed against their rulings. `9b47e5c9` is the disintegrate fix the user ratified in this lane, and `a09b8e38`, `c7da3493` and `035334af` are the three amendment appends F6 covers.
