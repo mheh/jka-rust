@@ -41,7 +41,7 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::cgame::tr_types::{
-    RF_DEPTHHACK, RF_FORCE_ENT_ALPHA, RF_RGB_TINT, RF_TAPERED,
+    RF_DEPTHHACK, RF_DISTORTION, RF_FORCE_ENT_ALPHA, RF_RGB_TINT, RF_TAPERED,
 };
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
@@ -754,6 +754,52 @@ fn scene_depthhack(host: &mut UiHost, frame_data: &mut FrameData, _shader: qhand
     record_entities(host, frame_data, &out);
 }
 
+/// Census renderfx row `RF_DISTORTION` (2,125): a four-colour backdrop with one distortion sprite over it.
+/// The sprite binds the square of the frame the capture rectangle names instead of its own texture.
+///
+/// The backdrop is a two-by-two block of opaque sprites meeting at screen (220, 120), each quadrant 64 screen pixels square.
+/// The sprite draws at screen (220, 104) and spans 64 pixels, and its capture square is 40 pixels, so the sprite carries a magnified crop of the block.
+/// The crop sits 16 pixels above the block's meeting point, so it holds 35 rows of the upper quadrants and 5 rows of the lower pair.
+/// Those 5 rows land at the top of the sprite, because the two worlds store a copied rect in opposite row order and the port reproduces the oracle's order.
+///
+/// `R_WorldCoordToScreenCoordFloat` projects against `viewaxis[1]`, which `AnglesToAxis` fills with the left vector, so its `x` counts from the right edge.
+/// Raven's `cX = vidWidth - x - rad/2` turns that back into a left-edge column, so the capture lands on the entity's own screen position and not a mirror of it.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1144-1209`,
+/// `oracle/codemp/renderer/tr_shade.cpp:2163-2169`,
+/// `oracle/codemp/game/q_math.c:530-536` (`AnglesToAxis`)
+fn scene_distortion(host: &mut UiHost, frame_data: &mut FrameData, shader: qhandle_t) {
+    let opaque = register_shader(host, "gfx/golden/opaque");
+    let mut out = Vec::new();
+    // The block's quadrants, each 64 screen pixels square, meeting at world (-75, 0).
+    for (y, z, rgba) in [
+        (-115.0f32, 40.0f32, [255u8, 32, 32, 255]),
+        (-35.0, 40.0, [32, 255, 32, 255]),
+        (-115.0, -40.0, [64, 64, 255, 255]),
+        (-35.0, -40.0, [255, 220, 32, 255]),
+    ] {
+        let mut re = base_ref_entity();
+        re.reType = refEntityType_t::RT_SPRITE;
+        re.customShader = opaque;
+        re.origin = [200.0, y, z];
+        re.radius = 40.0;
+        re.shaderRGBA = rgba;
+        out.push(re);
+    }
+
+    // The post-render deferral draws this sprite after the whole sorted list, so its capture reads a frame that already holds the backdrop.
+    // It sits 20 units above the block's meeting point, which puts the two lower colours in a thin band and makes the row order readable.
+    let mut sprite = base_ref_entity();
+    sprite.reType = refEntityType_t::RT_SPRITE;
+    sprite.customShader = shader;
+    sprite.renderfx = RF_DISTORTION;
+    sprite.origin = [200.0, -75.0, 20.0];
+    sprite.radius = 40.0;
+    out.push(sprite);
+
+    record_entities(host, frame_data, &out);
+}
+
 /// The FX module's `RT_ORIENTED_QUAD` submissions,
 /// which the trap census never saw because `COrientedParticle::Draw` builds the entity inside the engine.
 /// Three quads at one radius, each on its own orthonormal `axis[1]`/`axis[2]` pair and its own rotation,
@@ -939,6 +985,16 @@ fn golden_scene_dlights() {
         eye: [0.0, 0.0, 0.0],
         record: scene_dlights,
         expect_dlights: 3,
+    });
+}
+
+#[test]
+fn golden_scene_distortion() {
+    run_scene(&Scene {
+        stem: "scene_distortion",
+        eye: [0.0, 0.0, 0.0],
+        record: scene_distortion,
+        expect_dlights: 0,
     });
 }
 
