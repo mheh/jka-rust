@@ -4269,6 +4269,12 @@ fn lighting_ref_entity(ent: &trRefEntity_t) -> RefEntity {
         ambient_light: ent.ambientLight,
         directed_light: ent.directedLight,
         shader_rgba: ent.e.shaderRGBA,
+        // The disintegrate arms branch on `renderfx` and measure against `oldorigin` and `endTime`.
+        // Without these three the burn tests read zero, so both arms return the colour buffer untouched.
+        // Source: oracle/codemp/renderer/tr_shade_calc.cpp:1545-1671
+        renderfx: ent.e.renderfx,
+        old_origin: ent.e.oldorigin,
+        end_time: ent.e.endTime,
         ..Default::default()
     }
 }
