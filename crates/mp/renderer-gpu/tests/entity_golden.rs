@@ -40,6 +40,9 @@ use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
+use mp_qshared::common::mp::cgame::tr_types::{
+    RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_VOLUMETRIC,
+};
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::frame_data::FrameData;
@@ -48,6 +51,7 @@ use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_model::render_models::RenderModels;
+use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
 use mp_renderer::tr_scene::{RE_AddRefEntityToScene, RE_ClearScene, RE_RenderScene};
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -87,6 +91,28 @@ const MD3_DROP: f32 = 60.0;
 const GHOUL2_FORWARD_DIST: f32 = 170.0;
 const GHOUL2_SIDE_OFFSET: f32 = -70.0;
 const GHOUL2_DROP: f32 = 40.0;
+
+/// The three renderfx copies stand this far in front of the eye and this far below it.
+/// The map object is 315 units deep and 303 wide, so at the `entity_duel1` distance one copy alone spans most of the frame.
+/// This distance shrinks each copy to about 255 pixels, which is what lets three of them share one image.
+const RENDERFX_FORWARD_DIST: f32 = 600.0;
+const RENDERFX_DROP: f32 = 60.0;
+
+/// The side offsets that spread the three copies across the frame, one near each third of the width.
+const RENDERFX_SIDE_OFFSETS: [f32; 3] = [340.0, 0.0, -340.0];
+
+/// The burn centre the two disintegrate copies carry, a model-space point.
+/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh, so a world-space origin would put the burn nowhere near the skin.
+/// This is the model vertex nearest the frame's bounding-box centre, so the burn sphere cuts real geometry rather than empty interior.
+const DISINTEGRATE_ORIGIN: [f32; 3] = [24.5, -20.703125, 54.34375];
+
+/// The burn clock the two disintegrate copies carry.
+/// `RB_CalcDisintegrateColors` reads `threshold = (refdef.time - endTime) * 0.045`, so this puts the threshold at 120 units.
+/// The model carries 702 vertices over a 315 unit span, and 184 of them fall inside that radius, so the burn takes a readable bite rather than one corner.
+/// The colour bands are per vertex, so a radius near the vertex spacing would shade a couple of corners and interpolate away.
+///
+/// Source: `oracle/codemp/renderer/tr_shade_calc.cpp:1545-1560`
+const DISINTEGRATE_END_TIME: f32 = 9678.333;
 
 /// Builds the frozen scene refdef at `eye`, looking straight ahead (yaw 0, pitch 0), through the fixed viewport.
 /// This mirrors `world_golden::build_refdef`.
@@ -139,14 +165,24 @@ fn init_ghoul2(host: &mut UiHost, name: &str) -> Option<(Ghoul2System, Ghoul2Han
     Some((g2, Ghoul2Handle(info.mItem), model_handle))
 }
 
+/// The absolute path of the committed golden named `stem`.
+fn golden_path_for(stem: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/goldens/{stem}.png"))
+}
+
+/// The absolute path the actual image lands at on a mismatch of the golden named `stem`.
+fn actual_path_for(stem: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/goldens/{stem}.actual.png"))
+}
+
 /// The absolute path of the committed golden.
 fn golden_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/entity_duel1.png")
+    golden_path_for("entity_duel1")
 }
 
 /// The absolute path the actual image lands at on a mismatch.
 fn actual_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/entity_duel1.actual.png")
+    actual_path_for("entity_duel1")
 }
 
 /// Writes RGBA8 pixels to `path` as an 8-bit PNG.
@@ -438,6 +474,205 @@ fn golden_entity_duel1() {
         write_png(&actual_out, width, height, &actual);
         panic!(
             "entity golden mismatch: {} pixels differ, max channel delta {}; wrote actual image to {}",
+            differing_pixels,
+            max_delta,
+            actual_out.display(),
+        );
+    }
+}
+
+/// Boots duel1, draws the same map object three times with three different renderfx flags, and compares the pixels to the committed golden.
+///
+/// The census counts `RF_DISINTEGRATE1`, `RF_DISINTEGRATE2` and `RF_VOLUMETRIC` as live rows, and all three arms already draw.
+/// None of them had an image golden, so this scene locks the three colour short-circuits that `ComputeColors` runs.
+/// The scene needs surface normals: the vert deform reads them and the volumetric fade reads them, so it draws an MD3 model rather than a sprite.
+///
+/// The two disintegrate copies carry `endTime` and `oldorigin`, and the burn threshold sits inside the model's own bounds at the frozen clock.
+/// `RB_CalcDisintegrateColors` compares `oldorigin` against `tess.xyz`, which is model space for a mesh, so the burn centre here is a model-space point.
+///
+/// Source: `oracle/codemp/renderer/tr_shade.cpp:1536-1581`,
+/// `oracle/codemp/renderer/tr_shade_calc.cpp:1545-1671`
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_entity_renderfx_duel1() {
+    // ---- boot and load the world ---------------------------------------
+    let mut cfg = BootConfig::default();
+    if let Ok(basepath) = std::env::var("JKA_BASEPATH") {
+        cfg.basepath = basepath;
+    }
+    let mut host = boot::boot(&cfg);
+    let (loaded, _land_scape): (bool, srfTerrain_t) =
+        boot::load_world(&mut host, "maps/mp/duel1.bsp");
+    assert!(loaded, "maps/mp/duel1.bsp did not load");
+
+    host.re.frame.view_cluster = -1;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
+
+    let md3_model = boot::register_model(&mut host, MD3_MODEL_NAME);
+    assert!(md3_model > 0, "{MD3_MODEL_NAME} did not register");
+
+    let eye = host
+        .re
+        .sim
+        .published
+        .world
+        .as_ref()
+        .and_then(|w| boot::find_spawn_origin(&w.entity_string))
+        .map(|o| [o[0], o[1], o[2] + EYE_HEIGHT])
+        .unwrap_or([0.0, 0.0, 0.0]);
+
+    let mut refdef = build_refdef(eye);
+    // The three copies are the whole subject here, so the world stays out of the frame.
+    // `R_AddWorldSurfaces` returns on this flag before it touches the BSP, so no wall can occlude a copy and the three effects read side by side.
+    // The sibling test above keeps the world in frame, so the world and entity composition is still covered.
+    // Source: oracle/codemp/renderer/tr_world.cpp:1936-1940
+    refdef.rdflags = RDF_NOWORLDMODEL;
+
+    // ---- record the scene ----------------------------------------------
+    let mut frame_data = FrameData { events: Vec::new() };
+    RE_ClearScene(&mut frame_data, &mut host.re.scene);
+
+    for (index, renderfx) in [RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_VOLUMETRIC]
+        .into_iter()
+        .enumerate()
+    {
+        let mut ent = refEntity_t::zeroed();
+        ent.reType = refEntityType_t::RT_MODEL;
+        ent.hModel = md3_model;
+        ent.renderfx = renderfx;
+        ent.origin = [
+            eye[0] + RENDERFX_FORWARD_DIST,
+            eye[1] + RENDERFX_SIDE_OFFSETS[index],
+            eye[2] - RENDERFX_DROP,
+        ];
+        ent.oldorigin = DISINTEGRATE_ORIGIN;
+        ent.endTime = DISINTEGRATE_END_TIME;
+        ent.frame = 0;
+        ent.oldframe = 0;
+        // The volumetric fade reads the red channel alone and writes it into every channel.
+        ent.shaderRGBA = [255, 255, 255, 255];
+        AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
+        RE_AddRefEntityToScene(
+            &mut frame_data,
+            &host.re.sim.published,
+            &mut host.re.scene,
+            &ent,
+            None,
+        );
+    }
+
+    RE_RenderScene(
+        &refdef,
+        &mut frame_data,
+        &host.re.sim.published,
+        &host.re.cvars,
+        &mut host.re.scene,
+        &mut host.engine.common,
+        &host.re.sim.light_styles,
+    );
+
+    // ---- headless GPU and the render resources -------------------------
+    let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
+    let mut images = GpuImages::new(&gpu);
+    let mut executor = FrameExecutor::new(&gpu, &images);
+    let bmodel_table = BModelTable::build(&host.models);
+    if let Some(world) = host.re.sim.published.world.as_ref() {
+        executor.set_world(&gpu, world, bmodel_table);
+    }
+
+    // ---- draw the frame into the offscreen target ----------------------
+    let target = gpu.headless_view();
+    // The frame executor takes `&mut Gpu`, so the capture source is cloned out here and the borrow on `gpu` ends.
+    let target_texture = gpu.headless_texture().clone();
+    gpu.clear_headless(&target);
+    let float_time = FROZEN_TIME_MS as f32 * 0.001;
+
+    let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
+
+    let stats = {
+        if let Some(blocks) = host.models.publish_blocks() {
+            host.re.sim.publish_models(blocks);
+        }
+        let pinned = Arc::clone(&host.re.sim.published);
+        let UiHost {
+            re:
+                RendererFrontend {
+                    world_load,
+                    img_state,
+                    noise,
+                    ..
+                },
+            ..
+        } = &mut host;
+
+        executor.execute_frame(
+            &mut gpu,
+            &target,
+            &target_texture,
+            &frame_data,
+            &pinned,
+            world_load,
+            img_state.pending_uploads.drain().collect(),
+            &mut images,
+            noise,
+            float_time,
+            RenderCvarSnapshot::default(),
+        )
+    };
+
+    // All three copies must draw, or a world-only render blesses as the golden.
+    assert!(
+        stats.world.md3_surfaces_drawn > 0,
+        "no MD3 entity surface drawn: stats.world = {:?}",
+        stats.world,
+    );
+    assert_eq!(
+        stats.world.md3_decode_failed, 0,
+        "an MD3 surface failed to decode: stats.world = {:?}",
+        stats.world,
+    );
+
+    // ---- read the pixels back ------------------------------------------
+    let (width, height, actual) = read_target_rgba(&gpu);
+    assert_eq!(width, GOLDEN_WIDTH);
+    assert_eq!(height, GOLDEN_HEIGHT);
+
+    let golden = golden_path_for("entity_renderfx_duel1");
+
+    if std::env::var("JKA_GOLDEN_BLESS").as_deref() == Ok("1") {
+        write_png(&golden, width, height, &actual);
+        println!(
+            "entity_renderfx_duel1: blessed {} ({} bytes, {} md3 surfaces)",
+            golden.display(),
+            std::fs::metadata(&golden).map(|m| m.len()).unwrap_or(0),
+            stats.world.md3_surfaces_drawn,
+        );
+        return;
+    }
+
+    assert!(
+        golden.exists(),
+        "golden missing at {}; run once with JKA_GOLDEN_BLESS=1 to write it",
+        golden.display(),
+    );
+    let (gw, gh, golden_bytes) = read_png(&golden);
+    assert_eq!(
+        (gw, gh),
+        (width, height),
+        "golden size does not match the rendered size",
+    );
+    assert_eq!(
+        golden_bytes.len(),
+        actual.len(),
+        "golden byte count does not match the rendered byte count",
+    );
+
+    let (differing_pixels, max_delta) = compare(&golden_bytes, &actual);
+    if differing_pixels > 0 {
+        let actual_out = actual_path_for("entity_renderfx_duel1");
+        write_png(&actual_out, width, height, &actual);
+        panic!(
+            "renderfx entity golden mismatch: {} pixels differ, max channel delta {}; wrote actual image to {}",
             differing_pixels,
             max_delta,
             actual_out.display(),
