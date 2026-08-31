@@ -602,9 +602,11 @@ fn bmodel_quad_face(surf: &Surface) -> Option<&SurfaceFace> {
 /// (brush) model's surfaces, picking whichever one faces the current view,
 /// as its 4 corner verts.
 ///
-/// The handle resolves to a `WorldAsset::bmodels` row through
-/// `RenderModels::bmodel_index`, and that row's range addresses the owned
+/// The handle resolves to an owning world and a `WorldAsset::bmodels` row through
+/// `RenderModels::bmodel_location`, and that row's range addresses that world's own
 /// `WorldAsset::surfaces` (the path `R_AddBrushModelSurfaces` uses).
+/// A sub-BSP instance's submodels live in their own world's table, Raven's `tr.bspModels[index - 1]`, so the world
+/// half of the pair is what keeps an instance handle off the main world's rows.
 ///
 /// PORT-NOTE: the oracle's `vec3_t normal` out-param is declared but never
 /// written anywhere in the body — a dead out-param, dropped per
@@ -624,13 +626,17 @@ pub fn RE_GetBModelVerts(
     assets: &RenderAssets,
     frame: &FrameState,
 ) -> [vec3_t; 4] {
-    let idx = models
-        .bmodel_index(bmodel_index)
+    let (world_index, idx) = models
+        .bmodel_location(bmodel_index)
         .expect("RE_GetBModelVerts reached a non-brush model handle");
-    let world = assets
-        .world
-        .as_ref()
-        .expect("RE_GetBModelVerts needs the loaded world");
+    let world: &WorldAsset = if world_index == 0 {
+        assets
+            .world
+            .as_deref()
+            .expect("RE_GetBModelVerts needs the loaded world")
+    } else {
+        &assets.bsp_models[world_index - 1]
+    };
     let bmodel = &world.bmodels[idx];
     let first = bmodel.first_surface;
     let num = bmodel.num_surfaces.max(0) as usize;

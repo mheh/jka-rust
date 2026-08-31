@@ -192,6 +192,8 @@ impl RenderModels {
         // The reset renumbers every handle above slot 0, so the published entries no longer name what they claim.
         self.blocks.clear();
         self.blocks_dirty = true;
+        // A reused handle carrying a stale `(world, submodel)` pair would resolve into an emptied `bsp_models`.
+        self.bmodel_indices.clear();
 
         // leave a space for NULL model
         let null_model = self
@@ -234,6 +236,8 @@ impl RenderModels {
         // Same reason as `model_init`: the reset invalidates every published handle.
         self.blocks.clear();
         self.blocks_dirty = true;
+        // Same reason as `model_init`: a reused handle must not resolve a stale `(world, submodel)` pair.
+        self.bmodel_indices.clear();
         // `tr.numSkins = 0` (the skin memory itself lived on the just-reset
         // hunk); `tr.numShaders = 0` stays §20, not a field of this struct.
         self.skins.clear();
@@ -357,15 +361,6 @@ impl RenderModels {
         self.bmodel_indices
             .insert(handle, (world_index as usize, submodel));
         handle
-    }
-
-    /// The `WorldAsset::bmodels` index a brush `model_t` handle was registered
-    /// against by [`Self::register_bmodel`] — the owned replacement for the
-    /// `model_t::bmodel` deref. `None` for a handle that names no brush submodel.
-    pub(crate) fn bmodel_index(&self, handle: qhandle_t) -> Option<usize> {
-        self.bmodel_indices
-            .get(&handle)
-            .map(|&(_, submodel)| submodel)
     }
 
     /// The owning world and submodel index a brush handle was registered
@@ -497,18 +492,18 @@ mod tests {
         assert_eq!(read_qpath(&rm.models.slot(h1 as usize).name), "*1");
         assert!(matches!(rm.models.slot(h0 as usize).r#type, modtype_t::MOD_BRUSH));
         assert_eq!(rm.models.slot(h0 as usize).bspInstance, 0);
-        assert_eq!(rm.bmodel_index(h0), Some(0));
-        assert_eq!(rm.bmodel_index(h1), Some(1));
+        assert_eq!(rm.bmodel_location(h0), Some((0, 0)));
+        assert_eq!(rm.bmodel_location(h1), Some((0, 1)));
         assert_eq!(rm.hash.get("*1"), Some(&h1));
 
         // RMG instance (index 3): name "*3-2", bspInstance set.
         let h2 = rm.register_bmodel(2, 3);
         assert_eq!(read_qpath(&rm.models.slot(h2 as usize).name), "*3-2");
         assert_eq!(rm.models.slot(h2 as usize).bspInstance, 1);
-        assert_eq!(rm.bmodel_index(h2), Some(2));
+        assert_eq!(rm.bmodel_location(h2), Some((3, 2)));
 
         // A handle that names no submodel resolves to None.
-        assert_eq!(rm.bmodel_index(999), None);
+        assert_eq!(rm.bmodel_location(999), None);
     }
 
     #[test]
