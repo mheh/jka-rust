@@ -27,11 +27,15 @@ use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::TrRefdef;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
+use crate::render_state::weather_frame::{WeatherCloudBatch, WeatherFrame, WeatherVertex};
 use crate::tr_backend::GL_Bind;
 use crate::tr_image::{R_FindImageFile, TrImageState};
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
-use crate::tr_shader::ParseVector;
+use crate::tr_shader::{
+    ParseVector, GLS_DSTBLEND_ONE, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA, GLS_SRCBLEND_ONE,
+    GLS_SRCBLEND_SRC_ALPHA,
+};
 
 /// Raven `POINTCACHE_CELL_SIZE` — the weather point-cache cell edge length.
 /// Both preprocessor branches (`_XBOX` and the PC `#else`) define the same
@@ -1437,24 +1441,141 @@ impl CWeatherParticleCloud {
 
     /// Raven `CWeatherParticleCloud::Render`.
     ///
-    /// DEFERRED: R4 — the entire body is immediate-mode GL drawing
-    /// (`qglBegin`/`qglColor4f`/`qglVertex3f*`/`qglTexCoord2f`/`qglEnd`/
-    /// `qglPushMatrix`/`qglPopMatrix`/`qglPointSize`/`qglPointParameterf*EXT`/
-    /// `qglEnable`/`qglMatrixMode`/`qglTexParameterf`), gated on GL wire
-    /// constants (`GLS_ALPHA`, `GL_POINTS`, `GL_MODELVIEW`, `GL_TEXTURE_2D`,
-    /// `GL_TEXTURE_MIN_FILTER`, `GL_TEXTURE_MAG_FILTER`, `GL_LINEAR`,
-    /// `GL_NEAREST`, `GL_POINT_SIZE_MIN_EXT`, `GL_POINT_SIZE_MAX_EXT`,
-    /// `GL_DISTANCE_ATTENUATION_EXT`) this packet does not carry — never
-    /// guessed (porting-rules: no numeric-constant guessing). The in-module
-    /// callees (`GL_State`/`GL_Bind`/`GL_Cull`) are themselves already
-    /// DEFERRED no-ops at their own definitions (`tr_backend.rs`, DEC-37
-    /// A13.2); R2 leaves the fixed-function GL surface with no R3 home — it
-    /// dissolves into R4's wgpu rewrite (the render thread owns the GL
-    /// binding cache, DEC-63.4). Only the CPU-only counter effect survives
-    /// this wave.
+    /// The oracle emits this geometry through immediate-mode GL, so the port collects the same vertices into a batch the render pass draws.
+    /// `mGLModeEnum` is `GL_TRIANGLES` or `GL_QUADS` and nothing else on the PC build, because the `GL_POINTS` assignment sits inside `_XBOX`.
+    /// Every point-sprite branch is therefore dead here, and the field is not on this type.
+    /// A `GL_QUADS` quad becomes two triangles, `0, 1, 2` and `0, 2, 3`, because the render pass draws a triangle list.
+    ///
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1311-1480`
-    pub fn Render(&self, particles_rendered: &mut i32) {
+    pub fn Render(&self, particles_rendered: &mut i32) -> WeatherCloudBatch {
+        // Raven `GL_State((mBlendMode==0)?(GLS_ALPHA):(GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE))`.
+        // `GLS_ALPHA` is `(GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA)`.
+        // Neither value sets `GLS_DEPTHMASK_TRUE` or `GLS_DEPTHTEST_DISABLE`, so weather depth-tests and does not depth-write.
+        // Source: oracle/codemp/renderer/tr_local.h:1683, oracle/codemp/renderer/tr_WorldEffects.cpp:1319
+        let state_bits = if self.mBlendMode == 0 {
+            (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32
+        } else {
+            (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) as u32
+        };
+
+        let mut batch = WeatherCloudBatch {
+            image: self.mImage,
+            state_bits,
+            // Raven `(mFilterMode==0)?(GL_LINEAR):(GL_NEAREST)` on both the min and the mag filter.
+            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1364-1365
+            nearest_filter: self.mFilterMode != 0,
+            vertices: Vec::new(),
+            indices: Vec::new(),
+        };
+
+        let flag_render = 1u32 << CWeatherParticle::FLAG_RENDER;
+        for particle_num in 0..self.mParticleCount {
+            let part = particle_num as usize;
+            if self.mParticles[part].mFlags & flag_render == 0 {
+                continue;
+            }
+
+            // Blend mode zero applies the alpha to the alpha channel alone, and every other mode applies it to all four channels.
+            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1393-1403
+            let alpha = self.mParticles[part].mAlpha;
+            let color: [f32; 4] = if self.mBlendMode == 0 {
+                [self.mColor[0], self.mColor[1], self.mColor[2], alpha]
+            } else {
+                [
+                    self.mColor[0] * alpha,
+                    self.mColor[1] * alpha,
+                    self.mColor[2] * alpha,
+                    self.mColor[3] * alpha,
+                ]
+            };
+
+            let position = self.mParticles[part].mPosition;
+            let base = batch.vertices.len() as u32;
+
+            // Render A Triangle
+            //-------------------
+            if self.mVertexCount == 3 {
+                batch.vertices.push(WeatherVertex {
+                    position,
+                    st: [1.0, 0.0],
+                    color,
+                });
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] + self.mCameraLeft[0],
+                        position[1] + self.mCameraLeft[1],
+                        position[2] + self.mCameraLeft[2],
+                    ],
+                    st: [0.0, 1.0],
+                    color,
+                });
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] + self.mCameraLeftPlusUp[0],
+                        position[1] + self.mCameraLeftPlusUp[1],
+                        position[2] + self.mCameraLeftPlusUp[2],
+                    ],
+                    st: [0.0, 0.0],
+                    color,
+                });
+                batch.indices.extend_from_slice(&[base, base + 1, base + 2]);
+            }
+            // Render A Quad
+            //---------------
+            else {
+                // Left bottom.
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] - self.mCameraLeftMinusUp[0],
+                        position[1] - self.mCameraLeftMinusUp[1],
+                        position[2] - self.mCameraLeftMinusUp[2],
+                    ],
+                    st: [0.0, 0.0],
+                    color,
+                });
+                // Right bottom.
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] - self.mCameraLeftPlusUp[0],
+                        position[1] - self.mCameraLeftPlusUp[1],
+                        position[2] - self.mCameraLeftPlusUp[2],
+                    ],
+                    st: [1.0, 0.0],
+                    color,
+                });
+                // Right top.
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] + self.mCameraLeftMinusUp[0],
+                        position[1] + self.mCameraLeftMinusUp[1],
+                        position[2] + self.mCameraLeftMinusUp[2],
+                    ],
+                    st: [1.0, 1.0],
+                    color,
+                });
+                // Left top.
+                batch.vertices.push(WeatherVertex {
+                    position: [
+                        position[0] + self.mCameraLeftPlusUp[0],
+                        position[1] + self.mCameraLeftPlusUp[1],
+                        position[2] + self.mCameraLeftPlusUp[2],
+                    ],
+                    st: [0.0, 1.0],
+                    color,
+                });
+                batch.indices.extend_from_slice(&[
+                    base,
+                    base + 1,
+                    base + 2,
+                    base,
+                    base + 2,
+                    base + 3,
+                ]);
+            }
+        }
+
         *particles_rendered += self.mParticleCountRender;
+        batch
     }
 }
 
@@ -1531,7 +1652,9 @@ impl WorldEffectsState {
         assets: &RenderAssets,
         refdef: &TrRefdef,
         host: &mut EngineHostView,
-    ) {
+    ) -> WeatherFrame {
+        let mut weather = WeatherFrame { clouds: Vec::new() };
+
         // Raven: "no world rendering or no world or no particle clouds"
         //
         // Raven's `||` chain short-circuits left to right in C, and so does Rust's, so the four terms keep their oracle order.
@@ -1541,7 +1664,7 @@ impl WorldEffectsState {
             || refdef.rdflags & RDF_SKYBOXPORTAL != 0
             || self.mParticleClouds.is_empty()
         {
-            return;
+            return weather;
         }
 
         // `SetViewportAndScissor` is retired at this site. The render pass sets the viewport and the scissor from the same view.
@@ -1568,6 +1691,8 @@ impl WorldEffectsState {
 
         // Make Sure We Are Always Outside Cached
         //----------------------------------------
+        // The cache-building frame updates nothing and draws nothing, because everything else sits in the `else` below.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1544-1548
         if !self.mOutside.Initialized() {
             // Submodel 0 is the worldspawn brush model, so these bounds are the whole map.
             // Raven indexes `bmodels[0]` without a length test, which reads out of bounds for a world with no submodel.
@@ -1616,7 +1741,8 @@ impl WorldEffectsState {
                     wind_velocity,
                     seconds_elapsed,
                 );
-                self.mParticleClouds[i].Render(&mut self.mParticlesRendered);
+                let batch = self.mParticleClouds[i].Render(&mut self.mParticlesRendered);
+                weather.clouds.push(batch);
             }
             if false {
                 com_printf(
@@ -1625,6 +1751,8 @@ impl WorldEffectsState {
                 );
             }
         }
+
+        weather
     }
 
     /// Raven `R_GetChanceOfSaberFizz`.
@@ -2346,5 +2474,89 @@ mod tests {
         assert_eq!(cloud.mParticles[0].mFlags, 0);
         assert_eq!(cloud.mParticles[0].mAlpha, 0.0);
         assert_eq!(cloud.mParticleCountRender, 0);
+    }
+
+    /// A cloud holding one rendering particle at `position`, with a billboard basis the render tests can predict.
+    fn one_rendering_particle(position: vec3_t, alpha: f32) -> CWeatherParticleCloud {
+        let mut cloud = one_particle_cloud(position);
+        cloud.mParticles[0].mFlags = 1u32 << CWeatherParticle::FLAG_RENDER;
+        cloud.mParticles[0].mAlpha = alpha;
+        cloud.mParticleCountRender = 1;
+        cloud.mCameraLeft = [0.0, 2.0, 0.0];
+        cloud.mCameraDown = [0.0, 0.0, -3.0];
+        cloud.mCameraLeftPlusUp = [0.0, 2.0, 3.0];
+        cloud.mCameraLeftMinusUp = [0.0, 2.0, -3.0];
+        cloud
+    }
+
+    /// The quad arm emits four corners at the two precomputed offsets, and the render pass splits it into two triangles.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1434-1459`
+    #[test]
+    fn the_quad_arm_emits_four_corners_and_two_triangles() {
+        let mut rendered = 0;
+        let cloud = one_rendering_particle([100.0, 0.0, 50.0], 1.0);
+        let batch = cloud.Render(&mut rendered);
+
+        assert_eq!(rendered, 1);
+        assert_eq!(batch.vertices.len(), 4);
+        assert_eq!(batch.indices, vec![0, 1, 2, 0, 2, 3]);
+
+        // Left bottom, right bottom, right top, left top.
+        assert_eq!(batch.vertices[0].position, [100.0, -2.0, 53.0]);
+        assert_eq!(batch.vertices[0].st, [0.0, 0.0]);
+        assert_eq!(batch.vertices[1].position, [100.0, -2.0, 47.0]);
+        assert_eq!(batch.vertices[1].st, [1.0, 0.0]);
+        assert_eq!(batch.vertices[2].position, [100.0, 2.0, 47.0]);
+        assert_eq!(batch.vertices[2].st, [1.0, 1.0]);
+        assert_eq!(batch.vertices[3].position, [100.0, 2.0, 53.0]);
+        assert_eq!(batch.vertices[3].st, [0.0, 1.0]);
+    }
+
+    /// The triangle arm emits three corners at the origin, the left offset, and the left-plus-up offset.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1414-1430`
+    #[test]
+    fn the_triangle_arm_emits_three_corners() {
+        let mut rendered = 0;
+        let mut cloud = one_rendering_particle([100.0, 0.0, 50.0], 1.0);
+        cloud.mVertexCount = 3;
+        let batch = cloud.Render(&mut rendered);
+
+        assert_eq!(batch.vertices.len(), 3);
+        assert_eq!(batch.indices, vec![0, 1, 2]);
+
+        assert_eq!(batch.vertices[0].position, [100.0, 0.0, 50.0]);
+        assert_eq!(batch.vertices[0].st, [1.0, 0.0]);
+        assert_eq!(batch.vertices[1].position, [100.0, 2.0, 50.0]);
+        assert_eq!(batch.vertices[1].st, [0.0, 1.0]);
+        assert_eq!(batch.vertices[2].position, [100.0, 2.0, 53.0]);
+        assert_eq!(batch.vertices[2].st, [0.0, 0.0]);
+    }
+
+    /// Blend mode zero puts the alpha in the alpha channel alone, and every other mode multiplies all four channels by it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1393-1403`
+    #[test]
+    fn the_two_blend_modes_colour_differently() {
+        let mut rendered = 0;
+        let mut cloud = one_rendering_particle([0.0; 3], 0.5);
+        cloud.mColor = [0.8, 0.6, 0.4, 0.75];
+
+        cloud.mBlendMode = 0;
+        let batch = cloud.Render(&mut rendered);
+        assert_eq!(batch.vertices[0].color, [0.8, 0.6, 0.4, 0.5]);
+        assert_eq!(
+            batch.state_bits,
+            (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) as u32
+        );
+
+        cloud.mBlendMode = 1;
+        let batch = cloud.Render(&mut rendered);
+        assert_eq!(batch.vertices[0].color, [0.4, 0.3, 0.2, 0.375]);
+        assert_eq!(
+            batch.state_bits,
+            (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) as u32
+        );
     }
 }

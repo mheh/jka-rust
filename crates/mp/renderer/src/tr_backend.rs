@@ -21,6 +21,7 @@ use crate::render_state::placeholders::{TrRefdef, Vec3};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::weather_frame::WeatherFrame;
 use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_image::{
     PendingUpload, R_Images_GetNextIteration, R_Images_StartIteration, TrImageState,
@@ -905,16 +906,18 @@ pub fn RB_WorldEffects(
     assets: &RenderAssets,
     refdef: &TrRefdef,
     host: &mut EngineHostView,
-) {
+) -> WeatherFrame {
     // DEFERRED: R4 — tess.shader && tess.numIndexes guard + RB_EndSurface()
     // flush (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1893-1896
 
-    world_effects.RB_RenderWorldEffects(assets, refdef, host);
+    let weather = world_effects.RB_RenderWorldEffects(assets, refdef, host);
 
     // DEFERRED: R4 — tess.shader guard + RB_BeginSurface(tess.shader,
     // tess.fogNum) reopen (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1899-1902
+
+    weather
 }
 
 /// Raven `RB_StretchPic` — the `RC_STRETCH_PIC` backend command: draws a
