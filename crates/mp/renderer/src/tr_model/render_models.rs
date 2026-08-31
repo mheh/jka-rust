@@ -120,7 +120,7 @@ pub struct RenderModels {
     /// struct no longer carries. Filled by [`Self::register_bmodel`].
     ///
     /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1441`
-    pub(crate) bmodel_indices: HashMap<qhandle_t, usize>,
+    pub(crate) bmodel_indices: HashMap<qhandle_t, (usize, usize)>,
 
     /// The DEC-65 ruling 1 published view of this registry: one entry per registered slot, naming its blocks by
     /// `Arc` and byte offset. `RE_EndFrame` hands a clone to `RenderAssetsSim`, and the render thread reads it out
@@ -347,7 +347,8 @@ impl RenderModels {
         }
 
         self.re_insert_model_into_hash(&name, handle);
-        self.bmodel_indices.insert(handle, submodel);
+        self.bmodel_indices
+            .insert(handle, (world_index as usize, submodel));
         handle
     }
 
@@ -355,6 +356,16 @@ impl RenderModels {
     /// against by [`Self::register_bmodel`] — the owned replacement for the
     /// `model_t::bmodel` deref. `None` for a handle that names no brush submodel.
     pub(crate) fn bmodel_index(&self, handle: qhandle_t) -> Option<usize> {
+        self.bmodel_indices
+            .get(&handle)
+            .map(|&(_, submodel)| submodel)
+    }
+
+    /// The owning world and submodel index a brush handle was registered
+    /// against: `(0, n)` for the main world's `bmodels[n]`, `(k, n)` for
+    /// `RenderAssets::bsp_models[k - 1].bmodels[n]`.
+    /// A sub-BSP handle resolved against the main world reads the wrong table, so bounds and draw walks take the pair.
+    pub(crate) fn bmodel_location(&self, handle: qhandle_t) -> Option<(usize, usize)> {
         self.bmodel_indices.get(&handle).copied()
     }
 
