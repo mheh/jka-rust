@@ -30,6 +30,7 @@ use crate::render_state::renderer_cvars::RendererCvars;
 use crate::tr_backend::{GL_Bind, SetViewportAndScissor};
 use crate::tr_image::{R_FindImageFile, TrImageState};
 use crate::tr_model::render_models::RenderModels;
+use crate::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
 use crate::tr_shader::ParseVector;
 
 /// Raven `POINTCACHE_CELL_SIZE` — the weather point-cache cell edge length.
@@ -1125,55 +1126,29 @@ impl CWeatherParticleCloud {
 
     /// Raven `CWeatherParticleCloud::Update`.
     ///
-    /// `_frame` carries `backEnd.viewParms.ori`'s origin/axis; `frozen` is
-    /// `mFrozen`; `wind_velocity` is `mGlobalWindVelocity`; `seconds_elapsed`
-    /// is `mSecondsElapsed` — all threaded rather than reached
-    /// (porting-rules §B4). `CVec3` operator overloads
-    /// (`+=`/`-=`/`*=`/`ScaleAdd`) are expanded component-wise (interior-
-    /// safety law: `vec3_t` is `[f32; 3]`, no operator overloads).
+    /// `view_origin` and `view_axis` are `backEnd.viewParms.ori.origin` and `.axis`, threaded rather than reached (porting-rules §B4).
+    /// `RE_RenderScene` fills that orientation straight from the scene refdef (`oracle/codemp/renderer/tr_scene.cpp:848-851`), so the refdef gives the identical values.
+    /// The `orientationr_t` marker is therefore moot, not stale: the placeholder `ViewParms` still carries no `ori` field, and this fn takes the value from the refdef instead.
+    /// `frozen` is `mFrozen`, `wind_velocity` is `mGlobalWindVelocity`, and `seconds_elapsed` is `mSecondsElapsed`.
+    /// `CVec3`'s `+=`, `-=`, `*=` and `ScaleAdd` are expanded component-wise, because `vec3_t` is `[f32; 3]` under the interior-safety law.
     ///
-    /// Two dependencies are genuinely out-of-packet for this wave (escalated
-    /// via `todo!()`, not invented):
-    /// - `backEnd.viewParms.ori.origin`/`.axis[0..2]` — `OrientationR`/
-    ///   `ViewParms` are still empty placeholder structs, landed by the
-    ///   not-yet-run `tr_main` R3 wave (R2-D7(b)).
-    /// - `mOutside` — the per-particle loop's `mOutside.PointOutside(pos,
-    ///   mWidth, mHeight)` needs `COutside` threaded into this signature, a
-    ///   seam change this fn's wave does not own; the loop body is deferred
-    ///   as one unit rather than scattered, and is unreachable behind the
-    ///   `orientationr_t` block above regardless.
+    /// The per-particle loop still waits on `mOutside`, which commit 2 threads in.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1039-1306`
-    // Deferred `todo!()` escalation sites (cited above) diverge, leaving the rest
-    // of this body statically unreachable and its inputs unread until the value
-    // they wait on lands.
-    #[allow(unreachable_code, unused_variables)]
     pub fn Update(
         &mut self,
         rng: &mut Rng,
-        _frame: &FrameState,
+        view_origin: vec3_t,
+        view_axis: [vec3_t; 3],
         frozen: bool,
         wind_velocity: vec3_t,
         seconds_elapsed: f32,
     ) {
         // Compute Camera
         //----------------
-        //TODO: Port orientationr_t (viewParms_t::ori origin/axis)
-        // Source: oracle/codemp/renderer/tr_local.h:109-114,629-644
-        // (`OrientationR`/`ViewParms` are still empty placeholders — landed
-        // by the not-yet-run `tr_main` R3 wave); used at
-        // oracle/codemp/renderer/tr_WorldEffects.cpp:1061-1064
-        let (camera_position, camera_forward, camera_left0, camera_down0): (
-            vec3_t,
-            vec3_t,
-            vec3_t,
-            vec3_t,
-        ) = todo!(
-            "Port orientationr_t (viewParms_t::ori) — oracle/codemp/renderer/tr_WorldEffects.cpp:1061-1064"
-        );
-        self.mCameraPosition = camera_position;
-        self.mCameraForward = camera_forward;
-        self.mCameraLeft = camera_left0;
-        self.mCameraDown = camera_down0;
+        self.mCameraPosition = view_origin;
+        self.mCameraForward = view_axis[0];
+        self.mCameraLeft = view_axis[1];
+        self.mCameraDown = view_axis[2];
 
         if self.mRotationChangeNext != -1 {
             if self.mRotationChangeNext == 0 {
@@ -1387,17 +1362,10 @@ impl WorldEffectsState {
     /// `mOutside.Cache`'s engine/collision access and `Com_Printf`'s
     /// `Common`; all threaded rather than reached (porting-rules §B4).
     ///
-    /// Two state homes this wave's packet promises (`## State ownership`)
-    /// aren't actually populated on their landed placeholder types yet —
-    /// `TrRefdef::rdflags`/`frametime` (`tr_scene` R3 wave) and
-    /// `world_t::bmodels[0].bounds` (`tr_bsp`/`tr_world` R3 wave, folded into
-    /// `WorldAsset`) — genuinely out-of-packet for this wave; escalated via
-    /// `todo!()` at the exact read sites rather than invented.
+    /// `frame.refdef` is the submitted scene's own refdef, which carries `rdflags` and `frametime`, and `assets.world` carries `bmodels[0].bounds`.
+    /// Raven reads `RDF_NOWORLDMODEL` off `tr.refdef` and `RDF_SKYBOXPORTAL` off `backEnd.refdef`, two copies that hold different scenes at backend time.
+    /// The port has one refdef per scene and reads both bits off it.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1513-1580`
-    // Deferred `todo!()` escalation sites (cited above) diverge, leaving the rest
-    // of this body statically unreachable and its inputs unread until the value
-    // they wait on lands.
-    #[allow(unreachable_code, unused_variables)]
     pub fn RB_RenderWorldEffects(
         &mut self,
         wind: &mut WindZoneState,
@@ -1408,24 +1376,11 @@ impl WorldEffectsState {
     ) {
         // Raven: "no world rendering or no world or no particle clouds"
         //
-        // Raven's `||` chain short-circuits left-to-right in C same as Rust;
-        // the `rdflags` read is nested in a block so `!tr.world`/an empty
-        // `mParticleClouds` still return early without forcing the blocked
-        // read below (preserves the oracle's evaluation order rather than
-        // widening the panic surface).
-        //TODO: Port trRefdef_t::rdflags
-        // Source: oracle/codemp/renderer/tr_local.h:563-598 (`rdflags` is not
-        // yet a field on the landed `TrRefdef` — lands with the `tr_scene`
-        // R3 wave, not this one); guard reads both `tr.refdef.rdflags &
-        // RDF_NOWORLDMODEL` and `backEnd.refdef.rdflags & RDF_SKYBOXPORTAL`
-        // at oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521
+        // Raven's `||` chain short-circuits left to right in C, and so does Rust's, so the four terms keep their oracle order.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521
         if assets.world.is_none()
-            || {
-                let rdflags_blocked: bool = todo!(
-                    "Port trRefdef_t::rdflags — oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521"
-                );
-                rdflags_blocked
-            }
+            || frame.refdef.rdflags & RDF_NOWORLDMODEL != 0
+            || frame.refdef.rdflags & RDF_SKYBOXPORTAL != 0
             || self.mParticleClouds.is_empty()
         {
             return;
@@ -1440,13 +1395,10 @@ impl WorldEffectsState {
 
         // Calculate Elapsed Time For Scale Purposes
         //-------------------------------------------
-        //TODO: Port trRefdef_t::frametime
-        // Source: oracle/codemp/renderer/tr_local.h:563-598 (`frametime` is
-        // not yet a field on the landed `TrRefdef` — `tr_scene` R3 wave);
-        // used at oracle/codemp/renderer/tr_WorldEffects.cpp:1530
-        let frametime: f32 =
-            todo!("Port trRefdef_t::frametime — oracle/codemp/renderer/tr_WorldEffects.cpp:1530");
-        self.mMillisecondsElapsed = frametime;
+        // The 1 ms floor below means a zero never divides by zero.
+        // It makes the weather crawl at one thousandth speed instead.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1530
+        self.mMillisecondsElapsed = frame.refdef.frametime as f32;
         if self.mMillisecondsElapsed < 1.0 {
             self.mMillisecondsElapsed = 1.0;
         }
@@ -1458,14 +1410,15 @@ impl WorldEffectsState {
         // Make Sure We Are Always Outside Cached
         //----------------------------------------
         if !self.mOutside.Initialized() {
-            //TODO: Port bmodel_t (world.bmodels[0].bounds)
-            // Source: oracle/codemp/renderer/tr_local.h:1039-1090
-            // (`world_t::bmodels` is not yet a field on the landed
-            // `WorldAsset` — `tr_bsp`/`tr_world` R3 wave); used at
-            // oracle/codemp/renderer/tr_WorldEffects.cpp:1546
-            let world_bmodel_bounds: Option<[vec3_t; 2]> = todo!(
-                "Port bmodel_t (world.bmodels[0].bounds) — oracle/codemp/renderer/tr_WorldEffects.cpp:1546"
-            );
+            // Submodel 0 is the worldspawn brush model, so these bounds are the whole map.
+            // Raven indexes `bmodels[0]` without a length test, which reads out of bounds for a world with no submodel.
+            // §19 picks `None` for that case, which leaves the cache unbuilt rather than panicking.
+            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1546
+            let world_bmodel_bounds = assets
+                .world
+                .as_ref()
+                .and_then(|w| w.bmodels.first())
+                .map(|b| b.bounds);
             self.mOutside.Cache(host, world_bmodel_bounds);
         } else {
             // Update All Wind Zones
@@ -1490,8 +1443,17 @@ impl WorldEffectsState {
             let frozen = self.mFrozen;
             let seconds_elapsed = self.mSecondsElapsed;
             let wind_velocity = wind.global_wind_velocity;
+            let view_origin = frame.refdef.view_origin;
+            let view_axis = frame.refdef.view_axis;
             for i in 0..self.mParticleClouds.len() {
-                self.mParticleClouds[i].Update(rng, frame, frozen, wind_velocity, seconds_elapsed);
+                self.mParticleClouds[i].Update(
+                    rng,
+                    view_origin,
+                    view_axis,
+                    frozen,
+                    wind_velocity,
+                    seconds_elapsed,
+                );
                 self.mParticleClouds[i].Render(&mut self.mParticlesRendered);
             }
             if false {
