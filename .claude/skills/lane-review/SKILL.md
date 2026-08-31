@@ -10,14 +10,14 @@ The lane's report is a claim. The commits are the evidence. Lane-review closes e
 ## Procedure
 
 1. Read `step-NNN/finished.md`. It must carry the assumptions and choices keyed to commits, the deviations or the word "none", the commit list with gate results, and the open gaps. A missing or thin finished file is itself a deviation.
-2. Spawn the vet on fable with the fixed brief below. The vet is blind to the finished file: the brief never names it, and the vet must not open it. Blindness makes the vet's findings independent evidence beside the lane's confession. Before the spawn, name the hunks the vet must quote back regardless of findings: the ABI seams, the surfaces, and the spots where the step's intent lives, chosen from the synopsis and the arc's rulings.
+2. Spawn the vet on opus with the fixed brief below. The vet is blind to the finished file: the brief never names it, and the vet must not open it. Blindness makes the vet's findings independent evidence beside the lane's confession. Before the spawn, name the hunks the vet must quote back regardless of findings: the ABI seams, the surfaces, and the spots where the step's intent lives, chosen from the synopsis and the arc's rulings.
 3. Read `vet.md` and compare it against the finished file. A finding the lane confessed is a confessed deviation. A finding the lane did not confess is an unconfessed deviation. A confession with no matching finding stands as confessed.
 4. On zero findings with the full gate battery green, act on the packet's disposition. A merge happens locally with `--no-gpg-sign`. This repo holds pushes, so the lane never pushes and never opens a pull request. Report the landed commits in chat, and add the step-folder link to the GitHub issue.
 5. On findings, stop. No merge. Present each finding to the user plainly: the packet clause the vet quoted, and the commit evidence the vet quoted. The ruling lands as a packet Amendment or as a rework step. A fix round continues the same lane agent over SendMessage, and the same vet then walks the new commits over SendMessage. The agents keep their context, and the session keeps only the verdicts.
 
 ## The vet
 
-The vet hunts defects. It walks the packet's oracle cites in the source before it reads a single commit, so it judges the work against the world and not against the work's own frame. Then it walks the commit sequence one commit at a time, in order, every hunk of every commit, never a sample. It quotes evidence for every finding, and it lists what it could not check. It runs on fable and on no other model.
+The vet hunts defects. It walks the packet's oracle cites in the source before it reads a single commit, so it judges the work against the world and not against the work's own frame. Then it walks the commit sequence one commit at a time, in order, every hunk of every commit, never a sample. It quotes evidence for every finding, and it lists what it could not check. It runs on opus. Fable needs the user's explicit approval, asked per spawn.
 
 The brief below is fixed text. Paste it whole with the five values filled, and do not rewrite it per lane, so no session drifts the vet's duties.
 
