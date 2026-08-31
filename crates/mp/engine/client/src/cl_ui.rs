@@ -55,7 +55,8 @@ use mp_qshared::shared::file_mode::fsMode_t;
 use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
-use mp_renderer::tr_cmds::{RE_SetColor, RE_StretchPic};
+use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::tr_cmds::{RE_RenderWorldEffects, RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_font::{
     AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
@@ -1372,6 +1373,22 @@ pub fn CL_UISystemCalls(
             view.common,
             &re.sim.light_styles,
         );
+        // Raven queues the weather command as the last act of a scene, so the step runs here.
+        // `RE_RenderScene` seals the scene with its own refdef, and the weather guard reads that scene's flags rather than a later one's.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:868
+        let scene_refdef = match re.frame_data.events.last() {
+            Some(FrameEvent::RenderScene { refdef, .. }) => Some(refdef.clone()),
+            _ => None,
+        };
+        if let Some(refdef) = scene_refdef {
+            RE_RenderWorldEffects(
+                &mut re.frame_data,
+                &mut re.world_effects,
+                &re.sim.published,
+                &refdef,
+                view,
+            );
+        }
         0
     } else if trap == MpUiImport::UI_R_SETCOLOR as c_int {
         unsafe {

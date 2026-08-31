@@ -23,6 +23,7 @@ use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_package::FramePackage;
 use crate::render_state::frame_sink::FrameSink;
+use crate::render_state::placeholders::TrRefdef;
 use crate::render_state::world_generation::WorldGeneration;
 use crate::render_state::world_load_state::WorldLoadState;
 use crate::render_state::render_assets::RenderAssets;
@@ -33,6 +34,7 @@ use crate::tr_image::{GL_TextureMode, R_SetColorMappings, TrImageState};
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_scene::{R_ToggleSmpFrame, SceneState};
 use crate::tr_shader::R_GetShaderByHandle;
+use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 /// Raven `R_InitCommandBuffers` — command-buffer subsystem init.
 ///
@@ -242,20 +244,23 @@ pub fn RE_RotatePic2(
     });
 }
 
-// DEFERRED: RE_RenderWorldEffects — the A1 disposition table's `RC_WORLD_
-// EFFECTS` row folds this command into `FrameEvent::WorldEffectCommand`,
-// but that variant's payload (`String`) is built by a different, not-yet-
-// ported oracle fn (the `CG_R_WORLDEFFECTCOMMAND` handler, `RE_WorldEffect-
-// Command` per the trap-table naming), not by this one — `RE_RenderWorld-
-// Effects` takes no arguments and, per its own threading digest, carries no
-// state channel at all now that `R_GetCommandBuffer`'s buffer is dissolved.
-// A bare bufferless `RC_WORLD_EFFECTS` marker has no `FrameEvent` variant in
-// scope for this wave to push, and inventing one collides with the existing
-// `WorldEffectCommand(String)` variant's name/shape without a design
-// ruling reconciling the two RC_WORLD_EFFECTS producers. Escalated for the
-// wave that ports `RE_WorldEffectCommand`.
-// (R2 `### A1 disposition table` row `RC_WORLD_EFFECTS`)
-// Source: `oracle/codemp/renderer/tr_cmds.cpp:291-300`
+/// Raven `RE_RenderWorldEffects` — steps the scene's weather and queues its batch.
+/// Raven's bufferless `RC_WORLD_EFFECTS` marker becomes the frame's `WorldEffects` event, which carries the batch the pass draws.
+/// The caller passes the submitted scene's own refdef, so the guard gates on that scene's flags and not on a later one's.
+///
+/// Raven queues the marker once per scene and the backend steps `Update` once per marker, so this fn runs once per `RE_RenderScene` and the counts match.
+///
+/// Source: `oracle/codemp/renderer/tr_cmds.cpp:291-300`
+pub fn RE_RenderWorldEffects(
+    frame: &mut FrameData,
+    world_effects: &mut WorldEffectsState,
+    assets: &RenderAssets,
+    refdef: &TrRefdef,
+    host: &mut EngineHostView,
+) {
+    let weather = world_effects.RB_RenderWorldEffects(assets, refdef, host);
+    frame.events.push(FrameEvent::WorldEffects(weather));
+}
 
 // DEFERRED: RE_RenderAutoMap — the A1 disposition table's `RC_AUTO_MAP` row
 // splits this command: `AutomapElevAdj` already crosses as its own

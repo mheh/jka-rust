@@ -122,7 +122,9 @@ use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::world_generation::WorldGeneration;
 use mp_renderer::tr_bsp::{RE_LoadWorldMap, R_GetEntityToken};
-use mp_renderer::tr_cmds::{RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic};
+use mp_renderer::tr_cmds::{
+    RE_RenderWorldEffects, RE_RotatePic, RE_RotatePic2, RE_SetColor, RE_StretchPic,
+};
 use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_font::{
     AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
@@ -2245,6 +2247,22 @@ pub fn CL_CgameSystemCalls(
             view.common,
             &re.sim.light_styles,
         );
+        // Raven queues the weather command as the last act of a scene, so the step runs here.
+        // `RE_RenderScene` seals the scene with its own refdef, and the weather guard reads that scene's flags rather than a later one's.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:868
+        let scene_refdef = match re.frame_data.events.last() {
+            Some(FrameEvent::RenderScene { refdef, .. }) => Some(refdef.clone()),
+            _ => None,
+        };
+        if let Some(refdef) = scene_refdef {
+            RE_RenderWorldEffects(
+                &mut re.frame_data,
+                &mut re.world_effects,
+                &re.sim.published,
+                &refdef,
+                view,
+            );
+        }
         0
     } else if op == MpCgameImport::CG_R_SETCOLOR as c_int {
         let rgba = rgba_arg(vma(vc, args, 1) as *const f32);

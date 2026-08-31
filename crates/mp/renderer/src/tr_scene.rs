@@ -1343,10 +1343,8 @@ pub fn RE_RenderScene(
     // - startTime;` — paired with `startTime` above.
     // Source: oracle/codemp/renderer/tr_scene.cpp:866
 
-    // DEFERRED: `RE_RenderWorldEffects()` — unported: `tr_cmds.rs` carries
-    // its own `DEFERRED: RE_RenderWorldEffects` marker (no callable fn under
-    // this name exists anywhere in the crate; verified by grep, not
-    // assumed).
+    // `RE_RenderWorldEffects()` is ported in `tr_cmds.rs` and runs from the trap arm right after this fn returns.
+    // It needs the world-effects state, the collision world, and the engine host, none of which reach trap-time scene code.
     // Source: oracle/codemp/renderer/tr_scene.cpp:868
 
     // DEFERRED: `if (tr.refdef.rdflags & RDF_AUTOMAP) RE_RenderAutoMap();` —
