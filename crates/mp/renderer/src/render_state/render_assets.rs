@@ -219,3 +219,132 @@ pub struct RenderAssets {
     /// Source: `oracle/codemp/renderer/tr_world.cpp:782,784,1205-1231`
     pub automap_wireframe: AutomapWireframe,
 }
+
+impl RenderAssets {
+    /// The first flat surface index world `world_index` owns: `0` for the main world, and the running sum of every
+    /// earlier world's surface count for [`Self::bsp_models`]`[world_index - 1]`.
+    /// The ordering law both this and [`Self::resolve_world_surface`] follow: the main world first, then `bsp_models`
+    /// in slot order.
+    /// `build_world_mesh` concatenates the geometry in that same order, and the two must never diverge.
+    /// The oracle needs no such number, because `bmodel_t::firstSurface` is a pointer into the owning world's own array.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:938-942`
+    pub fn world_surface_base(&self, world_index: usize) -> u32 {
+        if world_index == 0 {
+            return 0;
+        }
+        let main = self.world.as_deref().map_or(0, |world| world.surfaces.len());
+        let earlier: usize = self
+            .bsp_models
+            .iter()
+            .take(world_index - 1)
+            .map(|instance| instance.surfaces.len())
+            .sum();
+        (main + earlier) as u32
+    }
+
+    /// The world that owns flat surface index `flat`, with that surface's index inside it.
+    /// `None` past the last loaded world's surfaces.
+    pub fn resolve_world_surface(&self, flat: u32) -> Option<(&WorldAsset, usize)> {
+        let mut remaining = flat as usize;
+        if let Some(world) = self.world.as_deref() {
+            if remaining < world.surfaces.len() {
+                return Some((world, remaining));
+            }
+            remaining -= world.surfaces.len();
+        }
+        for instance in &self.bsp_models {
+            if remaining < instance.surfaces.len() {
+                return Some((instance, remaining));
+            }
+            remaining -= instance.surfaces.len();
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::renderer_frontend::empty_render_assets;
+    use crate::tr_bsp::{Surface, SurfaceData};
+
+    /// A world named `name` carrying `count` skip surfaces.
+    /// A skip surface draws nothing and still occupies one flat index, which is all these tests read.
+    fn world_with_surfaces(name: &str, count: usize) -> WorldAsset {
+        let mut world = WorldAsset::default();
+        world.name = name.to_string();
+        world.surfaces = (0..count)
+            .map(|_| Surface {
+                shader: ShaderHandle::slot_zero(),
+                fog_index: 0,
+                data: SurfaceData::Skip,
+            })
+            .collect();
+        world
+    }
+
+    /// A main world of 4 surfaces and two instances of 3 and 2.
+    fn assets_with_two_instances() -> RenderAssets {
+        let mut assets = empty_render_assets();
+        assets.world = Some(Arc::new(world_with_surfaces("main", 4)));
+        assets.bsp_models = vec![
+            world_with_surfaces("first", 3),
+            world_with_surfaces("second", 2),
+        ];
+        assets
+    }
+
+    #[test]
+    fn world_surface_base_sums_every_earlier_world() {
+        let assets = assets_with_two_instances();
+        assert_eq!(assets.world_surface_base(0), 0);
+        assert_eq!(assets.world_surface_base(1), 4);
+        assert_eq!(assets.world_surface_base(2), 7);
+    }
+
+    #[test]
+    fn resolve_world_surface_names_the_owning_world_and_the_index_inside_it() {
+        let assets = assets_with_two_instances();
+
+        let (world, index) = assets.resolve_world_surface(3).expect("the main world owns flat index 3");
+        assert_eq!(world.name, "main");
+        assert_eq!(index, 3);
+
+        let (world, index) = assets.resolve_world_surface(6).expect("the first instance owns flat index 6");
+        assert_eq!(world.name, "first");
+        assert_eq!(index, 2);
+
+        let (world, index) = assets.resolve_world_surface(7).expect("the second instance owns flat index 7");
+        assert_eq!(world.name, "second");
+        assert_eq!(index, 0);
+    }
+
+    #[test]
+    fn resolve_world_surface_stops_past_the_last_loaded_world() {
+        let assets = assets_with_two_instances();
+        assert!(assets.resolve_world_surface(9).is_none());
+    }
+
+    #[test]
+    fn every_base_resolves_to_its_own_world_at_index_zero() {
+        let assets = assets_with_two_instances();
+        for (world_index, name) in [(0usize, "main"), (1, "first"), (2, "second")] {
+            let base = assets.world_surface_base(world_index);
+            let (world, index) = assets
+                .resolve_world_surface(base)
+                .expect("a world base is always inside the flat index space");
+            assert_eq!(world.name, name);
+            assert_eq!(index, 0);
+        }
+    }
+
+    #[test]
+    fn an_unloaded_world_has_an_empty_index_space() {
+        let assets = empty_render_assets();
+        assert_eq!(assets.world_surface_base(0), 0);
+        assert_eq!(assets.world_surface_base(1), 0);
+        assert!(assets.resolve_world_surface(0).is_none());
+    }
+}
