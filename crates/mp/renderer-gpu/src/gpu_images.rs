@@ -94,6 +94,12 @@ pub struct GpuImages {
     /// `GL_CLAMP`/`GL_CLAMP_TO_EDGE` — bilinear, clamped. Every 2D image
     /// `R_RegisterShaderNoMip` registers lands here.
     sampler_clamp: Sampler,
+    /// The unmipmapped nearest sampler Raven's `mFilterMode != 0` clouds bind.
+    /// Weather sets both the min and the mag filter, and neither weather filter uses mips.
+    /// The weather image always loads with `GL_CLAMP`, so one nearest-clamp sampler covers every cloud.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1364-1365`
+    sampler_nearest: Sampler,
     /// The stand-in a draw binds when it names no image, names one that never
     /// uploaded, or resolves through a shader with no stage image: one opaque
     /// white texel, so `texture * vertex_color` reduces to the vertex colour.
@@ -139,6 +145,7 @@ impl GpuImages {
 
         let sampler_repeat = create_sampler(device, AddressMode::Repeat, "repeat");
         let sampler_clamp = create_sampler(device, AddressMode::ClampToEdge, "clamp");
+        let sampler_nearest = create_nearest_sampler(device);
 
         let white = create_image(
             gpu,
@@ -180,6 +187,7 @@ impl GpuImages {
             layout,
             sampler_repeat,
             sampler_clamp,
+            sampler_nearest,
             white,
             neutral_normal,
             neutral_roughness,
@@ -384,6 +392,49 @@ impl GpuImages {
         })
     }
 
+    /// The weather bind group for one cloud: its image with the clamp wrap `R_FindImageFile` gave it, and the filter its `mFilterMode` chose.
+    /// A cloud binds one image and no lightmap, so slot 2 takes the white texel and the world shader's second sample reduces to one.
+    /// `layout` is the world pipeline's group-1 layout, which `Pipeline3d` owns, the same way `world_bind_group` and `view_bind_group` take it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1319-1320,1364-1365`
+    pub fn weather_bind_group(
+        &self,
+        gpu: &Gpu,
+        layout: &BindGroupLayout,
+        handle: Option<ImageHandle>,
+        nearest: bool,
+    ) -> BindGroup {
+        let image = self.image_or_white(handle);
+        let sampler = if nearest {
+            &self.sampler_nearest
+        } else {
+            &self.sampler_clamp
+        };
+
+        gpu.device().create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("mp_renderer_gpu weather texture bind group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&image.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&self.white.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler_clamp),
+                },
+            ],
+        })
+    }
+
     /// Builds the world texture bind group with an explicit diffuse view, the shape the distortion stage needs.
     /// The screen image is render-thread scratch with no `ImageHandle`, so it binds by view and takes the clamping sampler.
     ///
@@ -509,6 +560,22 @@ impl GpuImages {
 /// `wrapClampMode`.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp` (`R_RegisterShaderNoMip`)
+/// The nearest-filtered clamping sampler a `mFilterMode != 0` weather cloud binds.
+/// Both the min and the mag filter are nearest, and neither uses mips.
+///
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1364-1365`
+fn create_nearest_sampler(device: &wgpu::Device) -> Sampler {
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("mp_renderer_gpu weather sampler (nearest)"),
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        address_mode_w: AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    })
+}
+
 fn create_sampler(device: &wgpu::Device, address_mode: AddressMode, label: &str) -> Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some(&format!("mp_renderer_gpu 2d sampler ({label})")),
