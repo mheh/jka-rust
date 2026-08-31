@@ -45,12 +45,19 @@ pub struct WorldWalkScratch {
 }
 
 impl WorldWalkScratch {
-    /// Sizes the mark arrays for a newly loaded world and clears every mark.
+    /// Sizes the surface marks to the main world and every loaded instance together, and the node marks to the main
+    /// world alone.
+    /// Only the main world's nodes are ever walked: `R_RecursiveWorldNode` and `R_MarkLeaves` traverse
+    /// `tr.world->nodes`, and instance surfaces reach the draw list through `R_AddBrushModelSurfaces` alone.
     ///
     /// Raven gets the same zeroed state from the `Hunk_Alloc` block a map load
     /// allocates. Call this whenever the loaded world changes.
-    pub fn set_world(&mut self, world: &WorldAsset) {
-        self.resize(world.surfaces.len(), world.nodes.len());
+    ///
+    /// Source: `oracle/codemp/renderer/tr_world.cpp:1957`, `oracle/codemp/renderer/tr_main.cpp:1432-1433`
+    pub fn set_world(&mut self, world: &WorldAsset, instances: &[WorldAsset]) {
+        let surfaces =
+            world.surfaces.len() + instances.iter().map(|w| w.surfaces.len()).sum::<usize>();
+        self.resize(surfaces, world.nodes.len());
     }
 
     /// Sizes the mark arrays to `num_surfaces` and `num_nodes`, and clears

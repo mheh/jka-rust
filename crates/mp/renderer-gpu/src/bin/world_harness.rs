@@ -1013,8 +1013,9 @@ impl ApplicationHandler for App {
         // Upload the loaded world's geometry once, before the first frame. The
         // brush-submodel rows the same map load registered go with it (W2-F8).
         let bmodel_table = BModelTable::build(&self.host.models);
-        if let Some(world) = self.host.re.sim.published.world.as_ref() {
-            executor.set_world(&gpu, world, bmodel_table);
+        let assets = &self.host.re.sim.published;
+        if let Some(world) = assets.world.as_ref() {
+            executor.set_world(&gpu, world, &assets.bsp_models, bmodel_table);
         }
 
         let size = window.inner_size();

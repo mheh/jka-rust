@@ -762,7 +762,7 @@ pub fn load_world_and_render(host: &mut UiHost, map: &str) -> WorldSpikeReport {
         // call (W2-F4).
         let mut walk_scratch = WorldWalkScratch::default();
         if let Some(world) = assets.world.as_ref() {
-            walk_scratch.set_world(world);
+            walk_scratch.set_world(world, &assets.bsp_models);
         }
         let cvar_snapshot = RenderCvarSnapshot::from_cvars(cvars, engine_view.common);
         // The spike walks once, so its brush-submodel rows live and die with
