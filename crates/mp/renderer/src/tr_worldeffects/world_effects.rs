@@ -23,11 +23,11 @@ use native_math::rng::{Rng, RAND_MAX};
 use native_string::atoi;
 
 use crate::gl_constants::GL_CLAMP;
-use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
+use crate::render_state::placeholders::TrRefdef;
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
-use crate::tr_backend::{GL_Bind, SetViewportAndScissor};
+use crate::tr_backend::GL_Bind;
 use crate::tr_image::{R_FindImageFile, TrImageState};
 use crate::tr_model::render_models::RenderModels;
 use crate::tr_public::ref_flags::{RDF_NOWORLDMODEL, RDF_SKYBOXPORTAL};
@@ -806,6 +806,11 @@ pub struct WorldEffectsState {
     pub mOutside: COutside,
     pub mParticleClouds: Vec<CWeatherParticleCloud>,
     pub mWindZones: Vec<CWindZone>,
+    /// Raven's `mGlobalWindVelocity`, `mGlobalWindDirection` and `mGlobalWindSpeed` file statics, the same DEC-37 A13.3 promotion as `mOutside`.
+    /// The trio had no owner before this step, so nothing could call the functions that take it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:73-75`
+    pub wind: WindZoneState,
     /// The C runtime's `holdrand` (`srand`/`rand`, seeded by
     /// `R_InitWorldEffects`) plus `q_math.c`'s `holdrand` behind `Q_irand` —
     /// both TU-invisible globals in Raven, owned here as one field on the
@@ -1514,38 +1519,33 @@ impl WorldEffectsState {
 
     /// Raven `RB_RenderWorldEffects`.
     ///
-    /// `wind` carries the `mGlobalWindDirection`/`mGlobalWindSpeed`/
-    /// `mGlobalWindVelocity` trio (`WindZoneState`); `assets` is the
-    /// sim-published `RenderAssets` (`tr.world`'s SPLIT half); `frame` is the
-    /// render-thread `FrameState` (`backEnd`'s half); `host` carries
-    /// `mOutside.Cache`'s engine/collision access and `Com_Printf`'s
-    /// `Common`; all threaded rather than reached (porting-rules §B4).
+    /// `assets` is the sim-published `RenderAssets`, which carries `tr.world`, and `host` carries `mOutside.Cache`'s engine and collision access plus `Com_Printf`'s `Common`.
+    /// Both are threaded rather than reached (porting-rules §B4).
     ///
-    /// `frame.refdef` is the submitted scene's own refdef, which carries `rdflags` and `frametime`, and `assets.world` carries `bmodels[0].bounds`.
+    /// `refdef` is the submitted scene's own refdef, which carries `rdflags` and `frametime`.
     /// Raven reads `RDF_NOWORLDMODEL` off `tr.refdef` and `RDF_SKYBOXPORTAL` off `backEnd.refdef`, two copies that hold different scenes at backend time.
     /// The port has one refdef per scene and reads both bits off it.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1513-1580`
     pub fn RB_RenderWorldEffects(
         &mut self,
-        wind: &mut WindZoneState,
         assets: &RenderAssets,
-        frame: &FrameState,
+        refdef: &TrRefdef,
         host: &mut EngineHostView,
-        rng: &mut Rng,
     ) {
         // Raven: "no world rendering or no world or no particle clouds"
         //
         // Raven's `||` chain short-circuits left to right in C, and so does Rust's, so the four terms keep their oracle order.
         // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1515-1521
         if assets.world.is_none()
-            || frame.refdef.rdflags & RDF_NOWORLDMODEL != 0
-            || frame.refdef.rdflags & RDF_SKYBOXPORTAL != 0
+            || refdef.rdflags & RDF_NOWORLDMODEL != 0
+            || refdef.rdflags & RDF_SKYBOXPORTAL != 0
             || self.mParticleClouds.is_empty()
         {
             return;
         }
 
-        SetViewportAndScissor(frame);
+        // `SetViewportAndScissor` is retired at this site. The render pass sets the viewport and the scissor from the same view.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1523
         // DEFERRED: R4 — qglMatrixMode(GL_MODELVIEW)/qglLoadMatrixf(backEnd
         // .viewParms.world.modelMatrix): fixed-function GL surface, no R3
         // home (DEC-37 A13.2); `viewParms_t::world.modelMatrix` is also not
@@ -1557,7 +1557,7 @@ impl WorldEffectsState {
         // The 1 ms floor below means a zero never divides by zero.
         // It makes the weather crawl at one thousandth speed instead.
         // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1530
-        self.mMillisecondsElapsed = frame.refdef.frametime as f32;
+        self.mMillisecondsElapsed = refdef.frametime as f32;
         if self.mMillisecondsElapsed < 1.0 {
             self.mMillisecondsElapsed = 1.0;
         }
@@ -1583,17 +1583,19 @@ impl WorldEffectsState {
             // Update All Wind Zones
             //-----------------------
             if !self.mFrozen {
-                wind.global_wind_velocity = [0.0; 3];
+                self.wind.global_wind_velocity = [0.0; 3];
                 for wz in 0..self.mWindZones.len() {
-                    self.mWindZones[wz].Update(rng);
+                    self.mWindZones[wz].Update(&mut self.rng);
                     if self.mWindZones[wz].mGlobal {
                         for i in 0..3 {
-                            wind.global_wind_velocity[i] += self.mWindZones[wz].mCurrentVelocity[i];
+                            self.wind.global_wind_velocity[i] +=
+                                self.mWindZones[wz].mCurrentVelocity[i];
                         }
                     }
                 }
-                wind.global_wind_direction = wind.global_wind_velocity;
-                wind.global_wind_speed = VectorNormalize(&mut wind.global_wind_direction);
+                self.wind.global_wind_direction = self.wind.global_wind_velocity;
+                self.wind.global_wind_speed =
+                    VectorNormalize(&mut self.wind.global_wind_direction);
             }
 
             // Update All Particle Clouds
@@ -1601,12 +1603,12 @@ impl WorldEffectsState {
             self.mParticlesRendered = 0;
             let frozen = self.mFrozen;
             let seconds_elapsed = self.mSecondsElapsed;
-            let wind_velocity = wind.global_wind_velocity;
-            let view_origin = frame.refdef.view_origin;
-            let view_axis = frame.refdef.view_axis;
+            let wind_velocity = self.wind.global_wind_velocity;
+            let view_origin = refdef.view_origin;
+            let view_axis = refdef.view_axis;
             for i in 0..self.mParticleClouds.len() {
                 self.mParticleClouds[i].Update(
-                    rng,
+                    &mut self.rng,
                     &self.mOutside,
                     view_origin,
                     view_axis,
