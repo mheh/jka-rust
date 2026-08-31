@@ -6,7 +6,7 @@
 
 use core::ffi::{c_char, c_int, c_uint};
 
-use libc::{memmove, strcasecmp, strcat, strcpy, strlen};
+use libc::{memmove, strcasecmp, strcpy, strlen};
 
 use mp_abi::cgame::exports::MpCgameExport;
 use mp_abi::cgame::public::tcgincoming_console_command::TCGIncomingConsoleCommand;
@@ -311,11 +311,12 @@ pub fn Key_GetBinding(cl: &mut Client, keynum: c_int) -> *mut c_char {
 pub fn Key_GetKey(cl: &mut Client, binding: *const c_char) -> c_int {
     unsafe {
         if !binding.is_null() {
-            let binding_str = core::ffi::CStr::from_ptr(binding).to_string_lossy();
+            let binding_str = latin1_to_string(core::ffi::CStr::from_ptr(binding).to_bytes());
             for i in 0..256 {
                 if !cl.kg.keys[i].binding.is_null() {
-                    let bound_str =
-                        core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_string_lossy();
+                    let bound_str = latin1_to_string(
+                        core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_bytes(),
+                    );
                     if Q_stricmp(&binding_str, &bound_str) == 0 {
                         return i as c_int;
                     }
@@ -555,7 +556,10 @@ pub fn Key_Unbind_f(view: &mut EngineHostView, cl: &mut Client) {
         return;
     }
 
-    let b = Key_StringToKeynum(cl, Cmd_Argv(view.common, 1).as_ptr() as *mut c_char);
+    // `Cmd_Argv` returns a Rust slice with no NUL, so the C-string call gets a terminated Latin-1 copy.
+    let mut keyname = string_to_latin1(Cmd_Argv(view.common, 1));
+    keyname.push(0);
+    let b = Key_StringToKeynum(cl, keyname.as_ptr() as *mut c_char);
     if b == -1 {
         com_printf(
             view.common,
@@ -592,7 +596,10 @@ pub fn Key_Bind_f(view: &mut EngineHostView, cl: &mut Client) {
             );
             return;
         }
-        let b = Key_StringToKeynum(cl, Cmd_Argv(view.common, 1).as_ptr() as *mut c_char);
+        // `Cmd_Argv` returns a Rust slice with no NUL, so the C-string call gets a terminated Latin-1 copy.
+        let mut keyname = string_to_latin1(Cmd_Argv(view.common, 1));
+        keyname.push(0);
+        let b = Key_StringToKeynum(cl, keyname.as_ptr() as *mut c_char);
         if b == -1 {
             com_printf(
                 view.common,
@@ -603,8 +610,10 @@ pub fn Key_Bind_f(view: &mut EngineHostView, cl: &mut Client) {
 
         if c == 2 {
             if !cl.kg.keys[b as usize].binding.is_null() {
-                let bound =
-                    core::ffi::CStr::from_ptr(cl.kg.keys[b as usize].binding).to_string_lossy();
+                // The binding buffer is Latin-1 bytes, and a UTF-8 read of it mints replacement characters.
+                let bound = latin1_to_string(
+                    core::ffi::CStr::from_ptr(cl.kg.keys[b as usize].binding).to_bytes(),
+                );
                 com_printf(
                     view.common,
                     &format!("\"{}\" = \"{}\"\n", Cmd_Argv(view.common, 1), bound),
@@ -619,26 +628,18 @@ pub fn Key_Bind_f(view: &mut EngineHostView, cl: &mut Client) {
         }
 
         // Copy the rest of the command line.
-        let mut cmd = [0u8; 1024];
-        cmd[0] = 0;
+        // `Cmd_Argv` slices carry no NUL, so the line builds as an owned string instead of Raven's `strcat` walk.
+        let mut cmd = String::new();
         for i in 2..c {
-            let arg = Cmd_Argv(view.common, i);
-            strcat(
-                cmd.as_mut_ptr() as *mut c_char,
-                arg.as_ptr() as *const c_char,
-            );
+            cmd.push_str(Cmd_Argv(view.common, i));
             if i != c - 1 {
-                strcat(cmd.as_mut_ptr() as *mut c_char, c" ".as_ptr());
+                cmd.push(' ');
             }
         }
 
-        let cmd_str = core::ffi::CStr::from_ptr(cmd.as_ptr() as *const c_char).to_string_lossy();
-        Key_SetBinding(
-            view,
-            cl,
-            b,
-            std::ffi::CString::new(&*cmd_str).unwrap().as_ptr(),
-        );
+        let mut cmd_bytes = string_to_latin1(&cmd);
+        cmd_bytes.push(0);
+        Key_SetBinding(view, cl, b, cmd_bytes.as_ptr() as *const c_char);
     }
 }
 
@@ -802,9 +803,12 @@ pub fn Key_WriteBindings(common: &mut Common, cl: &mut Client, f: fileHandle_t) 
         FS_Printf(common, f, "unbindall\n");
         for i in 0..MAX_KEYS {
             if !cl.kg.keys[i].binding.is_null() && *cl.kg.keys[i].binding != 0 {
-                let name =
-                    core::ffi::CStr::from_ptr(Key_KeynumToString(cl, i as c_int)).to_string_lossy();
-                let binding = core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_string_lossy();
+                // Both buffers are Latin-1 bytes, and a UTF-8 read would grow replacement characters through every config round trip.
+                let name = latin1_to_string(
+                    core::ffi::CStr::from_ptr(Key_KeynumToString(cl, i as c_int)).to_bytes(),
+                );
+                let binding =
+                    latin1_to_string(core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_bytes());
                 FS_Printf(common, f, &format!("bind {} \"{}\"\n", name, binding));
             }
         }
@@ -818,11 +822,14 @@ pub fn Key_Bindlist_f(common: &mut Common, cl: &mut Client) {
     unsafe {
         for i in 0..MAX_KEYS {
             if !cl.kg.keys[i].binding.is_null() && *cl.kg.keys[i].binding != 0 {
-                let ascii =
-                    core::ffi::CStr::from_ptr(Key_KeynumToAscii(cl, i as c_int)).to_string_lossy();
-                let name =
-                    core::ffi::CStr::from_ptr(Key_KeynumToString(cl, i as c_int)).to_string_lossy();
-                let binding = core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_string_lossy();
+                let ascii = latin1_to_string(
+                    core::ffi::CStr::from_ptr(Key_KeynumToAscii(cl, i as c_int)).to_bytes(),
+                );
+                let name = latin1_to_string(
+                    core::ffi::CStr::from_ptr(Key_KeynumToString(cl, i as c_int)).to_bytes(),
+                );
+                let binding =
+                    latin1_to_string(core::ffi::CStr::from_ptr(cl.kg.keys[i].binding).to_bytes());
                 com_printf(
                     common,
                     &format!("Key : {} ({}) \"{}\"\n", ascii, name, binding),
