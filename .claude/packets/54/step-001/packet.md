@@ -643,3 +643,11 @@ After a clean lane-review: open the pull request from `gh54-step-001-weather-lan
 The reseed therefore lands twice in the fixture: once before the weather command triple, and once after the commands and before stepping. The live path keeps the faithful wall-clock `srand` untouched, because the reseed is fixture-only.
 
 Verification is now explicit. Before the row-7 bless STOP, run the fixture three times in isolation and show byte-identical output all three times. Report the three run results at the STOP beside the image path and the defect conditions.
+
+**2026-08-31 - the row-7 bless, ruled.** The user reviewed `crates/mp/renderer-gpu/tests/goldens/world_weather_ctf2.png` in chat and blessed it as is. SHA-256 `4044611f92816317b3c5f94a03bd9c60f04bb61a5906b69771aff9851696aa05`, 800 by 600, 8-bit RGBA.
+
+The verdict on the defect conditions: developed particles are discernible across the upper half of the frame, the fog overlay is present and strong with the scene legible underneath, and no failure signature appears. There is no panic in `mParticles` or `mPointCache`, and the batch did not cross empty. The frame draws 2048 weather vertices over 891 world draw calls, which is 512 quads out of the 1060 particles the two clouds hold.
+
+Determinism is proven. Three isolated runs under the double reseed each reported 2048 weather vertices, and three isolated comparison runs after the bless each passed at `CHANNEL_TOLERANCE` zero with no `.actual.png` written.
+
+One caveat was presented and blessed as is: the fog is dense enough to wash the room, which follows from the `fog` preset's 60 quads at 70 units square and from the camera sitting inside the spawn range box. The levers, had the user rejected it, were the camera angle and the step count, both fixture knobs rather than port behavior.
