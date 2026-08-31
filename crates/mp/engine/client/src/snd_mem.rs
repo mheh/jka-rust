@@ -257,7 +257,8 @@ pub fn ResampleSfx(
 /// Source: `oracle/codemp/game/q_shared.c:112-131`
 pub fn COM_DefaultExtension_str(path: &mut String, extension: &str) {
     // Raven's walk stops at index 0 without testing it, so index 0 is skipped here too.
-    for &b in path.as_bytes()[1..].iter().rev() {
+    // An empty name starts Raven's walk out of bounds, which is UB, so the defined pick skips the scan and appends.
+    for &b in path.as_bytes().get(1..).unwrap_or_default().iter().rev() {
         if b == b'/' {
             break;
         }
