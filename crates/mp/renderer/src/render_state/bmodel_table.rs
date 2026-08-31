@@ -5,7 +5,8 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::tr_model::render_models::RenderModels;
 
-/// One model handle's row: the two `model_t` scalars the brush-submodel path reads and nothing else.
+/// One model handle's row: the two `model_t` scalars the brush-submodel path reads, plus the world that owns the
+/// submodel.
 ///
 /// Source: `oracle/codemp/renderer/tr_local.h:1117-1135` (`model_t`)
 #[derive(Clone, Copy)]
@@ -14,6 +15,11 @@ pub struct BModelEntry {
     /// handle that names no brush submodel. The pointer itself has no twin:
     /// `RenderModels::register_bmodel` records the index instead.
     pub bmodel_index: i32,
+    /// The world that owns this submodel: `0` for the main world, `k` for `RenderAssets::bsp_models[k - 1]`.
+    /// Raven's `bmodel_t::firstSurface` pointer carries this, so the oracle's row has no twin field.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_bsp.cpp:1442-1450`
+    pub world_index: i32,
     /// `model_t::bspInstance`, the RMG flag that turns on entity lighting for
     /// a sub-BSP instance. Raven's `qboolean`.
     pub bsp_instance: i32,
@@ -23,9 +29,12 @@ impl Default for BModelEntry {
     /// The row an unregistered handle resolves to, matching the zeroed
     /// `Hunk_Alloc` block `ModelPool::by_handle` returns for an out-of-range
     /// handle.
+    ///
+    /// `world_index` is `0` here and inert, because the row already fails the brush test on `bmodel_index = -1`.
     fn default() -> BModelEntry {
         BModelEntry {
             bmodel_index: -1,
+            world_index: 0,
             bsp_instance: 0,
         }
     }
@@ -59,11 +68,13 @@ impl BModelTable {
         let mut entries = Vec::with_capacity(count);
         for slot in 0..count {
             let model = models.get_model(slot as qhandle_t);
+            let (world_index, bmodel_index) = match models.bmodel_location(slot as qhandle_t) {
+                Some((world, submodel)) => (world as i32, submodel as i32),
+                None => (0, -1),
+            };
             entries.push(BModelEntry {
-                bmodel_index: match models.bmodel_index(slot as qhandle_t) {
-                    Some(index) => index as i32,
-                    None => -1,
-                },
+                bmodel_index,
+                world_index,
                 bsp_instance: model.bspInstance,
             });
         }

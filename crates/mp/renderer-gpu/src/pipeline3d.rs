@@ -4101,10 +4101,13 @@ fn world_ref_index(world_ref: WorldSurfaceRef) -> u32 {
 }
 
 /// The bezier-patch grid at flat surface `index`, or `None` when the surface is
-/// another kind or no world is loaded. The surface array is in the same lump
-/// order the geometry ranges were built from, so `index` addresses both.
+/// another kind or no world is loaded.
+/// `RenderAssets::resolve_world_surface` names the owning world, because the flat index space spans the main world
+/// and every loaded instance. Each world's surfaces are in the same lump order the geometry ranges were built from,
+/// so `index` addresses both.
 fn world_surface_grid(assets: &RenderAssets, index: u32) -> Option<&GridMesh> {
-    match &assets.world.as_ref()?.surfaces.get(index as usize)?.data {
+    let (world, surface) = assets.resolve_world_surface(index)?;
+    match &world.surfaces.get(surface)?.data {
         SurfaceData::Grid(grid) => Some(grid),
         _ => None,
     }
