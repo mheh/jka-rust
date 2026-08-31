@@ -28,6 +28,8 @@ use std::path::PathBuf;
 use mp_engine_core::Engine;
 use mp_engine_server::Server;
 use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
+use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::mark_fragment::markFragment_t;
 use mp_qshared::shared::qhandle_t;
@@ -38,7 +40,9 @@ use mp_renderer::renderer_frontend::RendererFrontend;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_model::render_models::RenderModels;
-use mp_renderer::tr_scene::{RE_AddDynamicLightToScene, RE_AddPolyToScene, RE_RenderScene};
+use mp_renderer::tr_scene::{
+    RE_AddDynamicLightToScene, RE_AddPolyToScene, RE_AddRefEntityToScene, RE_RenderScene,
+};
 use mp_renderer::tr_shader::RE_RegisterShader;
 use mp_renderer_gpu::ui_host::boot;
 use mp_renderer_gpu::ui_host::{BootConfig, UiHost};
@@ -558,6 +562,99 @@ fn golden_world_marks_duel1() {
         false,
         [90.0, 0.0, 0.0],
         Some(duel1_floor_mark),
+        false,
+    );
+}
+
+/// The `#`-prefixed name that registers a second map as a sub-BSP instance world.
+/// `RE_RegisterModel` branches on the `#`, loads `maps/mp/duel1.bsp` into `tr.bspModels[0]`, and returns the handle
+/// hashed for `*1-0`, that instance's whole submodel 0.
+///
+/// Source: `oracle/codemp/renderer/tr_model.cpp:1227-1246`
+const SUBBSP_INSTANCE_NAME: &str = "#mp/duel1";
+
+/// Where the instance's own bounding box lands, relative to the eye: its near face this far along `+x`, and its
+/// centre level with the eye plus this drop.
+/// An instance world keeps its own map coordinates, and `mp/duel1` sits nowhere near the `mp/ffa2` spawn, so the
+/// entity origin carries the whole offset.
+const INSTANCE_NEAR_DIST: f32 = 64.0;
+const INSTANCE_DROP: f32 = 0.0;
+
+/// Registers `mp/duel1` as a sub-BSP instance and draws its submodel 0 as one `RT_MODEL` entity in front of the eye.
+///
+/// This is the `misc_bsp` path a mod server drives. A `misc_bsp` entity registers a `#`-prefixed name as a
+/// `CS_BSP_MODELS` configstring, cgame registers every such configstring at init, and the returned `*<k>-0` handle
+/// draws as a brush entity.
+///
+/// Source: `oracle/codemp/game/g_misc.c:416-418`, `oracle/codemp/cgame/cg_main.c:2308-2324`
+fn ffa2_subbsp_instance(host: &mut UiHost, frame_data: &mut FrameData, eye: [f32; 3]) {
+    let model = boot::register_model(host, SUBBSP_INSTANCE_NAME);
+    assert!(
+        model > 0,
+        "{SUBBSP_INSTANCE_NAME} did not register as a sub-BSP instance",
+    );
+
+    // An empty instance world would draw nothing and bless the plain ffa2 image, so the load is gated here.
+    let bounds = {
+        let instance = host
+            .re
+            .sim
+            .published
+            .bsp_models
+            .first()
+            .expect("the instance world must reach the published registry");
+        assert!(
+            !instance.surfaces.is_empty(),
+            "the instance world loaded no surface",
+        );
+        println!(
+            "world_subbsp_ffa2: instance carries {} surfaces and {} submodels",
+            instance.surfaces.len(),
+            instance.bmodels.len(),
+        );
+        instance.bmodels[0].bounds
+    };
+    println!("world_subbsp_ffa2: instance submodel 0 bounds {bounds:?}");
+
+    let centre = [
+        (bounds[0][0] + bounds[1][0]) * 0.5,
+        (bounds[0][1] + bounds[1][1]) * 0.5,
+        (bounds[0][2] + bounds[1][2]) * 0.5,
+    ];
+
+    let mut ent = refEntity_t::zeroed();
+    ent.reType = refEntityType_t::RT_MODEL;
+    ent.hModel = model;
+    ent.origin = [
+        eye[0] + INSTANCE_NEAR_DIST - bounds[0][0],
+        eye[1] - centre[1],
+        eye[2] - INSTANCE_DROP - centre[2],
+    ];
+    ent.oldorigin = ent.origin;
+    ent.shaderRGBA = [255, 255, 255, 255];
+    AnglesToAxis([0.0, 0.0, 0.0], ent.axis.as_mut_ptr());
+    RE_AddRefEntityToScene(
+        frame_data,
+        &host.re.sim.published,
+        &mut host.re.scene,
+        &ent,
+        None,
+    );
+}
+
+/// The sub-BSP fixture: the `mp/ffa2` courtyard with the whole `mp/duel1` map drawn inside it as one instance
+/// brush entity.
+/// This is the gh#50 gate. The instance's surfaces live past the main world's in the flat index space, so a lost
+/// offset draws nothing and blesses the plain ffa2 image instead.
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_subbsp_ffa2() {
+    run_golden_scene(
+        "maps/mp/ffa2.bsp",
+        "world_subbsp_ffa2",
+        true,
+        [0.0, 0.0, 0.0],
+        Some(ffa2_subbsp_instance),
         false,
     );
 }
