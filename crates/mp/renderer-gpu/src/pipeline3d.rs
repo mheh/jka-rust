@@ -32,6 +32,7 @@ use core::f64::consts::PI;
 use core::ffi::c_int;
 use core::ops::Range;
 use std::collections::HashMap;
+use std::iter::once;
 use std::mem::size_of;
 use std::sync::Arc;
 
@@ -235,11 +236,14 @@ pub struct WorldGeometry {
 }
 
 impl WorldGeometry {
-    /// Packs `world`'s surfaces into GPU buffers. An empty world (no surfaces,
-    /// or every surface a `Skip`/`Flare`) still creates one-element buffers so
-    /// the buffer handles are always valid.
-    pub fn upload(gpu: &Gpu, world: &WorldAsset) -> WorldGeometry {
-        let (vertices, indices, ranges) = build_world_mesh(world);
+    /// Packs the main world's surfaces and then every loaded instance's, in `RenderAssets::bsp_models` slot order,
+    /// into one pair of buffers.
+    /// The concatenation order is the flat index space `RenderAssets::world_surface_base` computes, and the two must
+    /// agree.
+    /// An empty world (no surfaces, or every surface a `Skip`/`Flare`) still creates one-element buffers so the buffer
+    /// handles are always valid.
+    pub fn upload(gpu: &Gpu, world: &WorldAsset, instances: &[WorldAsset]) -> WorldGeometry {
+        let (vertices, indices, ranges) = build_world_mesh(world, instances);
 
         // wgpu rejects a zero-size buffer, so an empty world falls back to one
         // zeroed element in each buffer.
@@ -324,19 +328,28 @@ impl WorldGeometry {
     }
 }
 
-/// Packs `world`'s surfaces into a vertex list, an index list, and one range
-/// per surface. Faces carry points plus indices. Triangle soups carry verts
+/// Packs the main world's surfaces and then every instance's into a vertex list, an index list, and one range per
+/// surface. Faces carry points plus indices. Triangle soups carry verts
 /// plus indexes. Grids carry a `width` by `height` vertex lattice and emit two
 /// triangles per cell in row-major order. `Skip` and `Flare` draw nothing.
 ///
+/// The worlds concatenate in the order `RenderAssets::world_surface_base` sums, the main world first and then
+/// `bsp_models` in slot order, so range `n` is the surface at flat index `n`.
+/// With no instance loaded the concatenation is the main world alone.
+///
 /// This is the pure half of [`WorldGeometry::upload`], split out for the unit
 /// tests.
-pub fn build_world_mesh(world: &WorldAsset) -> (Vec<WorldVertex>, Vec<u32>, Vec<SurfaceRange>) {
+pub fn build_world_mesh(
+    world: &WorldAsset,
+    instances: &[WorldAsset],
+) -> (Vec<WorldVertex>, Vec<u32>, Vec<SurfaceRange>) {
     let mut vertices: Vec<WorldVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    let mut ranges: Vec<SurfaceRange> = Vec::with_capacity(world.surfaces.len());
+    let total_surfaces =
+        world.surfaces.len() + instances.iter().map(|w| w.surfaces.len()).sum::<usize>();
+    let mut ranges: Vec<SurfaceRange> = Vec::with_capacity(total_surfaces);
 
-    for surface in &world.surfaces {
+    for surface in once(world).chain(instances).flat_map(|w| &w.surfaces) {
         let base_vertex = vertices.len() as i32;
         let first_index = indices.len() as u32;
 
@@ -4088,10 +4101,13 @@ fn world_ref_index(world_ref: WorldSurfaceRef) -> u32 {
 }
 
 /// The bezier-patch grid at flat surface `index`, or `None` when the surface is
-/// another kind or no world is loaded. The surface array is in the same lump
-/// order the geometry ranges were built from, so `index` addresses both.
+/// another kind or no world is loaded.
+/// `RenderAssets::resolve_world_surface` names the owning world, because the flat index space spans the main world
+/// and every loaded instance. Each world's surfaces are in the same lump order the geometry ranges were built from,
+/// so `index` addresses both.
 fn world_surface_grid(assets: &RenderAssets, index: u32) -> Option<&GridMesh> {
-    match &assets.world.as_ref()?.surfaces.get(index as usize)?.data {
+    let (world, surface) = assets.resolve_world_surface(index)?;
+    match &world.surfaces.get(surface)?.data {
         SurfaceData::Grid(grid) => Some(grid),
         _ => None,
     }
@@ -5967,6 +5983,8 @@ mod tests {
     use mp_renderer::tr_local::gen_func_t::genFunc_t;
     use mp_renderer::tr_local::tex_mod_info_t::texModInfo_t;
     use mp_renderer::tr_local::wave_form_t::waveForm_t;
+    use mp_renderer::render_state::shader_asset::ShaderHandle;
+    use mp_renderer::tr_bsp::{Surface, SurfaceTriangles};
 
     use crate::ui_host::boot::empty_assets;
 
@@ -6040,6 +6058,69 @@ mod tests {
         assert!(grid_indices(1, 5).is_empty());
         assert!(grid_indices(5, 1).is_empty());
         assert!(grid_indices(0, 0).is_empty());
+    }
+
+    // the flat surface index space
+
+    /// A world of `count` triangle-soup surfaces, where surface `i` carries `first + i` vertices.
+    /// A range's `vertex_count` therefore names the surface it came from, which is what lets the concatenation test
+    /// find each world inside the packed ranges.
+    fn world_of_triangle_soups(count: usize, first: usize) -> WorldAsset {
+        let mut world = WorldAsset::default();
+        world.surfaces = (0..count)
+            .map(|i| Surface {
+                shader: ShaderHandle::slot_zero(),
+                fog_index: 0,
+                data: SurfaceData::Triangles(SurfaceTriangles {
+                    bounds: [[0.0; 3]; 2],
+                    verts: vec![sample_draw_vert(); first + i],
+                    indexes: Vec::new(),
+                }),
+            })
+            .collect();
+        world
+    }
+
+    #[test]
+    fn the_packed_ranges_start_each_world_at_its_own_surface_base() {
+        let world = world_of_triangle_soups(2, 10);
+        let instances = vec![world_of_triangle_soups(3, 20), world_of_triangle_soups(1, 30)];
+
+        let mut assets = empty_assets();
+        assets.world = Some(Arc::new(world.clone()));
+        assets.bsp_models = instances.clone();
+
+        let (vertices, _indices, ranges) = build_world_mesh(&world, &instances);
+        assert_eq!(ranges.len(), 6);
+        assert_eq!(vertices.len(), 10 + 11 + 20 + 21 + 22 + 30);
+
+        // Each world's first surface sits at the base `RenderAssets::world_surface_base` computes for it.
+        for (world_index, expected_verts) in [(0usize, 10u32), (1, 20), (2, 30)] {
+            let base = assets.world_surface_base(world_index);
+            assert_eq!(ranges[base as usize].vertex_count, expected_verts);
+            let (owner, index) = assets
+                .resolve_world_surface(base)
+                .expect("a world base is always inside the flat index space");
+            assert_eq!(index, 0);
+            assert_eq!(owner.surfaces.len(), [2, 3, 1][world_index]);
+        }
+
+        // The vertex blocks concatenate in the same order, so each range starts where the last one ended.
+        let mut running = 0i32;
+        for range in &ranges {
+            assert_eq!(range.base_vertex, running);
+            running += range.vertex_count as i32;
+        }
+    }
+
+    #[test]
+    fn an_empty_instance_list_packs_the_main_world_alone() {
+        let world = world_of_triangle_soups(3, 5);
+        let (with_none, _, ranges_none) = build_world_mesh(&world, &[]);
+        let (with_empty, _, ranges_empty) = build_world_mesh(&world, &Vec::new());
+        assert_eq!(ranges_none.len(), 3);
+        assert_eq!(ranges_none, ranges_empty);
+        assert_eq!(with_none.len(), with_empty.len());
     }
 
     #[test]

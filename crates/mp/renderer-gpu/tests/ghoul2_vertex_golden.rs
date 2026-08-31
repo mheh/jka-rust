@@ -454,8 +454,9 @@ fn golden_ghoul2_verts_stormtrooper() {
     let mut images = GpuImages::new(&gpu);
     let mut executor = FrameExecutor::new(&gpu, &images);
     let bmodel_table = BModelTable::build(&host.models);
-    if let Some(world) = host.re.sim.published.world.as_ref() {
-        executor.set_world(&gpu, world, bmodel_table);
+    let assets = &host.re.sim.published;
+    if let Some(world) = assets.world.as_ref() {
+        executor.set_world(&gpu, world, &assets.bsp_models, bmodel_table);
     }
 
 

@@ -302,9 +302,19 @@ impl FrameExecutor {
     ///
     /// The three arrive together because one map load produces all three
     /// (W2-F7/F8).
-    pub fn set_world(&mut self, gpu: &Gpu, world: &WorldAsset, bmodels: BModelTable) {
-        self.world_geometry = Some(WorldGeometry::upload(gpu, world));
-        self.walk_scratch.set_world(world);
+    ///
+    /// `instances` is `RenderAssets::bsp_models`, the sub-BSP worlds a `#`-prefixed registration loaded.
+    /// Their geometry uploads into the same buffer pair and their surfaces extend the same walk marks, because the
+    /// flat surface index space spans every loaded world.
+    pub fn set_world(
+        &mut self,
+        gpu: &Gpu,
+        world: &WorldAsset,
+        instances: &[WorldAsset],
+        bmodels: BModelTable,
+    ) {
+        self.world_geometry = Some(WorldGeometry::upload(gpu, world, instances));
+        self.walk_scratch.set_world(world, instances);
         self.bmodel_table = bmodels;
     }
 
@@ -359,7 +369,9 @@ impl FrameExecutor {
         // world to re-mark (G6).
         if let Some(generation) = package.world.take() {
             match generation.world.as_deref() {
-                Some(world) => self.set_world(gpu, world, generation.bmodels),
+                Some(world) => {
+                    self.set_world(gpu, world, &package.assets.bsp_models, generation.bmodels)
+                }
                 None => self.drop_world(generation.bmodels),
             }
             // tr.viewCluster = -1

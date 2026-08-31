@@ -133,6 +133,12 @@ pub struct RenderModels {
     /// The dedicated server marks slots with no render thread to publish to, and this flag is what lets that stay
     /// inert instead of failing.
     pub(crate) blocks_dirty: bool,
+
+    /// Set when a `#`-prefixed registration loaded a new sub-BSP instance, cleared when `RE_EndFrame` republishes the
+    /// world generation. The render thread uploads geometry only on a generation, so a late instance needs one.
+    ///
+    /// No oracle counterpart: Raven's renderer has one thread and reads `tr.bspModels` in place.
+    pub(crate) worlds_dirty: bool,
 }
 
 impl Default for RenderModels {
@@ -156,6 +162,7 @@ impl Default for RenderModels {
             bmodel_indices: HashMap::new(),
             blocks: ModelBlocks::default(),
             blocks_dirty: false,
+            worlds_dirty: false,
         }
     }
 }
@@ -185,6 +192,8 @@ impl RenderModels {
         // The reset renumbers every handle above slot 0, so the published entries no longer name what they claim.
         self.blocks.clear();
         self.blocks_dirty = true;
+        // A reused handle carrying a stale `(world, submodel)` pair would resolve into an emptied `bsp_models`.
+        self.bmodel_indices.clear();
 
         // leave a space for NULL model
         let null_model = self
@@ -227,6 +236,8 @@ impl RenderModels {
         // Same reason as `model_init`: the reset invalidates every published handle.
         self.blocks.clear();
         self.blocks_dirty = true;
+        // Same reason as `model_init`: a reused handle must not resolve a stale `(world, submodel)` pair.
+        self.bmodel_indices.clear();
         // `tr.numSkins = 0` (the skin memory itself lived on the just-reset
         // hunk); `tr.numShaders = 0` stays §20, not a field of this struct.
         self.skins.clear();
@@ -352,15 +363,6 @@ impl RenderModels {
         handle
     }
 
-    /// The `WorldAsset::bmodels` index a brush `model_t` handle was registered
-    /// against by [`Self::register_bmodel`] — the owned replacement for the
-    /// `model_t::bmodel` deref. `None` for a handle that names no brush submodel.
-    pub(crate) fn bmodel_index(&self, handle: qhandle_t) -> Option<usize> {
-        self.bmodel_indices
-            .get(&handle)
-            .map(|&(_, submodel)| submodel)
-    }
-
     /// The owning world and submodel index a brush handle was registered
     /// against: `(0, n)` for the main world's `bmodels[n]`, `(k, n)` for
     /// `RenderAssets::bsp_models[k - 1].bmodels[n]`.
@@ -384,6 +386,14 @@ impl RenderModels {
     /// (`RE_RegisterModel_Actual` hash lookup)
     pub fn handle_for_name(&self, name: &str) -> Option<qhandle_t> {
         self.hash.get(&name.to_ascii_lowercase()).copied()
+    }
+
+    /// Takes the sub-BSP dirty flag, `true` once per batch of instance registrations.
+    /// `RE_EndFrame` drains this once per frame and republishes the world generation on a `true`.
+    pub(crate) fn take_worlds_dirty(&mut self) -> bool {
+        let dirty = self.worlds_dirty;
+        self.worlds_dirty = false;
+        dirty
     }
 
     /// The published block registry, but only when a registration, an eviction or a reset changed it since the
@@ -482,18 +492,18 @@ mod tests {
         assert_eq!(read_qpath(&rm.models.slot(h1 as usize).name), "*1");
         assert!(matches!(rm.models.slot(h0 as usize).r#type, modtype_t::MOD_BRUSH));
         assert_eq!(rm.models.slot(h0 as usize).bspInstance, 0);
-        assert_eq!(rm.bmodel_index(h0), Some(0));
-        assert_eq!(rm.bmodel_index(h1), Some(1));
+        assert_eq!(rm.bmodel_location(h0), Some((0, 0)));
+        assert_eq!(rm.bmodel_location(h1), Some((0, 1)));
         assert_eq!(rm.hash.get("*1"), Some(&h1));
 
         // RMG instance (index 3): name "*3-2", bspInstance set.
         let h2 = rm.register_bmodel(2, 3);
         assert_eq!(read_qpath(&rm.models.slot(h2 as usize).name), "*3-2");
         assert_eq!(rm.models.slot(h2 as usize).bspInstance, 1);
-        assert_eq!(rm.bmodel_index(h2), Some(2));
+        assert_eq!(rm.bmodel_location(h2), Some((3, 2)));
 
         // A handle that names no submodel resolves to None.
-        assert_eq!(rm.bmodel_index(999), None);
+        assert_eq!(rm.bmodel_location(999), None);
     }
 
     #[test]

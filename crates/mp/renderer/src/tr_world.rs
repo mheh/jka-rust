@@ -24,7 +24,7 @@ use native_types::fileHandle_t;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
-use crate::render_state::placeholders::RefEntity;
+use crate::render_state::placeholders::{RefEntity, WorldAsset};
 use crate::render_state::arena::Arena;
 use crate::render_state::bmodel_table::BModelEntry;
 use crate::render_state::render_assets::RenderAssets;
@@ -602,9 +602,11 @@ fn bmodel_quad_face(surf: &Surface) -> Option<&SurfaceFace> {
 /// (brush) model's surfaces, picking whichever one faces the current view,
 /// as its 4 corner verts.
 ///
-/// The handle resolves to a `WorldAsset::bmodels` row through
-/// `RenderModels::bmodel_index`, and that row's range addresses the owned
+/// The handle resolves to an owning world and a `WorldAsset::bmodels` row through
+/// `RenderModels::bmodel_location`, and that row's range addresses that world's own
 /// `WorldAsset::surfaces` (the path `R_AddBrushModelSurfaces` uses).
+/// A sub-BSP instance's submodels live in their own world's table, Raven's `tr.bspModels[index - 1]`, so the world
+/// half of the pair is what keeps an instance handle off the main world's rows.
 ///
 /// PORT-NOTE: the oracle's `vec3_t normal` out-param is declared but never
 /// written anywhere in the body — a dead out-param, dropped per
@@ -624,13 +626,17 @@ pub fn RE_GetBModelVerts(
     assets: &RenderAssets,
     frame: &FrameState,
 ) -> [vec3_t; 4] {
-    let idx = models
-        .bmodel_index(bmodel_index)
+    let (world_index, idx) = models
+        .bmodel_location(bmodel_index)
         .expect("RE_GetBModelVerts reached a non-brush model handle");
-    let world = assets
-        .world
-        .as_ref()
-        .expect("RE_GetBModelVerts needs the loaded world");
+    let world: &WorldAsset = if world_index == 0 {
+        assets
+            .world
+            .as_deref()
+            .expect("RE_GetBModelVerts needs the loaded world")
+    } else {
+        &assets.bsp_models[world_index - 1]
+    };
     let bmodel = &world.bmodels[idx];
     let first = bmodel.first_surface;
     let num = bmodel.num_surfaces.max(0) as usize;
@@ -1489,11 +1495,16 @@ pub fn R_InitializeWireframeAutomap(
 /// The `//rww` commented-out `com_RMG` branch below the `R_DlightBmodel`
 /// call is plain dead prose in the oracle (not `#if 0`), nothing to port.
 ///
-/// PORT-NOTE: `pModel->bmodel` is resolved through the owned path — the handle
-/// maps to a `WorldAsset::bmodels` index (`RenderModels::bmodel_index`, filled
-/// by `R_LoadSubmodels`), and both the cull bounds and the surface range read
-/// off `assets.world`, never the retired `model_t::bmodel` raw pointer.
+/// PORT-NOTE: `pModel->bmodel` is resolved through the owned path.
+/// The `BModelTable` row names the owning world and the submodel's index inside it, both recorded by
+/// `R_LoadSubmodels`, so the cull bounds and the surface range read off that world rather than the retired
+/// `model_t::bmodel` raw pointer.
+/// Raven's `bmodel_t::firstSurface` is an `msurface_t*` into the owning world's own surface array, and the pair
+/// replaces that pointer.
+/// The surface marks and the uploaded geometry span every loaded world in one flat index space, so every index this
+/// fn hands down carries `RenderAssets::world_surface_base` for the owning world.
 /// `pModel->bspInstance` still reads the `model_t` (`RenderModels::get_model`).
+/// Source: `oracle/codemp/renderer/tr_local.h:938-942`
 /// `R_DlightBmodel`'s own already-ported signature (wave 1) takes an owned
 /// `DlightBmodel` snapshot; it is built here from the submodel bounds and each
 /// surface's owned `dlight_bits` over the `[first, first + num)` range into
@@ -1536,10 +1547,18 @@ pub fn R_AddBrushModelSurfaces<'a>(
         model.bmodel_index >= 0,
         "R_AddBrushModelSurfaces reached a non-brush model handle",
     );
-    let world = assets
-        .world
-        .as_ref()
-        .expect("R_AddBrushModelSurfaces needs the loaded world");
+    // A sub-BSP instance's submodels live in their own world's table, Raven's `tr.bspModels[index - 1]`.
+    let world: &WorldAsset = if model.world_index == 0 {
+        assets
+            .world
+            .as_deref()
+            .expect("R_AddBrushModelSurfaces needs the loaded world")
+    } else {
+        &assets.bsp_models[model.world_index as usize - 1]
+    };
+    // The surface marks and the uploaded geometry span every loaded world, so this world's own surface subscripts
+    // shift by its base in that flat index space.
+    let base = assets.world_surface_base(model.world_index as usize) as usize;
     let bmodel = &world.bmodels[model.bmodel_index as usize];
 
     let clip = R_CullLocalBox(bmodel.bounds, cvars.nocull, ori, frustum);
@@ -1568,13 +1587,13 @@ pub fn R_AddBrushModelSurfaces<'a>(
             .map(|(i, s)| DlightSurface {
                 data: match &s.data {
                     SurfaceData::Face(_) => DlightSurfaceData::Face {
-                        dlightBits: scratch.surf_dlight_bits[first + i],
+                        dlightBits: scratch.surf_dlight_bits[base + first + i],
                     },
                     SurfaceData::Grid(_) => DlightSurfaceData::Grid {
-                        dlightBits: scratch.surf_dlight_bits[first + i],
+                        dlightBits: scratch.surf_dlight_bits[base + first + i],
                     },
                     SurfaceData::Triangles(_) => DlightSurfaceData::Triangles {
-                        dlightBits: scratch.surf_dlight_bits[first + i],
+                        dlightBits: scratch.surf_dlight_bits[base + first + i],
                     },
                     SurfaceData::Skip | SurfaceData::Flare(_) => DlightSurfaceData::Other,
                 },
@@ -1607,13 +1626,17 @@ pub fn R_AddBrushModelSurfaces<'a>(
     // Borrow the shader registry and the world surfaces disjointly, exactly as
     // `R_RecursiveWorldNode`'s own leaf loop does.
     let shaders = &assets.shaders;
-    let world = assets
-        .world
-        .as_ref()
-        .expect("R_AddBrushModelSurfaces needs the loaded world");
+    let world: &WorldAsset = if model.world_index == 0 {
+        assets
+            .world
+            .as_deref()
+            .expect("R_AddBrushModelSurfaces needs the loaded world")
+    } else {
+        &assets.bsp_models[model.world_index as usize - 1]
+    };
 
     for i in 0..num {
-        let surf_index = (first + i) as u32;
+        let surf_index = (base + first + i) as u32;
         let shader_handle = world.surfaces[first + i].shader;
         let shader = shaders
             .get(shader_handle)

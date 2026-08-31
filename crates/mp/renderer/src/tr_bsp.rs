@@ -3789,6 +3789,12 @@ pub fn RE_LoadWorldMap_Actual(
 
         // only set tr.world now that we know the entire level has loaded properly
         assets.world = Some(Arc::new(world.clone()));
+        // The previous map's sub-BSP instances belong to a world that is gone.
+        // Raven's `tr.bspModels` array survives a map change too, but `tr.numBSPModels` alone bounds every read of
+        // it, so a stale entry is unreachable there. The flat surface index space this port builds sums over the
+        // whole `Vec`, so a stale world would sit inside it for the rest of the session.
+        // Source: `oracle/codemp/renderer/tr_local.h:1399-1400`
+        assets.bsp_models.clear();
 
         if let Some(h) = view.common.com_RMG {
             if view.common.cvar(h).integer != 0 {
