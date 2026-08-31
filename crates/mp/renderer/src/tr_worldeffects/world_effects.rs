@@ -18,7 +18,7 @@ use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{
     errorParm_t, CONTENTS_INSIDE, CONTENTS_OUTSIDE, CONTENTS_SOLID, CONTENTS_WATER,
 };
-use native_math::qmath::{MakeNormalVectors, VectorNormalize};
+use native_math::qmath::{MakeNormalVectors, VectorNormalize, _DotProduct};
 use native_math::rng::{Rng, RAND_MAX};
 use native_string::atoi;
 
@@ -1129,20 +1129,25 @@ impl CWeatherParticleCloud {
     /// `view_origin` and `view_axis` are `backEnd.viewParms.ori.origin` and `.axis`, threaded rather than reached (porting-rules §B4).
     /// `RE_RenderScene` fills that orientation straight from the scene refdef (`oracle/codemp/renderer/tr_scene.cpp:848-851`), so the refdef gives the identical values.
     /// The `orientationr_t` marker is therefore moot, not stale: the placeholder `ViewParms` still carries no `ori` field, and this fn takes the value from the refdef instead.
-    /// `frozen` is `mFrozen`, `wind_velocity` is `mGlobalWindVelocity`, and `seconds_elapsed` is `mSecondsElapsed`.
+    /// `outside` is `mOutside`, `frozen` is `mFrozen`, `wind_velocity` is `mGlobalWindVelocity`, and `seconds_elapsed` is `mSecondsElapsed`.
     /// `CVec3`'s `+=`, `-=`, `*=` and `ScaleAdd` are expanded component-wise, because `vec3_t` is `[f32; 3]` under the interior-safety law.
     ///
-    /// The per-particle loop still waits on `mOutside`, which commit 2 threads in.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1039-1306`
+    #[allow(clippy::too_many_arguments)]
     pub fn Update(
         &mut self,
         rng: &mut Rng,
+        outside: &COutside,
         view_origin: vec3_t,
         view_axis: [vec3_t; 3],
         frozen: bool,
         wind_velocity: vec3_t,
         seconds_elapsed: f32,
     ) {
+        // Raven computes this once per cloud per frame, ahead of the freeze gate below.
+        // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1050
+        let particle_fade = self.mFade * seconds_elapsed;
+
         // Compute Camera
         //----------------
         self.mCameraPosition = view_origin;
@@ -1152,7 +1157,12 @@ impl CWeatherParticleCloud {
 
         if self.mRotationChangeNext != -1 {
             if self.mRotationChangeNext == 0 {
+                // The two picks draw from different streams: `mRotation` from the C runtime `rand`, and `mRotationChangeTimer` from `holdrand`.
                 self.mRotation.Pick(rng, &mut self.mRotationDeltaTarget);
+                // `Reset` writes `mRotationChangeTimer.mMin` twice and never writes `mMax`, so the range is reversed: min 2000, max 0.
+                // `Q_irand` increments `max` first, so `((result * -1999) >> 15) + 2000` over `result` in `[0, 32767]` lands uniformly in `[1, 2000]`.
+                // The clamp below therefore never fires, and the rotation interval varies.
+                // Source: oracle/codemp/game/q_math.c:1464-1467
                 self.mRotationChangeNext = self.mRotationChangeTimer.Pick(rng);
                 if self.mRotationChangeNext <= 0 {
                     self.mRotationChangeNext = 1;
@@ -1255,18 +1265,167 @@ impl CWeatherParticleCloud {
 
         // Now Update All Particles
         //--------------------------
+        // Raven's `ratl::bits_vs` `get_bit`, `set_bit` and `clear_bit` become mask tests and mask updates on the `u32` bit set.
+        let flag_render = 1u32 << CWeatherParticle::FLAG_RENDER;
+        let flag_fadein = 1u32 << CWeatherParticle::FLAG_FADEIN;
+        let flag_fadeout = 1u32 << CWeatherParticle::FLAG_FADEOUT;
+
         self.mParticleCountRender = 0;
         for particle_num in 0..self.mParticleCount {
-            let _ = particle_num;
-            // DEFERRED: whole per-particle body — needs `mOutside`
-            // (`COutside::PointOutside`) threaded into this signature (see
-            // this fn's doc comment). Escalated as one block rather than
-            // scattered statement-by-statement.
-            //TODO: Port CWeatherParticleCloud::Update
-            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298
-            todo!(
-                "Port CWeatherParticleCloud::Update per-particle loop — oracle/codemp/renderer/tr_WorldEffects.cpp:1174-1298"
+            // Raven's `part = &mParticles[particleNum]` is an index here, not a borrow, so the range picks can write through it (porting-rules §B5).
+            let part = particle_num as usize;
+
+            if !self.mPopulated {
+                // First Time Spawn Location
+                self.mRange.Pick(rng, &mut self.mParticles[part].mPosition);
+            }
+
+            // Grab The Force And Apply Non Global Wind
+            //------------------------------------------
+            let mut part_force = force;
+            for i in 0..3 {
+                part_force[i] /= self.mParticles[part].mMass;
+            }
+
+            // Apply The Force
+            //-----------------
+            // The force and the friction apply once per frame with no time factor, and only the position step is time-scaled.
+            // The result is frame-rate dependent in the oracle too.
+            for i in 0..3 {
+                self.mParticles[part].mVelocity[i] += part_force[i];
+                self.mParticles[part].mVelocity[i] *= self.mFrictionInverse;
+            }
+            for i in 0..3 {
+                self.mParticles[part].mPosition[i] +=
+                    self.mParticles[part].mVelocity[i] * seconds_elapsed;
+            }
+
+            let part_to_camera: vec3_t = [
+                self.mParticles[part].mPosition[0] - self.mCameraPosition[0],
+                self.mParticles[part].mPosition[1] - self.mCameraPosition[1],
+                self.mParticles[part].mPosition[2] - self.mCameraPosition[2],
+            ];
+            let mut part_rendering = self.mParticles[part].mFlags & flag_render != 0;
+            // Raven calls the three-argument `PointOutside` overload, which never tests `mCacheInit`.
+            let part_outside = outside.PointOutsideBounded(
+                &self.mParticles[part].mPosition,
+                self.mWidth,
+                self.mHeight,
             );
+            let mut part_in_range = self.mRange.In(&self.mParticles[part].mPosition);
+            // This is a half-space test against the camera forward axis, not a frustum test.
+            let part_in_view = part_outside
+                && part_in_range
+                && _DotProduct(part_to_camera, self.mCameraForward) > 0.0;
+
+            // Process Respawn
+            //-----------------
+            if !part_in_range && !part_rendering {
+                self.mParticles[part].mVelocity = [0.0; 3];
+
+                // Reselect A Position On The Spawn Plane
+                //----------------------------------------
+                if self.UseSpawnPlane() {
+                    self.mParticles[part].mPosition = self.mCameraPosition;
+                    // `CVec3` has no binary scalar multiply, so the float converts through the broadcast constructor and this line draws nothing.
+                    // Source: oracle/codemp/Ravl/CVec.h:570,628
+                    for i in 0..3 {
+                        self.mParticles[part].mPosition[i] -=
+                            self.mSpawnPlaneNorm[i] * self.mSpawnPlaneDistance;
+                    }
+                    // The same broadcast makes each of the next two lines exactly one `WE_flrand` draw, scaling x, y and z alike.
+                    // A per-component draw would take six values instead of two and shift the stream for the rest of the session.
+                    // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1216-1217
+                    let right_scale = WE_flrand(rng, -self.mSpawnPlaneSize, self.mSpawnPlaneSize);
+                    for i in 0..3 {
+                        self.mParticles[part].mPosition[i] +=
+                            self.mSpawnPlaneRight[i] * right_scale;
+                    }
+                    let up_scale = WE_flrand(rng, -self.mSpawnPlaneSize, self.mSpawnPlaneSize);
+                    for i in 0..3 {
+                        self.mParticles[part].mPosition[i] += self.mSpawnPlaneUp[i] * up_scale;
+                    }
+                }
+                // Otherwise, Just Wrap Around To The Other End Of The Range
+                //-----------------------------------------------------------
+                else {
+                    self.mRange
+                        .Wrap(&mut self.mParticles[part].mPosition, &mut self.mSpawnRange);
+                }
+                // Raven's store is dead: the fade machine and the render count below read only `partRendering`, `partInView` and `part->mFlags`.
+                // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1226
+                #[allow(unused_assignments)]
+                {
+                    part_in_range = true;
+                }
+            }
+
+            // Process Fade
+            //--------------
+            {
+                // Start A Fade Out
+                //------------------
+                if part_rendering && !part_in_view {
+                    self.mParticles[part].mFlags &= !flag_fadein;
+                    self.mParticles[part].mFlags |= flag_fadeout;
+                }
+                // Switch From Fade Out To Fade In
+                //---------------------------------
+                else if part_rendering
+                    && part_in_view
+                    && self.mParticles[part].mFlags & flag_fadeout != 0
+                {
+                    self.mParticles[part].mFlags |= flag_fadein;
+                    self.mParticles[part].mFlags &= !flag_fadeout;
+                }
+                // Start A Fade In
+                //-----------------
+                else if !part_rendering && part_in_view {
+                    part_rendering = true;
+                    self.mParticles[part].mAlpha = 0.0;
+                    self.mParticles[part].mFlags |= flag_render;
+                    self.mParticles[part].mFlags |= flag_fadein;
+                    self.mParticles[part].mFlags &= !flag_fadeout;
+                }
+
+                // Update Fade
+                //-------------
+                if part_rendering {
+                    // Update Fade Out
+                    //-----------------
+                    if self.mParticles[part].mFlags & flag_fadeout != 0 {
+                        self.mParticles[part].mAlpha -= particle_fade;
+                        if self.mParticles[part].mAlpha <= 0.0 {
+                            self.mParticles[part].mAlpha = 0.0;
+                            self.mParticles[part].mFlags &= !flag_fadeout;
+                            self.mParticles[part].mFlags &= !flag_fadein;
+                            self.mParticles[part].mFlags &= !flag_render;
+                            // This store is dead too: the render count below re-reads the flag, and the next particle re-initializes the local.
+                            #[allow(unused_assignments)]
+                            {
+                                part_rendering = false;
+                            }
+                        }
+                    }
+                    // Update Fade In
+                    //----------------
+                    else if self.mParticles[part].mFlags & flag_fadein != 0 {
+                        // The alpha ceiling is `mColor[3]`, not 1.0.
+                        self.mParticles[part].mAlpha += particle_fade;
+                        if self.mParticles[part].mAlpha >= self.mColor[3] {
+                            self.mParticles[part].mFlags &= !flag_fadein;
+                            self.mParticles[part].mAlpha = self.mColor[3];
+                        }
+                    }
+                }
+            }
+
+            // Keep Track Of The Number Of Particles To Render
+            //-------------------------------------------------
+            // Raven re-reads the flag rather than the local, so a particle that faded out this frame is not counted.
+            if self.mParticles[part].mFlags & flag_render != 0 {
+                self.mParticleCountRender += 1;
+            }
         }
         self.mPopulated = true;
     }
@@ -1448,6 +1607,7 @@ impl WorldEffectsState {
             for i in 0..self.mParticleClouds.len() {
                 self.mParticleClouds[i].Update(
                     rng,
+                    &self.mOutside,
                     view_origin,
                     view_axis,
                     frozen,
@@ -2040,5 +2200,149 @@ pub fn R_WorldEffect_f(
             image_state,
             Some(temp.as_bytes()),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A cloud with one particle, at `Reset`'s defaults, with the rotation spin off so the camera block draws nothing.
+    fn one_particle_cloud(position: vec3_t) -> CWeatherParticleCloud {
+        let mut cloud = CWeatherParticleCloud::new();
+        cloud.mParticleCount = 1;
+        cloud.mParticles = vec![CWeatherParticle {
+            mAlpha: 0.0,
+            mFlags: 0,
+            mPosition: position,
+            mVelocity: [0.0; 3],
+            mMass: 5.0,
+        }];
+        // The first update spawns every particle while this is false, and the spawn draws three values.
+        cloud.mPopulated = true;
+        cloud
+    }
+
+    const VIEW_AXIS: [vec3_t; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+    /// Raven's two spawn-plane lines each make one `WE_flrand` draw, and that one value scales x, y and z alike.
+    /// A per-component transcription would draw six values instead of two.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1216-1217`
+    #[test]
+    fn the_spawn_plane_respawn_draws_twice_and_broadcasts() {
+        const SEED: u32 = 7;
+        let outside = COutside::new();
+
+        // The particle sits far outside the range box and does not render, which is the respawn condition.
+        let mut cloud = one_particle_cloud([10000.0, 0.0, 0.0]);
+        let size = cloud.mSpawnPlaneSize;
+
+        let mut reference = Rng::default();
+        reference.srand(SEED);
+        let right_scale = WE_flrand(&mut reference, -size, size);
+        let up_scale = WE_flrand(&mut reference, -size, size);
+        let after_two_draws = reference.rand();
+
+        let mut rng = Rng::default();
+        rng.srand(SEED);
+        cloud.Update(&mut rng, &outside, [0.0; 3], VIEW_AXIS, false, [0.0; 3], 0.02);
+
+        assert_eq!(
+            rng.rand(),
+            after_two_draws,
+            "the respawn must take exactly two draws off the C runtime stream",
+        );
+
+        let expected: vec3_t = [
+            -cloud.mSpawnPlaneNorm[0] * cloud.mSpawnPlaneDistance
+                + cloud.mSpawnPlaneRight[0] * right_scale
+                + cloud.mSpawnPlaneUp[0] * up_scale,
+            -cloud.mSpawnPlaneNorm[1] * cloud.mSpawnPlaneDistance
+                + cloud.mSpawnPlaneRight[1] * right_scale
+                + cloud.mSpawnPlaneUp[1] * up_scale,
+            -cloud.mSpawnPlaneNorm[2] * cloud.mSpawnPlaneDistance
+                + cloud.mSpawnPlaneRight[2] * right_scale
+                + cloud.mSpawnPlaneUp[2] * up_scale,
+        ];
+        assert_eq!(cloud.mParticles[0].mPosition, expected);
+    }
+
+    /// `SVecRange::Wrap` folds a point back through the opposite face, one axis at a time.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:162-196`
+    #[test]
+    fn the_range_wraps_each_axis() {
+        let range = SVecRange {
+            mMins: [-10.0; 3],
+            mMaxs: [10.0; 3],
+        };
+        let mut spawn = SVecRange {
+            mMins: [0.0; 3],
+            mMaxs: [0.0; 3],
+        };
+
+        // Under the minimum on x, over the maximum on y, and inside on z.
+        let mut v: vec3_t = [-13.0, 15.0, 4.0];
+        range.Wrap(&mut v, &mut spawn);
+        assert_eq!(v, [7.0, -5.0, 4.0]);
+
+        // Over the maximum on x and under the minimum on y.
+        let mut v: vec3_t = [11.0, -11.0, 0.0];
+        range.Wrap(&mut v, &mut spawn);
+        assert_eq!(v, [-9.0, 9.0, 0.0]);
+    }
+
+    /// The fade machine's four transitions, driven through `Update` in order.
+    /// The alpha ceiling is `mColor[3]`, and the render count re-reads the flag rather than the local.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1229-1298`
+    #[test]
+    fn the_fade_machine_walks_its_four_transitions() {
+        let outside = COutside::new();
+        let flag_render = 1u32 << CWeatherParticle::FLAG_RENDER;
+        let flag_fadein = 1u32 << CWeatherParticle::FLAG_FADEIN;
+        let flag_fadeout = 1u32 << CWeatherParticle::FLAG_FADEOUT;
+
+        // The particle sits in front of the camera and inside the range box, so it is in view.
+        let mut cloud = one_particle_cloud([10.0, 0.0, 0.0]);
+        // No gravity and no wind, so the particle holds its place and the view test does not drift.
+        cloud.mGravity = 0.0;
+        let mut rng = Rng::default();
+        let step = |cloud: &mut CWeatherParticleCloud, rng: &mut Rng| {
+            cloud.Update(rng, &outside, [0.0; 3], VIEW_AXIS, false, [0.0; 3], 0.02);
+        };
+        // `mFade` is 10.0 and the step is 0.02 seconds, so each update moves the alpha by 0.2.
+        let fade = cloud.mFade * 0.02;
+
+        // Transition one: not rendering and in view starts a fade in.
+        step(&mut cloud, &mut rng);
+        assert_eq!(cloud.mParticles[0].mFlags, flag_render | flag_fadein);
+        assert_eq!(cloud.mParticles[0].mAlpha, fade);
+        assert_eq!(cloud.mParticleCountRender, 1);
+
+        // Transition two: the fade in stops at `mColor[3]`, not at 1.0.
+        cloud.mColor[3] = 0.75;
+        for _ in 0..8 {
+            step(&mut cloud, &mut rng);
+        }
+        assert_eq!(cloud.mParticles[0].mFlags, flag_render);
+        assert_eq!(cloud.mParticles[0].mAlpha, 0.75);
+
+        // Transition three: rendering and out of view starts a fade out.
+        // The particle moves behind the camera, which fails the half-space test.
+        cloud.mParticles[0].mPosition = [-10.0, 0.0, 0.0];
+        step(&mut cloud, &mut rng);
+        assert_eq!(cloud.mParticles[0].mFlags, flag_render | flag_fadeout);
+        assert_eq!(cloud.mParticles[0].mAlpha, 0.75 - fade);
+        assert_eq!(cloud.mParticleCountRender, 1);
+
+        // Transition four: the fade out ends by clearing every flag, and the count re-reads the flag it just cleared.
+        for _ in 0..3 {
+            step(&mut cloud, &mut rng);
+        }
+        assert_eq!(cloud.mParticles[0].mFlags, 0);
+        assert_eq!(cloud.mParticles[0].mAlpha, 0.0);
+        assert_eq!(cloud.mParticleCountRender, 0);
     }
 }
