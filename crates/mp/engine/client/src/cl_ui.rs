@@ -47,6 +47,7 @@ use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
+use mp_qshared::shared::server_address::{AS_FAVORITES, AS_GLOBAL, AS_LOCAL, AS_MPLAYER};
 use mp_qshared::common::mp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 use mp_qshared::shared::connstate_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -83,17 +84,6 @@ use crate::client_host::snd_from_view;
 use crate::snd_dma::{S_RegisterSound, S_StartLocalSound, S_StopBackgroundTrack};
 use crate::snd_dma::S_StartBackgroundTrack;
 use crate::Client;
-
-/// Raven's `AS_LOCAL`/`AS_MPLAYER`/`AS_GLOBAL`/`AS_FAVORITES` server-source
-/// selector has no rosetta row yet.
-///
-/// PORT-NOTE(consts): numbering matches Raven's `enum { AS_LOCAL, AS_MPLAYER,
-/// AS_GLOBAL, AS_FAVORITES }` declaration order.
-/// Source: `oracle/codemp/qcommon/qcommon.h`
-const AS_LOCAL: c_int = 0;
-const AS_MPLAYER: c_int = 1;
-const AS_GLOBAL: c_int = 2;
-const AS_FAVORITES: c_int = 3;
 
 /// Raven `KEYCATCH_UI` bit flag. No rosetta row exists yet.
 ///

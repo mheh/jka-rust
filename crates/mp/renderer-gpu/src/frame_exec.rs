@@ -348,6 +348,7 @@ impl FrameExecutor {
         &mut self,
         gpu: &mut Gpu,
         target: &TextureView,
+        target_texture: &wgpu::Texture,
         package: &mut FramePackage,
         gpu_images: &mut GpuImages,
         noise: &NoiseState,
@@ -370,6 +371,7 @@ impl FrameExecutor {
         self.execute_frame(
             gpu,
             target,
+            target_texture,
             &package.frame_data,
             &package.assets,
             &package.world_load,
@@ -404,6 +406,7 @@ impl FrameExecutor {
         &mut self,
         gpu: &mut Gpu,
         target: &TextureView,
+        target_texture: &wgpu::Texture,
         frame_data: &FrameData,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
@@ -611,6 +614,7 @@ impl FrameExecutor {
                     stats.world = self.render_world(
                         gpu,
                         target,
+                        target_texture,
                         assets,
                         world_load,
                         frame_data,
@@ -716,6 +720,7 @@ impl FrameExecutor {
         &mut self,
         gpu: &mut Gpu,
         target: &TextureView,
+        target_texture: &wgpu::Texture,
         assets: &RenderAssets,
         world_load: &WorldLoadState,
         frame_data: &'f FrameData,
@@ -899,6 +904,7 @@ impl FrameExecutor {
         self.pipeline3d.draw(
             gpu,
             target,
+            target_texture,
             &draw_surfs,
             geometry,
             assets,

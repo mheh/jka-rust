@@ -123,6 +123,16 @@ pub unsafe fn Sys_LoadDll(
             com_printf(common, &format!("Sys_LoadDll({path}): succeeded ...\n"));
         }
 
+        // A server-side mod sets `fs_game` and ships no client modules, and the retail win32 client then runs the base ones.
+        // The unix source served the dedicated server only and never met a mod switch, so the fallback lands here.
+        // Source: `oracle/codemp/win32/win_main.cpp:811-877` (the base-reachable search)
+        if lib_handle.is_null() && !gamedir.is_empty() && gamedir != "base" {
+            path = FS_BuildOSPath4(common, &basepath, "base", &fname);
+            com_printf(common, &format!("Sys_LoadDll({path})... \n"));
+            let path_c = std::ffi::CString::new(path.clone()).unwrap_or_default();
+            lib_handle = libc::dlopen(path_c.as_ptr(), q_rtld);
+        }
+
         if lib_handle.is_null() {
             // NDEBUG (retail release) branch: abort on failure.
             com_error(

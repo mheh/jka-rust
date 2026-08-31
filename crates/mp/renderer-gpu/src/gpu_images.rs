@@ -384,6 +384,43 @@ impl GpuImages {
         })
     }
 
+    /// Builds the world texture bind group with an explicit diffuse view, the shape the distortion stage needs.
+    /// The screen image is render-thread scratch with no `ImageHandle`, so it binds by view and takes the clamping sampler.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2167` (`GL_Bind( tr.screenImage )`)
+    pub fn view_bind_group(
+        &self,
+        gpu: &Gpu,
+        layout: &BindGroupLayout,
+        diffuse: &TextureView,
+        lightmap: Option<ImageHandle>,
+    ) -> BindGroup {
+        let lightmap_image = self.image_or_white(lightmap);
+
+        gpu.device().create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("mp_renderer_gpu view texture bind group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(diffuse),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler_clamp),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&lightmap_image.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler_clamp),
+                },
+            ],
+        })
+    }
+
     /// Builds the four-texture PBR bind group (diffuse, lightmap, normal,
     /// roughness) for the world pipeline against `layout`. The diffuse and
     /// lightmap resolve exactly as [`Self::world_bind_group`] resolves them, so

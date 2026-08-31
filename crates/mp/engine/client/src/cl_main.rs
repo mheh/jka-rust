@@ -63,14 +63,14 @@ use mp_engine_qcommon::qcommon::filesystem_limits::{FS_CGAME_REF, FS_UI_REF};
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_engine_qcommon::qcommon::net_limits::{MAX_MSGLEN, MAX_RELIABLE_COMMANDS};
 use mp_engine_qcommon::qcommon::protocol::{
-    MASTER_SERVER_NAME, NUM_SERVER_PORTS, PORT_MASTER, PORT_SERVER, PORT_UPDATE, PROTOCOL_VERSION,
-    UPDATE_SERVER_NAME,
+    NUM_SERVER_PORTS, PORT_MASTER, PORT_SERVER, PORT_UPDATE, PROTOCOL_VERSION, UPDATE_SERVER_NAME,
 };
 use mp_engine_qcommon::stringed::api::{se_check_for_language_updates, SE_GetString};
 use mp_engine_qcommon::sys_net::Sys_ShowIP;
 use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_engine_qcommon::vm_fns::VM_Call;
 use mp_engine_qcommon::z_memman_pc::{Hunk_Clear, Hunk_ClearToMark};
+use mp_engine_server::server_host::MAX_MASTER_SERVERS;
 use mp_engine_server::sv_init::SV_Shutdown;
 use mp_engine_server::sv_main::SV_Frame;
 use mp_game::prelude::byte as game_byte;
@@ -1353,45 +1353,82 @@ pub fn CL_LocalServers_f(common: &mut Common, cl: &mut Client) {
 
 /// `CL_GlobalServers_f` — asks a master server for its server list.
 ///
+/// Raven hardcodes the dead `masterjk3.ravensoft.com`, so the retail browser can never fill.
+/// This port reads the address from the `sv_masterN` cvars instead: the master number selects a slot, and 0 fans out to every non-empty one.
+/// The retail UI already sends `globalservers <masterNum> <protocol>`, so the argument shape is unchanged.
 /// Source: `oracle/codemp/client/cl_main.cpp:3208-3255`
+/// Divergence: deliberate, ruled 2026-08-30, because the hardcoded master is a dead external service.
 pub fn CL_GlobalServers_f(common: &mut Common, cl: &mut Client) {
     let mut to: netadr_t = unsafe { core::mem::zeroed() };
-    let mut command = String::new();
 
-    if Cmd_Argc(common) < 3 {
+    let count = Cmd_Argc(common);
+    let master_num = atoi(Cmd_Argv(common, 1));
+    if count < 3 || master_num < 0 || master_num > MAX_MASTER_SERVERS as c_int {
         com_printf(
             common,
-            "usage: globalservers <master# 0-1> <protocol> [keywords]\n",
+            "usage: globalservers <master# 0-5> <protocol> [keywords]\n",
         );
         return;
     }
 
-    cl.cls.masterNum = atoi(Cmd_Argv(common, 1));
+    // Master 0 re-issues the command once per configured master.
+    if master_num == 0 {
+        let mut num_address = 0;
+        for i in 1..=MAX_MASTER_SERVERS {
+            let masteraddress = Cvar_VariableString(common, &format!("sv_master{i}"));
+            if masteraddress.is_empty() {
+                continue;
+            }
+            num_address += 1;
+            let mut fanned = format!("globalservers {} {}", i, Cmd_Argv(common, 2));
+            for j in 3..count {
+                fanned = format!("{} {}", fanned, Cmd_Argv(common, j));
+            }
+            fanned.push('\n');
+            Cbuf_AddText(common, &fanned);
+        }
+        if num_address == 0 {
+            com_printf(common, "CL_GlobalServers_f: Error: No master server addresses.\n");
+        }
+        return;
+    }
+
+    let masteraddress = Cvar_VariableString(common, &format!("sv_master{master_num}")).to_string();
+    if masteraddress.is_empty() {
+        com_printf(
+            common,
+            &format!("CL_GlobalServers_f: Error: No master server address given for sv_master{master_num}.\n"),
+        );
+        return;
+    }
+
+    // `NET_StringToAdr` takes a NUL-terminated pointer, so the cvar string gains its terminator here.
+    let masteraddress_c = format!("{masteraddress}\0");
+    if NET_StringToAdr(masteraddress_c.as_ptr() as *const c_char, &mut to) == qfalse {
+        com_printf(
+            common,
+            &format!("CL_GlobalServers_f: Error: could not resolve address of master {masteraddress}\n"),
+        );
+        return;
+    }
+    to.r#type = netadrtype_t::NA_IP;
+    // `NET_StringToAdr` defaults a missing port to `PORT_SERVER`, so the master default keys on the string.
+    if !masteraddress.contains(':') {
+        to.port = (PORT_MASTER as u16).to_be();
+    }
+
+    cl.cls.masterNum = master_num;
 
     com_printf(common, "Requesting servers from the master...\n");
 
     // reset the list, waiting for response
     // -1 is used to distinguish a "no response"
+    cl.cls.numglobalservers = -1;
+    cl.cls.pingUpdateSource = AS_GLOBAL;
 
-    /*	if( cls.masterNum == 1 ) {
-        NET_StringToAdr( "master.quake3world.com", &to );
-        cls.nummplayerservers = -1;
-        cls.pingUpdateSource = AS_MPLAYER;
-    }
-    else
-    */
-    {
-        NET_StringToAdr(MASTER_SERVER_NAME.as_ptr() as *const c_char, &mut to);
-        cl.cls.numglobalservers = -1;
-        cl.cls.pingUpdateSource = AS_GLOBAL;
-    }
-    to.r#type = netadrtype_t::NA_IP;
-    to.port = (PORT_MASTER as u16).to_be();
-
-    command = format!("getservers {}", Cmd_Argv(common, 2));
+    let mut command = format!("getservers {}", Cmd_Argv(common, 2));
 
     // tack on keywords
-    let count = Cmd_Argc(common);
     for i in 3..count {
         command = format!("{} {}", command, Cmd_Argv(common, i));
     }
@@ -1984,22 +2021,15 @@ pub fn CL_ServersResponsePacket(
         }
     }
 
-    if cl.cls.masterNum == 0 {
-        count = cl.cls.numglobalservers;
-        max = MAX_GLOBAL_SERVERS as c_int;
-    } else {
-        count = cl.cls.nummplayerservers;
-        max = MAX_OTHER_SERVERS as c_int;
-    }
+    // Raven branched on `masterNum == 0` to fill the obsolete mplayer list.
+    // The cvar-indexed master shape redefines `masterNum` as the `sv_masterN` slot, so every response fills the global list.
+    count = cl.cls.numglobalservers;
+    max = MAX_GLOBAL_SERVERS as c_int;
 
     let mut i: c_int = 0;
     while i < numservers && count < max {
         // build net address
-        let server: *mut serverInfo_t = if cl.cls.masterNum == 0 {
-            &mut cl.cls.globalServers[count as usize] as *mut serverInfo_t
-        } else {
-            &mut cl.cls.mplayerServers[count as usize] as *mut serverInfo_t
-        };
+        let server: *mut serverInfo_t = &mut cl.cls.globalServers[count as usize];
 
         CL_InitServerInfo(server, &mut addresses[i as usize] as *mut serverAddress_t);
         // advance to next slot
@@ -2007,31 +2037,23 @@ pub fn CL_ServersResponsePacket(
         i += 1;
     }
 
-    // if getting the global list
-    if cl.cls.masterNum == 0 {
-        if cl.cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS as c_int {
-            // if we couldn't store the servers in the main list anymore
-            while i < numservers && count >= max {
-                // just store the addresses in an additional list
-                let slot = cl.cls.numGlobalServerAddresses as usize;
-                cl.cls.numGlobalServerAddresses += 1;
-                cl.cls.globalServerAddresses[slot].ip[0] = addresses[i as usize].ip[0];
-                cl.cls.globalServerAddresses[slot].ip[1] = addresses[i as usize].ip[1];
-                cl.cls.globalServerAddresses[slot].ip[2] = addresses[i as usize].ip[2];
-                cl.cls.globalServerAddresses[slot].ip[3] = addresses[i as usize].ip[3];
-                cl.cls.globalServerAddresses[slot].port = addresses[i as usize].port;
-                i += 1;
-            }
+    if cl.cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS as c_int {
+        // if we couldn't store the servers in the main list anymore
+        while i < numservers && count >= max {
+            // just store the addresses in an additional list
+            let slot = cl.cls.numGlobalServerAddresses as usize;
+            cl.cls.numGlobalServerAddresses += 1;
+            cl.cls.globalServerAddresses[slot].ip[0] = addresses[i as usize].ip[0];
+            cl.cls.globalServerAddresses[slot].ip[1] = addresses[i as usize].ip[1];
+            cl.cls.globalServerAddresses[slot].ip[2] = addresses[i as usize].ip[2];
+            cl.cls.globalServerAddresses[slot].ip[3] = addresses[i as usize].ip[3];
+            cl.cls.globalServerAddresses[slot].port = addresses[i as usize].port;
+            i += 1;
         }
     }
 
-    if cl.cls.masterNum == 0 {
-        cl.cls.numglobalservers = count;
-        total = count + cl.cls.numGlobalServerAddresses;
-    } else {
-        cl.cls.nummplayerservers = count;
-        total = count;
-    }
+    cl.cls.numglobalservers = count;
+    total = count + cl.cls.numGlobalServerAddresses;
 
     com_printf(
         common,

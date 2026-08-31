@@ -489,10 +489,14 @@ pub fn R_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> bool {
     cluster = CM_LeafCluster(cm, leafnum2);
     let _area2 = CM_LeafArea(cm, leafnum2);
 
-    if let Some(mask) = mask {
-        let byte = mask[(cluster >> 3) as usize];
-        if byte & (1 << (cluster & 7)) == 0 {
-            return false;
+    // A point in solid has cluster -1, and Raven's `mask[cluster>>3]` then reads before the PVS table, which is UB.
+    // The defined pick mirrors Raven's missing-mask arm and reports visible.
+    if cluster >= 0 {
+        if let Some(mask) = mask {
+            let byte = mask[(cluster >> 3) as usize];
+            if byte & (1 << (cluster & 7)) == 0 {
+                return false;
+            }
         }
     }
 

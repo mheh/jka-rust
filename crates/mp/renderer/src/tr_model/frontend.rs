@@ -306,11 +306,16 @@ pub unsafe fn r_model_bounds(
     assets: &RenderAssets,
     handle: qhandle_t,
 ) -> (vec3_t, vec3_t) {
-    if let Some(idx) = rm.bmodel_index(handle) {
-        let world = assets
-            .world
-            .as_ref()
-            .expect("r_model_bounds needs the loaded world for a brush model");
+    if let Some((world_index, idx)) = rm.bmodel_location(handle) {
+        // A sub-BSP instance's submodels live in their own world's table, Raven's `tr.bspModels[index - 1]`.
+        let world: &WorldAsset = if world_index == 0 {
+            assets
+                .world
+                .as_deref()
+                .expect("r_model_bounds needs the loaded world for a brush model")
+        } else {
+            &assets.bsp_models[world_index - 1]
+        };
         let bmodel = &world.bmodels[idx];
         return (bmodel.bounds[0], bmodel.bounds[1]);
     }

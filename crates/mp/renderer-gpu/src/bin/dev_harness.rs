@@ -153,6 +153,7 @@ impl ApplicationHandler for App {
                         let stats = executor.execute_frame(
                             gpu,
                             &view,
+                            &frame.texture,
                             &test_pattern(self.registries.checker),
                             &self.registries.assets,
                             &WorldLoadState::default(),

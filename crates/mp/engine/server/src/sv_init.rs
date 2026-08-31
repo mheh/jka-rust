@@ -1104,10 +1104,12 @@ pub fn SV_Init(view: &mut EngineHostView) {
     // `MASTER_SERVER_NAME` (`qcommon/protocol.rs`) as a c-string cvar default,
     // matching the inline-literal precedent of the sibling sv_masterN defaults.
     view.common.sv_master[0] = Some(Cvar_Get(view, "sv_master1", "masterjk3.ravensoft.com", 0));
+    // Raven defaults this slot empty, and the live community master replaces the dead retail one.
+    // The client browser reads the `sv_masterN` cvars too, so this default is what fills it.
     view.common.sv_master[1] = Some(Cvar_Get(
         view,
         "sv_master2",
-        "",
+        "master.jkhub.org",
         mp_qshared::shared::cvar::CVAR_ARCHIVE,
     ));
     view.common.sv_master[2] = Some(Cvar_Get(

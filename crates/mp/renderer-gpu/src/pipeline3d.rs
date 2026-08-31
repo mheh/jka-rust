@@ -29,6 +29,8 @@
 //! Source: `oracle/codemp/renderer/tr_shade.cpp:1953-2231` (`RB_IterateStagesGeneric`)
 
 use core::f64::consts::PI;
+use core::ffi::c_int;
+use core::ops::Range;
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -43,13 +45,14 @@ use mp_qshared::common::mp::cgame::poly_vert_t::polyVert_t;
 use mp_qshared::common::mp::cgame::ref_entity_type_t::refEntityType_t;
 use mp_qshared::common::mp::cgame::tr_types::{
     RF_ALPHA_DEPTH, RF_DEPTHHACK, RF_DISINTEGRATE1, RF_DISINTEGRATE2, RF_DISTORTION,
-    RF_FORCE_ENT_ALPHA, RF_NODEPTH, RF_RGB_TINT, RF_VOLUMETRIC,
+    RF_FORCEPOST, RF_FORCE_ENT_ALPHA, RF_FORKED, RF_GROW, RF_NODEPTH, RF_RGB_TINT, RF_TAPERED,
+    RF_VOLUMETRIC,
 };
 use mp_qshared::shared::mdxaBone_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorMA as VectorMA, _VectorScale as VectorScale,
-    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, VectorCompare,
-    VectorNormalize,
+    _DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA, _VectorScale as VectorScale,
+    _VectorSubtract as VectorSubtract, vec3_origin, CrossProduct, Q_fabs, Q_random,
+    RotatePointAroundVector, VectorCompare, VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{SURF_NODLIGHT, SURF_SKY};
 use mp_qshared::shared::vec3_t;
@@ -57,12 +60,15 @@ use mp_renderer::render_state::frame_state::FrameState;
 use mp_renderer::render_state::ghoul2_render_payload::Ghoul2RenderPayload;
 use mp_renderer::render_state::image_asset::ImageHandle;
 use mp_renderer::render_state::model_blocks::ModelBlocks;
-use mp_renderer::render_state::placeholders::{RefEntity, SkyParms, WorldAsset, FUNCTABLE_SIZE};
+use mp_renderer::render_state::placeholders::{
+    RefEntity, SkyParms, TrRefdef, WorldAsset, FUNCTABLE_SIZE,
+};
 use mp_renderer::render_state::render_assets::RenderAssets;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::render_state::texture_bundle::TextureBundle;
+use mp_renderer::tr_backend::MAX_POST_RENDERS;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
 use mp_renderer::tr_curve::GridMesh;
 use mp_renderer::tr_local::acff_t::acff_t;
@@ -94,13 +100,16 @@ use mp_renderer::tr_shader::{
     GLS_SRCBLEND_SRC_ALPHA, GL_MODULATE,
 };
 use mp_renderer::tr_sky::{RB_StageIteratorSky, SkyBoxFace, SkyState, HALF_SKY_SUBDIVISIONS};
-use mp_renderer::tr_surface::LodErrorForVolume;
+use mp_renderer::tr_surface::{
+    LodErrorForVolume, TrSurfaceShapeState, LIGHTNING_RECURSION_LEVEL,
+};
 use wgpu::{BlendState, RenderPipeline, TextureView};
 
 use crate::blend::{blend_state_from_gls, OPAQUE};
 use crate::gpu::Gpu;
 use crate::gpu_images::GpuImages;
-use native_math::qmath::Q_rsqrt;
+use native_math::qmath::{MakeNormalVectors, Q_crandom, Q_rsqrt};
+use native_math::rng::Rng;
 
 use crate::stage2d::{
     apply_alpha_gen, apply_tex_mods, stage_colors_into, stage_image, Stage2dWarnings, StageTime,
@@ -677,13 +686,10 @@ enum Warned {
     FogImageMissing,
     /// An `SF_ENTITY` draw surf whose `reType` builds no geometry yet.
     EntitySurface,
-    /// An `RF_DISTORTION` entity, which needs the screen-capture refraction
-    /// pass.
-    Distortion,
 }
 
 impl Warned {
-    const COUNT: usize = 8;
+    const COUNT: usize = 7;
 
     fn slot(self) -> usize {
         match self {
@@ -694,7 +700,6 @@ impl Warned {
             Warned::VideoMap => 4,
             Warned::FogImageMissing => 5,
             Warned::EntitySurface => 6,
-            Warned::Distortion => 7,
         }
     }
 
@@ -709,7 +714,6 @@ impl Warned {
             Warned::VideoMap => "draws a videoMap world stage as a plain stage — no cinematic yet",
             Warned::FogImageMissing => "skips a fog pass because the fog image is not registered",
             Warned::EntitySurface => "skips a generated entity surface whose reType is not ported",
-            Warned::Distortion => "draws an RF_DISTORTION entity plain - no screen capture yet",
         }
     }
 }
@@ -836,6 +840,15 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_backend.cpp:930-938,957-973`
     depth_range: DepthRange,
+    /// The entity number this item defers behind, Raven's `postRender_t::entNum`.
+    /// `Some` moves the item into the post-render pass, and the capture reads the entity back by this index.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:781-783,1011`
+    post_render_ent: Option<i32>,
+    /// Whether this stage binds the captured screen image instead of its own diffuse.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
+    screen_image: bool,
 }
 
 /// Raven's `depthRange` switch in `RB_RenderDrawSurfList`: the depth window a
@@ -951,6 +964,29 @@ pub struct Pipeline3d {
     ///
     /// [`FrameExecutor::set_ghoul2_capture`]: crate::FrameExecutor::set_ghoul2_capture
     ghoul2_capture: Option<Vec<Ghoul2SurfaceCapture>>,
+
+    /// The render-side C runtime stream, per DEC-66 ruling 1.
+    /// It persists across frames, because a per-frame reset would replay the same jitter every frame and freeze the bolt shimmer.
+    rng: Rng,
+
+    /// Raven's `sh1`, `sh2` and `f_count` file statics, per DEC-66 ruling 1.
+    shape: TrSurfaceShapeState,
+
+    /// Raven's `tr.screenImage`, the square of the frame a distortion stage samples instead of its own texture.
+    /// `qglCopyTexImage2D` re-specifies the oracle's texture per capture, so this rebuilds whenever the requested side length changes.
+    /// One slot serves every distortion entity, because each capture is drawn in the pass that immediately follows it.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_local.h:1337`
+    screen_image: Option<ScreenImage>,
+}
+
+/// One capture of the frame into a square texture, held across frames and rebuilt on a side-length change.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1200-1205`
+struct ScreenImage {
+    side: u32,
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
 }
 
 /// One captured Ghoul2 surface vertex stream: the decoded vertices, the triangle
@@ -1100,6 +1136,9 @@ impl Pipeline3d {
             warned: [false; Warned::COUNT],
             stage_warnings: Stage2dWarnings::default(),
             ghoul2_capture: None,
+            rng: Rng::new(),
+            shape: TrSurfaceShapeState::default(),
+            screen_image: None,
         }
     }
 
@@ -1150,11 +1189,15 @@ impl Pipeline3d {
     /// `dlights` holds the scene lights the caller already transformed into the
     /// world frame, and `surf_dlight_bits` holds the world walk's per-surface
     /// light mask, indexed by the world surface number.
+    ///
+    /// `target_texture` is the colour attachment's own texture.
+    /// A mid-frame screen capture copies out of it, and wgpu takes a texture for that copy rather than a view.
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gpu: &Gpu,
         target: &TextureView,
+        target_texture: &wgpu::Texture,
         draw_surfs: &[DrawSurf<SurfaceGeometry>],
         geometry: &WorldGeometry,
         assets: &RenderAssets,
@@ -1191,7 +1234,7 @@ impl Pipeline3d {
 
         let mut dynamic_vertices: Vec<WorldVertex> = Vec::new();
         let mut dynamic_indices: Vec<u32> = Vec::new();
-        let items = self.collect_stage_items(
+        let (items, post_surfaces) = self.collect_stage_items(
             draw_surfs,
             geometry,
             assets,
@@ -1254,12 +1297,14 @@ impl Pipeline3d {
         // share it. Most surfaces in a frame repeat the same diffuse-plus-lightmap
         // pair, so the cache holds the allocation count near surface count rather
         // than stage-times-surface count.
-        let mut group_cache: HashMap<(Option<ImageHandle>, Option<ImageHandle>), usize> =
+        // The `screen_image` flag joins the key, so a distortion stage never shares an entry with an ordinary stage of the same images.
+        // The entry it does get holds its own diffuse, which is what it binds on a frame where the capture did not run.
+        let mut group_cache: HashMap<(Option<ImageHandle>, Option<ImageHandle>, bool), usize> =
             HashMap::new();
         let mut bind_groups: Vec<wgpu::BindGroup> = Vec::new();
         let mut item_group: Vec<usize> = Vec::with_capacity(items.len());
         for item in &items {
-            let cache_key = (item.diffuse, item.lightmap);
+            let cache_key = (item.diffuse, item.lightmap, item.screen_image);
             let group_index = *group_cache.entry(cache_key).or_insert_with(|| {
                 // The `Faithful` arm builds the exact two-texture group the
                 // pre-seam path built. The `Pbr` arm builds the four-texture
@@ -1322,6 +1367,38 @@ impl Pipeline3d {
             None => wgpu::LoadOp::Load,
         };
 
+        // The sky box and clouds draw at the far plane. wgpu forces that
+        // through the viewport depth range, not a fixed-function call, so the
+        // loop calls `set_viewport(.., 1.0, 1.0)` when it enters the sky run
+        // and restores `0.0..1.0` when it leaves. A frame with no sky never
+        // sets a viewport, keeping the default full-target range. The rect
+        // comes from the view, as the oracle's `qglViewport` does, so a
+        // future sub-rect view keeps its inset through the toggle.
+        // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
+        // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
+        let vp_x = view.viewportX as f32;
+        let vp_w = view.viewportWidth as f32;
+        let vp_h = view.viewportHeight as f32;
+        // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y that
+        // `R_RenderView` stores from `tr.refdef.y`. GL puts 0 at the bottom,
+        // so the oracle flips y when it sets the viewport. wgpu puts viewport
+        // y at the top like the refdef, so the oracle's GL flip has no
+        // counterpart here. We use the stored value straight.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:838
+        let vp_y = view.viewportY as f32;
+        let viewport = (vp_x, vp_y, vp_w, vp_h);
+
+        // The sorted pass draws everything the post-render enqueue left behind.
+        // A deferred surface reaches its own pass below, because the oracle continues past it without opening a draw surf.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:832-835
+        let mut deferred = vec![false; items.len()];
+        for range in &post_surfaces {
+            for flag in &mut deferred[range.clone()] {
+                *flag = true;
+            }
+        }
+        let main_order: Vec<usize> = (0..items.len()).filter(|index| !deferred[*index]).collect();
+
         let mut encoder = gpu
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -1352,88 +1429,201 @@ impl Pipeline3d {
                 multiview_mask: None,
             });
 
-            // The sky box and clouds draw at the far plane. wgpu forces that
-            // through the viewport depth range, not a fixed-function call, so the
-            // loop calls `set_viewport(.., 1.0, 1.0)` when it enters the sky run
-            // and restores `0.0..1.0` when it leaves. A frame with no sky never
-            // sets a viewport, keeping the default full-target range. The rect
-            // comes from the view, as the oracle's `qglViewport` does, so a
-            // future sub-rect view keeps its inset through the toggle.
-            // Source: oracle/codemp/renderer/tr_sky.cpp:808-816,843-844
-            // Source: oracle/codemp/renderer/tr_backend.cpp:463-464
-            let vp_x = view.viewportX as f32;
-            let vp_w = view.viewportWidth as f32;
-            let vp_h = view.viewportHeight as f32;
-            // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y that
-            // `R_RenderView` stores from `tr.refdef.y`. GL puts 0 at the bottom,
-            // so the oracle flips y when it sets the viewport. wgpu puts viewport
-            // y at the top like the refdef, so the oracle's GL flip has no
-            // counterpart here. We use the stored value straight.
-            // Source: oracle/codemp/renderer/tr_scene.cpp:838
-            let vp_y = view.viewportY as f32;
-            let mut depth_far = false;
-            let mut depth_range = DepthRange::Normal;
+            self.draw_items(
+                &mut pass,
+                &items,
+                &main_order,
+                &bind_groups,
+                &item_group,
+                None,
+                geometry,
+                mode,
+                viewport,
+                &mut stats,
+            );
+        }
 
-            for (draw_index, item) in items.iter().enumerate() {
-                if item.depth_far != depth_far || item.depth_range != depth_range {
-                    depth_far = item.depth_far;
-                    depth_range = item.depth_range;
-                    // The sky's far-plane window overrides the entity hack: a
-                    // sky surface never belongs to a view-model entity.
-                    let (min_depth, max_depth) = if depth_far {
-                        (1.0, 1.0)
-                    } else {
-                        depth_range.window()
-                    };
-                    pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
-                }
+        // Raven's `lastPostEnt`, a compare against the entity of the last successful capture rather than a set of every entity captured.
+        // A deferred order of A, B, A therefore captures A twice, and a projection behind the eye leaves the value alone so the next surface retries.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1006,1144-1145,1207
+        let mut last_post_ent: i32 = -1;
+        // A rebuilt screen image replaces the texture an already-encoded pass binds, so the replaced one lives here until the submit.
+        let mut keep_alive: Vec<ScreenImage> = Vec::new();
+        let vid_width = target_texture.width() as i32;
+        let vid_height = target_texture.height() as i32;
 
-                let pipeline = match mode {
-                    BackendMode::Faithful => &self.pipelines,
-                    BackendMode::Pbr => &self.pbr_pipelines,
-                }
-                .get(&item.key)
-                .expect("world pipeline was created for every item's key above");
-                let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
+        // The drain is last in first out, so the deferred surfaces replay in reverse submission order.
+        // Each surface takes its own pass, which loads both attachments and therefore composites over the sorted draw.
+        // The capture is encoded before that pass, so capture N reads a frame holding the deferred draws 1 through N-1.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:1003-1214
+        for range in post_surfaces.iter().rev() {
+            let order: Vec<usize> = range.clone().collect();
 
-                // A dynamic stage draws from the per-frame buffer, a static
-                // stage from the concatenated world buffer.
-                let vertex_buffer = if item.dynamic {
-                    &self.dynamic_buffer
-                } else {
-                    &geometry.vertex_buffer
-                };
-
-                // An MD3 entity surface indexes the per-frame index buffer, a
-                // world surface the static world index buffer.
-                let index_buffer = if item.index_dynamic {
-                    &self.dynamic_index_buffer
-                } else {
-                    &geometry.index_buffer
-                };
-                pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
-                pass.set_pipeline(pipeline);
-                // Group 0 selects this surface's clip matrix by its entity slot.
-                pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
-                pass.set_bind_group(1, &bind_groups[item_group[draw_index]], &[]);
-                pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
-                pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                pass.draw_indexed(
-                    item.first_index..item.first_index + item.index_count,
-                    item.base_vertex,
-                    0..1,
-                );
-
-                stats.draw_calls += 1;
-                if item.reads_lightmap {
-                    stats.lightmapped += 1;
+            // The capture runs once per run of one entity's deferred surfaces, and it reads the entity back by the stored index.
+            // Source: oracle/codemp/renderer/tr_backend.cpp:1144-1173
+            let entity_num = items[range.start]
+                .post_render_ent
+                .expect("a deferred surface's items carry their entity number");
+            if let Some(ent) = entities.get(entity_num as usize) {
+                if ent.e.renderfx & RF_DISTORTION != 0 && last_post_ent != entity_num {
+                    if let Some(rect) =
+                        screen_capture_rect(&ent.e, &frame.refdef, vid_width, vid_height)
+                    {
+                        capture_screen_image(
+                            gpu,
+                            &mut encoder,
+                            target_texture,
+                            &mut self.screen_image,
+                            &mut keep_alive,
+                            rect,
+                        );
+                        last_post_ent = entity_num;
+                    }
                 }
             }
+
+            // `RB_IterateStagesGeneric` binds `tr.screenImage` for every stage of a distortion entity.
+            // The view changes with each capture, so this group is built here rather than in the shared cache walk above.
+            // A surface whose capture did not run keeps its cached group, which holds its own diffuse.
+            // The PBR backend takes a four-texture layout this two-texture group does not fit, so it keeps its own diffuse as well.
+            // Source: oracle/codemp/renderer/tr_shade.cpp:2163-2169
+            let wants_screen = items[range.clone()].iter().any(|item| item.screen_image);
+            let screen_group = match (wants_screen && last_post_ent == entity_num, mode) {
+                (true, BackendMode::Faithful) => self.screen_image.as_ref().map(|image| {
+                    gpu_images.view_bind_group(gpu, &self.texture_layout, &image.view, None)
+                }),
+                _ => None,
+            };
+
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("mp_renderer_gpu post-render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+
+            self.draw_items(
+                &mut pass,
+                &items,
+                &order,
+                &bind_groups,
+                &item_group,
+                screen_group.as_ref(),
+                geometry,
+                mode,
+                viewport,
+                &mut stats,
+            );
         }
         gpu.queue().submit(std::iter::once(encoder.finish()));
 
         stats
+    }
+
+    /// Draws the stage items `order` names, in that order, into an open pass.
+    /// The depth window tracks per pass, so a run that never leaves the normal window sets no viewport and keeps the pass default.
+    /// `screen_group` is the captured-frame group a distortion stage binds in place of its cached one.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2136-2158` (the per-stage draw)
+    #[allow(clippy::too_many_arguments)]
+    fn draw_items(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        items: &[StageDrawItem],
+        order: &[usize],
+        bind_groups: &[wgpu::BindGroup],
+        item_group: &[usize],
+        screen_group: Option<&wgpu::BindGroup>,
+        geometry: &WorldGeometry,
+        mode: BackendMode,
+        viewport: (f32, f32, f32, f32),
+        stats: &mut WorldStats,
+    ) {
+        let (vp_x, vp_y, vp_w, vp_h) = viewport;
+        let mut depth_far = false;
+        let mut depth_range = DepthRange::Normal;
+
+        for &draw_index in order {
+            let item = &items[draw_index];
+            if item.depth_far != depth_far || item.depth_range != depth_range {
+                depth_far = item.depth_far;
+                depth_range = item.depth_range;
+                // The sky's far-plane window overrides the entity hack: a
+                // sky surface never belongs to a view-model entity.
+                let (min_depth, max_depth) = if depth_far {
+                    (1.0, 1.0)
+                } else {
+                    depth_range.window()
+                };
+                pass.set_viewport(vp_x, vp_y, vp_w, vp_h, min_depth, max_depth);
+            }
+
+            let pipeline = match mode {
+                BackendMode::Faithful => &self.pipelines,
+                BackendMode::Pbr => &self.pbr_pipelines,
+            }
+            .get(&item.key)
+            .expect("world pipeline was created for every item's key above");
+            let offset = (draw_index as u64 * SURFACE_FLAGS_STRIDE) as u32;
+
+            // A dynamic stage draws from the per-frame buffer, a static
+            // stage from the concatenated world buffer.
+            let vertex_buffer = if item.dynamic {
+                &self.dynamic_buffer
+            } else {
+                &geometry.vertex_buffer
+            };
+
+            // An MD3 entity surface indexes the per-frame index buffer, a
+            // world surface the static world index buffer.
+            let index_buffer = if item.index_dynamic {
+                &self.dynamic_index_buffer
+            } else {
+                &geometry.index_buffer
+            };
+            pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+
+            // Divergence: the oracle binds `tr.screenImage` unconditionally.
+            // A skipped capture there samples the last successful one or the built-in 8 by 8 white image, and the port binds the stage's own diffuse.
+            let texture_group = match (item.screen_image, screen_group) {
+                (true, Some(group)) => group,
+                _ => &bind_groups[item_group[draw_index]],
+            };
+
+            pass.set_pipeline(pipeline);
+            // Group 0 selects this surface's clip matrix by its entity slot.
+            pass.set_bind_group(0, &self.globals_bind_group, &[item.globals_offset]);
+            pass.set_bind_group(1, texture_group, &[]);
+            pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
+            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            pass.draw_indexed(
+                item.first_index..item.first_index + item.index_count,
+                item.base_vertex,
+                0..1,
+            );
+
+            stats.draw_calls += 1;
+            if item.reads_lightmap {
+                stats.lightmapped += 1;
+            }
+        }
     }
 
     /// Resolves every world draw surf into its per-stage [`StageDrawItem`]
@@ -1443,6 +1633,11 @@ impl Pipeline3d {
     ///
     /// `dlights` and `surf_dlight_bits` reach the world arm only, because no
     /// entity surface ever carries a dlight mask in the oracle.
+    ///
+    /// The second result holds one range per surface the post-render enqueue deferred, in submission order.
+    /// The caller draws those ranges after the sorted list, and the surface boundaries have to survive the walk because the drain reverses them.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_backend.cpp:778-835`
     #[allow(clippy::too_many_arguments)]
     fn collect_stage_items(
         &mut self,
@@ -1465,15 +1660,22 @@ impl Pipeline3d {
         cvars: RenderCvarSnapshot,
         dlights: &[dlight_t],
         surf_dlight_bits: &[i32],
-    ) -> Vec<StageDrawItem> {
+    ) -> (Vec<StageDrawItem>, Vec<Range<usize>>) {
         let mut items: Vec<StageDrawItem> = Vec::new();
+        // One range per deferred surface, in submission order, each covering that surface's own stage items.
+        let mut post_surfaces: Vec<Range<usize>> = Vec::new();
         // The two scene-wide inputs the renderfx colour overrides read: the
         // disintegrate threshold clock and the volumetric fade axis.
         // Source: oracle/codemp/renderer/tr_shade.cpp:1568,1596
         let refdef_time = frame.refdef.time;
         let view_axis = view.ori.axis[0];
+        // Raven's `g_numPostRenders`, the count of draw surfs already deferred out of the sorted draw.
+        // The oracle drains the queue at the end of the same call, so the count starts at zero per draw.
+        // Source: oracle/codemp/renderer/tr_backend.cpp:669,1008-1011
+        let mut post_renders = 0usize;
 
         for surf in draw_surfs {
+            let first_item = items.len();
             match surf.surface {
                 SurfaceGeometry::World(world_ref) => {
                     self.collect_world_surface(
@@ -1591,9 +1793,35 @@ impl Pipeline3d {
                     stats.skipped_non_world += 1;
                 }
             }
+
+            // `RB_RenderDrawSurfList` takes a non-world entity's surface out of the sorted draw and replays it last.
+            // The test is a three-way or over the entity's renderfx, and it stops once the queue holds `MAX_POST_RENDERS` surfaces.
+            // Every stage this surface produced moves together, so the mark lands on the whole run rather than one item.
+            // Source: oracle/codemp/renderer/tr_backend.cpp:778-835
+            if post_renders >= MAX_POST_RENDERS {
+                continue;
+            }
+            let (entity_num, _shader, _fog, _dlighted) =
+                R_DecomposeSort(surf.sort, &assets.sorted_shaders);
+            if entity_num == TR_WORLDENT {
+                continue;
+            }
+            let Some(ent) = entities.get(entity_num as usize) else {
+                continue;
+            };
+            if ent.e.renderfx & (RF_DISTORTION | RF_FORCEPOST | RF_FORCE_ENT_ALPHA) == 0 {
+                continue;
+            }
+            post_renders += 1;
+            for item in &mut items[first_item..] {
+                item.post_render_ent = Some(entity_num);
+            }
+            if first_item < items.len() {
+                post_surfaces.push(first_item..items.len());
+            }
         }
 
-        items
+        (items, post_surfaces)
     }
 
     /// Resolves one `SF_POLY` draw surf: the scene polygon `RE_AddPolyToScene`
@@ -1758,7 +1986,13 @@ impl Pipeline3d {
             return;
         };
 
-        let (verts, index_block) = build_entity_geometry(&entity.e, view);
+        let (verts, index_block) = build_entity_geometry(
+            &entity.e,
+            view,
+            refdef_time,
+            &mut self.rng,
+            &mut self.shape,
+        );
         if index_block.is_empty() {
             self.warn_once(Warned::EntitySurface);
             stats.skipped_non_world += 1;
@@ -2155,6 +2389,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range: DepthRange::Normal,
+                post_render_ent: None,
+                screen_image: false,
             });
             stats.dlight_passes += 1;
         }
@@ -2610,6 +2846,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: true,
                 depth_range: DepthRange::Normal,
+                post_render_ent: None,
+                screen_image: false,
             });
         }
 
@@ -2743,9 +2981,6 @@ impl Pipeline3d {
 
         // These stage kinds still draw as a plain stage, but each logs once so
         // the missing behavior stays visible.
-        if fx.distortion {
-            self.warn_once(Warned::Distortion);
-        }
         if stage.glow {
             self.warn_once(Warned::Glow);
         }
@@ -2819,6 +3054,10 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                // A multitextured stage diverts to `DrawMultitextured`, which has no distortion arm, so it keeps its own diffuse.
+                // Source: oracle/codemp/renderer/tr_shade.cpp:2147-2150
+                screen_image: false,
             });
         }
 
@@ -2829,7 +3068,11 @@ impl Pipeline3d {
         }
         let reads_lightmap = source == StSource::Lightmap;
         let diffuse = stage_image(bundle0, time.shader_time);
-        let dynamic = stage_is_dynamic(stage, false) || fog_mod.is_some() || fx.rewrites_colors();
+        // A screen-image stage carries the `v` flip on its evaluated texcoords, so it takes the dynamic path even where nothing else moves it.
+        let dynamic = stage_is_dynamic(stage, false)
+            || fog_mod.is_some()
+            || fx.rewrites_colors()
+            || fx.distortion;
 
         if dynamic {
             let base_vertex = build_dynamic_block(
@@ -2870,6 +3113,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                screen_image: fx.distortion,
             })
         } else {
             Some(StageDrawItem {
@@ -2888,6 +3133,8 @@ impl Pipeline3d {
                 globals_offset,
                 depth_far: false,
                 depth_range,
+                post_render_ent: None,
+                screen_image: fx.distortion,
             })
         }
     }
@@ -2937,9 +3184,6 @@ impl Pipeline3d {
         // Source: oracle/codemp/renderer/tr_shade.cpp:2039-2054,2190-2202
         let fx = EntityFx::resolve(entity);
         let depth_range = DepthRange::resolve(entity);
-        if fx.distortion {
-            self.warn_once(Warned::Distortion);
-        }
         let state_bits = fx.state_bits(stage.state_bits);
         let alpha_func = alpha_func_code(state_bits);
         let key = PipelineKey {
@@ -3008,6 +3252,8 @@ impl Pipeline3d {
             globals_offset,
             depth_far: false,
             depth_range,
+            post_render_ent: None,
+            screen_image: fx.distortion,
         })
     }
 
@@ -3094,6 +3340,9 @@ impl Pipeline3d {
             globals_offset,
             depth_far: false,
             depth_range,
+            post_render_ent: None,
+            // The fog pass binds the fog image, so a fogged distortion surface still takes its own diffuse here.
+            screen_image: false,
         })
     }
 
@@ -4011,16 +4260,22 @@ fn is_modulate_collapse(shader: &ShaderAsset, stage: &ShaderStage) -> bool {
         && stage.bundle[1].is_lightmap
 }
 
-/// Builds the small [`RefEntity`] the diffuse-lighting evaluators read from a
-/// `trRefEntity_t`. `R_SetupEntityLighting` folded the entity light into
-/// `lightDir`/`ambientLight`/`directedLight`, and the evaluators read only
-/// those plus `shaderRGBA`, so the rest stays at its default.
+/// Builds the small [`RefEntity`] the colour evaluators read from a `trRefEntity_t`.
+/// `R_SetupEntityLighting` folded the entity light into `lightDir`, `ambientLight` and `directedLight`, which the diffuse arms read.
+/// The colour short-circuits read `shaderRGBA`, and the two disintegrate arms additionally read `renderfx`, `oldorigin` and `endTime`.
+/// Those seven fields are what this builder carries, and every other field keeps its default.
 fn lighting_ref_entity(ent: &trRefEntity_t) -> RefEntity {
     RefEntity {
         light_dir: ent.lightDir,
         ambient_light: ent.ambientLight,
         directed_light: ent.directedLight,
         shader_rgba: ent.e.shaderRGBA,
+        // The disintegrate arms branch on `renderfx` and measure against `oldorigin` and `endTime`.
+        // Without these three the burn tests read zero, so both arms return the colour buffer untouched.
+        // Source: oracle/codemp/renderer/tr_shade_calc.cpp:1545-1671
+        renderfx: ent.e.renderfx,
+        old_origin: ent.e.oldorigin,
+        end_time: ent.e.endTime,
         ..Default::default()
     }
 }
@@ -4080,6 +4335,15 @@ fn build_dynamic_block(
         warnings,
     );
 
+    // The two worlds store a copied rect in opposite row order: `glCopyTexImage2D` stores it bottom-up and `copy_texture_to_texture` top-down.
+    // A screen-image stage flips `v` here, which cancels that and leaves the sampling where the oracle puts it.
+    // Only the single-texture branch binds the screen image, so a two-texture collapse keeps its own coordinates.
+    if fx.distortion && !two_texture {
+        for coord in st.iter_mut() {
+            coord[1] = 1.0 - coord[1];
+        }
+    }
+
     // The `xyz` block the disintegrate and volumetric arms read, and the one
     // `RB_CalcDisintegrateVertDeform` moves.
     let mut xyz: Vec<[f32; 4]> = cpu
@@ -4098,6 +4362,9 @@ fn build_dynamic_block(
     // A single-texture stage runs the full rgbGen/alphaGen. A two-texture
     // collapse keeps the input colour, which its shader path never reads.
     let mut colors: Vec<[u8; 4]> = if let Some(re) = short_circuit {
+        // Divergence: `RF_DISINTEGRATE1`'s first band writes alpha only, so the oracle leaves rgb at the previous surface's `tess` scratch.
+        // This buffer supplies zeros instead, and the band's own alpha test discards those vertices.
+        // The difference therefore reaches only the border blend, at no more than a quarter vertex weight.
         let mut evaluated = vec![[0u8; 4]; count];
         if fx.disintegrate1 || fx.disintegrate2 {
             RB_CalcDisintegrateColors(&mut evaluated, &xyz, &re, refdef_time);
@@ -4326,6 +4593,176 @@ fn entity_shader_time(entities: &[trRefEntity_t], entity_num: i32) -> f32 {
         .unwrap_or(0.0)
 }
 
+/// Raven `R_WorldCoordToScreenCoordFloat` - projects a world point onto the screen in top-down pixel coordinates.
+/// It returns `None` where the point sits at or behind the eye plane, Raven's `transformed[2] < 0.01` early return.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:597-635`
+fn world_coord_to_screen_coord_float(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(f32, f32)> {
+    let xcenter = vid_width / 2;
+    let ycenter = vid_height / 2;
+
+    let vfwd = refdef.view_axis[0];
+    let vright = refdef.view_axis[1];
+    let vup = refdef.view_axis[2];
+
+    let mut local = vec3_origin;
+    VectorSubtract(world_coord, refdef.view_origin, &mut local);
+
+    let transformed = [
+        _DotProduct(local, vright),
+        _DotProduct(local, vup),
+        _DotProduct(local, vfwd),
+    ];
+
+    // The point sits at or behind the eye plane, so it projects nowhere on the screen.
+    if (transformed[2] as f64) < 0.01 {
+        return None;
+    }
+
+    // The two scale terms divide by a double `90.0` and land back in a float, which is the C promotion here.
+    let xzi = ((xcenter as f32 / transformed[2]) as f64 * (90.0 / refdef.fov_x as f64)) as f32;
+    let yzi = ((ycenter as f32 / transformed[2]) as f64 * (90.0 / refdef.fov_y as f64)) as f32;
+
+    let x = xcenter as f32 + xzi * transformed[0];
+    // The y counts down from the top of the screen, because the up component subtracts.
+    let y = ycenter as f32 - yzi * transformed[1];
+    Some((x, y))
+}
+
+/// Raven `R_WorldCoordToScreenCoord` - the integer wrapper, truncating both components.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:637-645`
+fn world_coord_to_screen_coord(
+    world_coord: vec3_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(i32, i32)> {
+    let (x, y) = world_coord_to_screen_coord_float(world_coord, refdef, vid_width, vid_height)?;
+    Some((x as i32, y as i32))
+}
+
+/// The source rectangle one distortion capture copies, as `(x, y, side)` in the target texture's top-down coordinates.
+/// Raven's `cY` counts from the framebuffer's bottom edge, and the flip back to a top-down origin happens here.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1172-1198`
+fn screen_capture_rect(
+    e: &refEntity_t,
+    refdef: &TrRefdef,
+    vid_width: i32,
+    vid_height: i32,
+) -> Option<(u32, u32, u32)> {
+    let (x, y) = world_coord_to_screen_coord(e.origin, refdef, vid_width, vid_height)?;
+    let rad = e.radius as i32;
+    // A zero or negative radius leaves the oracle an unsampleable texture and wgpu rejects the copy outright.
+    // The port takes the defined answer and skips the capture, so the stage binds its own diffuse.
+    if rad <= 0 {
+        return None;
+    }
+    // Raven's clamp turns negative once `rad` passes a target dimension, and the copy then reads outside the frame.
+    // The side length clamps to the smaller dimension first, which keeps the rect inside the target.
+    let rad = rad.min(vid_width).min(vid_height);
+
+    // C's out-of-range float-to-int cast is undefined, and Rust's saturates to the `i32` bounds instead.
+    // The clamps below run in `i64` so a saturated projection cannot overflow, and every in-range input gives the same result either way.
+    let x = x as i64;
+    let y = y as i64;
+    let rad_wide = rad as i64;
+    let vid_width_wide = vid_width as i64;
+    let vid_height_wide = vid_height as i64;
+
+    let mut c_x = vid_width_wide - x - (rad_wide / 2);
+    let mut c_y = vid_height_wide - y - (rad_wide / 2);
+    if c_x + rad_wide > vid_width_wide {
+        c_x = vid_width_wide - rad_wide;
+    } else if c_x < 0 {
+        c_x = 0;
+    }
+    if c_y + rad_wide > vid_height_wide {
+        c_y = vid_height_wide - rad_wide;
+    } else if c_y < 0 {
+        c_y = 0;
+    }
+
+    // `AnglesToAxis` fills `viewaxis[1]` with the left vector, so the helper's `x` counts from the right edge of the screen.
+    // The `vid_width - x` term converts it back, which puts the capture on the entity's own screen position.
+    // The `vid_height - y` term converts a top-down y to the framebuffer's bottom-up origin, so the row flips back here.
+    let top = vid_height_wide - c_y - rad_wide;
+    Some((c_x as u32, top as u32, rad as u32))
+}
+
+/// Encodes one distortion entity's capture into `screen_image`, rebuilding the texture when the side length changed.
+/// The oracle re-specifies its texture on every copy, so a rebuild here is the faithful shape rather than a cache miss.
+/// A rebuild moves the replaced texture into `keep_alive`, which the caller holds until the submit so an already-encoded pass keeps its binding.
+///
+/// Source: `oracle/codemp/renderer/tr_backend.cpp:1144-1209`
+fn capture_screen_image(
+    gpu: &Gpu,
+    encoder: &mut wgpu::CommandEncoder,
+    target_texture: &wgpu::Texture,
+    screen_image: &mut Option<ScreenImage>,
+    keep_alive: &mut Vec<ScreenImage>,
+    rect: (u32, u32, u32),
+) {
+    let (x, y, side) = rect;
+    let stale = screen_image
+        .as_ref()
+        .map(|image| image.side != side)
+        .unwrap_or(true);
+    if stale {
+        let texture = gpu.device().create_texture(&wgpu::TextureDescriptor {
+            label: Some("mp_renderer_gpu screen image"),
+            size: wgpu::Extent3d {
+                width: side,
+                height: side,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: target_texture.format(),
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        if let Some(old) = screen_image.replace(ScreenImage {
+            side,
+            texture,
+            view,
+        }) {
+            keep_alive.push(old);
+        }
+    }
+
+    let image = screen_image
+        .as_ref()
+        .expect("the screen image is built above when the side length changed");
+    encoder.copy_texture_to_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: target_texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d { x, y, z: 0 },
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyTextureInfo {
+            texture: &image.texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::Extent3d {
+            width: side,
+            height: side,
+            depth_or_array_layers: 1,
+        },
+    );
+}
+
 /// The renderfx overrides the current entity applies to every stage of its
 /// surface, resolved once per stage build.
 ///
@@ -4354,13 +4791,10 @@ struct EntityFx {
     alpha_depth: bool,
     /// `RF_VOLUMETRIC`: the fake volumetric shading short-circuit.
     volumetric: bool,
-    /// `RF_DISTORTION`: the screen-capture refraction pass.
+    /// `RF_DISTORTION`: the stage samples the captured square of the frame instead of its own diffuse.
+    /// The arm's other half is `GL_Cull(CT_TWO_SIDED)`, and this pipeline already draws with `cull_mode: None`, so that half needs no code.
     ///
-    //TODO: Port RB_IterateStagesGeneric's RF_DISTORTION arm
-    // Source: oracle/codemp/renderer/tr_shade.cpp:2162-2168
-    // The arm binds `tr.screenImage` and switches to two-sided culling, so it
-    // needs a screen-capture pass (`RB_CaptureScreenImage`) that no wave has
-    // built. The flag is read only to log once, and the stage draws plain.
+    /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
     distortion: bool,
     /// The entity's `shaderRGBA[3]`, the alpha `RF_FORCE_ENT_ALPHA` writes.
     ent_alpha: u8,
@@ -4528,27 +4962,310 @@ fn do_line(
     indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
 }
 
-/// Builds one generated entity surface's world-space vertices and triangle
-/// indices, the `RB_SurfaceEntity` dispatch restricted to the DEC-54 census
-/// set: `RT_SPRITE`, `RT_LINE`, and `RT_SABER_GLOW`.
+/// Raven `DoLine2` - one tapered quad from `start` to `end`, `span_width` wide at the start edge and `span_width2` at the end edge.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:658-710`
+#[allow(clippy::too_many_arguments)]
+fn do_line2(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    up: vec3_t,
+    span_width: f32,
+    span_width2: f32,
+    color: [u8; 4],
+) {
+    let vbase = verts.len() as u32;
+
+    for (base, width, st) in [
+        (start, span_width, [0.0f32, 0.0f32]),
+        (start, -span_width, [1.0, 0.0]),
+        (end, span_width2, [0.0, 1.0]),
+        (end, -span_width2, [1.0, 1.0]),
+    ] {
+        let mut xyz: vec3_t = [0.0; 3];
+        VectorMA(base, width, up, &mut xyz);
+        verts.push(WorldVertex {
+            position: xyz,
+            st,
+            lightmap_st: [0.0, 0.0],
+            color,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 1, vbase + 3]);
+}
+
+/// Raven `CreateShape` - redraws the two fractal offset vectors from the backend stream.
+/// The six draws run in source order, and `sh2` reads `sh1` back, so the two vectors share one home.
+///
+/// `crandom()` is `double` in C, so each constant widens rather than the call narrowing.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:976-987`
+fn create_shape(shape: &mut TrSurfaceShapeState, rng: &mut Rng) {
+    shape.sh1 = [
+        // fwd
+        (0.66f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+        (0.07f32 as f64 + rng.crandom() * 0.025f32 as f64) as f32,
+    ];
+
+    // it seems to look best to have a point on one side of the ideal line, then the other point on the other side.
+    shape.sh2 = [
+        // fwd
+        (0.33f32 as f64 + rng.crandom() * 0.1f32 as f64) as f32,
+        // forcing point to be on the opposite side of the line -- right
+        ((-shape.sh1[1]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+        // up
+        ((-shape.sh1[2]) as f64 + rng.crandom() * 0.02f32 as f64) as f32,
+    ];
+}
+
+/// Raven `ApplyShape` - splits one bolt segment into three jagged sub-segments, or emits it as a tapered quad at the base case.
+///
+/// `sh2` is read after the first recursive call, which is where Raven reads it, so a deeper recursion level would see the redrawn value.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:990-1036`
+#[allow(clippy::too_many_arguments)]
+fn apply_shape(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    sradius: f32,
+    eradius: f32,
+    count: c_int,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    if count < 1 {
+        // done recursing
+        do_line2(verts, indices, start, end, right, sradius, eradius, color);
+        return;
+    }
+
+    create_shape(shape, rng);
+
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd) * 0.7;
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut perc = shape.sh1[0];
+
+    let mut point1: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point1);
+    VectorMA(point1, 1.0 - perc, end, &mut point1);
+    VectorMA(point1, dis * shape.sh1[1], rt, &mut point1);
+    VectorMA(point1, dis * shape.sh1[2], up, &mut point1);
+
+    // do a quick and dirty interpolation of the radius at that point
+    let rads1 = sradius * 0.666 + eradius * 0.333;
+    let rads2 = sradius * 0.333 + eradius * 0.666;
+
+    // recursion
+    apply_shape(
+        verts, indices, start, point1, right, sradius, rads1, count - 1, color, shape, rng,
+    );
+
+    perc = shape.sh2[0];
+
+    let mut point2: vec3_t = [0.0; 3];
+    VectorScale(start, perc, &mut point2);
+    VectorMA(point2, 1.0 - perc, end, &mut point2);
+    VectorMA(point2, dis * shape.sh2[1], rt, &mut point2);
+    VectorMA(point2, dis * shape.sh2[2], up, &mut point2);
+
+    // recursion
+    apply_shape(
+        verts, indices, point2, point1, right, rads1, rads2, count - 1, color, shape, rng,
+    );
+    apply_shape(
+        verts, indices, point2, end, right, rads2, eradius, count - 1, color, shape, rng,
+    );
+}
+
+/// Raven `DoBoltSeg` - steps `start` to `end` in 20-unit chunks, jitters each step off the entity's own seed, and shapes each chunk.
+/// `seed` is `e.frame` hoisted into a local, per DEC-66 ruling 2.
+/// The oracle's seed write is unobservable until portal or mirror views draw, because a second view of the same frame would read the mutated seed.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:1039-1124`
+#[allow(clippy::too_many_arguments)]
+fn do_bolt_seg(
+    verts: &mut Vec<WorldVertex>,
+    indices: &mut Vec<u32>,
+    e: &refEntity_t,
+    seed: &mut c_int,
+    start: vec3_t,
+    end: vec3_t,
+    right: vec3_t,
+    radius: f32,
+    color: [u8; 4],
+    shape: &mut TrSurfaceShapeState,
+    rng: &mut Rng,
+) {
+    let mut fwd: vec3_t = [0.0; 3];
+    VectorSubtract(end, start, &mut fwd);
+    let dis = VectorNormalize(&mut fwd);
+
+    let mut rt: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+    MakeNormalVectors(fwd, &mut rt, &mut up);
+
+    let mut old = start;
+    let mut off: vec3_t = [10.0, 10.0, 10.0];
+
+    let mut old_perc = 0.0f32;
+    let mut old_radius = radius;
+    let mut new_radius = radius;
+
+    let mut i: c_int = 20;
+    while i as f32 <= dis {
+        // because of our large step size, we may not actually draw to the end.  In this case, fudge our percent so that we are basically complete
+        let perc = if (i + 20) as f32 > dis {
+            1.0
+        } else {
+            // percentage of the amount of line completed
+            i as f32 / dis
+        };
+
+        // create our level of deviation for this point
+        //
+        // Raven writes these three lines as `VectorScale` and `VectorMA` macros, and each macro expands its scale argument once per component.
+        // Every component therefore draws its own value, nine per step,
+        // and hoisting any draw into a local would change both the stream and the shape.
+        let mut temp: vec3_t = [0.0; 3];
+        // move less in fwd direction, chaos also does not affect this
+        temp[0] = fwd[0] * (Q_crandom(seed) * 3.0);
+        temp[1] = fwd[1] * (Q_crandom(seed) * 3.0);
+        temp[2] = fwd[2] * (Q_crandom(seed) * 3.0);
+
+        // move more in direction perpendicular to line, angles is really the chaos
+        temp[0] += rt[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += rt[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += rt[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // move more in direction perpendicular to line
+        temp[0] += up[0] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[1] += up[1] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+        temp[2] += up[2] * (Q_crandom(seed) * 7.0 * e.axis[0][0]);
+
+        // track our total level of offset from the ideal line
+        VectorAdd(off, temp, &mut off);
+
+        // Move from start to end, always adding our current level of offset from the ideal line
+        //	Even though we are adding a random offset.....by nature, we always move from exactly start....to end
+        let mut cur: vec3_t = [0.0; 3];
+        VectorAdd(start, off, &mut cur);
+        VectorScale(cur, 1.0 - perc, &mut cur);
+        VectorMA(cur, perc, end, &mut cur);
+
+        if (e.renderfx & RF_TAPERED) != 0 {
+            // This does pretty close to perfect tapering since apply shape interpolates the old and new as it goes along.
+            //	by using one minus the square, the radius stays fairly constant, then drops off quickly at the very point of the bolt
+            old_radius = radius * (1.0 - old_perc * old_perc);
+            new_radius = radius * (1.0 - perc * perc);
+        }
+
+        // Apply the random shape to our line seg to give it some micro-detail-jaggy-coolness.
+        apply_shape(
+            verts,
+            indices,
+            cur,
+            old,
+            right,
+            new_radius,
+            old_radius,
+            LIGHTNING_RECURSION_LEVEL,
+            color,
+            shape,
+            rng,
+        );
+
+        // randomly split off to create little tendrils, but don't do it too close to the end and especially if we are not even of the forked variety
+        //
+        // MP never assigns `f_count`, so this branch is dead here.
+        // SP sets it to 3 right before its own `DoBoltSeg` call, which is what makes the fork live there.
+        // The `&&` chain keeps its short-circuit, because an eager `Q_random` draw would advance the seed on every step.
+        // Source: oracle/code/renderer/tr_surface.cpp:844
+        if (e.renderfx & RF_FORKED) != 0
+            && shape.f_count > 0.0
+            && Q_random(seed) > 0.94
+            && radius * (1.0 - perc) > 0.2
+        {
+            shape.f_count -= 1.0;
+
+            // Pick a point somewhere between the current point and the final endpoint
+            let mut new_dest: vec3_t = [0.0; 3];
+            VectorAdd(cur, e.oldorigin, &mut new_dest);
+            VectorScale(new_dest, 0.5, &mut new_dest);
+
+            // And then add some crazy offset
+            for t in 0..3 {
+                new_dest[t] += Q_crandom(seed) * 80.0;
+            }
+
+            // we could branch off using OLD and NEWDEST, but that would allow multiple forks...whereas, we just want simpler brancing
+            do_bolt_seg(
+                verts, indices, e, seed, cur, new_dest, right, new_radius, color, shape, rng,
+            );
+        }
+
+        // Current point along the line becomes our new old attach point
+        old = cur;
+        old_perc = perc;
+
+        i += 20;
+    }
+}
+
+/// Raven `DoCylinderPart` - one four-corner ring segment, emitted with the cylinder's own index winding.
+///
+/// Source: `oracle/codemp/renderer/tr_surface.cpp:818-847`
+fn do_cylinder_part(verts: &mut Vec<WorldVertex>, indices: &mut Vec<u32>, quad: &[polyVert_t; 4]) {
+    let vbase = verts.len() as u32;
+
+    for corner in quad {
+        verts.push(WorldVertex {
+            position: corner.xyz,
+            st: corner.st,
+            lightmap_st: [0.0, 0.0],
+            color: corner.modulate,
+            normal: [0.0, 0.0, 0.0],
+        });
+    }
+
+    indices.extend_from_slice(&[vbase, vbase + 1, vbase + 2, vbase + 2, vbase + 3, vbase]);
+}
+
+/// Builds one generated entity surface's world-space vertices and triangle indices,
+/// the `RB_SurfaceEntity` dispatch restricted to the kinds this backend draws.
+/// Those are the DEC-54 census set, `RT_SPRITE`, `RT_LINE` and `RT_SABER_GLOW`,
+/// plus the three the FX module submits, `RT_ORIENTED_QUAD`, `RT_CYLINDER` and `RT_ELECTRICITY`.
 ///
 /// Every other `reType` returns empty, which the caller counts as a skip.
-/// `RT_BEAM`, `RT_ORIENTED_QUAD`, `RT_ORIENTEDLINE`, `RT_ELECTRICITY`, and
-/// `RT_CYLINDER` are census-complement fog, so they stay unbuilt rather than
-/// guessed at.
+/// `RT_BEAM` and `RT_ORIENTEDLINE` are census-complement fog, so they stay unbuilt rather than guessed at.
+/// The census never saw the other three.
+/// The FX module builds their `refEntity_t` inside the engine and submits it from `FxHost::AddFxToScene`, behind the trap seam the census counts.
 //TODO: Port RB_SurfaceBeam
-// Source: oracle/codemp/renderer/tr_surface.cpp:226-283
-//TODO: Port RB_SurfaceOrientedQuad
-// Source: oracle/codemp/renderer/tr_surface.cpp:173-215
+// Source: oracle/codemp/renderer/tr_surface.cpp:478-528
 //TODO: Port RB_SurfaceOrientedLine
-// Source: oracle/codemp/renderer/tr_surface.cpp:786-806
-//TODO: Port RB_SurfaceElectricity
-// Source: oracle/codemp/renderer/tr_surface.cpp:1038-1090
-//TODO: Port RB_SurfaceCylinder
-// Source: oracle/codemp/renderer/tr_surface.cpp:854-985
+// Source: oracle/codemp/renderer/tr_surface.cpp:792-807
 ///
 /// Source: `oracle/codemp/renderer/tr_surface.cpp:1798-1870`
-fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVertex>, Vec<u32>) {
+fn build_entity_geometry(
+    e: &refEntity_t,
+    view: &viewParms_t,
+    refdef_time: i32,
+    rng: &mut Rng,
+    shape: &mut TrSurfaceShapeState,
+) -> (Vec<WorldVertex>, Vec<u32>) {
     let mut verts: Vec<WorldVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let color = e.shaderRGBA;
@@ -4577,6 +5294,58 @@ fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVerte
             if view.isMirror != 0 {
                 VectorSubtract(vec3_origin, left, &mut left);
             }
+            add_quad_stamp_ext(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                left,
+                up,
+                color,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            );
+        }
+
+        // `RB_SurfaceOrientedQuad`: the quad spans the entity's own `axis[1]` and `axis[2]`, not the view's, so it keeps its world orientation.
+        //
+        // The MP tree reads the two axis rows directly.
+        // The SP tree derives both from `axis[0]` through `MakeNormalVectors`, which MP leaves commented out.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:177-220
+        refEntityType_t::RT_ORIENTED_QUAD => {
+            let radius = e.radius;
+            //	MakeNormalVectors( backEnd.currentEntity->e.axis[0], left, up );
+            let mut left = e.axis[1];
+            let mut up = e.axis[2];
+
+            if e.rotation == 0.0 {
+                VectorScale(left, radius, &mut left);
+                VectorScale(up, radius, &mut up);
+            } else {
+                let ang = (PI * e.rotation as f64 / 180.0) as f32;
+                let s = ang.sin();
+                let c = ang.cos();
+
+                // Use a temp so we don't trash the values we'll need later
+                let mut temp_left: vec3_t = [0.0; 3];
+                VectorScale(left, c * radius, &mut temp_left);
+                VectorMA(temp_left, -s * radius, up, &mut temp_left);
+
+                let mut temp_up: vec3_t = [0.0; 3];
+                VectorScale(up, c * radius, &mut temp_up);
+                // no need to use the temp anymore, so copy into the dest vector ( up )
+                VectorMA(temp_up, s * radius, left, &mut up);
+
+                // This was copied for safekeeping, we're done, so we can move it back to left
+                left = temp_left;
+            }
+
+            if view.isMirror != 0 {
+                VectorSubtract(vec3_origin, left, &mut left);
+            }
+
             add_quad_stamp_ext(
                 &mut verts,
                 &mut indices,
@@ -4636,14 +5405,180 @@ fn build_entity_geometry(e: &refEntity_t, view: &viewParms_t) -> (Vec<WorldVerte
 
             // Big hilt sprite
             //
-            //TODO: Port RB_SurfaceSaberGlow's random hilt radius
+            // The quarter-unit pulse draws from the backend's own C runtime stream, per DEC-66 ruling 1.
+            // Retail runs one process-wide stream instead, and ruling 3 accepts the split as a divergence on cosmetic geometry.
             // Source: oracle/codemp/renderer/tr_surface.cpp:579
-            // The oracle radius is `5.5f + random() * 0.25f`. `random()` is
-            // `rand()/32768` off the ambient C generator, which the render
-            // thread does not own and which no image golden can pin. The low
-            // end of the same quarter-unit span stands in until a render-side
-            // generator lands.
-            do_sprite(&mut verts, &mut indices, e.origin, 5.5, 0.0, color, view);
+            do_sprite(
+                &mut verts,
+                &mut indices,
+                e.origin,
+                5.5 + rng.random() * 0.25,
+                0.0,
+                color,
+                view,
+            );
+        }
+
+        // `RB_SurfaceCylinder`: two rings of points around `axis[0]`, joined into a closed ring of quads.
+        // The segment count drops with distance.
+        //
+        // `e.radius` scales the ring that translates to `e.oldorigin`, and `e.rotation` scales the ring that translates to `e.origin`.
+        // Raven's own `upper_points` and `lower_points` names run the other way from its header comment, so the code is the authority here.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:853-953
+        refEntityType_t::RT_CYLINDER => {
+            // `#define NUM_CYLINDER_SEGMENTS 32`
+            // Source: oracle/codemp/renderer/tr_surface.cpp:815
+            const NUM_CYLINDER_SEGMENTS: i32 = 32;
+
+            // Work out the detail level of this cylinder
+            let mut midpoint: vec3_t = [0.0; 3];
+            VectorAdd(e.origin, e.oldorigin, &mut midpoint);
+            VectorScale(midpoint, 0.5, &mut midpoint); // Average start and end
+
+            VectorSubtract(midpoint, view.ori.origin, &mut midpoint);
+            let mut length = VectorNormalize(&mut midpoint);
+
+            // this doesn't need to be perfect....just a rough compensation for zoom level is enough
+            length *= view.fovX / 90.0;
+
+            let mut detail = 1.0 - (length / 1024.0);
+            let mut segments = (NUM_CYLINDER_SEGMENTS as f32 * detail) as i32;
+
+            // 3 is the absolute minimum, but the pop between 3-8 is too noticeable
+            if segments < 8 {
+                segments = 8;
+            }
+
+            if segments > NUM_CYLINDER_SEGMENTS {
+                segments = NUM_CYLINDER_SEGMENTS;
+            }
+
+            // Get the direction vector
+            let mut vr: vec3_t = [0.0; 3];
+            let mut vu: vec3_t = [0.0; 3];
+            MakeNormalVectors(e.axis[0], &mut vr, &mut vu);
+
+            let mut v1: vec3_t = [0.0; 3];
+            VectorScale(vu, e.radius, &mut v1); // size1
+            VectorScale(vu, e.rotation, &mut vu); // size2
+
+            // Calculate the step around the cylinder
+            detail = 360.0 / segments as f32;
+
+            // Raven's two ring arrays are function-local statics, and every element is written before it is read on each call.
+            // They are per-call scratch, so they become owned locals here.
+            let mut upper_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+            let mut lower_points = [[0.0f32; 3]; NUM_CYLINDER_SEGMENTS as usize];
+
+            for i in 0..segments {
+                // Upper ring
+                let mut point: vec3_t = [0.0; 3];
+                RotatePointAroundVector(&mut point, e.axis[0], vu, detail * i as f32);
+                VectorAdd(point, e.origin, &mut upper_points[i as usize]);
+
+                // Lower ring
+                RotatePointAroundVector(&mut point, e.axis[0], v1, detail * i as f32);
+                VectorAdd(point, e.oldorigin, &mut lower_points[i as usize]);
+            }
+
+            // Calculate the texture coords so the texture can wrap around the whole cylinder
+            detail = 1.0 / segments as f32;
+
+            let mut quad = [polyVert_t {
+                xyz: [0.0; 3],
+                st: [0.0; 2],
+                modulate: [0; 4],
+            }; 4];
+
+            for i in 0..segments {
+                let next_segment = if i + 1 < segments { i + 1 } else { 0 };
+
+                quad[0].xyz = upper_points[i as usize];
+                quad[0].st[1] = 1.0;
+                quad[0].st[0] = detail * i as f32;
+                quad[0].modulate = e.shaderRGBA;
+
+                quad[1].xyz = lower_points[i as usize];
+                quad[1].st[1] = 0.0;
+                quad[1].st[0] = detail * i as f32;
+                quad[1].modulate = e.shaderRGBA;
+
+                quad[2].xyz = lower_points[next_segment as usize];
+                quad[2].st[1] = 0.0;
+                quad[2].st[0] = detail * (i + 1) as f32;
+                quad[2].modulate = e.shaderRGBA;
+
+                quad[3].xyz = upper_points[next_segment as usize];
+                quad[3].st[1] = 1.0;
+                quad[3].st[0] = detail * (i + 1) as f32;
+                quad[3].modulate = e.shaderRGBA;
+
+                do_cylinder_part(&mut verts, &mut indices, &quad);
+            }
+        }
+
+        // `RB_SurfaceElectricity`: one jagged bolt from `origin` to `oldorigin`.
+        //
+        // `axis[0][1]` and `axis[0][2]` are not axis components here.
+        // Raven's own inline comments name them the duration and the end time, and the FX submitter fills them that way.
+        //
+        // Source: oracle/codemp/renderer/tr_surface.cpp:1127-1169
+        refEntityType_t::RT_ELECTRICITY => {
+            let radius = e.radius;
+
+            let start = e.origin;
+
+            let mut fwd: vec3_t = [0.0; 3];
+            VectorSubtract(e.oldorigin, start, &mut fwd);
+            let dis = VectorNormalize(&mut fwd);
+
+            // see if we should grow from start to end
+            let mut perc = 1.0f32;
+            if (e.renderfx & RF_GROW) != 0 {
+                perc = 1.0 - (e.axis[0][2] - refdef_time as f32) / e.axis[0][1];
+
+                if perc > 1.0 {
+                    perc = 1.0;
+                } else if perc < 0.0 {
+                    perc = 0.0;
+                }
+            }
+
+            // The oracle writes the grown endpoint back into the shared entity array and reads it straight back.
+            // The write lands in a local here, an accepted divergence a portal or a mirror view would make visible.
+            // The dead `RF_FORKED` branch would also read the un-grown `e.oldorigin`,
+            // where the oracle's fork read at `:1107` sees the grown value the write at `:1159` left.
+            // Source: oracle/codemp/renderer/tr_surface.cpp:1159
+            let mut end: vec3_t = [0.0; 3];
+            VectorMA(start, perc * dis, fwd, &mut end);
+
+            // compute side vector
+            let mut v1: vec3_t = [0.0; 3];
+            let mut v2: vec3_t = [0.0; 3];
+            VectorSubtract(start, view.ori.origin, &mut v1);
+            VectorSubtract(end, view.ori.origin, &mut v2);
+            let mut right: vec3_t = [0.0; 3];
+            CrossProduct(v1, v2, &mut right);
+            VectorNormalize(&mut right);
+
+            // DEC-66 ruling 2 threads the entity's own seed as a local.
+            // The dropped write is unobservable until portal or mirror views draw,
+            // because a second view of the same frame would read the mutated `oldorigin` and seed.
+            let mut seed: c_int = e.frame;
+            do_bolt_seg(
+                &mut verts,
+                &mut indices,
+                e,
+                &mut seed,
+                start,
+                end,
+                right,
+                radius,
+                color,
+                shape,
+                rng,
+            );
         }
 
         _ => {}

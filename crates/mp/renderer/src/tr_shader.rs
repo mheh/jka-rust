@@ -5960,30 +5960,10 @@ pub fn CreateExternalShaders(
     );
 }
 
-/// Raven `R_RemapShader` — wave 9.
+/// Raven `R_RemapShader` — points every shader with `shader_name`'s stripped name at `new_shader_name`'s shader.
 ///
-/// DEFERRED, whole-fn loud stub — but no longer field-blocked. The
-/// `lightmapsNone`/`stylesDefault` arguments to `RE_RegisterShaderLightMap`
-/// (`:281`, `:291`) landed as file-scope consts above, and campaign #41
-/// batch 1 landed both destination fields on `ShaderAsset`
-/// (`render_state/shader_asset.rs`):
-/// - `remapped_shader: Option<ShaderHandle>` — `sh->remappedShader = sh2;`/
-///   `= NULL;` (`:307,309`), Raven `struct shader_s *remappedShader`
-///   (`oracle/codemp/renderer/tr_local.h:528`), under the tier-2 transition
-///   audit's Group 2 self-pointer -> handle row; and
-/// - `time_offset: f32` — `sh2->timeOffset = atof(timeOffset);` (`:314`),
-///   Raven `float timeOffset` (`oracle/codemp/renderer/tr_local.h:511`).
-///
-/// What is left is the transcription itself — the two `R_FindShaderByName`/
-/// `RE_RegisterShaderLightMap` lookups plus the `hashTable[hash]` chain walk
-/// (`:304-312`), representable via `RenderAssets::shader_lookup`'s
-/// stripped-name bucket per this packet's STATE HOMES row — which is a
-/// follow-up port, not a field gap.
-///
-/// `sh == NULL || sh == tr.defaultShader` collapses to
-/// `sh == ShaderHandle::slot_zero()` once implemented (`R_FindShaderByName`'s
-/// existing doc comment: slot zero already IS the live default shader by
-/// construction, A12) — noted here for whichever wave finishes this stub.
+/// Raven's `sh == NULL || sh == tr.defaultShader` collapses to `sh == ShaderHandle::slot_zero()`, because slot zero is the live default shader by construction (A12).
+/// The remap lands on `ShaderAsset::remapped_shader`, which the draw path already consults, and `time_offset` on `ShaderAsset::time_offset`.
 ///
 /// Source: `oracle/codemp/renderer/tr_shader.cpp:273-316`
 #[allow(clippy::too_many_arguments)]
@@ -6000,24 +5980,75 @@ pub fn R_RemapShader(
     img_state: &mut TrImageState,
     sky_view: &mut viewParms_t,
 ) {
-    let _ = (
-        shader_name,
-        new_shader_name,
-        time_offset,
-        qs,
-        world_load,
-        assets,
-        view,
-        cvars,
-        models,
-        img_state,
-        sky_view,
-    );
-    // DEFERRED: body not transcribed — the destination fields exist now, the
-    // lookup/hash-chain walk does not. See doc comment above.
-    todo!(
-        "Port R_RemapShader — oracle/codemp/renderer/tr_shader.cpp:273-316 (lookup + hashTable chain walk not transcribed)"
-    );
+    let mut sh = R_FindShaderByName(assets, Some(shader_name));
+    if sh == ShaderHandle::slot_zero() {
+        let h = RE_RegisterShaderLightMap(
+            shader_name,
+            &lightmapsNone,
+            &stylesDefault,
+            qs,
+            world_load,
+            assets,
+            view,
+            cvars,
+            models,
+            img_state,
+            sky_view,
+        );
+        sh = R_GetShaderByHandle(assets, view.common, h);
+    }
+    if sh == ShaderHandle::slot_zero() {
+        com_printf(
+            view.common,
+            &format!("^3WARNING: R_RemapShader: shader {shader_name} not found\n"),
+        );
+        return;
+    }
+
+    let mut sh2 = R_FindShaderByName(assets, Some(new_shader_name));
+    if sh2 == ShaderHandle::slot_zero() {
+        let h = RE_RegisterShaderLightMap(
+            new_shader_name,
+            &lightmapsNone,
+            &stylesDefault,
+            qs,
+            world_load,
+            assets,
+            view,
+            cvars,
+            models,
+            img_state,
+            sky_view,
+        );
+        sh2 = R_GetShaderByHandle(assets, view.common, h);
+    }
+    if sh2 == ShaderHandle::slot_zero() {
+        com_printf(
+            view.common,
+            &format!("^3WARNING: R_RemapShader: new shader {new_shader_name} not found\n"),
+        );
+        return;
+    }
+
+    // remap all the shaders with the given name
+    // even tho they might have different lightmaps
+    // Raven's `hashTable[hash]` chain walk lands on `shader_lookup`'s stripped-name bucket, the same fold `GeneratePermanentShader` uses.
+    let stripped_name = COM_StripExtension(shader_name);
+    let candidates: Vec<ShaderHandle> = assets
+        .shader_lookup
+        .get(&stripped_name)
+        .map(|bucket| bucket.clone())
+        .unwrap_or_default();
+    for handle in candidates {
+        if let Some(shader) = assets.shaders.get_mut(handle) {
+            shader.remapped_shader = if handle != sh2 { Some(sh2) } else { None };
+        }
+    }
+    if let Some(time_offset) = time_offset {
+        if let Some(shader2) = assets.shaders.get_mut(sh2) {
+            shader2.time_offset = atof(time_offset) as f32;
+        }
+    }
 }
 
 /// Raven `R_MergeShaders` — wave 9.
