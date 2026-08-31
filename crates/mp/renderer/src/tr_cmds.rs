@@ -17,6 +17,7 @@ use mp_qshared::shared::qhandle_t;
 use std::mem;
 use std::sync::Arc;
 
+use crate::render_state::bmodel_table::BModelTable;
 use crate::render_state::capture_request::CaptureRequest;
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
@@ -355,6 +356,21 @@ pub fn RE_EndFrame(
     // This sits above the sink match, so the flag drains with no sink installed too.
     if let Some(blocks) = rm.publish_blocks() {
         sim.publish_models(blocks);
+    }
+
+    // A `#`-prefixed registration loads a sub-BSP instance after the main world already uploaded, and the render
+    // thread uploads geometry only on a world generation.
+    // The drain rebuilds the whole generation, so the instance's surfaces reach the one buffer pair and the walk
+    // marks grow to cover them.
+    // `pending_world` is an `Option` the package takes, so a batch of registrations between two frames coalesces
+    // into one upload.
+    // The overwrite is correct on a frame that already holds a map-load generation, because that generation's
+    // `BModelTable` was built before the registrations and is the stale one.
+    if rm.take_worlds_dirty() {
+        *pending_world = Some(WorldGeneration {
+            world: sim.published.world.clone(),
+            bmodels: BModelTable::build(rm),
+        });
     }
 
     // DEFERRED: `cmd = R_GetCommandBuffer(sizeof(*cmd)); if (!cmd) return;

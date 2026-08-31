@@ -133,6 +133,12 @@ pub struct RenderModels {
     /// The dedicated server marks slots with no render thread to publish to, and this flag is what lets that stay
     /// inert instead of failing.
     pub(crate) blocks_dirty: bool,
+
+    /// Set when a `#`-prefixed registration loaded a new sub-BSP instance, cleared when `RE_EndFrame` republishes the
+    /// world generation. The render thread uploads geometry only on a generation, so a late instance needs one.
+    ///
+    /// No oracle counterpart: Raven's renderer has one thread and reads `tr.bspModels` in place.
+    pub(crate) worlds_dirty: bool,
 }
 
 impl Default for RenderModels {
@@ -156,6 +162,7 @@ impl Default for RenderModels {
             bmodel_indices: HashMap::new(),
             blocks: ModelBlocks::default(),
             blocks_dirty: false,
+            worlds_dirty: false,
         }
     }
 }
@@ -384,6 +391,14 @@ impl RenderModels {
     /// (`RE_RegisterModel_Actual` hash lookup)
     pub fn handle_for_name(&self, name: &str) -> Option<qhandle_t> {
         self.hash.get(&name.to_ascii_lowercase()).copied()
+    }
+
+    /// Takes the sub-BSP dirty flag, `true` once per batch of instance registrations.
+    /// `RE_EndFrame` drains this once per frame and republishes the world generation on a `true`.
+    pub(crate) fn take_worlds_dirty(&mut self) -> bool {
+        let dirty = self.worlds_dirty;
+        self.worlds_dirty = false;
+        dirty
     }
 
     /// The published block registry, but only when a registration, an eviction or a reset changed it since the

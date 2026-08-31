@@ -962,6 +962,9 @@ fn RE_RegisterModel_Actual(
             assets.bsp_models.resize_with(slot + 1, WorldAsset::default);
         }
         assets.bsp_models[slot] = world;
+        // The main world already uploaded, so the render thread needs a fresh world generation to take this
+        // instance's geometry. `RE_EndFrame` drains the flag.
+        rm.worlds_dirty = true;
 
         let temp = format!("*{}-0", rm.num_bsp_models);
         if let Some(&handle) = rm.hash.get(&temp.to_ascii_lowercase()) {
