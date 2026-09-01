@@ -87,6 +87,16 @@ pub struct EngineHooks {
     /// Source: `oracle/codemp/null/null_client.cpp:19-20`
     pub Key_WriteBindings: Option<fn(&mut EngineHostView, fileHandle_t)>,
 
+    // ---- client tier: the `#ifndef DEDICATED` calls `null_client.cpp` never defines ----
+    /// Source: `oracle/codemp/client/cl_main.cpp:657`
+    pub CL_ShutdownAll: Option<fn(&mut EngineHostView)>,
+    /// Source: `oracle/codemp/client/cl_cgame.cpp:595`
+    pub CL_ShutdownCGame: Option<fn(&mut EngineHostView)>,
+    /// Source: `oracle/codemp/client/cl_ui.cpp:1444`
+    pub CL_ShutdownUI: Option<fn(&mut EngineHostView)>,
+    /// Source: `oracle/codemp/client/cl_cin.cpp:126`
+    pub CIN_CloseAllVideos: Option<fn(&mut EngineHostView)>,
+
     // ---- sound tier (null-build defaults; `null_snddma.cpp`) ----
     /// Source: `oracle/codemp/null/null_snddma.cpp:46-49`
     pub SND_FreeOldestSound: Option<fn(&mut EngineHostView) -> c_int>,
@@ -197,6 +207,10 @@ impl EngineHooks {
             CL_GameCommand: Some(CL_GameCommand_null),
             UI_GameCommand: Some(UI_GameCommand_null),
             Key_WriteBindings: Some(Key_WriteBindings_null),
+            CL_ShutdownAll: Some(CL_ShutdownAll_null),
+            CL_ShutdownCGame: Some(CL_ShutdownCGame_null),
+            CL_ShutdownUI: Some(CL_ShutdownUI_null),
+            CIN_CloseAllVideos: Some(CIN_CloseAllVideos_null),
             SND_FreeOldestSound: Some(SND_FreeOldestSound_null),
             SND_RegisterAudio_LevelLoadEnd: Some(SND_RegisterAudio_LevelLoadEnd_null),
             SV_Shutdown: None,
@@ -307,6 +321,31 @@ fn UI_GameCommand_null(_view: &mut EngineHostView) -> qboolean {
 /// Raven null `Key_WriteBindings`. Source: `oracle/codemp/null/null_client.cpp:19-20`
 #[allow(non_snake_case)]
 fn Key_WriteBindings_null(_view: &mut EngineHostView, _f: fileHandle_t) {}
+
+// ---- guard-excised client bodies ----
+//
+// `null_client.cpp` defines none of the four functions below.
+// Raven's dedicated build removes the call site with an `#ifndef DEDICATED` guard instead, so each null body cites that guard.
+
+/// The dedicated build never calls `CL_ShutdownAll`.
+/// Source: `oracle/codemp/server/sv_init.cpp:513-516`
+#[allow(non_snake_case)]
+fn CL_ShutdownAll_null(_view: &mut EngineHostView) {}
+
+/// The dedicated build never calls `CL_ShutdownCGame`.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:754-757`
+#[allow(non_snake_case)]
+fn CL_ShutdownCGame_null(_view: &mut EngineHostView) {}
+
+/// The dedicated build never calls `CL_ShutdownUI`.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:754-757`
+#[allow(non_snake_case)]
+fn CL_ShutdownUI_null(_view: &mut EngineHostView) {}
+
+/// The dedicated build never calls `CIN_CloseAllVideos`.
+/// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:760-762`
+#[allow(non_snake_case)]
+fn CIN_CloseAllVideos_null(_view: &mut EngineHostView) {}
 
 // ---- null_snddma.cpp bodies (faithful no-op ports) ----
 
