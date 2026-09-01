@@ -808,16 +808,32 @@ pub fn Hunk_FreeTempMemory(common: &mut Common, buf: *mut ()) {
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:752-782`
 pub fn Hunk_Clear(view: &mut EngineHostView) {
-    // DEDICATED: this is the dedicated-server build (§20/§C10 precedent —
-    // the engine-fork-discovery rulings treat DEDICATED as the live
-    // configuration), so the `#ifndef DEDICATED` client blocks
-    // (CL_ShutdownCGame/CL_ShutdownUI/CIN_CloseAllVideos) are dropped.
+    // The three client hooks in this function answer with a no-op on `jampded`, which reproduces Raven's `#ifndef DEDICATED` guards.
+    // The two shutdown calls must run before `VM_Clear` below, because each one nulls the client's own VM handle.
+    // A handle left set across `VM_Clear` addresses whichever module `VM_Create` seats in that slot next.
+    let cl_shutdown_cgame = view
+        .common
+        .hooks
+        .CL_ShutdownCGame
+        .expect("CL_ShutdownCGame hook");
+    cl_shutdown_cgame(view);
+
+    let cl_shutdown_ui = view.common.hooks.CL_ShutdownUI.expect("CL_ShutdownUI hook");
+    cl_shutdown_ui(view);
+
     let sv_shutdown_game_progs = view
         .common
         .hooks
         .SV_ShutdownGameProgs
         .expect("SV_ShutdownGameProgs hook — installed by mp_engine_server at boot");
     sv_shutdown_game_progs(view);
+
+    let cin_close_all_videos = view
+        .common
+        .hooks
+        .CIN_CloseAllVideos
+        .expect("CIN_CloseAllVideos hook");
+    cin_close_all_videos(view);
 
     view.common.hunk_tag = memtag_t::TAG_HUNK_MARK1;
     Z_TagFree(view.common, memtag_t::TAG_HUNK_MARK1);
