@@ -55,7 +55,8 @@ use mp_qshared::shared::file_mode::fsMode_t;
 use mp_qshared::shared::shared_ik_move_params::sharedIKMoveParams_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use mp_renderer::hook_install::{re_from_view, rm_from_view};
-use mp_renderer::tr_cmds::{RE_SetColor, RE_StretchPic};
+use mp_renderer::render_state::frame_event::FrameEvent;
+use mp_renderer::tr_cmds::{RE_RenderWorldEffects, RE_SetColor, RE_StretchPic};
 use mp_renderer::tr_ghoul2::build_ghoul2_render_payload;
 use mp_renderer::tr_font::{
     AnyLanguage_ReadCharFromString, GetLanguageEnum, Language_IsAsian, Language_UsesSpaces,
@@ -1362,6 +1363,14 @@ pub fn CL_UISystemCalls(
         let fd = unsafe { vma(view.common, args, 1) } as *const refdef_t;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
+        // Raven queues the weather command as the last act of a scene, so the step runs here.
+        // The count taken before the call is what makes the step follow this scene and no other.
+        // `RE_RenderScene` returns before it pushes anything under `r_norefresh`, and the last event is then an earlier scene's.
+        // A grown count plus a `RenderScene` tail therefore means this call sealed that event.
+        // Weather steps zero times under `r_norefresh`, which is what retail does.
+        // The backend never reaches `RB_RenderWorldEffects` on such a frame.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:868, crates/mp/renderer/src/tr_scene.rs:1200-1202
+        let events_before = re.frame_data.events.len();
         // SAFETY: `VMA(1)` is the module's `refdef_t` (porting-rules §D11).
         RE_RenderScene(
             unsafe { &*fd },
@@ -1372,6 +1381,23 @@ pub fn CL_UISystemCalls(
             view.common,
             &re.sim.light_styles,
         );
+        let scene_refdef = match re.frame_data.events.last() {
+            Some(FrameEvent::RenderScene { refdef, .. })
+                if re.frame_data.events.len() > events_before =>
+            {
+                Some(refdef.clone())
+            }
+            _ => None,
+        };
+        if let Some(refdef) = scene_refdef {
+            RE_RenderWorldEffects(
+                &mut re.frame_data,
+                &mut re.world_effects,
+                &re.sim.published,
+                &refdef,
+                view,
+            );
+        }
         0
     } else if trap == MpUiImport::UI_R_SETCOLOR as c_int {
         unsafe {

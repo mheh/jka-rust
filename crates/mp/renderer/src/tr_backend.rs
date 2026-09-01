@@ -12,16 +12,16 @@ use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common::Common;
 use mp_engine_qcommon::timing::sys_milliseconds;
 use mp_qshared::shared::error_parm::errorParm_t;
-use native_math::rng::Rng;
 
 use crate::render_state::frame_data::FrameData;
 use crate::render_state::frame_event::FrameEvent;
 use crate::render_state::frame_state::FrameState;
 use crate::render_state::image_asset::ImageHandle;
-use crate::render_state::placeholders::Vec3;
+use crate::render_state::placeholders::{TrRefdef, Vec3};
 use crate::render_state::render_assets::RenderAssets;
 use crate::render_state::renderer_cvars::RendererCvars;
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::weather_frame::WeatherFrame;
 use crate::tr_cmds::R_SyncRenderThread;
 use crate::tr_image::{
     PendingUpload, R_Images_GetNextIteration, R_Images_StartIteration, TrImageState,
@@ -29,7 +29,7 @@ use crate::tr_image::{
 use crate::tr_local::cull_type_t::cullType_t;
 use crate::tr_main::{DrawSurf, SurfaceGeometry};
 use crate::tr_public::ref_flags::RDF_NOWORLDMODEL;
-use crate::tr_worldeffects::world_effects::{WindZoneState, WorldEffectsState};
+use crate::tr_worldeffects::world_effects::WorldEffectsState;
 
 // `R_WorldCoordToScreenCoordFloat` threads `RenderAssets::glconfig`
 // (`crate::render_state::placeholders::GlConfig`) and `FrameState::refdef`
@@ -903,21 +903,21 @@ pub fn RB_SwapBuffers(
 /// Source: `oracle/codemp/renderer/tr_backend.cpp:1886-1905`
 pub fn RB_WorldEffects(
     world_effects: &mut WorldEffectsState,
-    wind: &mut WindZoneState,
     assets: &RenderAssets,
-    frame: &FrameState,
+    refdef: &TrRefdef,
     host: &mut EngineHostView,
-    rng: &mut Rng,
-) {
+) -> WeatherFrame {
     // DEFERRED: R4 — tess.shader && tess.numIndexes guard + RB_EndSurface()
     // flush (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1893-1896
 
-    world_effects.RB_RenderWorldEffects(wind, assets, frame, host, rng);
+    let weather = world_effects.RB_RenderWorldEffects(assets, refdef, host);
 
     // DEFERRED: R4 — tess.shader guard + RB_BeginSurface(tess.shader,
     // tess.fogNum) reopen (see doc comment above)
     // Source: oracle/codemp/renderer/tr_backend.cpp:1899-1902
+
+    weather
 }
 
 /// Raven `RB_StretchPic` — the `RC_STRETCH_PIC` backend command: draws a
