@@ -4456,7 +4456,7 @@ fn alpha_func_code(state_bits: u32) -> u32 {
     }
 }
 
-/// Converges one weather billboard vertex into the GPU vertex row, which is where the colour quantizes.
+/// Converts one weather billboard vertex into the GPU vertex row, which is where the colour quantizes.
 ///
 /// `qglColor4f` takes floats and the fixed-function pipeline converts them to fixed point before it interpolates.
 /// `WorldVertex` carries `[u8; 4]`, and every other billboard in the port goes through it, so the rounding lands here at one site.

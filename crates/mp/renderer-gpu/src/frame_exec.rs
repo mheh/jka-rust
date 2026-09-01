@@ -177,7 +177,9 @@ impl Warned {
             Warned::SceneEvent => {
                 "skips scene composition (lights, polys, decals) — not rendered yet"
             }
-            Warned::Other => "skips world-effect / automap commands — not rendered yet",
+            Warned::Other => {
+                "skips an automap or world-effect-command event, and skips a weather batch that no scene preceded"
+            }
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
             Warned::NoStageImage => "drew a stage whose image is not uploaded — white",
             Warned::NoWorldGeometry => "got a RenderScene before the world geometry uploaded",
@@ -682,13 +684,9 @@ impl FrameExecutor {
                                 cvars,
                             );
 
-                            stats.world.weather_vertices += self.pipeline3d.draw_weather(
-                                gpu,
-                                target,
-                                weather,
-                                &view,
-                                gpu_images,
-                            );
+                            stats.world.weather_vertices += self
+                                .pipeline3d
+                                .draw_weather(gpu, target, weather, &view, gpu_images);
                         }
                         None => {
                             // No scene came ahead of this event, so there is no view to draw it under.

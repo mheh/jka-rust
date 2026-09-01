@@ -18,7 +18,7 @@ use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::{
     errorParm_t, CONTENTS_INSIDE, CONTENTS_OUTSIDE, CONTENTS_SOLID, CONTENTS_WATER,
 };
-use native_math::qmath::{MakeNormalVectors, VectorNormalize, _DotProduct};
+use native_math::qmath::{_DotProduct, MakeNormalVectors, VectorNormalize};
 use native_math::rng::{Rng, RAND_MAX};
 use native_string::atoi;
 
@@ -1718,8 +1718,7 @@ impl WorldEffectsState {
                     }
                 }
                 self.wind.global_wind_direction = self.wind.global_wind_velocity;
-                self.wind.global_wind_speed =
-                    VectorNormalize(&mut self.wind.global_wind_direction);
+                self.wind.global_wind_speed = VectorNormalize(&mut self.wind.global_wind_direction);
             }
 
             // Update All Particle Clouds
@@ -2375,7 +2374,9 @@ mod tests {
 
         let mut rng = Rng::default();
         rng.srand(SEED);
-        cloud.Update(&mut rng, &outside, [0.0; 3], VIEW_AXIS, false, [0.0; 3], 0.02);
+        cloud.Update(
+            &mut rng, &outside, [0.0; 3], VIEW_AXIS, false, [0.0; 3], 0.02,
+        );
 
         assert_eq!(
             rng.rand(),

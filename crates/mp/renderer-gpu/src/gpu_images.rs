@@ -555,11 +555,6 @@ impl GpuImages {
     }
 }
 
-/// Bilinear in both directions, matching `R_RegisterShaderNoMip`'s
-/// `GL_LINEAR` 2D images; `address_mode` carries the image's
-/// `wrapClampMode`.
-///
-/// Source: `oracle/codemp/renderer/tr_shader.cpp` (`R_RegisterShaderNoMip`)
 /// The nearest-filtered clamping sampler a `mFilterMode != 0` weather cloud binds.
 /// Both the min and the mag filter are nearest, and neither uses mips.
 ///
@@ -576,6 +571,11 @@ fn create_nearest_sampler(device: &wgpu::Device) -> Sampler {
     })
 }
 
+/// Bilinear in both directions, matching `R_RegisterShaderNoMip`'s
+/// `GL_LINEAR` 2D images; `address_mode` carries the image's
+/// `wrapClampMode`.
+///
+/// Source: `oracle/codemp/renderer/tr_shader.cpp` (`R_RegisterShaderNoMip`)
 fn create_sampler(device: &wgpu::Device, address_mode: AddressMode, label: &str) -> Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some(&format!("mp_renderer_gpu 2d sampler ({label})")),
