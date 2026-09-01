@@ -1,7 +1,8 @@
 //! The `vm_t` slot-aliasing pin for gh#56.
 //!
 //! `VM_Clear` wipes every `vmTable` slot, and `VM_Create` hands the first empty slot to the next module.
-//! A slot address held across that pair therefore names whichever module arrives next, and the holder never learns.
+//! A slot address held across that pair therefore names whichever module arrives next.
+//! No signal reports that change to the holder.
 //! This test drives the real lookup loop over a seated table, so a future change to either function fails here.
 
 #![allow(non_snake_case)]
@@ -14,7 +15,7 @@ use mp_engine_qcommon::qcommon::vm_interpret_t::vmInterpret_t;
 use mp_engine_qcommon::vm_fns::{VM_Clear, VM_Create};
 use native_platform::entrypoints::{AbiCommand, AbiWord, RawVmMain};
 
-/// Stands in for a module's `vmMain`, so a seated slot looks loaded without a dylib on disk.
+/// This stub replaces a module's `vmMain`, so a seated slot looks loaded without a dylib on disk.
 /// The test never calls it.
 extern "C-unwind" fn stub_vm_main(
     _command: AbiCommand,
@@ -34,7 +35,7 @@ extern "C-unwind" fn stub_vm_main(
     0
 }
 
-/// Stands in for the engine syscall table `VM_Create` demands in its bad-parms guard.
+/// This stub replaces the engine syscall table that `VM_Create` demands in its bad-parms guard.
 /// The test never calls it.
 extern "C" fn stub_syscall(_args: *mut c_int) -> c_int {
     0
