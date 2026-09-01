@@ -2241,8 +2241,9 @@ pub fn CL_CgameSystemCalls(
         // Raven queues the weather command as the last act of a scene, so the step runs here.
         // The count taken before the call is what makes the step follow this scene and no other.
         // `RE_RenderScene` returns before it pushes anything under `r_norefresh`, and the last event is then an earlier scene's.
-        // A grown count plus a `RenderScene` tail therefore means this call sealed that event, and weather steps zero times under
-        // `r_norefresh`, which is what retail does: the backend never reaches `RB_RenderWorldEffects` on such a frame.
+        // A grown count plus a `RenderScene` tail therefore means this call sealed that event.
+        // Weather steps zero times under `r_norefresh`, which is what retail does.
+        // The backend never reaches `RB_RenderWorldEffects` on such a frame.
         // Source: oracle/codemp/renderer/tr_scene.cpp:868, crates/mp/renderer/src/tr_scene.rs:1200-1202
         let events_before = re.frame_data.events.len();
         RE_RenderScene(

@@ -1567,8 +1567,9 @@ impl Pipeline3d {
     }
 
     /// The GPU half of Raven `CWeatherParticleCloud::Render`: one draw per cloud, after the world pass, depth-tested and depth-write off.
-    /// The pass sets its own viewport and scissor from `view`, the same values the world pass used, because `SetViewportAndScissor` is retired at the CPU site.
-    /// The pass draws two-sided. That is faithful, not incidental: Raven sets `GL_Cull(CT_TWO_SIDED)` for weather at `oracle/codemp/renderer/tr_WorldEffects.cpp:1362`.
+    /// The pass sets its own viewport and scissor from `view`, the same values the world pass used.
+    /// `SetViewportAndScissor` is retired at the CPU site.
+    /// The pass draws two-sided, which Raven asks for at `oracle/codemp/renderer/tr_WorldEffects.cpp:1362`.
     /// The pass loads both attachments, so the world the previous pass drew stays and its depth still occludes the billboards.
     /// Returns the vertex count drawn, which the frame stats report.
     ///

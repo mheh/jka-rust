@@ -1,4 +1,4 @@
-//! `weather_frame` — the seam payload one frame of weather billboards crosses on.
+//! `weather_frame` - the seam payload one frame of weather billboards crosses on.
 //!
 //! Raven's `CWeatherParticleCloud::Render` is a self-contained fixed-function GL block with no `shader_t`, no `tess`, and no `drawSurf_t`.
 //! These three carrier types are port-invented, not ported Raven types, so the one-type-per-file rule does not split them.
@@ -35,8 +35,9 @@ pub struct WeatherCloudBatch {
 /// Every cloud's batch for one frame, in `mParticleClouds` order.
 /// The order is the oracle's own draw order, and later clouds blend over earlier ones.
 ///
-/// This type deliberately carries no view. The positional invariant stands in its place: one weather batch per frame, built from the world
-/// scene's refdef, with its `FrameEvent` emitted inside that scene's event span, so the executor draws it under the view that built it.
+/// This type deliberately carries no view.
+/// The positional invariant stands in its place: one weather batch per frame, built from the world scene's refdef,
+/// with its `FrameEvent` emitted inside that scene's event span, so the executor draws it under the view that built it.
 /// A future multi-view consumer revisits this as its own ruling.
 ///
 /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1569-1574`

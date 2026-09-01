@@ -244,11 +244,12 @@ pub fn RE_RotatePic2(
     });
 }
 
-/// Raven `RE_RenderWorldEffects` — steps the scene's weather and queues its batch.
+/// Raven `RE_RenderWorldEffects` - steps the scene's weather and queues its batch.
 /// Raven's bufferless `RC_WORLD_EFFECTS` marker becomes the frame's `WorldEffects` event, which carries the batch the pass draws.
 /// The caller passes the submitted scene's own refdef, so the guard gates on that scene's flags and not on a later one's.
 ///
-/// Raven queues the marker once per scene and the backend steps `Update` once per marker, so this fn runs once per `RE_RenderScene` and the counts match.
+/// Raven queues the marker once per scene and the backend steps `Update` once per marker.
+/// This fn therefore runs once per `RE_RenderScene`, and the counts match.
 ///
 /// Source: `oracle/codemp/renderer/tr_cmds.cpp:291-300`
 pub fn RE_RenderWorldEffects(

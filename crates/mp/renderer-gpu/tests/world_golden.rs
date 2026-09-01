@@ -791,9 +791,12 @@ fn step_weather(host: &mut UiHost, frame_data: &mut FrameData) {
 
 /// The weather fixture: the `ctf2` spawn view under the snow and fog `SP_CreateSnow` builds.
 ///
-/// `ctf2` is the one stock MP map that ships weather. Its entity lump carries two `fx_snow` entities and three `misc_weather_zone` brushes.
-/// The rig loads no collision world and runs no cgame, so the point cache reads every cell as outside and the zone list falls back to the
-/// whole map. Both are rig properties. This golden proves the draw path and byte stability, and it proves nothing about zone or cache behavior.
+/// `ctf2` is the one stock MP map that ships weather.
+/// Its entity lump carries two `fx_snow` entities and three `misc_weather_zone` brushes.
+/// The rig loads no collision world and runs no cgame, so the point cache reads every cell as outside,
+/// and the zone list falls back to the whole map.
+/// Both are rig properties.
+/// This golden proves the draw path and byte stability, and it proves nothing about zone or cache behavior.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2522-2527`, `oracle/codemp/renderer/tr_WorldEffects.cpp:1798,1879`
 #[test]
@@ -825,9 +828,10 @@ fn golden_world_weather_ctf2() {
         .unwrap_or([0.0, 0.0, 0.0]);
 
     // ---- pin both generator streams, build the weather, pin them again ---
-    // The first pin covers the commands themselves. `CWeatherParticleCloud::Initialize` picks every particle's `mMass` off the
-    // C runtime stream, and it runs inside `R_WorldEffectCommand`, so the snow and fog commands take 1060 draws before the
-    // second pin. Mass divides the force, so an unpinned draw here gives each particle its own fall rate and the image moves.
+    // The first pin covers the commands themselves.
+    // `CWeatherParticleCloud::Initialize` picks every particle's `mMass` off the C runtime stream, and it runs inside `R_WorldEffectCommand`.
+    // The snow and fog commands therefore take 1060 draws before the second pin.
+    // Mass divides the force, so an unpinned draw here gives each particle its own fall rate and the image moves.
     // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:928-935
     host.re.world_effects.rng.srand(WEATHER_SEED_CRT);
     host.re.world_effects.rng.Rand_Init(WEATHER_SEED_HOLDRAND);

@@ -656,9 +656,10 @@ impl FrameExecutor {
 
                 FrameEvent::WorldEffects(weather) => {
                     // The oracle's `RB_RenderWorldEffects` runs under `backEnd.viewParms`, the view the scene ahead of it built.
-                    // The two inputs `draw_weather` reads are derived, not carried: `R_RotateForViewer` needs the refdef's own
-                    // origin and axis, and `R_SetupProjection` needs the visible bounds the world walk grew, which the view
-                    // state still holds. Rebuilding both here reproduces that view without a carrier of its own.
+                    // `draw_weather` reads two derived inputs rather than carried ones.
+                    // `R_RotateForViewer` needs the refdef's own origin and axis.
+                    // `R_SetupProjection` needs the visible bounds the world walk grew, which the view state still holds.
+                    // Rebuilding both here reproduces that view without a carrier of its own.
                     // Source: oracle/codemp/renderer/tr_main.cpp:1612-1613, oracle/codemp/renderer/tr_WorldEffects.cpp:1523-1525
                     match scene_refdef {
                         Some(refdef) if cvars.skip_back_end == 0 && !weather.is_empty() => {

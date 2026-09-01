@@ -1136,8 +1136,10 @@ impl CWeatherParticleCloud {
     /// Raven `CWeatherParticleCloud::Update`.
     ///
     /// `view_origin` and `view_axis` are `backEnd.viewParms.ori.origin` and `.axis`, threaded rather than reached (porting-rules §B4).
-    /// `RE_RenderScene` fills that orientation straight from the scene refdef (`oracle/codemp/renderer/tr_scene.cpp:848-851`), so the refdef gives the identical values.
-    /// The `orientationr_t` marker is therefore moot, not stale: the placeholder `ViewParms` still carries no `ori` field, and this fn takes the value from the refdef instead.
+    /// `RE_RenderScene` fills that orientation straight from the scene refdef,
+    /// so the refdef gives the identical values (`oracle/codemp/renderer/tr_scene.cpp:848-851`).
+    /// The `orientationr_t` marker is therefore moot rather than stale.
+    /// The placeholder `ViewParms` still carries no `ori` field, and this fn takes the value from the refdef instead.
     /// `outside` is `mOutside`, `frozen` is `mFrozen`, `wind_velocity` is `mGlobalWindVelocity`, and `seconds_elapsed` is `mSecondsElapsed`.
     /// `CVec3`'s `+=`, `-=`, `*=` and `ScaleAdd` are expanded component-wise, because `vec3_t` is `[f32; 3]` under the interior-safety law.
     ///
@@ -1169,7 +1171,8 @@ impl CWeatherParticleCloud {
                 // The two picks draw from different streams: `mRotation` from the C runtime `rand`, and `mRotationChangeTimer` from `holdrand`.
                 self.mRotation.Pick(rng, &mut self.mRotationDeltaTarget);
                 // `Reset` writes `mRotationChangeTimer.mMin` twice and never writes `mMax`, so the range is reversed: min 2000, max 0.
-                // `Q_irand` increments `max` first, so `((result * -1999) >> 15) + 2000` over `result` in `[0, 32767]` lands uniformly in `[1, 2000]`.
+                // `Q_irand` increments `max` first, so the arithmetic is `((result * -1999) >> 15) + 2000`.
+                // Over `result` in `[0, 32767]` that lands uniformly in `[1, 2000]`.
                 // The clamp below therefore never fires, and the rotation interval varies.
                 // Source: oracle/codemp/game/q_math.c:1464-1467
                 self.mRotationChangeNext = self.mRotationChangeTimer.Pick(rng);
@@ -1640,11 +1643,13 @@ impl WorldEffectsState {
 
     /// Raven `RB_RenderWorldEffects`.
     ///
-    /// `assets` is the sim-published `RenderAssets`, which carries `tr.world`, and `host` carries `mOutside.Cache`'s engine and collision access plus `Com_Printf`'s `Common`.
+    /// `assets` is the sim-published `RenderAssets`, which carries `tr.world`.
+    /// `host` carries `mOutside.Cache`'s engine and collision access plus `Com_Printf`'s `Common`.
     /// Both are threaded rather than reached (porting-rules §B4).
     ///
     /// `refdef` is the submitted scene's own refdef, which carries `rdflags` and `frametime`.
-    /// Raven reads `RDF_NOWORLDMODEL` off `tr.refdef` and `RDF_SKYBOXPORTAL` off `backEnd.refdef`, two copies that hold different scenes at backend time.
+    /// Raven reads `RDF_NOWORLDMODEL` off `tr.refdef` and `RDF_SKYBOXPORTAL` off `backEnd.refdef`,
+    /// two copies that hold different scenes at backend time.
     /// The port has one refdef per scene and reads both bits off it.
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1513-1580`
     pub fn RB_RenderWorldEffects(
