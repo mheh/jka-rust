@@ -2238,6 +2238,13 @@ pub fn CL_CgameSystemCalls(
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
         // SAFETY: `VMA(1)` is the module's `refdef_t` (porting-rules §D11).
+        // Raven queues the weather command as the last act of a scene, so the step runs here.
+        // The count taken before the call is what makes the step follow this scene and no other.
+        // `RE_RenderScene` returns before it pushes anything under `r_norefresh`, and the last event is then an earlier scene's.
+        // A grown count plus a `RenderScene` tail therefore means this call sealed that event, and weather steps zero times under
+        // `r_norefresh`, which is what retail does: the backend never reaches `RB_RenderWorldEffects` on such a frame.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:868, crates/mp/renderer/src/tr_scene.rs:1200-1202
+        let events_before = re.frame_data.events.len();
         RE_RenderScene(
             unsafe { &*fd },
             &mut re.frame_data,
@@ -2247,11 +2254,12 @@ pub fn CL_CgameSystemCalls(
             view.common,
             &re.sim.light_styles,
         );
-        // Raven queues the weather command as the last act of a scene, so the step runs here.
-        // `RE_RenderScene` seals the scene with its own refdef, and the weather guard reads that scene's flags rather than a later one's.
-        // Source: oracle/codemp/renderer/tr_scene.cpp:868
         let scene_refdef = match re.frame_data.events.last() {
-            Some(FrameEvent::RenderScene { refdef, .. }) => Some(refdef.clone()),
+            Some(FrameEvent::RenderScene { refdef, .. })
+                if re.frame_data.events.len() > events_before =>
+            {
+                Some(refdef.clone())
+            }
             _ => None,
         };
         if let Some(refdef) = scene_refdef {

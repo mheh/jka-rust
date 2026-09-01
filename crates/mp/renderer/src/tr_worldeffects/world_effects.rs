@@ -1694,10 +1694,9 @@ impl WorldEffectsState {
         // The cache-building frame updates nothing and draws nothing, because everything else sits in the `else` below.
         // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1544-1548
         if !self.mOutside.Initialized() {
-            // Submodel 0 is the worldspawn brush model, so these bounds are the whole map.
-            // Raven indexes `bmodels[0]` without a length test, which reads out of bounds for a world with no submodel.
-            // §19 picks `None` for that case, which leaves the cache unbuilt rather than panicking.
-            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1546
+            // Divergence 5: Raven reads `bmodels[0]` with no length test, so a world with no submodel reads out of bounds.
+            // §19 picks `None`, which leaves the cache unbuilt rather than panicking.
+            // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:562,1546
             let world_bmodel_bounds = assets
                 .world
                 .as_ref()
