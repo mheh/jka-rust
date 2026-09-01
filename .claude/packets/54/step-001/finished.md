@@ -100,6 +100,8 @@ The fixture count is now twenty-two: twenty-one PNGs and one BIN.
 
 **Divergence 4 is verified by live play alone.** Raven reads `RDF_NOWORLDMODEL` off `tr.refdef`, the front-end copy, which at backend time holds the last scene's flags. On any retail frame that draws a 3D icon, every weather command that frame returns early, so weather neither steps nor draws for the whole frame. Both icon cvars default on, so that is the ordinary case. The port reads each submitted scene's own refdef and steps once on exactly those frames. The user ruled the difference cosmetic. No gate observes it.
 
+**The trap arms' scene guard has no automated coverage.** Each arm compares the frame's event count across `RE_RenderScene` and steps the weather only when the count grew and the last event is a `RenderScene`, so a scene that pushed nothing cannot hand the step an earlier scene's refdef. `RE_RenderScene` pushes nothing under `r_norefresh` (`crates/mp/renderer/src/tr_scene.rs:1200-1202`), which is the one case the guard exists for. The weather fixture holds `r_norefresh` at its default and records a scene on every step, so the guard never takes its false branch there. This is the same class as divergence 4 above, and live play verifies both.
+
 **The DEC-66 amendment still has to reach the ledger.** Its text is in the packet's Amendments section, corrected to the double-reseed shape, and it lands as a dated DEC-66 amendment in `docs/decisions.md` when the step merges.
 
 ## Out of scope, untouched, as the contract required

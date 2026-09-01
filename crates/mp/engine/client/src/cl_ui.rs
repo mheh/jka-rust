@@ -1363,7 +1363,6 @@ pub fn CL_UISystemCalls(
         let fd = unsafe { vma(view.common, args, 1) } as *const refdef_t;
         // SAFETY: view-constructor slot, single-threaded, no other live cast.
         let re = unsafe { re_from_view(view) };
-        // SAFETY: `VMA(1)` is the module's `refdef_t` (porting-rules §D11).
         // Raven queues the weather command as the last act of a scene, so the step runs here.
         // The count taken before the call is what makes the step follow this scene and no other.
         // `RE_RenderScene` returns before it pushes anything under `r_norefresh`, and the last event is then an earlier scene's.
@@ -1372,6 +1371,7 @@ pub fn CL_UISystemCalls(
         // The backend never reaches `RB_RenderWorldEffects` on such a frame.
         // Source: oracle/codemp/renderer/tr_scene.cpp:868, crates/mp/renderer/src/tr_scene.rs:1200-1202
         let events_before = re.frame_data.events.len();
+        // SAFETY: `VMA(1)` is the module's `refdef_t` (porting-rules §D11).
         RE_RenderScene(
             unsafe { &*fd },
             &mut re.frame_data,

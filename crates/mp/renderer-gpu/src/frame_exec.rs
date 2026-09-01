@@ -691,6 +691,8 @@ impl FrameExecutor {
                         }
                         None => {
                             // No scene came ahead of this event, so there is no view to draw it under.
+                            // The counter matches the sibling arm that shares this warning slot.
+                            stats.skipped_other += 1;
                             self.warn_once(Warned::Other);
                         }
                         _ => {}

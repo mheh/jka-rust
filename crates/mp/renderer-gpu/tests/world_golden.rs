@@ -755,7 +755,10 @@ fn weather_command(host: &mut UiHost, command: &str) {
 
 /// Steps the weather once for the scene `frame_data` just recorded, and appends the batch event.
 ///
-/// This is the trap arm's own shape: take the refdef `RE_RenderScene` sealed off the last event, then call `RE_RenderWorldEffects`.
+/// This takes the refdef `RE_RenderScene` sealed off the last event and calls `RE_RenderWorldEffects`, which is the trap arm's shape minus its guard.
+/// The arms also compare the event count across the call, so a scene that pushed nothing cannot hand the weather step an earlier scene's refdef.
+/// The fixture needs no such guard, because it holds `r_norefresh` at its default and every step records a scene.
+/// The guard therefore has no coverage here, and live play verifies it.
 ///
 /// Source: `oracle/codemp/renderer/tr_scene.cpp:868`
 fn step_weather(host: &mut UiHost, frame_data: &mut FrameData) {
@@ -793,8 +796,7 @@ fn step_weather(host: &mut UiHost, frame_data: &mut FrameData) {
 ///
 /// `ctf2` is the one stock MP map that ships weather.
 /// Its entity lump carries two `fx_snow` entities and three `misc_weather_zone` brushes.
-/// The rig loads no collision world and runs no cgame, so the point cache reads every cell as outside,
-/// and the zone list falls back to the whole map.
+/// The rig loads no collision world and runs no cgame, so the point cache reads every cell as outside, and the zone list falls back to the whole map.
 /// Both are rig properties.
 /// This golden proves the draw path and byte stability, and it proves nothing about zone or cache behavior.
 ///
