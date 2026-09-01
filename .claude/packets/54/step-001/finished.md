@@ -84,7 +84,19 @@ The full battery is: `cargo build --workspace` with zero warnings; `cargo test -
 | `b7d9f27d` | `process(gh#54 s001): the reseed amendment` | Packet text only, no gate |
 | `51183d1b` | `process(gh#54 s001): the row-7 bless amendment` | Packet text only, no gate |
 | `3830ec2f` | `test(gh#54 s001): the weather world golden` | Full battery green, the new golden green at tolerance zero, the 21 pre-existing fixtures byte-identical |
-| this file | `process(gh#54 s001): finished file` | Process only, no gate |
+| `f7ffe366` | `process(gh#54 s001): finished file` | Process only, no gate |
+
+Two lane-review fix rounds and a close follow the bundle. The vet walked the lane, the user closed eight disposition rows, and the first round ran; the vet walked that round, the user closed three more rows, and the second round ran; the vet's final pass returned one finding, which the close carries. Every code commit ran the same full battery, now over twenty-two fixtures.
+
+| Commit | Subject | Gate result |
+|---|---|---|
+| `4258fe82` | `process(gh#54 s001): the lane-review walk amendment` | Packet text only, no gate |
+| `ecbb586f` | `fix(gh#54 s001): the weather step follows its own scene` | Full battery green, 22 of 22 fixtures byte-identical, weather golden at tolerance zero |
+| `23e8f64c` | `fix(gh#54 s001): the lane-review mechanical batch` | Full battery green, 22 of 22 fixtures byte-identical, weather golden at tolerance zero |
+| `d5296657` | `style(gh#54 s001): the comment restyle batch` | Full battery green, 22 of 22 fixtures byte-identical, weather golden at tolerance zero |
+| `d4328541` | `process(gh#54 s001): the fix-round record corrections` | Packet text only, no gate |
+| `45041154` | `fix(gh#54 s001): the fix-round mechanical batch` | Full battery green, 22 of 22 fixtures byte-identical, weather golden at tolerance zero |
+| this file | `process(gh#54 s001): the lane close` | Full battery green, 22 of 22 fixtures byte-identical, weather golden at tolerance zero |
 
 The three unit-test groups the bundle asked for all pass: commit 2 covers the row-9 draw count and broadcast, `SVecRange::Wrap` across each axis, and the fade machine's four transitions with the render count's flag re-read; commit 4 covers both vertex arms' offsets and UVs and both blend modes' colour and state bits.
 

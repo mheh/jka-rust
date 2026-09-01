@@ -118,7 +118,7 @@ pub struct FrameStats {
     /// `AddRefEntityToScene` are no longer here when a world context is
     /// supplied.
     pub skipped_scene_events: u32,
-    /// Everything else skipped (world-effect commands, automap elevation).
+    /// Everything else skipped (world-effect commands, automap elevation, a weather batch that no scene preceded).
     pub skipped_other: u32,
     /// Ref-entities the last `RenderScene` rebuilt into `tr.refdef.entities`
     /// from the accumulated `AddRefEntityToScene` payloads.
