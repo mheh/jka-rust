@@ -42,7 +42,9 @@ No other deviation. No file outside the write scopes was edited.
 
 6. `0fb4a0bc` **style(gh#56 s001): the test doc rewording.** `cargo build --workspace` clean with zero warnings. `cargo test --workspace -- --test-threads=1` green, 138 result lines, no failure. `rustfmt --check` clean on the file.
 
-7. This file, which records the vet round. No gate.
+7. `0b083339` **process(gh#56 s001): the finished file records the vet round.** No gate.
+
+8. **process(gh#56 s001): the lane close.** This commit. It appends the finding-6 ruling to Amendment 1, adds the vet record `vet.md` to the repo, and updates this list. `cargo build --workspace` clean with zero warnings. No other gate, because the commit touches no source.
 
 `rustfmt --check` is clean on all five touched source files. No committed fixture moved at any point in the bundle.
 
@@ -51,6 +53,8 @@ No other deviation. No file outside the write scopes was edited.
 ## The record
 
 **The vet's "Unpure client detected" kick was environmental (Amendment 1, row 1).** The vet's own end-to-end run saw the client kick itself at `CS_PRIMED`. Stale state in `/tmp/jka-client-home`, left by the mixed-binary era of the investigation, caused it. The session re-ran the gate with a clean home path, and the log sits at `/tmp/gh56-clean-home-run.log`. That run shows `draw screen without UI loaded` 7 times, `unknown cmd connect` zero times, and `Unpure client` zero times. It also shows one `CS_PRIMED to CS_ACTIVE` transition, so the client reached the live state. Commit 2's spawn claim stands verified. The user closed the row with no code change and no new ticket.
+
+**One over-cap sentence stands by amendment (Amendment 1, finding 6).** The final vet pass found a 28-word sentence in `70b65f7d`'s body, "The stale comment that claimed the client blocks belong to a dedicated-only build is gone, and the replacement states that the hooks answer with a no-op on `jampded`." A second replay would rewrite hashes that this file, the packet, and `vet.md` already pin, so the user let the sentence stand and bound future bodies to the 25-word cap.
 
 ## Open gaps
 
