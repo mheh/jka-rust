@@ -308,4 +308,12 @@ After a clean lane-review this branch opens a pull request to master and merges 
 
 ## Amendments
 
-None.
+### Amendment 1 - the lane-review walk, 2026-09-01
+
+The Fable vet returned five findings. The user closed all three disposition rows on 2026-09-01. The verdicts follow.
+
+**Row 1 - the "Unpure client detected" kick was environmental.** The vet saw the end-to-end client kick itself at `CS_PRIMED`. The cause was stale state in `/tmp/jka-client-home`, left by the mixed-binary era of the investigation. The session re-ran the gate with a clean home path, and the log sits at `/tmp/gh56-clean-home-run.log`. That run shows `draw screen without UI loaded` 7 times, `unknown cmd connect` zero times, and `Unpure client` zero times. It also shows one `CS_PRIMED to CS_ACTIVE` transition, so the client reached the live state. Commit 2's spawn claim stands verified. No code change, and no new ticket.
+
+**Row 2 - the surface contract undercounted the test stubs.** The contract names "one private `extern "C"` syscall stub" for `vm_slot_alias.rs`. That count is wrong against ratified row 3's own default, which requires a stub entry point as well. `stub_vm_main` is that entry-point stub, and it is needed because `RawVmMain` and `VM_Create`'s `systemCalls` parameter have different signatures. The `seat_slot_zero` helper is accepted and named here too. All three items are private to the test file, and none is production surface. The lane's confessed deviation stands as written.
+
+**Row 3 - the walk orders two more commits.** A message replay rewrites three commit bodies with every tree unchanged, and the finished file carries the empty-diff proof. A style commit rewords the phrasal-verb doc lines in `vm_slot_alias.rs`, and it changes comments only.
