@@ -380,8 +380,9 @@ One new method on `Pipeline3d`, so the weather pass reuses the depth texture the
 
 ```rust
     /// The GPU half of Raven `CWeatherParticleCloud::Render`: one draw per cloud, after the world pass, depth-tested and depth-write off.
-    /// The pass sets its own viewport and scissor from `view`, the same values the world pass used, because `SetViewportAndScissor` is retired at the CPU site.
-    /// The pass draws two-sided. That is faithful, not incidental: Raven sets `GL_Cull(CT_TWO_SIDED)` for weather at `oracle/codemp/renderer/tr_WorldEffects.cpp:1362`.
+    /// The pass sets its own viewport and scissor from `view`, the same values the world pass used.
+    /// `SetViewportAndScissor` is retired at the CPU site.
+    /// The pass draws two-sided, which Raven asks for at `oracle/codemp/renderer/tr_WorldEffects.cpp:1362`.
     /// Returns the vertex count drawn, which the frame stats report.
     ///
     /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1311-1480`
@@ -597,7 +598,7 @@ Every commit uses `--no-gpg-sign`, a heading subject, an STE body, and no traile
 
 ## Write scopes
 
-Branch `gh54-step-001-weather-lane`, cut from `wf/54-renderer-complement`. A worktree builder runs `git merge wf/54-renderer-complement --no-gpg-sign` as its first act.
+Branch `gh54-step-001-weather`, cut from `wf/54-renderer-complement`. A worktree builder runs `git merge wf/54-renderer-complement --no-gpg-sign` as its first act.
 
 - `crates/mp/renderer/src/tr_worldeffects/world_effects.rs` - the five markers, the three signatures, the `wind` field, and the unit tests.
 - `crates/mp/renderer/src/render_state/weather_frame.rs` - new, the three seam types.
@@ -621,7 +622,7 @@ Everything else is read-only, including `oracle/`, every file under `crates/mp/g
 
 ## Disposition
 
-After a clean lane-review: open the pull request from `gh54-step-001-weather-lane` into `wf/54-renderer-complement` and merge it on GitHub with a merge commit, per DEC-67. The umbrella branch merges to master once at the end of the gh#54 campaign, not per step. Never squash, and never commit on master. The session never pushes or opens the pull request unprompted. It prepares the branch, asks, and the user rules on the push and on the merge.
+After a clean lane-review: open the pull request from `gh54-step-001-weather` into `wf/54-renderer-complement` and merge it on GitHub with a merge commit, per DEC-67. The umbrella branch merges to master once at the end of the gh#54 campaign, not per step. Never squash, and never commit on master. The session never pushes or opens the pull request unprompted. It prepares the branch, asks, and the user rules on the push and on the merge.
 
 ## Amendments
 
@@ -651,3 +652,21 @@ The verdict on the defect conditions: developed particles are discernible across
 Determinism is proven. Three isolated runs under the double reseed each reported 2048 weather vertices, and three isolated comparison runs after the bless each passed at `CHANNEL_TOLERANCE` zero with no `.actual.png` written.
 
 One caveat was presented and blessed as is: the fog is dense enough to wash the room, which follows from the `fog` preset's 60 quads at 70 units square and from the camera sitting inside the spawn range box. The levers, had the user rejected it, were the camera angle and the step count, both fixture knobs rather than port behavior.
+
+**2026-08-31 - the lane-review walk, all eight disposition rows closed.** The vet returned sixteen findings. The user ruled every row on 2026-08-31.
+
+1. **F6, fixed.** Both trap arms read the frame's last event to find the refdef, and `RE_RenderScene` returns before any push under `r_norefresh` (`crates/mp/renderer/src/tr_scene.rs:1200-1202`). On such a frame the arm would have read a stale earlier event and stepped the weather anyway, where retail never reaches `RB_RenderWorldEffects` at all. Each arm now records the event count before the call and steps only when the count grew and the last event is `RenderScene`. Weather then steps zero times under `r_norefresh`, matching retail. The fix is commit B below.
+
+2. **F3, retroactive acceptance.** The surface contract's clause for `cl_cgame.rs` and `cl_ui.rs` reads "one added call each, after `RE_RenderScene`" with "no other edit". That clause predates the ratified row-2 gate, which requires the arm to hand the weather step the submitted scene's own refdef. The landed arm shape is accepted and named: the refdef derivation off the frame's last event, and the guarded call that follows it. The `FrameEvent` import added to `cl_ui.rs` is accepted and named for the same reason.
+
+3. **F5, accepted as divergence 5.** The world-bounds read is `assets.world.as_ref().and_then(|w| w.bmodels.first()).map(|b| b.bounds)`. Raven reads `tr.world->bmodels[0].bounds` with no length test (`oracle/codemp/renderer/tr_WorldEffects.cpp:562`), which is out of bounds for a world with no submodel. Porting rule 19 picks `None` as the one defined behavior, which leaves the cache unbuilt rather than panicking. This enters the contract as divergence 5. The site note trims to rule 19's two-line cap in commit B.
+
+4. **F1 and F2, packet corrections.** F1: the write scope's branch name was a drafting typo and corrects in place to `gh54-step-001-weather`, in the write scopes and in the disposition. F2: the three private helpers `pipeline3d.rs` gained are named and accepted - `WeatherRun`, the resolved per-cloud GPU form; `world_vertex_from_weather`; and `quantize_color_channel`, which is row 10's "one named site" for the colour rounding.
+
+5. **F4 and F7 stand as confessed and ruled.** No action. F4 is the `weather_bind_group` layout parameter, already an Amendment of 2026-08-31. F7 is the double reseed, already an Amendment of the same date.
+
+6. **The two fix commits are named.** Commit B is `fix(gh#54 s001): the weather step follows its own scene`, carrying F6 and the F5 note trim. Commit C is `fix(gh#54 s001): the lane-review mechanical batch`, carrying F8, F9, F10 and F16.
+
+7. **The style batch is named, and the packet's own text corrects.** Commit D is `style(gh#54 s001): the comment restyle batch`, carrying F11, F13, F14 and F15. The packet's contracted `draw_weather` doc text is corrected above where it prescribed two over-cap lines and the antithesis sentence "That is faithful, not incidental". The landed commit body of `20195f41` stands by this amendment rather than being rewritten.
+
+8. **F12 rejected.** "seam" is domain vocabulary in this repo, used normatively throughout `docs/porting-rules.md`. The three uses stand.
