@@ -1,6 +1,6 @@
 # Finished gh#56 step-001 - the dropped client shutdown
 
-Branch `gh56-step-001-vm-shutdown`, cut from `master` at `a081e584`, merged with `master` as the lane's first act (already up to date). Three code commits plus this file. Nothing pushed, no pull request opened.
+Branch `gh56-step-001-vm-shutdown`, cut from `master` at `a081e584`, merged with `master` as the lane's first act (already up to date). Four code commits, two process commits, and this file. Nothing pushed, no pull request opened.
 
 ## Assumptions and choices
 
@@ -16,9 +16,13 @@ The end-to-end gate needed no re-staging. The loader resolves `basei386.so` name
 
 **Commit 3 - the aliasing test.** Row 3's shape and home hold. `engine_host_view` does not need a seated `Client` for this test, so the fixture is `Engine::new()` and the view alone. `VM_Create` runs with `VMI_NATIVE` against a pre-seated slot name, so the name-match loop returns before `Sys_LoadDll`, and no dylib is read.
 
+**Commit 6 - the test doc rewording.** The vet found three doc lines in `vm_slot_alias.rs` that miss the house style: two open with the phrasal verb "stands in for", and the third says "the holder never learns". Each line now reads as a direct statement. The commit changes comments only.
+
 ## Deviations
 
-**The test file carries two private stubs, not one.** The surface contract names "one private `extern "C"` syscall stub". Row 3's own sequence also requires a stub entry point and asserts `VM_Clear` drops it, and `RawVmMain` and the `systemCalls` parameter have different signatures, so one function cannot serve both. The file therefore holds `stub_vm_main` and `stub_syscall`. Both are private to the test file and neither is production surface, which the contract's binding clause requires.
+**The test file carries two private stubs, not one.** The surface contract names "one private `extern "C"` syscall stub". Row 3's own sequence also requires a stub entry point and asserts `VM_Clear` drops it, and `RawVmMain` and the `systemCalls` parameter have different signatures, so one function cannot serve both. The file therefore holds `stub_vm_main` and `stub_syscall`, beside the `seat_slot_zero` helper. All three are private to the test file, and none is production surface.
+
+The user ruled on this deviation on 2026-09-01. Amendment 1, row 2 of the packet rules the contract's stub count wrong against ratified row 3, names all three items, and lets the confessed deviation stand.
 
 No other deviation. No file outside the write scopes was edited.
 
@@ -26,18 +30,32 @@ No other deviation. No file outside the write scopes was edited.
 
 1. `d9251729` **feat(gh#56 s001): the client shutdown hooks.** `cargo build --workspace` clean with zero warnings. `cargo test --workspace -- --test-threads=1` green, 137 result lines, no failure. The goldens and the referee were not required, because no call site reads the new fields yet and behavior does not move.
 
-2. `5b2d88a2` **fix(gh#56 s001): a map load shuts the client modules down.** The full battery green. Build clean with zero warnings, and `cargo test --workspace -- --test-threads=1` green at 137 result lines. All 21 committed fixtures byte-identical over five serial runs: 5 world (`--ignored`), 11 scene, 2 entity (`--ignored`), 1 ghoul2 vertex (`--ignored`), and 2 hud (one plain run, one `--ignored`). The lockstep referee green at nine tests against the freshly built oracle dylib, with zero case-insensitive matches for `skip`.
+2. `70b65f7d` **fix(gh#56 s001): a map load shuts the client modules down.** The full battery green. Build clean with zero warnings, and `cargo test --workspace -- --test-threads=1` green at 137 result lines. All 21 committed fixtures byte-identical over five serial runs: 5 world (`--ignored`), 11 scene, 2 entity (`--ignored`), 1 ghoul2 vertex (`--ignored`), and 2 hud (one plain run, one `--ignored`). The lockstep referee green at nine tests against the freshly built oracle dylib, with zero case-insensitive matches for `skip`.
 
-   The end-to-end run started the release client with `+devmap mp/ffa1`, let it sit 70 seconds, and killed it by recorded process id. `grep -c "draw screen without UI loaded"` returned `10`, first at log line 1907, which proves `cl.uivm` went null across the map load. `grep -c "unknown cmd connect"` returned `0`. The only connect traffic left is the single handshake pair, `SV packet loopback : connect` at line 1802 and `CL packet loopback: connectResponse` at line 1908. The client spawned into the map and picked items up, so the map load completed rather than stalling.
+   The end-to-end run started the release client with `+devmap mp/ffa1`, let it sit 70 seconds, and killed it by recorded process id. `grep -c "draw screen without UI loaded"` returned `10`, first at log line 1907, which proves `cl.uivm` went null across the map load. `grep -c "unknown cmd connect"` returned `0`. The only connect traffic left is the single handshake pair, `SV packet loopback : connect` at line 1802 and `CL packet loopback: connectResponse` at line 1908.
 
-3. `4b4591e2` **test(gh#56 s001): a cleared VM slot is reused by the next module.** `cargo build --workspace` clean with zero warnings. `cargo test --workspace -- --test-threads=1` green, 138 result lines, no failure. The new test is the one added line.
+3. `55353ac2` **test(gh#56 s001): a cleared VM slot is reused by the next module.** `cargo build --workspace` clean with zero warnings. `cargo test --workspace -- --test-threads=1` green, 138 result lines, no failure. The new test is the one added line.
 
-`rustfmt --check` is clean on all five touched files. No committed fixture moved at any point in the bundle.
+4. `f7ba1262` **process(gh#56 s001): finished file.** The first version of this file. No gate.
+
+5. `01ed5a52` **process(gh#56 s001): the walk amendment.** Amendment 1 of the packet, carrying the three closed disposition rows. No gate.
+
+6. `0fb4a0bc` **style(gh#56 s001): the test doc rewording.** `cargo build --workspace` clean with zero warnings. `cargo test --workspace -- --test-threads=1` green, 138 result lines, no failure. `rustfmt --check` clean on the file.
+
+7. This file, which records the vet round. No gate.
+
+`rustfmt --check` is clean on all five touched source files. No committed fixture moved at any point in the bundle.
+
+**The message replay.** Commits 2, 3, and 4 were replayed once on 2026-09-01 to rewrite their bodies. Commit 2 lost a 31-word and a 33-word sentence, commit 3 lost a 34-word sentence and the phrasal verb "hands back", and commit 4 gained a body. The replay cherry-picked the three commits onto `d9251729` and amended each message, so no tree was touched. The proof: `git diff 48c614f20eccdcc028b344f4c2c744366a3220ab f7ba1262` against the pre-replay head returns zero bytes. Every gate result above therefore still holds against the same trees that earned it.
+
+## The record
+
+**The vet's "Unpure client detected" kick was environmental (Amendment 1, row 1).** The vet's own end-to-end run saw the client kick itself at `CS_PRIMED`. Stale state in `/tmp/jka-client-home`, left by the mixed-binary era of the investigation, caused it. The session re-ran the gate with a clean home path, and the log sits at `/tmp/gh56-clean-home-run.log`. That run shows `draw screen without UI loaded` 7 times, `unknown cmd connect` zero times, and `Unpure client` zero times. It also shows one `CS_PRIMED to CS_ACTIVE` transition, so the client reached the live state. Commit 2's spawn claim stands verified. The user closed the row with no code change and no new ticket.
 
 ## Open gaps
 
 **The hoth2 freeze is unreproduced and unattributed.** The wild `ClientDisconnect` read the packet describes is a plausible cause of the terminal freeze the first gh#56 session saw, and nobody has reproduced it deliberately. This step does not claim that freeze. It removes the caller that made the read possible, which is all the evidence supports.
 
-**`CIN_CloseAllVideos` gains its first caller with no automated gate on cinematic teardown.** The function had zero callers in the workspace before this step. No test in this workspace plays a cinematic, and the end-to-end `devmap` run starts no video, so the new call ran only against an empty `cinTable`. The oracle block and the ported body are the whole evidence for the call. Live play through a cinematic is the verification.
+**`CIN_CloseAllVideos` gains its first caller with no automated gate on cinematic teardown.** The function had zero callers in the workspace before this step. No test in this workspace plays a cinematic, and neither end-to-end `devmap` run starts a video, so the new call ran only against an empty `cinTable`. The oracle block and the ported body are the whole evidence for the call. Live play through a cinematic is the verification.
 
 **The SP tree is moot, recorded for the reader.** `crates/sp/engine/` carries no `z_memman` and no `sv_init` source, `grep` finds no `Hunk_Clear` and no `SV_SpawnServer` under `crates/sp/`, and SP links its cgame and ui statically. There is nothing of this kind to fix there.
