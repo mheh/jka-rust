@@ -661,12 +661,22 @@ One caveat was presented and blessed as is: the fog is dense enough to wash the 
 
 3. **F5, accepted as divergence 5.** The world-bounds read is `assets.world.as_ref().and_then(|w| w.bmodels.first()).map(|b| b.bounds)`. Raven reads `tr.world->bmodels[0].bounds` with no length test (`oracle/codemp/renderer/tr_WorldEffects.cpp:562`), which is out of bounds for a world with no submodel. Porting rule 19 picks `None` as the one defined behavior, which leaves the cache unbuilt rather than panicking. This enters the contract as divergence 5. The site note trims to rule 19's two-line cap in commit B.
 
-4. **F1 and F2, packet corrections.** F1: the write scope's branch name was a drafting typo and corrects in place to `gh54-step-001-weather`, in the write scopes and in the disposition. F2: the three private helpers `pipeline3d.rs` gained are named and accepted - `WeatherRun`, the resolved per-cloud GPU form; `world_vertex_from_weather`; and `quantize_color_channel`, which is row 10's "one named site" for the colour rounding.
+4. **F1 and F2, packet corrections.** F1: the write scope's branch name was a drafting typo and corrects in place to `gh54-step-001-weather`, in the write scopes and in the disposition. F2: the three private helpers `pipeline3d.rs` gained are named and accepted. `WeatherRun` is the resolved per-cloud GPU form. `world_vertex_from_weather` converts one billboard vertex into the GPU vertex row. `quantize_color_channel` is row 10's "one named site" for the colour rounding.
 
-5. **F4 and F7 stand as confessed and ruled.** No action. F4 is the `weather_bind_group` layout parameter, already an Amendment of 2026-08-31. F7 is the double reseed, already an Amendment of the same date.
+5. **F4 and F7 stand as confessed and ruled.** No action. F4 is the commit-3 file-list narrowing, where `tr_surfacesprites.rs` needed no edit because neither function that takes a `&WindZoneState` has a caller. F7 is the three Amendment commits the lane landed mid-run, which the finished file already records.
 
 6. **The two fix commits are named.** Commit B is `fix(gh#54 s001): the weather step follows its own scene`, carrying F6 and the F5 note trim. Commit C is `fix(gh#54 s001): the lane-review mechanical batch`, carrying F8, F9, F10 and F16.
 
 7. **The style batch is named, and the packet's own text corrects.** Commit D is `style(gh#54 s001): the comment restyle batch`, carrying F11, F13, F14 and F15. The packet's contracted `draw_weather` doc text is corrected above where it prescribed two over-cap lines and the antithesis sentence "That is faithful, not incidental". The landed commit body of `20195f41` stands by this amendment rather than being rewritten.
 
 8. **F12 rejected.** "seam" is domain vocabulary in this repo, used normatively throughout `docs/porting-rules.md`. The three uses stand.
+
+**2026-08-31 - the fix-round walk, all three disposition rows closed.** The vet walked the four fix-round commits and returned eight findings. The user ruled every row on 2026-08-31.
+
+1. **The walk Amendment's own record corrects.** FR1: item 5 above named the wrong pair. It described the finished file's two deviations, the layout parameter and the double reseed, where the vet's F4 is the commit-3 `tr_surfacesprites.rs` narrowing and F7 is the three Amendment commits. The text is corrected above and the verdicts are unchanged. FR7: the two semicolons in item 4's prose become sentence breaks.
+
+2. **FR4, a count correction.** Commit `23e8f64c` restored five rustfmt sites, not the four its body names. The fifth is the `draw_weather` call wrap in `crates/mp/renderer-gpu/src/frame_exec.rs`, which rustfmt rewrote to the method-chain form. The landed commit body stands by precedent, and this Amendment carries the true count.
+
+3. **FR5 rejected, with its boundary stated.** Comments follow the house line-break rule, where a break is a semantic act and the column limit is 150. Code follows rustfmt, which owns wrapping decisions the house rule does not reach. The two wrapped calls stand, because rustfmt produced them and rustfmt is the mechanical gate for code layout in this workspace.
+
+4. **The fix commits are named.** Commit A is `process(gh#54 s001): the fix-round record corrections`, carrying FR1, FR7, FR4 and the FR5 rejection. Commit B is `fix(gh#54 s001): the fix-round mechanical batch`, carrying FR2, FR3, FR6 and FR8.
