@@ -18,15 +18,16 @@ use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_types::fileHandle_t;
 
-use crate::cl_cgame::CL_GameCommand;
+use crate::cl_cgame::{CL_GameCommand, CL_ShutdownCGame};
+use crate::cl_cin::CIN_CloseAllVideos;
 use crate::cl_console::CL_ConsolePrint;
 use crate::cl_input::{CL_JoystickEvent, CL_MouseEvent};
 use crate::cl_keys::{CL_CharEvent, CL_InitKeyCommands, CL_KeyEvent, Key_WriteBindings};
 use crate::cl_main::{
     CL_Disconnect, CL_FlushMemory, CL_ForwardCommandToServer, CL_Frame, CL_Init, CL_MapLoading,
-    CL_PacketEvent, CL_Shutdown, CL_StartHunkUsers,
+    CL_PacketEvent, CL_Shutdown, CL_ShutdownAll, CL_StartHunkUsers,
 };
-use crate::cl_ui::UI_GameCommand;
+use crate::cl_ui::{CL_ShutdownUI, UI_GameCommand};
 use crate::client_host::{cl_from_view, snd_from_view};
 use crate::snd_dma::{SND_FreeOldestSound, SND_RegisterAudio_LevelLoadEnd};
 
@@ -61,6 +62,10 @@ pub fn install_client_engine_hooks(hooks: &mut EngineHooks) {
     hooks.CL_GameCommand = Some(CL_GameCommand_hook);
     hooks.UI_GameCommand = Some(UI_GameCommand_hook);
     hooks.Key_WriteBindings = Some(Key_WriteBindings_hook);
+    hooks.CL_ShutdownAll = Some(CL_ShutdownAll_hook);
+    hooks.CL_ShutdownCGame = Some(CL_ShutdownCGame_hook);
+    hooks.CL_ShutdownUI = Some(CL_ShutdownUI_hook);
+    hooks.CIN_CloseAllVideos = Some(CIN_CloseAllVideos_hook);
 }
 
 /// Raven `CL_Shutdown`. Source: `oracle/codemp/client/cl_main.cpp:2719`
@@ -191,6 +196,34 @@ fn Key_WriteBindings_hook(view: &mut EngineHostView, f: fileHandle_t) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let cl = unsafe { cl_from_view(view) };
     Key_WriteBindings(view.common, cl, f);
+}
+
+/// Raven `CL_ShutdownAll`. Source: `oracle/codemp/client/cl_main.cpp:657`
+fn CL_ShutdownAll_hook(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    CL_ShutdownAll(view, cl);
+}
+
+/// Raven `CL_ShutdownCGame`. Source: `oracle/codemp/client/cl_cgame.cpp:595`
+fn CL_ShutdownCGame_hook(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    CL_ShutdownCGame(view.common, cl);
+}
+
+/// Raven `CL_ShutdownUI`. Source: `oracle/codemp/client/cl_ui.cpp:1444`
+fn CL_ShutdownUI_hook(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    CL_ShutdownUI(view.common, cl);
+}
+
+/// Raven `CIN_CloseAllVideos`. Source: `oracle/codemp/client/cl_cin.cpp:126`
+fn CIN_CloseAllVideos_hook(view: &mut EngineHostView) {
+    // SAFETY: view-constructor slot, single-threaded, no other live cast.
+    let cl = unsafe { cl_from_view(view) };
+    CIN_CloseAllVideos(view, cl);
 }
 
 /// Raven `SND_FreeOldestSound(void)`, which the zone allocator calls to recover

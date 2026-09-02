@@ -555,6 +555,15 @@ pub fn SV_SpawnServer(
     let cl_map_loading = view.common.hooks.CL_MapLoading.expect("CL_MapLoading hook");
     cl_map_loading(view);
 
+    // make sure all the client stuff is unloaded
+    // The hook answers with a no-op on `jampded`, which reproduces Raven's `#ifndef DEDICATED` guard at this call site.
+    let cl_shutdown_all = view
+        .common
+        .hooks
+        .CL_ShutdownAll
+        .expect("CL_ShutdownAll hook");
+    cl_shutdown_all(view);
+
     CM_ClearMap(view.cm, &mut view.rmg);
 
     // clear the whole hunk because we're (re)loading the server
