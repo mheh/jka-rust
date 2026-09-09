@@ -20,6 +20,12 @@
 # `-fpermissive` to accept its `FOFS` pointer->int casts on a 64-bit host, which
 # Apple clang does not provide (`-fpermissive` is a silent no-op there). Install
 # with `brew install gcc`. See README.md for the full rationale.
+#
+# The link line adds `-static-libgcc -static-libstdc++`.
+# The Homebrew gcc runtime images are `libstdc++.6.dylib` and `libgcc_s.1.1.dylib`.
+# Each one registers a thread-specific-data key whose destructor is `emutls_destroy`.
+# The referee harness unloads the module before its engine thread exits, so the child calls that destructor in unmapped memory and dies with SIGSEGV.
+# The static link removes both images from the artifact, and the module then depends on libSystem alone.
 set -eu
 cd "$(dirname "$0")"
 
@@ -426,9 +432,11 @@ done
 echo "referee-oracle: compiled $n TUs"
 
 # --- link the loadable module -------------------------------------------------
+# The two static flags keep the gcc runtime images out of the artifact.
+# The header comment above states why.
 case "$OS" in
-	Darwin) "$CXX" -dynamiclib -o "$LIBOUT" build/obj/*.o -lm;;
-	Linux)  "$CXX" -shared -o "$LIBOUT" build/obj/*.o -lm;;
+	Darwin) "$CXX" -dynamiclib -o "$LIBOUT" build/obj/*.o -lm -static-libgcc -static-libstdc++;;
+	Linux)  "$CXX" -shared -o "$LIBOUT" build/obj/*.o -lm -static-libgcc -static-libstdc++;;
 esac
 echo "referee-oracle: linked $LIBOUT"
 

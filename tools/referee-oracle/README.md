@@ -53,6 +53,12 @@ brew install gcc        # provides g++-16 (or -15/-14/-13)
 `build.sh` auto-detects `g++-1x` (in `PATH` or `/opt/homebrew/bin`); override with
 `CXX=/path/to/g++`. It refuses Apple clang with a clear message.
 
+### The gcc runtime links statically
+
+The link line carries `-static-libgcc -static-libstdc++`. The Homebrew gcc runtime images are `libstdc++.6.dylib` and `libgcc_s.1.1.dylib`, and each one registers a thread-specific-data key whose destructor is `emutls_destroy`. The referee harness unloads the module before its engine thread exits, so the child calls that destructor in unmapped memory and dies with SIGSEGV. With the static link the artifact depends on `/usr/lib/libSystem.B.dylib` alone, and nothing registers the key. Check it with `otool -L build/liboraclejampgame.dylib`.
+
+A gcc version pin does not help here. The install name the linker records goes through the `gcc/current` symlink, so an artifact built under gcc 15 loads the gcc 16 runtime at load time.
+
 ## Defines
 
 | define | why |
