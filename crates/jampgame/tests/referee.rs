@@ -64,6 +64,7 @@
 
 mod common;
 
+use std::mem::forget;
 use std::path::{Path, PathBuf};
 
 use common::reflog::{self, Scenario};
@@ -308,7 +309,7 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
     // `GAME_SHUTDOWN` runs above, so the module is finished with its work.
     // A `dlclose` before the engine thread exits can strand a thread-specific-data destructor in unmapped memory.
     // Each child process runs one drive and exits, so the mapping costs nothing.
-    std::mem::forget(module);
+    forget(module);
     snaps
 }
 

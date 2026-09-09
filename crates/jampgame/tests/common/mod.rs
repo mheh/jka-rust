@@ -36,6 +36,7 @@ pub mod reflog;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, c_int, c_short, c_void, CStr, CString};
+use std::mem::forget;
 use std::path::{Path, PathBuf};
 
 use mp_abi::game::exports::MpGameExport;
@@ -1152,10 +1153,10 @@ fn run_lifecycle(dylib: PathBuf) {
         eprintln!("=================================\n");
     });
 
-    // `GAME_SHUTDOWN` ran above, so the module is finished with its work.
+    // `GAME_SHUTDOWN` runs above, so the module is finished with its work.
     // A `dlclose` before the engine thread exits can strand a thread-specific-data destructor in unmapped memory.
     // The whole lifecycle runs once per process, so the mapping costs nothing.
-    std::mem::forget(module);
+    forget(module);
 }
 
 /// The stem of a platform cdylib filename — the part the loader recombines with

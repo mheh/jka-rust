@@ -24,8 +24,11 @@
 # The link line adds `-static-libgcc -static-libstdc++`.
 # The Homebrew gcc runtime images are `libstdc++.6.dylib` and `libgcc_s.1.1.dylib`.
 # Each one registers a thread-specific-data key whose destructor is `emutls_destroy`.
-# The referee harness unloads the module before its engine thread exits, so the child calls that destructor in unmapped memory and dies with SIGSEGV.
+# The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered.
+# The child then called that destructor in unmapped memory and died with SIGSEGV.
 # The static link removes both images from the artifact, and the module then depends on libSystem alone.
+# The harness also keeps the module mapped to thread exit now, which is belt and braces.
+# The static link is the root fix.
 set -eu
 cd "$(dirname "$0")"
 
