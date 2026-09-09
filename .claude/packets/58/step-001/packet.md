@@ -200,3 +200,10 @@ Every row was ratified as proposed on 2026-09-08.
 **2026-09-08 - the surface wording corrects.** No comment stands above `drop(module)` at `crates/jampgame/tests/referee.rs:307-308` today, so commit 2 adds one rather than edits one.
 
 **2026-09-08 - the gate timings, for the lane's planning.** `build.sh` 40 s, the referee suite 20 s, `oracle_smoke` 3 s, and the workspace tests 36 s.
+
+**2026-09-08 - the lane review, seven findings closed.** The vet is at `.claude/packets/58/step-001/vet.md`, now `f9dfa968` after a rebase. The user ruled every finding on 2026-09-08.
+
+- **F1, ratified as it stands.** The two-line pointer comment above the `case "$OS"` block in `build.sh` is an accepted third comment site. It points a reader at the case statement back to the header rationale.
+- **F2, ratified as it stands.** The two three-sentence comment blocks in commit 2 stand, because each sentence carries content.
+- **N1, this packet's own cite corrects.** The `run_lifecycle` tail sits at `crates/jampgame/tests/common/mod.rs:1151-1156`. The `:922` cite above names the signature, not the tail.
+- **F3, F4, F5, and F6, repaired in a fix round.** Commit 2's body was rewritten in place as `a2168bf9` with an identical tree. `329e47e3` corrects the two present-tense sentences, moves `forget` to a top-of-file import, and aligns the comment tenses.
