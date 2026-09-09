@@ -75,3 +75,11 @@ Lane-review returned seven items in `.claude/packets/58/step-001/vet.md` (`96c18
 - `cargo test -p jampgame --test oracle_smoke -- --ignored --test-threads=1` passed. 0.6 s.
 - `cargo test --workspace -- --test-threads=1` green, 138 result blocks, every one `ok`. 47.3 s.
 - `rustfmt --check` clean on both Rust files.
+
+## The vet rewalk, 2026-09-08
+
+The rewalk (`cb42ed49`) closed F1 to F6 and N1 and found two style items in the prose the fix round added. The session made both edits directly.
+
+**F7, the README paragraph ran eight sentences.** Fixed. The check instruction now opens a second paragraph, and each paragraph is under the six-sentence limit.
+
+**F8, "belt and braces" on added lines.** Fixed. Both sites in `build.sh` and `README.md` now say "a second guard". The commit changes comment and README text only, and `bash -n` passes on the script.
