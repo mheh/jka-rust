@@ -1,6 +1,6 @@
 # Packet gh#58 step-001 - the referee rig repair
 
-Drafted 2026-09-08 on branch `gh58-step-001-referee-rig`, cut from master `1cb6c525`. The shape reference is `.claude/packets/54/step-002/packet.md` on `gh54-step-002-cinematics`.
+Ratified 2026-09-08 on branch `gh58-step-001-referee-rig`, cut from master `1cb6c525`. All seven open rows are closed and the vet's new row is closed with them. The audit is at `.claude/packets/58/step-001/audit.md` (`1f565841`), and the folds below carry its one correction and its two notes. The shape reference is `.claude/packets/54/step-002/packet.md` on `gh54-step-002-cinematics`.
 
 ## Scope
 
@@ -48,7 +48,9 @@ dyld: /opt/homebrew/Cellar/gcc/16.2.0/lib/gcc/current/libstdc++.6.dylib
 dyld: libstdc++.6.dylib has weak-def (or flat lookup) symbol used by libgcc_s.1.1.dylib
 ```
 
-`libgcc_s.1.1.dylib` owns the key and the destructor. `nm -m` on it shows `_emutls_key`, `_emutls_destroy`, and an undefined `_pthread_key_create` from libSystem. The oracle dylib itself contains no `emutls` symbol, so the key comes from the gcc runtime and not from Raven's code.
+Both runtime images carry their own key and destructor. `nm -m` on each shows `_emutls_key`, `_emutls_destroy`, and an undefined `_pthread_key_create` from libSystem. The oracle dylib itself contains no `emutls` symbol, so the key comes from the gcc runtime and not from Raven's code.
+
+The dangling destructor is the one in `libstdc++.6.dylib`. `_emutls_destroy` sits at `0x17a0` in `libstdc++.6.dylib` and at `0x11a00` in `libgcc_s.1.1.dylib`, and every fault address ends in `0x17a0`: `0x10ada17a0` in the report above, `0x1073b97a0` in the audit's rerun, and `0x10aae97a0` in the cgame sibling. `-static-libstdc++` is therefore the load-bearing flag. The pair stays, because `-static-libgcc` closes the same hazard in the second image at no cost.
 
 ### Who unloads it
 
@@ -59,6 +61,8 @@ The Rust child survives the same drop because its cdylib links no gcc runtime an
 ### Why now
 
 The referee was last green on 2026-09-01. Homebrew `gcc` moved to 16.2.0 on 2026-09-04, and `brew list --versions gcc` reports `gcc 16.2.0`. `/opt/homebrew/bin/g++-16` is the only real g++ on this host, so `build.sh`'s auto-detect loop picks it.
+
+The coupling is the `gcc/current` symlink, not the build date. The install name recorded in the artifact is `/opt/homebrew/opt/gcc/lib/gcc/current/libstdc++.6.dylib`, so an artifact built under gcc 15 loads the gcc 16 runtime at load time. A rebuild was never needed to expose the defect, and a toolchain pin would not have prevented it.
 
 ### The second victim
 
@@ -86,9 +90,11 @@ Candidate A alone does not repair `oracle_smoke`, because that load and drop liv
 
 **The combined run.** With both applied, the full suite passed 9 of 9 in 17.49 seconds, every oracle child exited 0, and every scenario reported byte-identical. The static link changes no snapshot byte.
 
+**The audit reran each candidate alone.** Candidate B alone repairs both tests: the referee suite at 9 of 9, and `oracle_smoke` green. Candidate A alone repairs the referee suite at 9 of 9, and `oracle_smoke` still dies by signal 11. Candidate B is therefore the root fix and candidate A is belt and braces. Candidate A costs nothing, because `run_referee` (`crates/jampgame/tests/referee.rs:587-612`) runs each drive in a child process that exits right after its one drive, and no in-process reload path exists. The static dylib is 1,715,656 bytes, the same size as the pristine one, so the static link absorbs no libstdc++ code and nothing was used from it.
+
 ### The candidates that mask, both rejected as defaults
 
-Calling `_exit` after the reflog write in the oracle child hides the signal and leaves the dangling destructor in place. Comparing the snapshots before judging the exit status does the same, and it also blinds the rig to a real crash, which is the one finding the driver's crash message exists to report. Row 4 and row 5 carry them for the user.
+Calling `_exit` after the reflog write in the oracle child hides the signal and leaves the dangling destructor in place. Comparing the snapshots before judging the exit status keeps the signal visible, because a check that sits after the diff still reports a crash. The check-first order stands anyway. It is the order that surfaced this defect, and a crash after a clean reflog is a finding the rig must report. Row 4 and row 5 carry both for the user.
 
 Building the oracle with Apple clang is not available. `README.md`'s toolchain section records why: `FOFS(x) ((int)&(((gentity_t *)0)->x))` is a hard error in C++ on a 64-bit host, and Apple clang treats `-fpermissive` as a silent no-op.
 
@@ -98,8 +104,8 @@ This step creates no `pub` item, no type, no constant, and no test. It changes f
 
 - `tools/referee-oracle/build.sh`: the `CXXFLAGS`-adjacent link commands in the `case "$OS"` block, and the header comment that states the toolchain requirement.
 - `tools/referee-oracle/README.md`: the toolchain section, which gains the static-link rationale.
-- `crates/jampgame/tests/referee.rs`: the last two lines of `drive`, and the comment above them.
-- `crates/jampgame/tests/common/mod.rs`: the tail of `run_lifecycle`, pending row 2.
+- `crates/jampgame/tests/referee.rs`: the last two lines of `drive`, plus a new comment above them. No comment stands above `drop(module)` at `:307-308` today, so the lane adds one and edits none.
+- `crates/jampgame/tests/common/mod.rs`: the tail of `run_lifecycle`, at `:922` through its closing brace.
 
 Anything not on this list is out of scope, and the agent must not add it. No new `pub` item, no new crate, no new cvar, no new test, no ABI change, no change to any scenario, reflog, or committed fixture, and no edit under `oracle/` or `crates/mp/`.
 
@@ -111,7 +117,9 @@ Every commit uses `git commit --no-gpg-sign`, a heading subject, an STE body, an
 
 Files: `tools/referee-oracle/build.sh`, `tools/referee-oracle/README.md`.
 
-The Darwin and Linux link commands both gain `-static-libgcc -static-libstdc++`. The header comment and the README toolchain section record why: the gcc runtime dylibs register a thread-specific-data key, and the harness unloads the module before the thread exits. The README's existing claim that the module's only undefined symbols are libc and libm becomes true again.
+The Darwin and Linux link commands both gain `-static-libgcc -static-libstdc++`. The header comment and the README toolchain section record why: `libstdc++.6.dylib` registers a thread-specific-data key whose destructor is `emutls_destroy`, `libgcc_s.1.1.dylib` registers its own, and the harness unloads the module before the thread exits. Name `libstdc++` as the owning image, or name both images. Do not name `libgcc_s` alone. The README also gains the one sentence that explains the pin question: the recorded install name goes through `gcc/current`, so an artifact built under gcc 15 loads the gcc 16 runtime at load time. The README's existing claim that the module's only undefined symbols are libc and libm becomes true again.
+
+The Linux arm takes the same two flags, so the script stays one rule. That arm is untested. No Linux host here runs it, and `.github/workflows/build.yml` never invokes `build.sh`.
 
 Gates:
 
@@ -123,9 +131,9 @@ Gates:
 
 ### Commit 2 - `fix(gh#58 s001): the referee children keep the module mapped to thread exit`
 
-Files: `crates/jampgame/tests/referee.rs`, and `crates/jampgame/tests/common/mod.rs` if row 2 rules for it.
+Files: `crates/jampgame/tests/referee.rs` and `crates/jampgame/tests/common/mod.rs`.
 
-`drive` ends with `std::mem::forget(module)` instead of `drop(module)`, and `run_lifecycle` does the same with its module. A comment states the reason in one or two sentences: a dlclose before thread exit can strand a thread-specific-data destructor, the child process is short-lived, and `GAME_SHUTDOWN` still runs first.
+`drive` ends with `std::mem::forget(module)` instead of `drop(module)`, and `run_lifecycle` does the same with its module. A new comment states the reason in one or two sentences: a dlclose before thread exit can strand a thread-specific-data destructor, each child process runs one drive and exits, and `GAME_SHUTDOWN` still runs first.
 
 Gates:
 
@@ -142,7 +150,7 @@ File: `.claude/packets/58/step-001/finished.md`. No gate beyond the packet skill
 
 The referee suite needs both artifacts first: `tools/referee-oracle/build.sh`, then `cargo build --workspace`. The rig runs one agent at a time, and the lane agent is the only one on it. The world goldens are not on this battery, because no commit touches the renderer. `cargo test --workspace` never runs without `--test-threads=1`, or the two world-golden tests abort in the pk3 inflate path.
 
-Both batteries are known reachable. The drafter ran the full referee suite green 9 of 9 with the two fixes applied, and ran `cargo test --workspace -- --test-threads=1` green on the pristine tree.
+Both batteries are known reachable. The drafter ran the full referee suite green 9 of 9 with the two fixes applied, and ran `cargo test --workspace -- --test-threads=1` green on the pristine tree. The audit reran every gate and measured it: `build.sh` 40 s, the referee suite 20 s, `oracle_smoke` 3 s, and the workspace tests 36 s over 138 green result blocks.
 
 ## Write scopes
 
@@ -153,9 +161,9 @@ Writable:
 - `crates/jampgame/tests/referee.rs`
 - `tools/referee-oracle/build.sh` and `tools/referee-oracle/README.md`
 - `.claude/packets/58/step-001/`
-- `crates/jampgame/tests/common/mod.rs`, pending row 2
+- `crates/jampgame/tests/common/mod.rs`, the `run_lifecycle` tail only
 
-Everything else is read-only, including `oracle/`, every crate under `crates/mp/` and `crates/sp/`, `crates/native/`, every committed fixture and reflog, and `~/Developer/jka/` beyond the read-only asset reads the real-map scenarios already make. Source files change through the Edit tool only. `tools/referee-oracle/build/` is generated and gitignored, so the agent runs the build script but commits nothing from that directory.
+Everything else is read-only, including `oracle/`, every crate under `crates/mp/` and `crates/sp/`, `crates/native/`, `tools/cgame-oracle/`, `crates/cgame/`, every committed fixture and reflog, and `~/Developer/jka/` beyond the read-only asset reads the real-map scenarios already make. Source files change through the Edit tool only. `tools/referee-oracle/build/` is generated and gitignored, so the agent runs the build script but commits nothing from that directory.
 
 There is a stash from another lane in the stash list. The agent must never touch it.
 
@@ -163,22 +171,32 @@ There is a stash from another lane in the stash list. The agent must never touch
 
 After a clean lane-review: open the pull request from `gh58-step-001-referee-rig` into master and merge it on GitHub with a merge commit, per DEC-67. Never squash. The session never pushes or opens the pull request unprompted. It prepares the branch, asks, and the user rules on the push and on the merge. The gh#54 step-002 lane merges master into its branch afterwards and reruns its commit-1 battery.
 
-## Open rows
+## The rows, all closed
 
-1. **The two fixes, mechanical.** Land both, commit 1 and commit 2. Proposed default: both. Commit 1 removes the key from the picture and repairs both broken tests. Commit 2 removes the unload, which is the other half of the precondition, and it protects the rig against a future toolchain that registers a key again.
+Every row was ratified as proposed on 2026-09-08.
 
-2. **The write-scope extension to `crates/jampgame/tests/common/mod.rs`, user ruling.** `oracle_smoke` is broken by the same defect, and one line in `run_lifecycle` repairs it. The file is not in the scope the issue states. Proposed default: extend the scope to that one file and that one function tail, and fix it inside commit 2.
+1. **The two fixes, cleared.** Land both. The audit ran each alone: commit 1 alone repairs the referee suite and `oracle_smoke`, and commit 2 alone repairs the referee suite only. Commit 1 is the root fix. Commit 2 is belt and braces at no cost, because each referee child runs one drive and exits (`crates/jampgame/tests/referee.rs:587-612`).
 
-3. **The Linux link line, mechanical.** The flags are gcc-generic and apply to the `Linux)` arm as well. No Linux host tests them here, and CI runs no referee. Proposed default: apply the same two flags to both arms, so the script stays one rule.
+2. **The write-scope extension, ratified.** The scope takes `crates/jampgame/tests/common/mod.rs` by the `run_lifecycle` tail, and commit 2 repairs `oracle_smoke` there.
 
-4. **The `_exit` after the reflog write, user ruling.** Rejected as a default. It hides the signal and leaves the dangling destructor. Proposed default: do not add it.
+3. **The Linux link arm, cleared.** It takes the same two flags. The arm stays untested, because CI never runs `build.sh` and no Linux host here runs it.
 
-5. **The driver comparing before it judges the exit status, user ruling.** Rejected as a default. It hides the signal and blinds the rig to a real crash. Proposed default: keep the crash check first, exactly as it stands at `crates/jampgame/tests/referee.rs:653-661`.
+4. **The `_exit` after the reflog write, ratified.** Do not add it. It hides the signal and leaves the dangling destructor.
 
-6. **A toolchain pin in `build.sh`, user ruling.** The auto-detect loop takes the newest `g++-1x` it finds. A pin would freeze the rig against the next Homebrew bump. Proposed default: no pin. The static link is what removes the coupling, and the README records the reason.
+5. **The crash check stays first, ratified.** The reason softens. A check that sits after the diff still reports a crash, so a reorder would not blind the rig. The check-first order stands because it is the order that surfaced this defect.
 
-7. **A DEC entry, user ruling.** The invariant "the referee oracle links the gcc runtime statically" is durable and cross-session. Proposed default: no DEC. The README and this packet carry it, and the issue links the step folder.
+6. **No toolchain pin, ratified.** The README gains the sentence that explains it: an artifact built under gcc 15 loads the gcc 16 runtime through the `gcc/current` symlink at load time, so a pin would not help.
+
+7. **No DEC entry, ratified.** The README and this packet carry the invariant. The invariant spans two build scripts once the cgame sibling is repaired.
+
+8. **The cgame oracle sibling defect, the vet's new row, ratified as a follow-up.** It is filed as issue #59 and is not a widening of this step. `tools/cgame-oracle/build.sh:260-261` carries the same two link lines, `crates/cgame/tests/replay_referee.rs:153` drops the module on the thread `cgame-replay-engine`, and `replay_oracle_self_check` dies by signal 11 with the same signature. The test is ignored and trace-gated, so no gate battery hides it today. The lane must not touch `tools/cgame-oracle/` or `crates/cgame/`. It records the follow-up under open gaps in the finished file, naming issue #59.
 
 ## Amendments
 
-None.
+**2026-09-08 - the ratification walk closed every row.** The audit is at `.claude/packets/58/step-001/audit.md` (`1f565841`), verdict GO WITH FIXES. Rows 1 through 7 are ratified as proposed, and the vet's new row lands as row 8 above. Each row above carries its folded text.
+
+**2026-09-08 - the attribution corrects.** The draft named `libgcc_s.1.1.dylib` as the owner of the dangling destructor. Both runtime images carry their own `_emutls_key` and `_emutls_destroy`, and every fault address ends in `0x17a0`, which is the offset of `_emutls_destroy` in `libstdc++.6.dylib`. The same symbol sits at `0x11a00` in `libgcc_s.1.1.dylib`. `-static-libstdc++` is the load-bearing flag, and the pair of flags stays. Commit 1's comment and the README name `libstdc++`, or both images, and never `libgcc_s` alone. The fix does not change.
+
+**2026-09-08 - the surface wording corrects.** No comment stands above `drop(module)` at `crates/jampgame/tests/referee.rs:307-308` today, so commit 2 adds one rather than edits one.
+
+**2026-09-08 - the gate timings, for the lane's planning.** `build.sh` 40 s, the referee suite 20 s, `oracle_smoke` 3 s, and the workspace tests 36 s.
