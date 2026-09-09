@@ -5,6 +5,7 @@ use mp_engine_qcommon::qfiles::light_style_limits::MAX_LIGHT_STYLES;
 use crate::render_state::image_asset::ImageHandle;
 use crate::render_state::placeholders::{Poly, PolyVert, RefEntity, TrRefdef, Vec3};
 use crate::render_state::shader_asset::ShaderHandle;
+use crate::render_state::weather_frame::WeatherFrame;
 
 /// The typed replacement for the oracle's byte-packed `renderCommandList_t`
 /// (`oracle/codemp/renderer/tr_local.h:2180-2250`): the traps that **mutate
@@ -187,6 +188,11 @@ pub enum FrameEvent {
     ///
     /// Source: `oracle/codemp/client/cl_cgame.cpp:1720-1722`
     WorldEffectCommand(String),
+    /// Raven's `RC_WORLD_EFFECTS` backend command, carrying the batch `RB_RenderWorldEffects` already built.
+    /// The oracle queues it after the scene's `RC_DRAW_SURFS`, so this event follows `RenderScene` and the pass draws over the world.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_scene.cpp:868`, `oracle/codemp/renderer/tr_cmds.cpp:291-300`
+    WorldEffects(WeatherFrame),
     /// `CG_R_AUTOMAPELEVADJ` — cgame-only; drives `g_playerHeight`.
     ///
     /// Source: `oracle/codemp/client/cl_cgame.cpp:1075-1077`

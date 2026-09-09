@@ -37,7 +37,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
-use mp_engine_qcommon::qfiles::draw_vert_t::drawVert_t;
+use mp_engine_qcommon::qfiles::draw_vert_t::{drawVert_t, MAXLIGHTMAPS};
 use mp_engine_qcommon::qfiles::md3_limits::MD3_XYZ_SCALE;
 use mp_engine_qcommon::qfiles::md3_surface_t::md3Surface_t;
 use mp_engine_qcommon::qfiles::shader_limits::SHADER_MAX_VERTEXES;
@@ -69,6 +69,7 @@ use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::render_state::shader_asset::ShaderAsset;
 use mp_renderer::render_state::shader_stage::ShaderStage;
 use mp_renderer::render_state::texture_bundle::TextureBundle;
+use mp_renderer::render_state::weather_frame::{WeatherFrame, WeatherVertex};
 use mp_renderer::tr_backend::MAX_POST_RENDERS;
 use mp_renderer::tr_bsp::{FaceVertex, SurfaceData};
 use mp_renderer::tr_curve::GridMesh;
@@ -776,6 +777,9 @@ pub struct WorldStats {
     ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:827,1168`
     pub dlight_passes: u32,
+    /// Weather billboard vertices drawn by [`Pipeline3d::draw_weather`], summed over every cloud in the frame.
+    /// A map with no weather command draws none, and a zero here on a weather map means the batch crossed empty.
+    pub weather_vertices: u32,
 }
 
 /// The shader backend the world pass draws one frame with (DEC-37 ruling 5).
@@ -862,6 +866,18 @@ struct StageDrawItem {
     ///
     /// Source: `oracle/codemp/renderer/tr_shade.cpp:2163-2169`
     screen_image: bool,
+}
+
+/// One weather cloud's draw in the concatenated weather blocks: its pipeline state, its texture, and its slice of the vertex and index runs.
+/// `WeatherCloudBatch` is the CPU payload, and this is the resolved GPU form [`Pipeline3d::draw_weather`] builds from it.
+struct WeatherRun {
+    key: PipelineKey,
+    image: Option<ImageHandle>,
+    nearest: bool,
+    alpha_func: u32,
+    first_index: u32,
+    index_count: u32,
+    base_vertex: i32,
 }
 
 /// Raven's `depthRange` switch in `RB_RenderDrawSurfList`: the depth window a
@@ -1548,6 +1564,183 @@ impl Pipeline3d {
         gpu.queue().submit(std::iter::once(encoder.finish()));
 
         stats
+    }
+
+    /// The GPU half of Raven `CWeatherParticleCloud::Render`: one draw per cloud, after the world pass, depth-tested and depth-write off.
+    /// The pass sets its own viewport and scissor from `view`, the same values the world pass used.
+    /// `SetViewportAndScissor` is retired at the CPU site.
+    /// The pass draws two-sided, which Raven asks for at `oracle/codemp/renderer/tr_WorldEffects.cpp:1362`.
+    /// The pass loads both attachments, so the world the previous pass drew stays and its depth still occludes the billboards.
+    /// Returns the vertex count drawn, which the frame stats report.
+    ///
+    /// The batch carries `WeatherFrame` order, and later clouds blend over earlier ones.
+    /// `WeatherFrame` carries no view of its own: the caller draws it under the view of the scene its event follows.
+    ///
+    /// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1311-1480`
+    pub fn draw_weather(
+        &mut self,
+        gpu: &Gpu,
+        target: &TextureView,
+        weather: &WeatherFrame,
+        view: &viewParms_t,
+        gpu_images: &mut GpuImages,
+    ) -> u32 {
+        if weather.is_empty() {
+            return 0;
+        }
+
+        // Concatenate every cloud's billboards into one vertex block and one index block, keeping each cloud's own run.
+        let mut vertices: Vec<WorldVertex> = Vec::new();
+        let mut indices: Vec<u32> = Vec::new();
+        let mut runs: Vec<WeatherRun> = Vec::new();
+        for batch in &weather.clouds {
+            if batch.indices.is_empty() {
+                continue;
+            }
+            let base_vertex = vertices.len() as i32;
+            let first_index = indices.len() as u32;
+            vertices.extend(batch.vertices.iter().map(world_vertex_from_weather));
+            indices.extend_from_slice(&batch.indices);
+            runs.push(WeatherRun {
+                key: PipelineKey {
+                    blend: blend_state_from_gls(batch.state_bits),
+                    depth_equal: false,
+                    // Neither weather blend mode sets `GLS_DEPTHMASK_TRUE`, so weather depth-tests and does not depth-write.
+                    depth_write: false,
+                    depth_bias: false,
+                },
+                image: batch.image,
+                nearest: batch.nearest_filter,
+                alpha_func: alpha_func_code(batch.state_bits),
+                first_index,
+                index_count: batch.indices.len() as u32,
+                base_vertex,
+            });
+        }
+        if runs.is_empty() {
+            return 0;
+        }
+
+        // The world pass already submitted its encoder, so these writes land after it and the reuse of both buffers is safe.
+        self.reserve_globals(gpu, 1);
+        self.write_globals(
+            gpu,
+            &[world_clip_matrix(
+                &view.world.modelMatrix,
+                &view.projectionMatrix,
+            )],
+        );
+
+        // One flags block per cloud, all of them the single-texture path, because a cloud binds one image and no lightmap.
+        self.reserve_flags(gpu, runs.len());
+        let mut flag_bytes = vec![0u8; runs.len() * SURFACE_FLAGS_STRIDE as usize];
+        for (index, run) in runs.iter().enumerate() {
+            let flags = SurfaceFlagsGpu {
+                mode: MODE_SINGLE,
+                tex_from_lightmap: 0,
+                alpha_func: run.alpha_func,
+                pbr_lit: 0,
+            };
+            let offset = index * SURFACE_FLAGS_STRIDE as usize;
+            let src = bytemuck::bytes_of(&flags);
+            flag_bytes[offset..offset + src.len()].copy_from_slice(src);
+        }
+        gpu.queue().write_buffer(&self.flags_buffer, 0, &flag_bytes);
+
+        self.reserve_dynamic(gpu, vertices.len());
+        gpu.queue()
+            .write_buffer(&self.dynamic_buffer, 0, bytemuck::cast_slice(&vertices));
+        self.reserve_dynamic_indices(gpu, indices.len());
+        gpu.queue().write_buffer(
+            &self.dynamic_index_buffer,
+            0,
+            bytemuck::cast_slice(&indices),
+        );
+
+        // Every pipeline the pass uses must exist before the pass borrows `self` immutably.
+        for run in &runs {
+            self.ensure_pipeline(gpu, run.key);
+        }
+
+        let bind_groups: Vec<wgpu::BindGroup> = runs
+            .iter()
+            .map(|run| {
+                gpu_images.weather_bind_group(gpu, &self.texture_layout, run.image, run.nearest)
+            })
+            .collect();
+
+        let mut encoder = gpu
+            .device()
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("mp_renderer_gpu weather encoder"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("mp_renderer_gpu weather pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+
+            // `viewParms_t::viewportY` carries the unflipped, 0-at-the-top y, which is what wgpu wants.
+            // Source: oracle/codemp/renderer/tr_backend.cpp:457-467
+            pass.set_viewport(
+                view.viewportX as f32,
+                view.viewportY as f32,
+                view.viewportWidth as f32,
+                view.viewportHeight as f32,
+                0.0,
+                1.0,
+            );
+            pass.set_scissor_rect(
+                view.viewportX.max(0) as u32,
+                view.viewportY.max(0) as u32,
+                view.viewportWidth.max(0) as u32,
+                view.viewportHeight.max(0) as u32,
+            );
+            pass.set_index_buffer(
+                self.dynamic_index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+            pass.set_vertex_buffer(0, self.dynamic_buffer.slice(..));
+
+            for (index, run) in runs.iter().enumerate() {
+                let pipeline = self
+                    .pipelines
+                    .get(&run.key)
+                    .expect("a weather pipeline was created for every run's key above");
+                let offset = (index as u64 * SURFACE_FLAGS_STRIDE) as u32;
+                pass.set_pipeline(pipeline);
+                pass.set_bind_group(0, &self.globals_bind_group, &[0]);
+                pass.set_bind_group(1, &bind_groups[index], &[]);
+                pass.set_bind_group(2, &self.flags_bind_group, &[offset]);
+                pass.draw_indexed(
+                    run.first_index..run.first_index + run.index_count,
+                    run.base_vertex,
+                    0..1,
+                );
+            }
+        }
+        gpu.queue().submit(std::iter::once(encoder.finish()));
+
+        vertices.len() as u32
     }
 
     /// Draws the stage items `order` names, in that order, into an open pass.
@@ -4262,6 +4455,36 @@ fn alpha_func_code(state_bits: u32) -> u32 {
     } else {
         0
     }
+}
+
+/// Converts one weather billboard vertex into the GPU vertex row, which is where the colour quantizes.
+///
+/// `qglColor4f` takes floats and the fixed-function pipeline converts them to fixed point before it interpolates.
+/// `WorldVertex` carries `[u8; 4]`, and every other billboard in the port goes through it, so the rounding lands here at one site.
+/// A weather cloud carries no lightmap and no normal, so those fields stay zero and the single-texture path never reads them.
+///
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1393-1403`
+fn world_vertex_from_weather(v: &WeatherVertex) -> WorldVertex {
+    let color = [
+        quantize_color_channel(v.color[0]),
+        quantize_color_channel(v.color[1]),
+        quantize_color_channel(v.color[2]),
+        quantize_color_channel(v.color[3]),
+    ];
+    let vert = drawVert_t {
+        xyz: v.position,
+        st: v.st,
+        lightmap: [[0.0; 2]; MAXLIGHTMAPS],
+        normal: [0.0; 3],
+        color: [color; MAXLIGHTMAPS],
+    };
+    WorldVertex::from_draw_vert(&vert)
+}
+
+/// One colour channel from the float `qglColor4f` value to the vertex row's byte: clamp, scale by 255, round to nearest.
+/// The premultiplied blend mode makes every channel depend on this rounding, so truncation would move every pixel.
+fn quantize_color_channel(channel: f32) -> u8 {
+    (channel.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 /// Whether the shader collapses bundle 0 and bundle 1 into one modulated pass.

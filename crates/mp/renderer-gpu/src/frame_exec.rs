@@ -70,7 +70,8 @@ use mp_renderer::tr_local::tr_ref_entity_t::trRefEntity_t;
 use mp_renderer::tr_local::tr_refdef_t::trRefdef_t;
 use mp_renderer::tr_local::view_parms_t::viewParms_t;
 use mp_renderer::tr_main::{
-    tr_ref_entity_from_ref_entity, DrawSurf, R_RenderView, SurfaceGeometry, TrMainScratch,
+    tr_ref_entity_from_ref_entity, DrawSurf, R_RenderView, R_RotateForViewer, R_SetupProjection,
+    SurfaceGeometry, TrMainScratch,
 };
 use mp_renderer::tr_noise::NoiseState;
 use mp_renderer::tr_public::ref_flags::RDF_NOWORLDMODEL;
@@ -117,7 +118,7 @@ pub struct FrameStats {
     /// `AddRefEntityToScene` are no longer here when a world context is
     /// supplied.
     pub skipped_scene_events: u32,
-    /// Everything else skipped (world-effect commands, automap elevation).
+    /// Everything else skipped (world-effect commands, automap elevation, a weather batch that no scene preceded).
     pub skipped_other: u32,
     /// Ref-entities the last `RenderScene` rebuilt into `tr.refdef.entities`
     /// from the accumulated `AddRefEntityToScene` payloads.
@@ -176,7 +177,9 @@ impl Warned {
             Warned::SceneEvent => {
                 "skips scene composition (lights, polys, decals) — not rendered yet"
             }
-            Warned::Other => "skips world-effect / automap commands — not rendered yet",
+            Warned::Other => {
+                "skips an automap or world-effect-command event, and skips a weather batch that no scene preceded"
+            }
             Warned::UnknownShader => "drew a pic whose shader handle is not registered — white",
             Warned::NoStageImage => "drew a stage whose image is not uploaded — white",
             Warned::NoWorldGeometry => "got a RenderScene before the world geometry uploaded",
@@ -459,6 +462,10 @@ impl FrameExecutor {
         self.scene_dlights.clear();
         self.first_scene_dlight = 0;
 
+        // The weather event carries no view of its own, so the walk keeps the refdef of the scene it follows.
+        // Source: oracle/codemp/renderer/tr_scene.cpp:868
+        let mut scene_refdef: Option<&TrRefdef> = None;
+
         for event in &frame_data.events {
             match event {
                 FrameEvent::SetColor(rgba) => {
@@ -638,11 +645,58 @@ impl FrameExecutor {
                         cvars,
                     );
 
+                    scene_refdef = Some(refdef);
+
                     // The next scene in this frame tacks on after this one, so
                     // the window starts move to the current list ends.
                     // Source: oracle/codemp/renderer/tr_scene.cpp:859-860
                     self.first_scene_entity = self.scene_entities.len();
                     self.first_scene_dlight = self.scene_dlights.len();
+                }
+
+                FrameEvent::WorldEffects(weather) => {
+                    // The oracle's `RB_RenderWorldEffects` runs under `backEnd.viewParms`, the view the scene ahead of it built.
+                    // `draw_weather` reads two derived inputs rather than carried ones.
+                    // `R_RotateForViewer` needs the refdef's own origin and axis.
+                    // `R_SetupProjection` needs the visible bounds the world walk grew, which the view state still holds.
+                    // Rebuilding both here reproduces that view without a carrier of its own.
+                    // Source: oracle/codemp/renderer/tr_main.cpp:1612-1613, oracle/codemp/renderer/tr_WorldEffects.cpp:1523-1525
+                    match scene_refdef {
+                        Some(refdef) if cvars.skip_back_end == 0 && !weather.is_empty() => {
+                            let mut view = zeroed_view_parms();
+                            view.viewportX = refdef.x;
+                            view.viewportY = refdef.y;
+                            view.viewportWidth = refdef.width;
+                            view.viewportHeight = refdef.height;
+                            view.fovX = refdef.fov_x;
+                            view.fovY = refdef.fov_y;
+                            view.ori.origin = refdef.view_origin;
+                            view.ori.axis = refdef.view_axis;
+                            view.pvsOrigin = refdef.view_origin;
+
+                            R_RotateForViewer(&mut view);
+                            view.visBounds = self.view_state.view.vis_bounds;
+                            R_SetupProjection(
+                                &mut view,
+                                refdef.rdflags,
+                                refdef.fov_x,
+                                refdef.fov_y,
+                                assets.distance_cull,
+                                cvars,
+                            );
+
+                            stats.world.weather_vertices += self
+                                .pipeline3d
+                                .draw_weather(gpu, target, weather, &view, gpu_images);
+                        }
+                        None => {
+                            // No scene came ahead of this event, so there is no view to draw it under.
+                            // The counter matches the sibling arm that shares this warning slot.
+                            stats.skipped_other += 1;
+                            self.warn_once(Warned::Other);
+                        }
+                        _ => {}
+                    }
                 }
 
                 FrameEvent::AddRefEntityToScene(re) => {

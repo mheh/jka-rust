@@ -34,9 +34,11 @@ use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::mark_fragment::markFragment_t;
 use mp_qshared::shared::qhandle_t;
 use mp_renderer::render_state::frame_data::FrameData;
+use mp_renderer::render_state::frame_event::FrameEvent;
 use mp_renderer::render_state::bmodel_table::BModelTable;
 use mp_renderer::render_state::render_cvar_snapshot::RenderCvarSnapshot;
 use mp_renderer::renderer_frontend::RendererFrontend;
+use mp_renderer::tr_cmds::RE_RenderWorldEffects;
 use mp_renderer::tr_local::srf_terrain_s::srfTerrain_t;
 use mp_renderer::tr_marks::R_MarkFragments;
 use mp_renderer::tr_model::render_models::RenderModels;
@@ -688,6 +690,290 @@ fn duel1_dlights(host: &mut UiHost, frame_data: &mut FrameData, eye: [f32; 3]) {
             color[1],
             color[2],
             additive,
+        );
+    }
+}
+
+/// The three effect strings `SP_CreateSnow` registers, in its own order.
+/// `ctf2` carries two `fx_snow` entities, and the doubling is inert because a string already registered returns its existing index.
+/// Without `constantwind` the global wind velocity is zero and the snow falls straight down, which is not the retail picture.
+///
+/// Source: `oracle/codemp/game/g_misc.c:2522-2527`
+const CTF2_WEATHER_COMMANDS: [&str; 3] = ["snow", "fog", "constantwind (100 100 -100)"];
+
+/// The two fixed generator seeds the fixture pins.
+/// `Rng::srand` seeds the C runtime state alone and `Rng::Rand_Init` seeds `holdrand`, and weather draws from both.
+/// The `holdrand` stream is live on this path, because the `snow` preset sets `mRotationChangeNext` to zero.
+/// The live path keeps Raven's wall-clock seed, `srand(Com_Milliseconds())`, because the reseed is fixture-only.
+///
+/// Source: `oracle/codemp/renderer/tr_WorldEffects.cpp:1491,1811`
+const WEATHER_SEED_CRT: u32 = 12345;
+const WEATHER_SEED_HOLDRAND: i32 = 6789;
+
+/// The weather fixture's step count and step length in milliseconds.
+/// The rig renders one frame, and the particle system needs many updates before the fade reaches its ceiling and the flakes spread out.
+/// `RE_RenderScene` derives `frametime` from the delta between calls, so the clock advances by one step per call.
+///
+/// Source: `crates/mp/renderer/src/tr_scene.rs:1248-1249`
+const WEATHER_STEPS: i32 = 60;
+const WEATHER_STEP_MS: i32 = 33;
+
+/// Issues one `R_WorldEffectCommand` against the booted host.
+///
+/// The rig runs no game and no cgame, so it calls the parser directly, the way the marks fixture calls `RE_RegisterShader` directly.
+/// The destructuring matches `boot::load_world`'s own split, which is what lets one `host` hand the call every receiver it takes.
+fn weather_command(host: &mut UiHost, command: &str) {
+    let re_ptr: *mut RendererFrontend = &mut host.re;
+    let UiHost {
+        engine,
+        models,
+        re:
+            RendererFrontend {
+                cvars,
+                sim,
+                img_state,
+                qs,
+                world_effects,
+                ..
+            },
+        ..
+    } = host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+    world_effects.R_WorldEffectCommand(
+        qs,
+        &mut view,
+        cvars,
+        Arc::make_mut(&mut sim.published),
+        models,
+        img_state,
+        Some(command.as_bytes()),
+    );
+}
+
+/// Steps the weather once for the scene `frame_data` just recorded, and appends the batch event.
+///
+/// This takes the refdef `RE_RenderScene` sealed off the last event and calls `RE_RenderWorldEffects`, which is the trap arm's shape minus its guard.
+/// The arms also compare the event count across the call, so a scene that pushed nothing cannot hand the weather step an earlier scene's refdef.
+/// The fixture needs no such guard, because it holds `r_norefresh` at its default and every step records a scene.
+/// The guard therefore has no coverage here, and live play verifies it.
+///
+/// Source: `oracle/codemp/renderer/tr_scene.cpp:868`
+fn step_weather(host: &mut UiHost, frame_data: &mut FrameData) {
+    let scene_refdef = match frame_data.events.last() {
+        Some(FrameEvent::RenderScene { refdef, .. }) => Some(refdef.clone()),
+        _ => None,
+    };
+    let Some(refdef) = scene_refdef else {
+        panic!("the weather step must follow a recorded scene");
+    };
+
+    let re_ptr: *mut RendererFrontend = &mut host.re;
+    let UiHost {
+        engine,
+        models,
+        re: RendererFrontend {
+            sim, world_effects, ..
+        },
+        ..
+    } = host;
+    let models_ptr: *mut RenderModels = &mut *models;
+    let Engine { common, cm, sv, .. } = &mut **engine;
+    let sv_ptr: *mut () = sv as *mut Server as *mut ();
+    let mut view = boot::host_view(common, cm, sv_ptr, models_ptr, re_ptr);
+    RE_RenderWorldEffects(
+        frame_data,
+        world_effects,
+        &sim.published,
+        &refdef,
+        &mut view,
+    );
+}
+
+/// The weather fixture: the `ctf2` spawn view under the snow and fog `SP_CreateSnow` builds.
+///
+/// `ctf2` is the one stock MP map that ships weather.
+/// Its entity lump carries two `fx_snow` entities and three `misc_weather_zone` brushes.
+/// The rig loads no collision world and runs no cgame, so the point cache reads every cell as outside, and the zone list falls back to the whole map.
+/// Both are rig properties.
+/// This golden proves the draw path and byte stability, and it proves nothing about zone or cache behavior.
+///
+/// Source: `oracle/codemp/game/g_misc.c:2522-2527`, `oracle/codemp/renderer/tr_WorldEffects.cpp:1798,1879`
+#[test]
+#[ignore = "needs retail assets and a GPU; run locally with --ignored"]
+fn golden_world_weather_ctf2() {
+    let stem = "world_weather_ctf2";
+
+    // ---- boot and load the world ---------------------------------------
+    let mut cfg = BootConfig::default();
+    if let Ok(basepath) = std::env::var("JKA_BASEPATH") {
+        cfg.basepath = basepath;
+    }
+    let mut host = boot::boot(&cfg);
+    let (loaded, _land_scape): (bool, srfTerrain_t) =
+        boot::load_world(&mut host, "maps/mp/ctf2.bsp");
+    assert!(loaded, "maps/mp/ctf2.bsp did not load");
+
+    host.re.frame.view_cluster = -1;
+    Arc::make_mut(&mut host.re.sim.published).registered = true;
+
+    let eye = host
+        .re
+        .sim
+        .published
+        .world
+        .as_ref()
+        .and_then(|w| boot::find_spawn_origin(&w.entity_string))
+        .map(|o| [o[0], o[1], o[2] + EYE_HEIGHT])
+        .unwrap_or([0.0, 0.0, 0.0]);
+
+    // ---- pin both generator streams, build the weather, pin them again ---
+    // The first pin covers the commands themselves.
+    // `CWeatherParticleCloud::Initialize` picks every particle's `mMass` off the C runtime stream, and it runs inside `R_WorldEffectCommand`.
+    // The snow and fog commands therefore take 1060 draws before the second pin.
+    // Mass divides the force, so an unpinned draw here gives each particle its own fall rate and the image moves.
+    // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:928-935
+    host.re.world_effects.rng.srand(WEATHER_SEED_CRT);
+    host.re.world_effects.rng.Rand_Init(WEATHER_SEED_HOLDRAND);
+
+    for command in CTF2_WEATHER_COMMANDS {
+        weather_command(&mut host, command);
+    }
+    assert_eq!(
+        host.re.world_effects.mParticleClouds.len(),
+        2,
+        "the snow and fog commands must each build a particle cloud",
+    );
+    assert_eq!(
+        host.re.world_effects.mWindZones.len(),
+        1,
+        "the constantwind command must build one global wind zone",
+    );
+    // The second pin keeps the stepped stream independent of how many draws the command path took.
+    host.re.world_effects.rng.srand(WEATHER_SEED_CRT);
+    host.re.world_effects.rng.Rand_Init(WEATHER_SEED_HOLDRAND);
+
+    // ---- step the weather, keeping the last frame for the draw ----------
+    // The first step builds the point cache and draws nothing, which the oracle does too.
+    // Source: oracle/codemp/renderer/tr_WorldEffects.cpp:1544-1547
+    let mut frame_data = FrameData { events: Vec::new() };
+    for step in 0..WEATHER_STEPS {
+        let mut refdef = build_refdef(eye, [0.0, 0.0, 0.0]);
+        refdef.time = FROZEN_TIME_MS + step * WEATHER_STEP_MS;
+        frame_data = FrameData { events: Vec::new() };
+        record_scene(&mut host, &refdef, &mut frame_data);
+        step_weather(&mut host, &mut frame_data);
+    }
+
+    // ---- headless GPU and the render resources -------------------------
+    let mut gpu = Gpu::new_headless(GOLDEN_WIDTH, GOLDEN_HEIGHT);
+    let mut images = GpuImages::new(&gpu);
+    let mut executor = FrameExecutor::new(&gpu, &images);
+    let bmodel_table = BModelTable::build(&host.models);
+    let assets = &host.re.sim.published;
+    if let Some(world) = assets.world.as_ref() {
+        executor.set_world(&gpu, world, &assets.bsp_models, bmodel_table);
+    }
+
+    let target = gpu.headless_view();
+    let target_texture = gpu.headless_texture().clone();
+    gpu.clear_headless(&target);
+    let float_time = FROZEN_TIME_MS as f32 * 0.001;
+
+    let _uploaded = images.upload_pending(&mut gpu, &mut host.re.img_state, &host.re.sim.published);
+
+    {
+        if let Some(blocks) = host.models.publish_blocks() {
+            host.re.sim.publish_models(blocks);
+        }
+        let pinned = Arc::clone(&host.re.sim.published);
+        let UiHost {
+            re:
+                RendererFrontend {
+                    world_load,
+                    img_state,
+                    noise,
+                    ..
+                },
+            ..
+        } = &mut host;
+
+        let stats = executor.execute_frame(
+            &mut gpu,
+            &target,
+            &target_texture,
+            &frame_data,
+            &pinned,
+            world_load,
+            img_state.pending_uploads.drain().collect(),
+            &mut images,
+            noise,
+            float_time,
+            RenderCvarSnapshot::default(),
+        );
+
+        println!(
+            "{stem}: {} weather vertices over {} world draw calls",
+            stats.world.weather_vertices, stats.world.draw_calls,
+        );
+        assert!(
+            stats.world.surfaces_drawn > 0,
+            "no world surface drawn: stats.world = {:?}",
+            stats.world,
+        );
+        // An empty batch would bless the plain ctf2 room, so the counter gates the golden.
+        assert!(
+            stats.world.weather_vertices > 0,
+            "no weather vertex drawn: stats.world = {:?}",
+            stats.world,
+        );
+    }
+
+    // ---- read the pixels back ------------------------------------------
+    let (width, height, actual) = read_target_rgba(&gpu);
+    assert_eq!(width, GOLDEN_WIDTH);
+    assert_eq!(height, GOLDEN_HEIGHT);
+
+    let golden = golden_path(stem);
+    if std::env::var("JKA_GOLDEN_BLESS").as_deref() == Ok("1") {
+        write_png(&golden, width, height, &actual);
+        println!(
+            "{stem}: blessed {} ({} bytes)",
+            golden.display(),
+            std::fs::metadata(&golden).map(|m| m.len()).unwrap_or(0),
+        );
+        return;
+    }
+
+    assert!(
+        golden.exists(),
+        "golden missing at {}; run once with JKA_GOLDEN_BLESS=1 to write it",
+        golden.display(),
+    );
+    let (gw, gh, golden_bytes) = read_png(&golden);
+    assert_eq!(
+        (gw, gh),
+        (width, height),
+        "golden size does not match the rendered size",
+    );
+    assert_eq!(
+        golden_bytes.len(),
+        actual.len(),
+        "golden byte count does not match the rendered byte count",
+    );
+
+    let (differing_pixels, max_delta) = compare(&golden_bytes, &actual);
+    if differing_pixels > 0 {
+        let actual_out = actual_path(stem);
+        write_png(&actual_out, width, height, &actual);
+        panic!(
+            "world golden mismatch: {} pixels differ, max channel delta {}; \
+             wrote actual image to {}",
+            differing_pixels,
+            max_delta,
+            actual_out.display(),
         );
     }
 }
