@@ -55,7 +55,9 @@ brew install gcc        # provides g++-16 (or -15/-14/-13)
 
 ### The gcc runtime links statically
 
-The link line carries `-static-libgcc -static-libstdc++`. The Homebrew gcc runtime images are `libstdc++.6.dylib` and `libgcc_s.1.1.dylib`, and each one registers a thread-specific-data key whose destructor is `emutls_destroy`. The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered. The child then called that destructor in unmapped memory and died with SIGSEGV. With the static link the artifact depends on `/usr/lib/libSystem.B.dylib` alone, and nothing registers the key. Check it with `otool -L build/liboraclejampgame.dylib`. The harness also keeps the module mapped to thread exit now, which is belt and braces. The static link is the root fix.
+The link line carries `-static-libgcc -static-libstdc++`. The Homebrew gcc runtime images are `libstdc++.6.dylib` and `libgcc_s.1.1.dylib`, and each one registers a thread-specific-data key whose destructor is `emutls_destroy`. The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered. The child then called that destructor in unmapped memory and died with SIGSEGV. With the static link the artifact depends on `/usr/lib/libSystem.B.dylib` alone, and nothing registers the key.
+
+Check it with `otool -L build/liboraclejampgame.dylib`. The harness also keeps the module mapped to thread exit now, as a second guard. The static link is the root fix.
 
 A gcc version pin does not help here. The install name the linker records goes through the `gcc/current` symlink, so an artifact built under gcc 15 loads the gcc 16 runtime at load time.
 

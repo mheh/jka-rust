@@ -27,7 +27,7 @@
 # The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered.
 # The child then called that destructor in unmapped memory and died with SIGSEGV.
 # The static link removes both images from the artifact, and the module then depends on libSystem alone.
-# The harness also keeps the module mapped to thread exit now, which is belt and braces.
+# The harness also keeps the module mapped to thread exit now, as a second guard.
 # The static link is the root fix.
 set -eu
 cd "$(dirname "$0")"
