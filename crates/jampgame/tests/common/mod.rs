@@ -1151,6 +1151,11 @@ fn run_lifecycle(dylib: PathBuf) {
         );
         eprintln!("=================================\n");
     });
+
+    // `GAME_SHUTDOWN` ran above, so the module is finished with its work.
+    // A `dlclose` before the engine thread exits can strand a thread-specific-data destructor in unmapped memory.
+    // The whole lifecycle runs once per process, so the mapping costs nothing.
+    std::mem::forget(module);
 }
 
 /// The stem of a platform cdylib filename — the part the loader recombines with

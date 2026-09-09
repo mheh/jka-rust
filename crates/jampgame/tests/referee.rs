@@ -305,7 +305,10 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
     }
 
     referee_vm_call(vm, MpGameExport::GAME_SHUTDOWN, &[0]);
-    drop(module);
+    // `GAME_SHUTDOWN` runs above, so the module is finished with its work.
+    // A `dlclose` before the engine thread exits can strand a thread-specific-data destructor in unmapped memory.
+    // Each child process runs one drive and exits, so the mapping costs nothing.
+    std::mem::forget(module);
     snaps
 }
 
