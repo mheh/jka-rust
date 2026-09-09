@@ -255,3 +255,162 @@ Commit 3 names no gate.
 6. The claim in commit 2's body that "the smoke lifecycle runs once per process because of the module's own singletons". The vet confirmed that `run_lifecycle` has one call site on one spawned thread. It did not test a second in-process lifecycle, so the singleton reason is unchecked.
 7. The long-run leak posture of `std::mem::forget(module)`. `LoadedModule` holds a `libloading::Library` and a function pointer, so the leak is the mapping alone. The vet did not measure a process that drives many modules, because no such path exists in these two tests today.
 8. The `~/Developer/jka/` asset reads the real-map scenarios make. The vet ran them and they passed. It did not inspect that directory.
+
+---
+
+# Rewalk 2026-09-08 - after the fix round
+
+The branch was rewritten in place. The rewalk covers `a2168bf9` (commit 2, body only), `329e47e3`, `d890bcc6`, and `c2b8f7f1`, with the same eight duties. The vet did not open `finished.md` at either revision. The vet does not approve.
+
+Finding count for the rewalk: 2. Both are style findings on added prose. F3, F4, F5, and F6 are repaired. F1, F2, and N1 are closed by the packet amendment.
+
+**Commit 2 moved no tree.** `git diff ea136782 a2168bf9 --stat` prints nothing. The rewrite is a message rewrite, so every gate result in the first walk still applies to that tree.
+
+## 1. Letter violations
+
+None. The packet's current Amendments, added by `c2b8f7f1`, close F1 and F2 as they stand and correct the `:922` cite to `crates/jampgame/tests/common/mod.rs:1151-1156`. The fix round adds no `pub` item, no type, no constant, no test, no cvar, no `FrameEvent` variant, no engine hook, no trap or dispatcher arm, and no `#[repr]` layout. It adds one dependency-free import per file, `use std::mem::forget;`, which is a module-scope import of an existing `std` symbol and not a new crate dependency. Every changed file sits inside the write scopes, `.claude/packets/58/step-001/` included.
+
+## 2. Oracle divergences
+
+None. The packet still cites no Raven `oracle/**` line, and the fix round changes two comments, two call expressions, one README paragraph, and one commit message. No ported logic, float width, operator, evaluation order, macro argument, constant, or side effect changes. `forget(module)` and `std::mem::forget(module)` are the same call.
+
+## 3. The named hunks
+
+**Hunk F - the two `forget` call sites and their imports.**
+
+```rust
+ mod common;
+ 
++use std::mem::forget;
+ use std::path::{Path, PathBuf};
+```
+
+```rust
+     // Each child process runs one drive and exits, so the mapping costs nothing.
+-    std::mem::forget(module);
++    forget(module);
+     snaps
+```
+
+```rust
+ use std::ffi::{c_char, c_int, c_short, c_void, CStr, CString};
++use std::mem::forget;
+ use std::path::{Path, PathBuf};
+```
+
+```rust
+-    // `GAME_SHUTDOWN` ran above, so the module is finished with its work.
++    // `GAME_SHUTDOWN` runs above, so the module is finished with its work.
+     // A `dlclose` before the engine thread exits can strand a thread-specific-data destructor in unmapped memory.
+     // The whole lifecycle runs once per process, so the mapping costs nothing.
+-    std::mem::forget(module);
++    forget(module);
+```
+
+Each import merges into the file's existing `std` group in alphabetical order, and neither file gains a second use block. No import sits inside a function body.
+
+**Hunk G - the `build.sh` header correction.**
+
+```
+-# The referee harness unloads the module before its engine thread exits, so the child calls that destructor in unmapped memory and dies with SIGSEGV.
++# The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered.
++# The child then called that destructor in unmapped memory and died with SIGSEGV.
+ # The static link removes both images from the artifact, and the module then depends on libSystem alone.
++# The harness also keeps the module mapped to thread exit now, which is belt and braces.
++# The static link is the root fix.
+```
+
+**Hunk H - the README correction.** The subsection's first paragraph is replaced whole. Its new third and fourth sentences read "The referee harness once dropped the module on its engine thread, which unloaded both images with the destructor still registered. The child then called that destructor in unmapped memory and died with SIGSEGV." Its new last two sentences read "The harness also keeps the module mapped to thread exit now, which is belt and braces. The static link is the root fix." See F7.
+
+**Hunk I - the packet amendment.** `c2b8f7f1` appends one dated block with four bullets to `packet.md`. It edits no earlier line, so the packet's earlier `:922` cite still stands in the body and the amendment corrects it below, which is the ledger's own pattern.
+
+## 4. The inventories
+
+**Files changed by the fix round.**
+
+| file | commit | scope status |
+| --- | --- | --- |
+| `crates/jampgame/tests/referee.rs` | `329e47e3` | writable |
+| `crates/jampgame/tests/common/mod.rs` | `329e47e3` | writable |
+| `tools/referee-oracle/README.md` | `329e47e3` | writable |
+| `tools/referee-oracle/build.sh` | `329e47e3` | writable |
+| `.claude/packets/58/step-001/finished.md` | `d890bcc6` | writable, not opened |
+| `.claude/packets/58/step-001/packet.md` | `c2b8f7f1` | writable |
+
+The whole range now touches seven files. No file outside the write scopes changed at any revision. `oracle/`, `crates/mp/`, `crates/sp/`, `crates/native/`, `tools/cgame-oracle/`, and `crates/cgame/` are untouched. The other lane's stash is intact. The working tree is clean after the full battery.
+
+**Commits against the bundle.** The bundle plans three commits. The branch carries seven. The four extra commits are the lane-review ceremony: the vet, the fix round, the finished-file update, and the packet amendment. The current Amendments name every one of them, so the widening is authorized by the ratified packet and is not a finding. The two `fix` commits keep their planned subjects, and the code content of the bundle is unchanged in kind: commit 1 is untouched, and commit 2's tree is byte-identical to the walked one.
+
+**Commit messages.** Each of the four new commits carries a heading subject in the lane's form, an unwrapped STE body, no semicolon, no em dash, no contraction, and no trailer of any kind. All six rewritten or new commits report `N` for the signature field, which `--no-gpg-sign` produces. `f9dfa968` is the earlier vet report, and `git diff f9dfa968 gh58-step-001-referee-rig -- .claude/packets/58/step-001/vet.md` prints nothing, so the rebase did not alter the report's text.
+
+## 5. Repo mechanics on added lines
+
+- No `use` declaration inside a function body. Both new imports sit at the file top, in the existing `std` group. F4 is repaired.
+- No `todo!()` and no other placeholder.
+- No newly ported item, so no oracle `Source:` cite is owed.
+- No extern forward-declaration block.
+- No `format!` call, so no wire string is built.
+- No inline fully-qualified path in an expression on any added line. Both call sites now read `forget(module);`.
+- `cargo test --no-run -p jampgame` prints no warning, so neither import is unused in any test binary that includes `common/mod.rs`.
+
+## 6. House-style violations on added lines
+
+Clean on the mechanical checks. No em dash on any added line, no semicolon in any added prose sentence, no contraction, no banned-voice construction, no lowercase sentence start, and no line over 150 columns. The longest added comment line is 132 columns. Every added comment line ends a sentence.
+
+**F7 - the README paragraph passes the six-sentence cap.** STE's STRUCTURE rule sets it: "One topic per paragraph, max six sentences." The rewritten paragraph carries eight sentences, from "The link line carries `-static-libgcc -static-libstdc++`." through "The static link is the root fix." The reader also meets the instruction "Check it with `otool -L build/liboraclejampgame.dylib`." in position six, with two more statements after it. The added material belongs in a second paragraph, or after the pin paragraph.
+
+**F8 - an idiom on four added lines.** "which is belt and braces" appears in `tools/referee-oracle/build.sh` and in `tools/referee-oracle/README.md`, and the phrase carries a figurative meaning that STE's WORDS rule does not admit. A plain form is "which is a second guard", the term commit 2's own body already uses. The packet uses "belt and braces" in row 1 and in its Amendments, so the lane took the word from its brief. The vet reports the conflict and does not waive it.
+
+## 7. The gate battery, re-run
+
+The vet re-ran commit 2's four gates with the packet's exact invocations, on the branch head `c2b8f7f1`, alone on the rig.
+
+**Gate 1.** `cargo build --workspace`
+
+```
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.41s
+```
+
+Both test files were touched first, so the two changed targets rebuilt. No warning appeared.
+
+**Gate 2.** `cargo test -p jampgame --test referee -- --ignored --test-threads=1`
+
+```
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 18.04s
+```
+
+Nine of nine. No crash finding.
+
+**Gate 3.** `cargo test -p jampgame --test oracle_smoke -- --ignored --test-threads=1`
+
+```
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+**Gate 4.** `cargo test --workspace -- --test-threads=1`
+
+Exit status 0. 138 result blocks, all `ok`, 530 tests passed, 0 failed. The tree is clean after the run.
+
+Commit 1's gates were not re-run in this rewalk. `329e47e3` changes only comment text in `build.sh`, and the link commands are byte-identical to the walked ones.
+
+## The finding dispositions
+
+- **F1**, ratified as it stands by the amendment. The pointer comment above the `case "$OS"` block is an accepted third site. Closed.
+- **F2**, ratified as it stands by the amendment. The three-sentence comment blocks stand. Closed.
+- **F3**, repaired in `329e47e3`. Both sentences are in the past tense and both are true of the merged tree, and both files also record the present behavior. Verified against the source at `tools/referee-oracle/build.sh:27-31` and `tools/referee-oracle/README.md:58`.
+- **F4**, repaired in `329e47e3`. `use std::mem::forget;` sits in each file's top `std` group, and both call sites read `forget(module);`. No unused-import warning appears.
+- **F5**, repaired in `a2168bf9`. The body now reads "`GAME_SHUTDOWN` still runs on the line above. The module therefore completes its work, and only its mapping remains." The sentence carries a meaning.
+- **F6**, repaired in `329e47e3`. Both comment blocks now open with "`GAME_SHUTDOWN` runs above, so the module is finished with its work."
+- **N1**, corrected in the packet's Amendments to `crates/jampgame/tests/common/mod.rs:1151-1156`.
+- **F7** and **F8** are open and new.
+
+## 8. The unverified list
+
+1. `.claude/packets/58/step-001/finished.md`, at both `8fed1292` and `d890bcc6`, now 77 lines. The vet is barred from opening it. Its fix-round section, its commit list, its gate table, and its open-gaps section are unchecked. The vet confirmed only the path, the line counts, and the two commits that carry it.
+2. The Linux link arm, still untested. No Linux host is available here.
+3. The ablation of the two fixes, still not run separately by this vet.
+4. The size comparison against a pristine dynamic artifact, still not built by this vet.
+5. The attribution of the dangling destructor to `libstdc++.6.dylib`, still not re-derived from a live fault.
+6. The claim that the smoke lifecycle runs once per process because of the module's own singletons, carried over unchanged into `a2168bf9`'s body. The vet confirmed one call site on one spawned thread and did not test a second in-process lifecycle.
+7. Commit 1's five gates in this rewalk. Only the comment text in `build.sh` changed, and the vet compared the link commands rather than rebuilding the artifact.
+8. The reflog and fixture set. The vet observed a clean tree after every run and did not hash the committed reflogs.
